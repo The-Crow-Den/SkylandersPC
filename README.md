@@ -17,7 +17,8 @@ baseline launcher. See [current boot evidence](docs/CUSTOM_BOOT_PROGRESS_2026102
 [service contracts and priorities](docs/SYSTEM_CALL_CONTRACTS.md), and the
 [709-import inventory](docs/SYSTEM_CALL_INVENTORY.md).
 
-Optional graphical launcher: `python3 tools/launcher.py` (PyQt6). See
+Optional graphical launcher: `python3 tools/launcher.py` (PyQt6), or the
+[standalone AppImage](docs/STANDALONE_LAUNCHER.md) without Python packages. See
 [launcher controls and validation](docs/PC_LAUNCHER.md) and the
 [active PC experience goal](docs/PC_EXPERIENCE_GOAL.md).
 

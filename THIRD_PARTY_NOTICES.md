@@ -26,6 +26,9 @@ Upstream source headers and additional nested notices remain authoritative.
 | PyQt6 | GPL v3 or separate commercial license | Python launcher uses PyQt6, not PySide; this project uses the GPL route |
 | PyQt6-sip | BSD-2-Clause | Python binding support |
 | Qt | Module-specific GPL/LGPL/commercial and third-party terms | System GUI libraries; bundled Qt needs a separate module inventory |
+| CPython (python-build-standalone) | PSF-2.0 and bundled-library notices | Interpreter in the optional standalone launcher AppImage only |
+| cryptography / cffi / pycparser | Apache-2.0 or BSD-3-Clause / MIT-0 / BSD-3-Clause | Python packages in the standalone launcher AppImage |
+| AppImage type-2 runtime / appimagetool | MIT | Build tool and runtime of the standalone launcher AppImage |
 | Pillow | Full Pillow notice retained | Optional one-time image import tools |
 | FFmpeg | Build-dependent LGPL/GPL terms | Native provider links installed libav*; inspect the exact binary build before bundling |
 | OpenSSL libcrypto | Apache-2.0 | Read-only trap save metadata decoding; system dependency |
