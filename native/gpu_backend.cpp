@@ -448,8 +448,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
             // SDL_APP_ID from the launcher environment takes precedence.
             SDL_SetHint(SDL_HINT_APP_ID,"org.skylanders.PS4Native");
             const auto* build = GameHooks::active();
-            const auto title = (build ? std::string(build->window_title) : "PS4 native runtime — " + game_serial) +
-                " (custom native runtime)";
+            const auto title = build ? std::string(build->window_title) : "PS4 native runtime — " + game_serial;
             const BbGpuConfig config{title.c_str(), game_serial.c_str(), gpu_user_directory.c_str(),
                 sdk_version, psf_attributes, window_width, window_height};
             if (bbgpu_init(&config)) throw std::runtime_error("Vulkan presenter initialization failed");
