@@ -105,11 +105,13 @@ class LauncherUITests(unittest.TestCase):
         self.window.select_game('imaginators')
         self.assertIn('INSTALL',self.window.primary.text())
         self.assertEqual(self.window.canvas.game['id'],'imaginators')
-        self.window.library['figures']=['figure.sky'];self.window.library['portal']='figure.sky'
+        figure=self.root/'figure.sky';figure.write_bytes(bytes(1024))
+        self.window.library['portal']=str(figure)
         self.window.persist()
         from tools.launcher_library import load
         saved=load(self.window.library_path)
-        self.assertEqual(saved['selected'],'imaginators');self.assertEqual(saved['portal'],'figure.sky')
+        self.assertEqual(saved['selected'],'imaginators');self.assertEqual(saved['portal'],str(figure))
+        figure.unlink();self.assertIsNone(load(self.window.library_path)['portal'])
 
     def test_per_game_launch_keeps_universal_preferences(self):
         from tools import launcher_model
@@ -124,6 +126,48 @@ class LauncherUITests(unittest.TestCase):
         self.assertTrue(captured[0]['fullscreen'])
         self.assertEqual(self.window.values(),universal)
         self.assertEqual(launcher_model.load(self.window.preferences),universal)
+
+    def test_in_game_controller_choices_load_and_survive_launch(self):
+        pc=self.root/'out/pc-settings.json';pc.parent.mkdir(parents=True,exist_ok=True)
+        pc.write_text(json.dumps({'resolution':'1080p','quality':'high','fullscreen':True,'fps_counter':True,'frame_limit':30,
+                                  'frame_policy':'auto','portal_volume':30,'controller_layout':'keyboard-and-pad','controller_glyphs':'xbox'}))
+        window=Launcher(self.root)
+        try:
+            window.select_game('trap-team')
+            with patch('tools.launcher_model.command',return_value=['python3','-c','pass']):
+                window.launch()
+            self.wait(lambda:window.process is None)
+            saved=json.loads(pc.read_text())
+            self.assertEqual(saved['controller_layout'],'keyboard-and-pad')
+            self.assertEqual(saved['controller_glyphs'],'xbox')
+        finally:
+            window.close()
+
+    def test_skylanders_manager_edits_and_places_figures(self):
+        from test_figure_data import SEED, played
+        from tools import figure_data
+        assets=self.root/'.local/portal-assets';assets.mkdir(parents=True)
+        (assets/'trap-metadata.seed').write_bytes(SEED);(assets/'figure-names.json').write_text(json.dumps({'14:0':'Gill Grunt','16:0':'Spyro'}))
+        library=self.root/'out/portal-library/characters';library.mkdir(parents=True)
+        (library/'created-water.sky').write_bytes(played(gold=100))
+        (library/'created-fresh.sky').write_bytes(figure_data.blank(16,0))
+        self.window.manager();page=self.window.portal_page
+        self.assertIs(self.window.views.currentWidget(),page)
+        self.assertEqual([e.name for e in page.entries],['Gill Grunt','Spyro'])
+        page.list.setCurrentRow(1)
+        self.assertFalse(page.gold.isEnabled());self.assertFalse(page.notice.isHidden())
+        page.list.setCurrentRow(0)
+        self.assertFalse(page.save_button.isEnabled())
+        page.nickname.setText('Splashy');page.level.setValue(12);page.gold.setValue(4321)
+        self.assertTrue(page.save_button.isEnabled())
+        page.save()
+        saved=figure_data.Figure((library/'created-water.sky').read_bytes(),SEED)
+        self.assertEqual((saved.nickname,saved.level,saved.gold),('Splashy',12,4321))
+        self.assertTrue(any((self.root/'out/figure-backups').iterdir()))
+        page.toggle_portal()
+        self.assertEqual(self.window.library['portal'],str(library/'created-water.sky'))
+        self.assertEqual(self.window.fields['figure'].text(),str(library/'created-water.sky'))
+        page.close_page();self.assertIs(self.window.views.currentWidget(),self.window.canvas)
 
     def test_loading_wheel_and_stop_until_game_window(self):
         self.window.select_game('trap-team')

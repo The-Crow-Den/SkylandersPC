@@ -28,6 +28,11 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def launcher_icon(root):
+    folder = Path(root) / '.local/app-icon'
+    return folder / 'launcher.png' if (folder / 'launcher.png').is_file() else folder / 'crystal@2x.png'
+
+
 class Launcher(QMainWindow):
     def __init__(self, root=ROOT):
         super().__init__()
@@ -37,7 +42,7 @@ class Launcher(QMainWindow):
         self.stopping = False
         self.output_buffer = ''
         self.setWindowTitle('Trap Team · PC')
-        icon=self.root/'.local/app-icon/crystal@2x.png'
+        icon=launcher_icon(self.root)
         if icon.is_file():
             from PyQt6.QtGui import QIcon
             self.setWindowIcon(QIcon(str(icon)))
@@ -141,7 +146,10 @@ class Launcher(QMainWindow):
 
     def apply_values(self, value):
         for key, selected in value.items():
-            field = self.fields[key]
+            # In-game-only choices (e.g. controller layout) have no launcher field.
+            field = self.fields.get(key)
+            if field is None:
+                continue
             if isinstance(field, QComboBox):
                 field.setCurrentIndex(field.findData(selected))
             elif isinstance(field, QCheckBox):
@@ -223,7 +231,12 @@ class Launcher(QMainWindow):
             model.save(self.preferences, value)
             pc_path = self.root / 'out/pc-settings.json'
             pc_path.parent.mkdir(parents=True, exist_ok=True)
-            save_settings(pc_path, {key: value[key] for key in model.PC_KEYS})
+            try:
+                pc_value = load_settings(pc_path)
+            except (OSError, ValueError, TypeError):
+                pc_value = {}
+            pc_value.update({key: value[key] for key in model.PC_KEYS})
+            save_settings(pc_path, pc_value)
             argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None))
         except (OSError, ValueError, TypeError) as error:
             QMessageBox.warning(self, 'Cannot start Trap Team', str(error))
@@ -319,8 +332,9 @@ Launcher = renovated(Launcher)
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName('Skylanders Portal Library')
-    app.setDesktopFileName('org.skylanders.TrapTeam')
-    icon=ROOT/'.local/app-icon/crystal@2x.png'
+    # Its own identity, so desktops show the launcher icon rather than the game's.
+    app.setDesktopFileName('org.skylanders.Launcher')
+    icon=launcher_icon(ROOT)
     if icon.is_file():
         from PyQt6.QtGui import QIcon
         app.setWindowIcon(QIcon(str(icon)))

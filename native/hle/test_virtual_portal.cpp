@@ -119,6 +119,9 @@ int main() {
         {std::ifstream f(generated,std::ios::binary);check(bool(f.read(reinterpret_cast<char*>(made.data()),made.size())));}
         check(made[0x10]==14 && made[0x11]==0 && made[0x1c]==0 && made[0x1d]==0);
         check(made[4]==(made[0]^made[1]^made[2]^made[3]));
+        // A collection tag chosen as the starting figure is used in place, not copied.
+        check(PortalLibrary::import_character(generated.c_str(),false));
+        check(sky_portal_count(0)==before_count+1);
         unsigned crc=0xffff;
         for(unsigned i=0;i<0x1e;++i) {
             crc^=unsigned(made[i])<<8;

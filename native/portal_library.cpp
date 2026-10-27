@@ -115,6 +115,13 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         kind=is_item(id)?2:0;
         auto& collection=kind==2?items:characters;
         if(id>=210&&id<=220){feedback="This is a trap. Use the villain collection for dedicated traps.";return false;}
+        // A tag already in the collection (e.g. a created figure chosen as the
+        // starting Skylander) is used in place, never imported a second time.
+        std::error_code source_error;const auto source=fs::weakly_canonical(path,source_error);
+        if(!source_error&&source.parent_path()==root/"characters")
+            for(unsigned i=0;i<collection.size();++i)if(collection[i].file==source)index=static_cast<int>(i);
+        if(index>=0){if(!select_after){(kind==2?selected_item:selected_character)=index;return true;}}
+        else {
         std::uint64_t hash=14695981039346656037ull;
         for(auto b:bytes){hash^=b;hash*=1099511628211ull;}
         std::ostringstream filename;filename<<std::hex<<std::setw(16)<<std::setfill('0')<<hash<<".sky";
@@ -126,6 +133,7 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         for(unsigned i=0;i<collection.size();++i)if(collection[i].file==destination)index=static_cast<int>(i);
         if(index<0){if(characters.size()+items.size()>=512)return false;add_character(destination);index=static_cast<int>(collection.size())-1;}
         if(!select_after){(kind==2?selected_item:selected_character)=index;return true;}
+        }
     }
     return select(kind==0 && player==1?3:kind,index);
 }

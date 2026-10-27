@@ -45,7 +45,9 @@ def load(path):
         value['selected'] = value['games'][0]['id']
     if not isinstance(value.get('figures'), list) or any(not isinstance(p, str) for p in value['figures']):
         raise ValueError('Invalid figure collection')
-    if value.get('portal') not in value['figures']:
+    # The starting figure is any collection tag; a missing file is forgotten.
+    portal = value.get('portal')
+    if not isinstance(portal, str) or not portal or not Path(portal).is_file():
         value['portal'] = None
     return value
 

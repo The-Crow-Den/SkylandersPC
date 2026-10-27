@@ -1,13 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Library presentation layered over the existing native session controller."""
 from pathlib import Path
-import shutil
-import uuid
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer
-from PyQt6.QtGui import QColor, QPainter, QLinearGradient, QPixmap, QIcon, QRadialGradient, QFont, QPen
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel,
-    QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QLineEdit, QMessageBox,
-    QMenu, QListWidget, QInputDialog, QComboBox, QCheckBox, QSlider, QScrollArea, QSpinBox, QStackedWidget)
+from PyQt6.QtGui import QColor, QPainter, QPixmap, QIcon, QRadialGradient, QPen
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget)
 try:
     from . import launcher_library as library
 except ImportError:
@@ -68,37 +64,14 @@ class SkyCanvas(QWidget):
         p.end()
 
 
-class VirtualPortal(QWidget):
-    def __init__(self, root):
-        super().__init__(); self.name = 'Portal empty'; self.active = False
-        self.setMinimumHeight(190)
-
-    def setText(self, name):
-        self.name = name; self.active = name != 'Portal empty'; self.update()
-
-    def paintEvent(self, event):
-        p = QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        x = self.width()/2; y = self.height()/2
-        glow = QRadialGradient(x,y,130)
-        glow.setColorAt(0,QColor('#503fd6ff')); glow.setColorAt(1,QColor('#003fd6ff'))
-        p.fillRect(self.rect(),glow)
-        p.setBrush(QColor('#142f49')); p.setPen(QPen(QColor('#4a8da8'),3))
-        p.drawEllipse(QRectF(x-112,y-15,224,62))
-        p.setBrush(QColor('#204760')); p.setPen(QPen(QColor('#90eaff' if self.active else '#43819b'),4))
-        p.drawEllipse(QRectF(x-112,y-28,224,62))
-        p.setPen(QPen(QColor('#4dbbd6'),1));p.drawEllipse(QRectF(x-94,y-19,188,43))
-        p.setPen(QColor('#cbf5ff'));p.setFont(QFont('Cantarell',11,QFont.Weight.Bold))
-        p.drawText(QRectF(12,self.height()-35,self.width()-24,30),Qt.AlignmentFlag.AlignCenter,self.name)
-        p.end()
-
-
 def supplied_artwork(root, game):
     """Resolve supplied logos; launcher backgrounds are deliberately image-free."""
     folder = Path(root) / '.local/launcher-art/supplied'
-    logo = {'swap-force': 'swap-force-logo.png', 'trap-team': 'trap-team-logo-cutout.png'}.get(game['id'])
+    logo = {'swap-force': 'swap-force-logo.png', 'trap-team': 'trap-team-logo-cutout.png',
+            'superchargers': 'superchargers-logo.png', 'imaginators': 'imaginators-logo.png'}.get(game['id'])
     themed = dict(game)
     themed.update(background='', composite=False)
-    if not themed['logo'] and logo and (folder / logo).is_file():
+    if logo and (folder / logo).is_file():
         themed['logo'] = str(folder / logo)
     return themed
 
@@ -184,6 +157,11 @@ def renovated(base):
             except ImportError:
                 from launcher_settings import SettingsPage
             self.settings_page = SettingsPage(self);self.views.addWidget(self.settings_page)
+            try:
+                from .launcher_portal import PortalPage
+            except ImportError:
+                from launcher_portal import PortalPage
+            self.portal_page = PortalPage(self);self.views.addWidget(self.portal_page)
 
         @property
         def game(self):
@@ -217,7 +195,7 @@ def renovated(base):
                     button.setText({'superchargers':'SC','imaginators':'IM'}.get(game['id'],game['name'][:2].upper()))
             self.rail.addStretch()
             divider = QWidget();divider.setFixedHeight(1);divider.setStyleSheet('background: #38383e;');self.rail.addWidget(divider)
-            for kind, name, callback in [('collection','Skylanders Manager',self.manager),('settings','General settings',self.settings),('add','Manage games',self.manage)]:
+            for kind, name, callback in [('collection','Skylanders Manager',self.manager),('settings','General settings',self.settings)]:
                 control = self.button(self.rail,'',callback);control.setIcon(utility_icon(kind));control.setIconSize(QSize(24,24))
                 control.setFixedSize(82,48);control.setToolTip(name);control.setAccessibleName(name)
                 control.setStyleSheet('background: transparent; border: none; border-radius: 12px;')
@@ -329,89 +307,15 @@ def renovated(base):
         def game_menu(self):
             menu = QMenu(self)
             for title, callback in [('Install / update PKGs',self.install), ('Game settings',self.game_settings),
-                                    
-                                    ('Upload logo',lambda:self.artwork('logo')), ('Reset artwork',self.reset_artwork),
-                                    ('Manage games',self.manage)]:
+                                    ('Skylanders Manager',self.manager)]:
                 menu.addAction(title, callback)
             menu.exec(self.primary.mapToGlobal(self.primary.rect().topRight()))
-
-        def artwork(self, key):
-            path, _ = QFileDialog.getOpenFileName(self, 'Choose '+key, '', 'Images (*.png *.jpg *.jpeg *.webp)')
-            if not path: return
-            if QPixmap(path).isNull():
-                QMessageBox.warning(self, 'Invalid image', 'The selected image cannot be read.'); return
-            target = self.root / '.local/launcher-art' / (uuid.uuid4().hex + Path(path).suffix)
-            try:
-                target.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(path,target)
-            except OSError as error:
-                QMessageBox.warning(self, 'Artwork', str(error)); return
-            self.game[key] = str(target); self.persist(); self.rebuild_rail()
-
-        def reset_artwork(self):
-            self.game.update(background='',logo=''); self.persist(); self.rebuild_rail()
 
         def game_settings(self):
             self.settings_page.open(self.game)
 
-        def manage(self):
-            dialog = QDialog(self); dialog.setWindowTitle('Manage games'); dialog.resize(460,400)
-            column = QVBoxLayout(dialog); games = QListWidget(); column.addWidget(games)
-            for game in self.library['games']: games.addItem(game['name'])
-            def add():
-                name, ok = QInputDialog.getText(dialog, 'Add game', 'Game name')
-                if ok and name.strip():
-                    self.library['games'].append(dict(id=uuid.uuid4().hex,name=name.strip(),top='#244f99',bottom='#bd9ad8',background='',logo='',game_pkg='',update_pkg='',settings={}))
-                    self.persist(); self.rebuild_rail(); dialog.accept()
-            def remove():
-                index = games.currentRow()
-                if index < 0 or len(self.library['games']) == 1: return
-                if self.process: return
-                if QMessageBox.question(dialog,'Remove game','Remove this library entry? Game files are kept.') != QMessageBox.StandardButton.Yes: return
-                self.library['games'].pop(index)
-                if not any(g['id']==self.library['selected'] for g in self.library['games']): self.library['selected']=self.library['games'][0]['id']
-                self.persist(); self.rebuild_rail(); dialog.accept()
-            self.button(column,'Add game',add); self.button(column,'Remove selected game',remove)
-            dialog.exec()
-
         def manager(self):
-            dialog = QDialog(self); dialog.setWindowTitle('Skylanders Manager'); dialog.resize(670,580)
-            column = QVBoxLayout(dialog)
-            title = QLabel('◉  VIRTUAL PORTAL'); title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            title.setStyleSheet('font-size: 28px; color: #8ce5ff; padding: 24px;'); column.addWidget(title)
-            portal = VirtualPortal(self.root); column.addWidget(portal)
-            column.addWidget(QLabel('Simulated portal · placing a figure selects it for the next native session.'))
-            figures = QListWidget(); column.addWidget(figures)
-            def refresh():
-                figures.clear()
-                for path in self.library['figures']: figures.addItem(Path(path).stem)
-                active = self.library['portal']; portal.setText(Path(active).stem if active else 'Portal empty')
-            def add():
-                paths, _ = QFileDialog.getOpenFileNames(dialog,'Import figures','','Figure dumps (*.sky *.bin *.dump)')
-                self.library['figures'] += [p for p in paths if p not in self.library['figures']]
-                self.persist(); refresh()
-            def place():
-                i = figures.currentRow()
-                if i < 0: return
-                path = self.library['figures'][i]
-                if not Path(path).is_file():
-                    QMessageBox.warning(dialog,'Missing figure','The figure file is no longer available.'); return
-                self.library['portal'] = path; self.fields['figure'].setText(path)
-                if self.game['settings']: self.game['settings']['figure'] = path
-                self.persist(); refresh()
-            def eject():
-                self.library['portal'] = None; self.fields['figure'].clear()
-                if self.game['settings']: self.game['settings']['figure'] = ''
-                self.persist(); refresh()
-            def remove():
-                i = figures.currentRow()
-                if i < 0: return
-                path = self.library['figures'].pop(i)
-                if self.library['portal'] == path: eject()
-                self.persist(); refresh()
-            row = QHBoxLayout(); column.addLayout(row)
-            self.button(row,'Import figures',add); self.button(row,'Place on portal',place)
-            self.button(row,'Eject',eject); self.button(row,'Remove',remove)
-            refresh(); dialog.exec()
+            self.portal_page.open()
 
         def finished(self, code, status):
             super().finished(code,status)
@@ -420,6 +324,8 @@ def renovated(base):
             if hasattr(self,'canvas'):
                 self.loading_wheel.set_active(False);self.launch_status.hide()
                 self.session_stop.setVisible(False); self.primary.setEnabled(True); self.refresh_game()
+            if hasattr(self,'portal_page') and self.views.currentWidget() is self.portal_page:
+                self.portal_page.refresh()
 
         def closeEvent(self, event):
             if self.process is None: self.persist()
