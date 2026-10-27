@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Optional one-time glibc trim after the provider's shader warm-up.
+--- a/gpu/render/pipeline_cache.cpp
++++ b/gpu/render/pipeline_cache.cpp
+@@ -29,6 +29,11 @@
+ #include "gcn/decoder.h"
+ #include "render/gcn_to_vk.h"
+ #include "render/pipeline_cache.h"
++#if defined(__GLIBC__)
++#include <malloc.h>
++#include <cstdio>
++#include <cstdlib>
++#endif
+ #include "render/pipeline_store.h"
+ #include "render/scheduler.h"
+ #include "render/shader_capture.h"
+@@ -307,6 +312,16 @@
+                vk::to_string(cache_result));
+     pipeline_cache = std::move(cache);
+     WarmUp();
++#if defined(__GLIBC__)
++    // Warm-up releases temporary compiler allocations before returning. Give
++    // unused arena pages back once, before gameplay, rather than retaining them.
++    const auto* trim=std::getenv("BB_TRIM_SHADER_WARMUP");
++    if(trim && trim[0]=='1') {
++        const auto rss=[] { unsigned long size=0,resident=0; if(auto* f=std::fopen("/proc/self/statm","r")){if(std::fscanf(f,"%lu %lu",&size,&resident)!=2)resident=0;std::fclose(f);}return resident*static_cast<unsigned long>(sysconf(_SC_PAGESIZE));};
++        const auto before=rss();const int released=malloc_trim(0);const auto after=rss();
++        std::printf("Shader warmup trim: resident %lu -> %lu bytes, released=%d\n",before,after,released);
++    }
++#endif
+ }
+ 
+ PipelineCache::~PipelineCache() = default;

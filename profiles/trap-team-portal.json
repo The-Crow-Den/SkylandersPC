@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "source": "https://www.darkspyro.net/trapteam/villains/",
+  "artwork_credit": "Activision Publishing; identification thumbnails from darkSpyro. Downloaded art stays in ignored local cache.",
+  "villains": [
+    {
+      "key": "brawl_and_chain",
+      "name": "Brawl and Chain",
+      "element": "water",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_water_brawl_and_chain.jpg",
+      "trap_id": 211,
+      "trap_variant": 12289
+    },
+    {
+      "key": "chill_bill",
+      "name": "Chill Bill",
+      "element": "water",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_water_chill_bill.jpg",
+      "trap_id": 211,
+      "trap_variant": 12289
+    },
+    {
+      "key": "cross_crow",
+      "name": "Cross Crow",
+      "element": "water",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_water_cross_crow.jpg",
+      "trap_id": 211,
+      "trap_variant": 12289
+    },
+    {
+      "key": "the_gulper",
+      "name": "The Gulper",
+      "element": "water",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_water_the_gulper.jpg",
+      "trap_id": 211,
+      "trap_variant": 12289
+    },
+    {
+      "key": "slobber_trap",
+      "name": "Slobber Trap",
+      "element": "water",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_water_slobber_trap.jpg",
+      "trap_id": 211,
+      "trap_variant": 12289
+    },
+    {
+      "key": "threatpack",
+      "name": "Threatpack",
+      "element": "water",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_water_threatpack.jpg",
+      "trap_id": 211,
+      "trap_variant": 12289
+    },
+    {
+      "key": "kaos",
+      "name": "Kaos",
+      "element": "kaos",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_kaos_kaos.jpg",
+      "trap_id": 220,
+      "trap_variant": 12318
+    },
+    {
+      "key": "chomp_chest",
+      "name": "Chomp Chest",
+      "element": "earth",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_earth_chomp_chest.jpg",
+      "trap_id": 216,
+      "trap_variant": 12288
+    },
+    {
+      "key": "golden_queen",
+      "name": "Golden Queen",
+      "element": "earth",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_earth_golden_queen.jpg",
+      "trap_id": 216,
+      "trap_variant": 12288
+    },
+    {
+      "key": "grave_clobber",
+      "name": "Grave Clobber",
+      "element": "earth",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_earth_grave_clobber.jpg",
+      "trap_id": 216,
+      "trap_variant": 12288
+    },
+    {
+      "key": "tussle_sprout",
+      "name": "Tussle Sprout",
+      "element": "earth",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_earth_tussle_sprout.jpg",
+      "trap_id": 216,
+      "trap_variant": 12288
+    },
+    {
+      "key": "bomb_shell",
+      "name": "Bomb Shell",
+      "element": "magic",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_magic_bomb_shell.jpg",
+      "trap_id": 210,
+      "trap_variant": 12290
+    },
+    {
+      "key": "pain-yatta",
+      "name": "Pain-Yatta",
+      "element": "magic",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_magic_pain-yatta.jpg",
+      "trap_id": 210,
+      "trap_variant": 12290
+    },
+    {
+      "key": "rage_mage",
+      "name": "Rage Mage",
+      "element": "magic",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_magic_rage_mage.jpg",
+      "trap_id": 210,
+      "trap_variant": 12290
+    },
+    {
+      "key": "chef_pepper_jack",
+      "name": "Chef Pepper Jack",
+      "element": "fire",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_fire_chef_pepper_jack.jpg",
+      "trap_id": 215,
+      "trap_variant": 12293
+    },
+    {
+      "key": "grinnade",
+      "name": "Grinnade",
+      "element": "fire",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_fire_grinnade.jpg",
+      "trap_id": 215,
+      "trap_variant": 12293
+    },
+    {
+      "key": "scrap_shooter",
+      "name": "Scrap Shooter",
+      "element": "fire",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_fire_scrap_shooter.jpg",
+      "trap_id": 215,
+      "trap_variant": 12293
+    },
+    {
+      "key": "smoke_scream",
+      "name": "Smoke Scream",
+      "element": "fire",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_fire_smoke_scream.jpg",
+      "trap_id": 215,
+      "trap_variant": 12293
+    },
+    {
+      "key": "broccoli_guy",
+      "name": "Broccoli Guy",
+      "element": "life",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_life_broccoli_guy.jpg",
+      "trap_id": 217,
+      "trap_variant": 12291
+    },
+    {
+      "key": "chompy",
+      "name": "Chompy",
+      "element": "life",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_life_chompy.jpg",
+      "trap_id": 217,
+      "trap_variant": 12291
+    },
+    {
+      "key": "chompy_mage",
+      "name": "Chompy Mage",
+      "element": "life",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_life_chompy_mage.jpg",
+      "trap_id": 217,
+      "trap_variant": 12291
+    },
+    {
+      "key": "cuckoo_clocker",
+      "name": "Cuckoo Clocker",
+      "element": "life",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_life_cuckoo_clocker.jpg",
+      "trap_id": 217,
+      "trap_variant": 12291
+    },
+    {
+      "key": "sheep_creep",
+      "name": "Sheep Creep",
+      "element": "life",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_life_sheep_creep.jpg",
+      "trap_id": 217,
+      "trap_variant": 12291
+    },
+    {
+      "key": "shield_shredder",
+      "name": "Shield Shredder",
+      "element": "life",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_life_shield_shredder.jpg",
+      "trap_id": 217,
+      "trap_variant": 12291
+    },
+    {
+      "key": "brawlrus",
+      "name": "Brawlrus",
+      "element": "tech",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_tech_brawlrus.jpg",
+      "trap_id": 214,
+      "trap_variant": 12288
+    },
+    {
+      "key": "bruiser_cruiser",
+      "name": "Bruiser Cruiser",
+      "element": "tech",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_tech_bruiser_cruiser.jpg",
+      "trap_id": 214,
+      "trap_variant": 12288
+    },
+    {
+      "key": "dr._krankcase",
+      "name": "Dr. Krankcase",
+      "element": "tech",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_tech_dr._krankcase.jpg",
+      "trap_id": 214,
+      "trap_variant": 12288
+    },
+    {
+      "key": "mab_lobs",
+      "name": "Mab Lobs",
+      "element": "tech",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_tech_mab_lobs.jpg",
+      "trap_id": 214,
+      "trap_variant": 12288
+    },
+    {
+      "key": "shrednaught",
+      "name": "Shrednaught",
+      "element": "tech",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_tech_shrednaught.jpg",
+      "trap_id": 214,
+      "trap_variant": 12288
+    },
+    {
+      "key": "trolling_thunder",
+      "name": "Trolling Thunder",
+      "element": "tech",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_tech_trolling_thunder.jpg",
+      "trap_id": 214,
+      "trap_variant": 12288
+    },
+    {
+      "key": "bone_chompy",
+      "name": "Bone Chompy",
+      "element": "undead",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_undead_bone_chompy.jpg",
+      "trap_id": 213,
+      "trap_variant": 12292
+    },
+    {
+      "key": "hood_sickle",
+      "name": "Hood Sickle",
+      "element": "undead",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_undead_hood_sickle.jpg",
+      "trap_id": 213,
+      "trap_variant": 12292
+    },
+    {
+      "key": "masker_mind",
+      "name": "Masker Mind",
+      "element": "undead",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_undead_masker_mind.jpg",
+      "trap_id": 213,
+      "trap_variant": 12292
+    },
+    {
+      "key": "wolfgang",
+      "name": "Wolfgang",
+      "element": "undead",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_undead_wolfgang.jpg",
+      "trap_id": 213,
+      "trap_variant": 12292
+    },
+    {
+      "key": "bad_juju",
+      "name": "Bad Juju",
+      "element": "air",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_air_bad_juju.jpg",
+      "trap_id": 212,
+      "trap_variant": 12291
+    },
+    {
+      "key": "buzzer_beak",
+      "name": "Buzzer Beak",
+      "element": "air",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_air_buzzer_beak.jpg",
+      "trap_id": 212,
+      "trap_variant": 12291
+    },
+    {
+      "key": "dreamcatcher",
+      "name": "Dreamcatcher",
+      "element": "air",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_air_dreamcatcher.jpg",
+      "trap_id": 212,
+      "trap_variant": 12291
+    },
+    {
+      "key": "krankenstein",
+      "name": "Krankenstein",
+      "element": "air",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_air_krankenstein.jpg",
+      "trap_id": 212,
+      "trap_variant": 12291
+    },
+    {
+      "key": "eye_scream",
+      "name": "Eye Scream",
+      "element": "dark",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_dark_eye_scream.jpg",
+      "trap_id": 218,
+      "trap_variant": 12288
+    },
+    {
+      "key": "fisticuffs",
+      "name": "Fisticuffs",
+      "element": "dark",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_dark_fisticuffs.jpg",
+      "trap_id": 218,
+      "trap_variant": 12288
+    },
+    {
+      "key": "nightshade",
+      "name": "Nightshade",
+      "element": "dark",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_dark_nightshade.jpg",
+      "trap_id": 218,
+      "trap_variant": 12288
+    },
+    {
+      "key": "tae_kwon_crow",
+      "name": "Tae Kwon Crow",
+      "element": "dark",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_dark_tae_kwon_crow.jpg",
+      "trap_id": 218,
+      "trap_variant": 12288
+    },
+    {
+      "key": "blaster-tron",
+      "name": "Blaster-Tron",
+      "element": "light",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_light_blaster-tron.jpg",
+      "trap_id": 219,
+      "trap_variant": 12288
+    },
+    {
+      "key": "eye_five",
+      "name": "Eye Five",
+      "element": "light",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_light_eye_five.jpg",
+      "trap_id": 219,
+      "trap_variant": 12288
+    },
+    {
+      "key": "lob_goblin",
+      "name": "Lob Goblin",
+      "element": "light",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_light_lob_goblin.jpg",
+      "trap_id": 219,
+      "trap_variant": 12288
+    },
+    {
+      "key": "luminous",
+      "name": "Luminous",
+      "element": "light",
+      "portrait_url": "https://www.darkspyro.net/images/trapteam/evo_light_luminous.jpg",
+      "trap_id": 219,
+      "trap_variant": 12288
+    }
+  ]
+}

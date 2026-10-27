@@ -1,0 +1,18 @@
+{
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "asset": "level/title.bld",
+  "asset_sha256": "d5327735db727796e65e3570b11d702c5522c0e2d6650c4fff193fb456e237fd",
+  "chunk_offset": 1038336,
+  "allocation_size": 4096,
+  "compressed_payload_size": 3858,
+  "lzma_properties_hex": "5d00800000",
+  "decoded_size": 32768,
+  "decoded_sha256": "4a64f9fd3c00b95cb2c831f62dc6da23f169a16f7bdb5975b89b37445ad572f7",
+  "patch_offset_in_chunk": 32476,
+  "expected_hex": "284e020000000000",
+  "replacement_hex": "d8c4060000000000",
+  "status": "US 01.01 eligibility graph and recompression verified; live selection/save validation pending",
+  "reason": "Menu-Diff-Create compares the returned eligibility flag with itself, then uses its existing local allow-nightmare assignment. Preserve the outer disallow guard, selected difficulty and completion/save logic."
+}

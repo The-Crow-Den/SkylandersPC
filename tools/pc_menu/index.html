@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' qrc:; style-src 'self'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>Trap Team · PC overlay</title><link rel="stylesheet" href="menu.css">
+<script src="qrc:///qtwebchannel/qwebchannel.js" defer></script><script src="lucide.js" defer></script><script src="menu.js" defer></script>
+</head><body><div id="trap-rail-demo" aria-label="Trap Team PC menu">
+<div class="scene">
+  <div class="game-title">SKYLANDERS · TRAP TEAM</div>
+  <div class="left-tools">
+    <nav class="rail" aria-label="PC tools">
+      <button type="button" class="rail-button is-current cursor-interaction" data-view="portal" aria-label="Open virtual portal" aria-controls="trap-simple-portal"><i data-lucide="orbit" aria-hidden="true"></i><span class="nav-label">Portal</span></button>
+      <div class="rail-divider" aria-hidden="true"></div>
+      <button type="button" class="rail-button cursor-interaction" data-view="settings" data-page="display" aria-label="Open display settings" aria-controls="trap-simple-settings"><i data-lucide="monitor" aria-hidden="true"></i><span class="nav-label">Display</span></button>
+      <button type="button" class="rail-button cursor-interaction" data-view="settings" data-page="controls" aria-label="Open control settings" aria-controls="trap-simple-settings"><i data-lucide="gamepad-2" aria-hidden="true"></i><span class="nav-label">Controls</span></button>
+      <button type="button" class="rail-button cursor-interaction" data-view="settings" data-page="audio" aria-label="Open audio settings" aria-controls="trap-simple-settings"><i data-lucide="volume-2" aria-hidden="true"></i><span class="nav-label">Audio</span></button>
+    </nav>
+    <section class="settings-panel" id="trap-simple-settings" aria-label="PC settings" hidden>
+      <div class="head"><div class="panel-title"><i data-setting-icon data-lucide="monitor" aria-hidden="true"></i><h2 data-setting-title>Display</h2></div><button type="button" class="icon-button cursor-interaction" data-close aria-label="Close settings"><i data-lucide="x" aria-hidden="true"></i></button></div>
+
+      <div data-settings-page="display">
+        <div class="setting"><label for="trap-demo-res">Resolution</label><select id="trap-demo-res"><option>1280 × 720</option><option>1600 × 900</option><option>1920 × 1080</option><option>2560 × 1440</option><option>2560 × 1600</option><option>3840 × 2160</option></select></div>
+        <div class="setting"><label for="trap-demo-quality">Graphics quality</label><select id="trap-demo-quality"><option>Low</option><option selected>Balanced</option><option>High</option></select></div>
+        <div class="setting"><label for="trap-demo-fps">Frame rate</label><select id="trap-demo-fps"><option>Automatic · 30 / 60 FPS</option><option>30 FPS</option><option>60 FPS</option></select></div>
+        <label class="check"><input type="checkbox" checked>Fullscreen</label>
+      </div>
+      <div data-settings-page="controls" hidden><div class="setting"><label for="trap-demo-pad">Player setup</label><select id="trap-demo-pad"><option>Controller(s)</option><option>Keyboard + controller</option></select></div><div class="setting"><label for="trap-demo-glyphs">Button icons</label><select id="trap-demo-glyphs"><option>Automatic</option><option>PlayStation</option><option>Xbox</option><option>Nintendo</option></select></div><p>F6 or Escape closes the PC overlay.</p></div>
+      <div data-settings-page="audio" hidden><div class="setting"><label for="trap-demo-audio">Portal speaker volume <span data-volume>30%</span></label><input id="trap-demo-audio" type="range" min="0" max="100" value="30"></div><p>Portal voices play through your PC speakers.</p></div>
+      <button type="button" class="primary-action cursor-interaction" data-apply>Apply settings and restart</button><p class="message" data-settings-message aria-live="polite">Some settings apply after restart.</p>
+    </section>
+  </div>
+  <section class="portal-panel" id="trap-simple-portal" aria-label="Virtual portal">
+    <div class="head"><h2>Virtual portal</h2><button type="button" class="icon-button cursor-interaction" data-close aria-label="Close virtual portal"><i data-lucide="x" aria-hidden="true"></i></button></div>
+    <div class="slot-strip" role="group" aria-label="Choose the portal slot"></div>
+    <div class="small-row"><button type="button" class="text-button cursor-interaction" data-coop>+ Add player 2</button><button type="button" class="text-button cursor-interaction" data-remove>Remove figure</button></div>
+    <div class="small-row section-title"><h3 data-collection-title>Choose a Skylander</h3><p data-current-slot>Player 1</p></div>
+    <label class="search"><i data-lucide="search" aria-hidden="true"></i><input type="search" aria-label="Search figures" placeholder="Search Skylanders…" data-search></label>
+    <div class="trap-browser" hidden>
+      <h3>Place an empty trap</h3><div class="element-grid" role="group" aria-label="Trap elements"></div>
+      <div class="small-row section-title"><h3>Captured villains</h3></div>
+      <div class="capture-list" aria-label="Captured villain grid"></div>
+      
+    </div>
+    <div class="figure-creator" hidden><h3>Create a Skylander</h3><div class="setting"><label for="trap-create-character">Character</label><select id="trap-create-character"><option value="gill">Gill Grunt</option><option value="snap">Snap Shot</option><option value="spyro">Spyro</option><option value="ignitor">Ignitor</option><option value="cynder">Cynder</option><option value="bash">Bash</option></select></div><button class="primary-action cursor-interaction" type="button" data-create-figure>Create figure</button></div>
+    <div class="portrait-grid" role="group" aria-label="Available figures"></div>
+    <div class="collection-actions"><button type="button" class="quiet-button cursor-interaction" data-add>Create figure</button><button type="button" class="quiet-button cursor-interaction" data-import>Import file</button><p data-count hidden></p></div>
+    <p class="message" data-message aria-live="polite">Connecting to the game…</p>
+  </section>
+</div>
+</div></body></html>

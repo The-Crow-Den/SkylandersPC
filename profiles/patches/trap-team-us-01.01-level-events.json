@@ -1,0 +1,54 @@
+{
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "pack_sha256": {
+    "original": "b7161abd9337475591220cbe39509e13951461437c36cbfe46307e10545c1a84",
+    "60": "4053447875789815ee5ce771047a99e54ab549fe035543a25f286c8ef6ab0bdf",
+    "60-delta": "126e196a3104cf246af8e8503bbfd0461f4f4f54a065b7ec7f78cbc5ce204eb2"
+  },
+  "status": "US 01.01 expected bytes verified; live gameplay validation pending",
+  "commit_label_address": 17013024,
+  "hooks": [
+    {
+      "event": "switch-request",
+      "kind": "subscription-tail",
+      "virtual_address": 11927234,
+      "expected_hex": "488d3d47188bff",
+      "original_target": 4265744,
+      "reason": "Observe the registered SwitchLevelMessage handler; receipt can include filtered teardown requests."
+    },
+    {
+      "event": "load-commit-return",
+      "kind": "call-return-three-register-args",
+      "virtual_address": 4203334,
+      "expected_hex": "e835e8ffff",
+      "original_target": 4197248,
+      "reason": "Observe return from the main-loop stream integration call after worker readiness; this does not establish controllable gameplay."
+    },
+    {
+      "event": "load-begin",
+      "kind": "call-tail-utf16-name",
+      "virtual_address": 4203378,
+      "expected_hex": "e8c9f1ffff",
+      "original_target": 4199744,
+      "reason": "Capture the live UTF-16 load-name argument before the main-loop loader starts work. Tail dispatch preserves the original return address and arguments."
+    }
+  ],
+  "frame_policy": {
+    "supported_variant": "60-delta",
+    "unknown_fps": 30,
+    "gameplay_fps": 60,
+    "upshift_qualification_us": 500000,
+    "ui_global_node_address": 17014080,
+    "ui_directory_slots": {
+      "gameplay": 284,
+      "pause": 287,
+      "portal": 310
+    },
+    "sprite_visible_offset": 244,
+    "sprite_visible_mask": 65536,
+    "validation": "Chapter One; other chapters remain unverified",
+    "upshift_qualification_scope": "first gameplay entry per world; verified pause/portal resumes switch immediately"
+  }
+}

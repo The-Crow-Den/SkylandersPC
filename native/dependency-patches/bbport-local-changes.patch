@@ -1,0 +1,825 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Aggregate local changes; apply to the pinned source ONCE, not alongside historical patches.
+--- a/gpu/platform/videoout/display.cpp
++++ b/gpu/platform/videoout/display.cpp
+@@ -300,6 +300,18 @@
+ }
+ 
+ void Display::Flip(const Request& request) {
++    // Complete the guest-image copy before handing the Frame to the separate
++    // presenter. Present() releases Frame objects back to the recording pool;
++    // reading ready_tick after queueing it can race reuse of that same object.
++    // BB_HONEST_FLIPS=1 (an experiment): the flip completes once the GPU has finished the frame,
++    // as on the console (a vblank after the frame's commands end), instead of when it is queued.
++    static const bool honest_flips = [] {
++        const char* env = std::getenv("BB_HONEST_FLIPS");
++        return env && env[0] == '1';
++    }();
++    if (honest_flips) {
++        presenter->WaitRendered(request.frame);
++    }
+     RunPresenter([frame = request.frame, hdr = request.port->is_hdr] {
+         presenter->SetHDR(hdr);
+         presenter->Present(frame);
+@@ -309,15 +321,6 @@
+                                                     : 0);
+     if (FrameStatsEnabled()) {
+         OnFlipStats();
+-    }
+-    // BB_HONEST_FLIPS=1 (an experiment): the flip completes once the GPU has finished the frame,
+-    // as on the console (a vblank after the frame's commands end), instead of when it is queued.
+-    static const bool honest_flips = [] {
+-        const char* env = std::getenv("BB_HONEST_FLIPS");
+-        return env && env[0] == '1';
+-    }();
+-    if (honest_flips) {
+-        presenter->WaitRendered(request.frame);
+     }
+     {
+         std::scoped_lock lock{port->status_mutex};
+@@ -373,7 +376,11 @@
+                 EmulatorSettings.GetVblankFrequency(), frame_limit);
+     // With a frame limit or the uncapped presets a flip is shown as soon as it arrives (and its
+     // slot allows), between vblanks, instead of at the next vblank.
+-    const bool immediate_flips = frame_limit != 0 || EmulatorSettings.IsUncappedVblank();
++    // Native hosts can already pace submissions. Let their completed frames reach
++    // the presenter without snapping them to a second independent software clock.
++    // Guest vblank frequency and nonzero guest flip intervals remain unchanged.
++    const bool immediate_flips = frame_limit != 0 || EmulatorSettings.IsUncappedVblank() ||
++                                 EmulatorSettingsImpl::Flag("BB_PRESENT_AS_READY", false);
+     const auto flip = [&](const Request& request, std::chrono::steady_clock::time_point now) {
+         if (frame_limit) {
+             next_flip = std::max(next_flip + frame_period, now - frame_period);
+--- a/gpu/platform/videoout/frame_stats.cpp
++++ b/gpu/platform/videoout/frame_stats.cpp
+@@ -241,7 +241,7 @@
+                                "images,image_mb,buffer_mb,protect_ms,resident_ms,create_ms,"
+                                "refresh_ms,write_fault_ms,read_faults,guest_copy_mb,draws,"
+                                "dispatches,submissions,compiles,preupload_mb,kernel_ms,alloc_mb,"
+-                               "free_mb\n");
++                               "free_mb,monotonic_us\n");
+         }
+         return file;
+     }();
+@@ -257,9 +257,13 @@
+             last_value = now_value;
+             return d;
+         };
++        timespec stamp{};
++        clock_gettime(CLOCK_MONOTONIC, &stamp);
++        const auto monotonic_us = static_cast<unsigned long long>(stamp.tv_sec) * 1000000ull +
++                                  static_cast<unsigned long long>(stamp.tv_nsec) / 1000ull;
+         std::fprintf(frame_log,
+                      "%.4f,%.2f,%.2f,%.2f,%.2f,%llu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%llu,"
+-                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f\n",
++                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f,%llu\n",
+                      std::chrono::duration<double>(now - log_start).count(), frame_ms,
+                      delta(present, log_present) / 1e6, delta(tick, log_tick) / 1e6,
+                      last_gpu_ns ? (gpu_ns - last_gpu_ns) / 1e6 : 0.0,
+@@ -277,7 +281,7 @@
+                      delta(BbStats::preupload_bytes.load(), log_preupload) / 1e6,
+                      last_gpu_ns ? (sys_us - last_sys) / 1e3 : 0.0,
+                      delta(BbStats::device_alloc_bytes.load(), log_alloc) / 1e6,
+-                     delta(BbStats::device_free_bytes.load(), log_free) / 1e6);
++                     delta(BbStats::device_free_bytes.load(), log_free) / 1e6, monotonic_us);
+         static u32 unflushed = 0;
+         if (++unflushed >= 120) {
+             std::fflush(frame_log);
+--- a/gpu/render/pipeline_cache.cpp
++++ b/gpu/render/pipeline_cache.cpp
+@@ -29,6 +29,11 @@
+ #include "gcn/decoder.h"
+ #include "render/gcn_to_vk.h"
+ #include "render/pipeline_cache.h"
++#if defined(__GLIBC__)
++#include <malloc.h>
++#include <cstdio>
++#include <cstdlib>
++#endif
+ #include "render/pipeline_store.h"
+ #include "render/scheduler.h"
+ #include "render/shader_capture.h"
+@@ -307,6 +312,16 @@
+                vk::to_string(cache_result));
+     pipeline_cache = std::move(cache);
+     WarmUp();
++#if defined(__GLIBC__)
++    // Warm-up releases temporary compiler allocations before returning. Give
++    // unused arena pages back once, before gameplay, rather than retaining them.
++    const auto* trim=std::getenv("BB_TRIM_SHADER_WARMUP");
++    if(trim && trim[0]=='1') {
++        const auto rss=[] { unsigned long size=0,resident=0; if(auto* f=std::fopen("/proc/self/statm","r")){if(std::fscanf(f,"%lu %lu",&size,&resident)!=2)resident=0;std::fclose(f);}return resident*static_cast<unsigned long>(sysconf(_SC_PAGESIZE));};
++        const auto before=rss();const int released=malloc_trim(0);const auto after=rss();
++        std::printf("Shader warmup trim: resident %lu -> %lu bytes, released=%d\n",before,after,released);
++    }
++#endif
+ }
+ 
+ PipelineCache::~PipelineCache() = default;
+--- a/gpu/render/raster_targets.cpp
++++ b/gpu/render/raster_targets.cpp
+@@ -3,10 +3,24 @@
+ // copies), target lookup, the render pass (BeginRendering) and the UI placement.
+ 
+ #include "render/raster_internal.h"
++#include <set>
++#include <tuple>
++#include <cstdlib>
++#include <cstdio>
+ 
+ namespace Vulkan {
+ 
+ namespace {
++// Optional bounded inventory of actual bound attachments, not presentation size.
++void TraceTargetSize(const VideoCore::Image& image, bool depth) {
++    static const bool enabled = [] { const auto* p = std::getenv("BB_TARGET_SIZE_TRACE"); return p && p[0] == '1'; }();
++    if (!enabled) return;
++    static std::set<std::tuple<u32,u32,u32,bool>> seen;
++    const auto& info = image.info;
++    const auto key = std::make_tuple(info.size.width, info.size.height, info.num_samples, depth);
++    if (seen.size() < 128 && seen.insert(key).second)
++        std::printf("Bound render target: %ux%u samples=%u depth=%u\n", info.size.width, info.size.height, info.num_samples, depth);
++}
+ 
+ /// What a draw is: a draw, nothing, or a pass the color/depth control registers ask for.
+ enum class DrawPass {
+@@ -160,6 +174,7 @@
+             col_buf, hint));
+         auto& image = texture_cache.GetImage(image_id);
+         image.binding.is_target = 1u;
++        TraceTargetSize(image, false);
+     }
+ 
+     if ((regs.depth_control.depth_enable && regs.depth_buffer.DepthValid()) ||
+@@ -177,6 +192,7 @@
+             tag, regs.depth_buffer, regs.depth_view, regs.depth_control, htile_address, hint));
+         auto& image = texture_cache.GetImage(image_id);
+         image.binding.is_target = 1u;
++        TraceTargetSize(image, true);
+     } else {
+         db_desc.first = {};
+     }
+--- a/gpu/render/raster_textures.cpp
++++ b/gpu/render/raster_textures.cpp
+@@ -488,7 +488,11 @@
+         static std::atomic<u64> seen{0};
+         const u32 kind = u32(sharp.xy_min_filter) * 3 * 5 + u32(sharp.mip_filter) * 5 +
+                          u32(sharp.max_aniso);
+-        if (kind < 64 && !(seen.fetch_or(1ull << kind) & (1ull << kind))) {
++        // After a kind was reported, sampler binding only needs a relaxed read.
++        // Avoid a locked RMW on every bind; the second check still elects exactly
++        // one reporter when recording threads encounter a new kind together.
++        if (kind < 64 && !(seen.load(std::memory_order_relaxed) & (1ull << kind)) &&
++            !(seen.fetch_or(1ull << kind, std::memory_order_relaxed) & (1ull << kind))) {
+             std::printf("Sampler: game uses min filter %u, mip filter %u, anisotropy %.0fx\n",
+                         u32(sharp.xy_min_filter), u32(sharp.mip_filter),
+                         sharp.MaxAniso());
+--- a/gpu/render/rasterizer.cpp
++++ b/gpu/render/rasterizer.cpp
+@@ -885,8 +885,8 @@
+ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_indexed,
+                                     const IndirectDraw& indirect) {
+     buffer_cache.NewPacket();
++    FrameCapture::Poll();
+     if (DrawPipe::OnStageB()) {
+-        FrameCapture::Poll();
+         scheduler.PopPendingOperations();
+     }
+     const VAddr count_address = indirect.count;
+@@ -1144,6 +1144,7 @@
+ void Rasterizer::DispatchIndirectRecord(const ComputePipeline* pipeline, VAddr address,
+                                         u32 size) {
+     buffer_cache.NewPacket();
++    FrameCapture::Poll();
+     scheduler.PopPendingOperations();
+     if (!BindResources(pipeline)) {
+         return;
+--- a/gpu/render/vk_frame_capture.cpp
++++ b/gpu/render/vk_frame_capture.cpp
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ #include "render/vk_frame_capture.h"
++#include "render/capture_window.h"
+ 
+ #include <algorithm>
+ #include <cstdlib>
+@@ -18,7 +19,7 @@
+ struct Target {
+     VAddr address{};
+     vk::Format format{};
+-    u32 width{}, height{};
++    u32 width{}, height{}, pitch{}, tile{}, bytes{}, mip_pitch{}, mip_height{};
+     bool operator==(const Target&) const = default;
+ };
+ 
+@@ -49,6 +50,21 @@
+     }
+     pending_buffers.clear();
+ }
++// Opt-in: Trap Team writes display buffers more than once per frame. Capture
++// a bounded software-flip interval without treating each such pass as a frame.
++const unsigned window_flips = [] {
++    const char* value = std::getenv("BB_CAPTURE_FLIPS");
++    if (!value) return 0u;
++    char* end = nullptr;
++    const unsigned long count = std::strtoul(value, &end, 10);
++    if (end == value || *end || count > 4) {
++        std::fprintf(stderr, "BB_CAPTURE_FLIPS must be 0..4; using legacy capture\n");
++        return 0u;
++    }
++    return static_cast<unsigned>(count);
++}();
++CaptureWindow capture_window;
++const char* window_end_reason = "pending";
+ bool pass_open = false;
+ std::mutex display_mutex;
+ std::vector<VAddr> display_buffers;
+@@ -57,14 +73,18 @@
+ std::atomic<u32> display_count{0};
+ 
+ Target ToTarget(const VideoCore::ImageInfo& info) {
+-    return {info.guest_address, info.pixel_format, info.size.width, info.size.height};
++    return {info.guest_address, info.pixel_format, info.size.width, info.size.height,
++            info.pitch, u32(info.tile_mode), info.guest_size,
++            info.mips_layout[0].pitch, info.mips_layout[0].height};
+ }
+ 
+ std::string Describe(const Target& t) {
+     if (!t.address) {
+         return "-";
+     }
+-    return std::format("{:#x} {} {}x{}", t.address, vk::to_string(t.format), t.width, t.height);
++    return std::format("{:#x} {} {}x{} pitch={} tile={} bytes={} mip0_pitch={} mip0_height={}",
++                       t.address, vk::to_string(t.format), t.width, t.height,
++                       t.pitch, t.tile, t.bytes, t.mip_pitch, t.mip_height);
+ }
+ 
+ void AddSampled(Entry& entry) {
+@@ -93,6 +113,12 @@
+         return;
+     }
+     std::fprintf(f, "presented buffer %#llx\n", static_cast<unsigned long long>(presented));
++    if (window_flips) {
++        std::fprintf(f, "capture window: software flips %llu..%llu target=%u end=%s; may include partial frames\n",
++                     static_cast<unsigned long long>(capture_window.Start()),
++                     static_cast<unsigned long long>(FrameCapture::Flips()), window_flips,
++                     window_end_reason);
++    }
+     u32 index = 0;
+     for (const auto& e : entries) {
+         if (e.compute) {
+@@ -140,7 +166,29 @@
+     }
+ }
+ 
+-void FrameCapture::Poll() {}
++void FrameCapture::Poll() {
++    if (!window_flips) return;
++    const u32 current = state.load(std::memory_order_relaxed);
++    if (current == Idle) return;
++    const auto action = capture_window.Advance(current == Armed, Flips(), window_flips);
++    if (action == CaptureWindow::Action::Begin) {
++        entries.clear();
++        pending_sampled.clear();
++        pending_buffers.clear();
++        pass_open = false;
++        window_end_reason = "pending";
++        state.store(Recording, std::memory_order_release);
++    } else if (action == CaptureWindow::Action::FinishFlips ||
++               action == CaptureWindow::Action::FinishBudget) {
++        window_end_reason = action == CaptureWindow::Action::FinishFlips ? "flip-count" : "poll-budget";
++        Write(last_presented.load(std::memory_order_relaxed));
++        entries.clear();
++        pending_sampled.clear();
++        pending_buffers.clear();
++        pass_open = false;
++        state.store(Idle, std::memory_order_release);
++    }
++}
+ 
+ bool FrameCapture::IsDisplayBuffer(VAddr address) {
+     const u32 count = display_count.load(std::memory_order_acquire);
+@@ -183,7 +231,7 @@
+     // Frame boundaries in the command stream: the pass that writes a display buffer.
+     const bool new_pass = !(pass_open && !entries.empty() && !entries.back().compute &&
+                             entries.back().colors == targets);
+-    if (display && new_pass) {
++    if (display && new_pass && !window_flips) {
+         if (state.load(std::memory_order_relaxed) == Recording) {
+             Write(last_presented.load(std::memory_order_relaxed));
+             entries.clear();
+--- a/gpu/shim/bbgpu.cpp
++++ b/gpu/shim/bbgpu.cpp
+@@ -301,7 +301,8 @@
+     const char* hash = std::strchr(scoped_nid, '#');
+     const size_t length = hash ? size_t(hash - scoped_nid) : std::strlen(scoped_nid);
+     for (const auto& symbol : g_symbols) {
+-        if (symbol.nid.size() == length && !std::memcmp(symbol.nid.data(), scoped_nid, length)) {
++        const std::string canonical = symbol.nid + "#" + symbol.library + "#" + symbol.module;
++        if (symbol.nid.size() == length && canonical == scoped_nid) {
+             return uintptr_t(symbol.address);
+         }
+     }
+--- a/gpu/shim/bbport_overlay.cpp
++++ b/gpu/shim/bbport_overlay.cpp
+@@ -6,6 +6,7 @@
+ #include <atomic>
+ #include <chrono>
+ #include <cmath>
++#include <cctype>
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
+@@ -19,6 +20,7 @@
+ #include "bbport_frame_rate.h"
+ #include "bbport_settings.h"
+ #include "imgui.h"
++#include "imgui_internal.h"
+ #include "imgui_impl_vulkan.h"
+ #include "vulkan/instance.h"
+ #include "render/scheduler.h"
+@@ -359,9 +361,328 @@
+     }
+ }
+ 
++// SPDX-License-Identifier: GPL-2.0-or-later
++extern "C" int sky_pc_frame_limit() __attribute__((weak));
++extern "C" void sky_pc_set_frame_limit(int) __attribute__((weak));
++extern "C" int sky_pc_frame_policy() __attribute__((weak));
++extern "C" int sky_pc_auto_available() __attribute__((weak));
++extern "C" int sky_pc_set_frame_policy(int) __attribute__((weak));
++extern "C" int sky_pc_save_settings(int,int,int,int) __attribute__((weak));
++extern "C" int sky_portal_count(int) __attribute__((weak));
++extern "C" const char* sky_portal_name(int,int) __attribute__((weak));
++extern "C" const char* sky_portal_detail(int,int) __attribute__((weak));
++extern "C" int sky_portal_state(int,int) __attribute__((weak));
++extern "C" int sky_portal_portrait(int,int) __attribute__((weak));
++extern "C" const char* sky_portal_status() __attribute__((weak));
++extern "C" const char* sky_portal_atlas() __attribute__((weak));
++extern "C" int sky_portal_creation_count() __attribute__((weak));
++extern "C" int sky_portal_creation_kind(int) __attribute__((weak));
++extern "C" int sky_portal_creation_portrait(int) __attribute__((weak));
++extern "C" int sky_portal_element_portrait(int) __attribute__((weak));
++extern "C" int sky_portal_trap_element_count() __attribute__((weak));
++extern "C" const char* sky_portal_trap_element_name(int) __attribute__((weak));
++extern "C" int sky_portal_trap_element(int) __attribute__((weak));
++extern "C" int sky_portal_trap_capture(int) __attribute__((weak));
++
++extern "C" int sky_controller_family(int) __attribute__((weak));
++extern "C" int sky_pc_controller_layout() __attribute__((weak));
++extern "C" int sky_pc_controller_glyphs() __attribute__((weak));
++extern "C" int sky_pc_set_controller_glyphs(int) __attribute__((weak));
++extern "C" int sky_pc_set_controller_layout(int) __attribute__((weak));
++extern "C" const char* sky_portal_creation_name(int) __attribute__((weak));
++extern "C" int sky_portal_action(int,int) __attribute__((weak));
++extern "C" int sky_portal_volume() __attribute__((weak));
++extern "C" void sky_portal_set_volume(int) __attribute__((weak));
++
++// Images supplied by the user's installed Steam client, imported privately.
++ImTextureData* ControllerGlyphAtlas() {
++    static ImTextureData* texture=nullptr;static bool attempted=false;
++    if(attempted)return texture;attempted=true;
++    const auto* path=std::getenv("SKY_CONTROLLER_GLYPH_ATLAS");if(!path)return nullptr;
++    FILE* file=std::fopen(path,"rb");if(!file)return nullptr;
++    unsigned size[2]{};
++    if(std::fread(size,sizeof(size),1,file)!=1||size[0]!=512||size[1]!=256){std::fclose(file);return nullptr;}
++    auto* image=IM_NEW(ImTextureData)();image->Create(ImTextureFormat_RGBA32,512,256);
++    if(std::fread(image->Pixels,1,image->GetSizeInBytes(),file)!=static_cast<size_t>(image->GetSizeInBytes())){
++        std::fclose(file);IM_DELETE(image);return nullptr;
++    }
++    std::fclose(file);image->UseColors=true;image->UniqueID=10002;
++    ImGui::RegisterUserTexture(image);texture=image;return texture;
++}
++void PcFaceHint(int family,int button,const char* action) {
++    auto* atlas=ControllerGlyphAtlas();
++    if(atlas) {
++        const int positions[]{0,2,1,3};
++        const int cell=family==1?20+button:(family==3?10:0)+positions[button];
++        const ImVec2 uv0{float(cell%8)/8.0f,float(cell/8)/4.0f};
++        const ImVec2 uv1{uv0.x+1.0f/8.0f,uv0.y+1.0f/4.0f};
++        ImGui::Image(atlas->GetTexRef(),{27,27},uv0,uv1);
++    } else {
++        const char* ps[]{"Cross","Circle","Square","Triangle"};
++        const char* xbox[]{"A","B","X","Y"};const char* nintendo[]{"B","A","Y","X"};
++        ImGui::TextUnformatted(family==1?ps[button]:family==3?nintendo[button]:xbox[button]);
++    }
++    ImGui::SameLine();ImGui::TextUnformatted(action);
++}
++
++bool PcMenuEnabled() {
++    static const bool value=[] {const auto* p=std::getenv("SKY_PC_MENU");return p&&!std::strcmp(p,"1");}();return value;
++}
++int PcChoice(const char* key,int fallback) {const auto* p=std::getenv(key);return p?std::atoi(p):fallback;}
++ImVec4 PortalColor(const char* element) {
++    const std::string_view e=element?element:"";
++    if(e=="Water")return {0.22f,0.64f,1,1}; if(e=="Life")return {0.4f,0.85f,0.34f,1};
++    if(e=="Fire")return {1,0.4f,0.2f,1}; if(e=="Magic")return {0.75f,0.4f,1,1};
++    if(e=="Earth")return {0.85f,0.62f,0.3f,1}; if(e=="Tech")return {1,0.77f,0.25f,1};
++    if(e=="Undead")return {0.77f,0.78f,0.95f,1}; if(e=="Air")return {0.54f,0.86f,0.95f,1};
++    if(e=="Light")return {1,0.96f,0.7f,1};return {0.76f,0.5f,0.74f,1};
++}
++int portal_columns=8,portal_rows=6;
++ImTextureData* PortalAtlas() {
++    static ImTextureData* texture=nullptr;static bool attempted=false;
++    if(attempted)return texture;attempted=true;if(!sky_portal_atlas)return nullptr;
++    FILE* file=std::fopen(sky_portal_atlas(),"rb");if(!file)return nullptr;unsigned size[2]{};
++    if(std::fread(size,sizeof(size),1,file)!=1||!size[0]||!size[1]||size[0]>4096||size[1]>6144||
++       (size[0]==1024?size[1]!=768:(size[0]%96||size[1]%96))){std::fclose(file);return nullptr;}
++    const unsigned cell=size[0]==1024?128:96;portal_columns=static_cast<int>(size[0]/cell);portal_rows=static_cast<int>(size[1]/cell);
++    auto* image=IM_NEW(ImTextureData)();image->Create(ImTextureFormat_RGBA32,static_cast<int>(size[0]),static_cast<int>(size[1]));
++    if(std::fread(image->Pixels,1,image->GetSizeInBytes(),file)!=static_cast<size_t>(image->GetSizeInBytes())){std::fclose(file);IM_DELETE(image);return nullptr;}
++    std::fclose(file);image->UseColors=true;image->UniqueID=10001;ImGui::RegisterUserTexture(image);texture=image;return texture;
++}
++bool PortalMatches(const char* name,const char* search) {
++    std::string a=name?name:"",b=search?search:"";
++    std::transform(a.begin(),a.end(),a.begin(),[](unsigned char c){return char(std::tolower(c));});
++    std::transform(b.begin(),b.end(),b.begin(),[](unsigned char c){return char(std::tolower(c));});return a.find(b)!=std::string::npos;
++}
++void PortalImage(int cell,ImVec2 position,ImVec2 size) {
++    auto* atlas=PortalAtlas();if(!atlas||cell<0||cell>=portal_columns*portal_rows)return;
++    const ImVec2 uv0{float(cell%portal_columns)/float(portal_columns),float(cell/portal_columns)/float(portal_rows)};
++    const ImVec2 uv1{uv0.x+1.0f/float(portal_columns),uv0.y+1.0f/float(portal_rows)};
++    ImGui::GetWindowDrawList()->AddImage(atlas->GetTexRef(),position,{position.x+size.x,position.y+size.y},uv0,uv1);
++}
++// Portal base + swirling aperture, rather than a diamond/figure symbol.
++void PcToolIcon(int icon,ImVec2 p,float side,ImU32 color) {
++    auto* draw=ImGui::GetWindowDrawList();const float u=side/28.0f;const float line=1.8f*u;
++    const auto point=[&](float x,float y){return ImVec2(p.x+x*u,p.y+y*u);};
++    if(icon==0){draw->AddEllipse(point(14,10),{11*u,5*u},color,0,24,line);draw->AddEllipse(point(14,17),{11*u,5*u},color,0,24,line);draw->AddLine(point(3,10),point(3,17),color,line);draw->AddLine(point(25,10),point(25,17),color,line);draw->AddCircle(point(14,10),2.5f*u,color,18,line);}
++    else if(icon==1){draw->AddRect(point(3,3),point(25,20),color,2*u,line);draw->AddLine(point(14,20),point(14,25),color,line);draw->AddLine(point(9,25),point(19,25),color,line);}
++    else if(icon==2){draw->AddLine(point(3,24),point(3,4),color,line);draw->AddLine(point(3,24),point(25,24),color,line);draw->AddLine(point(5,19),point(11,12),color,line);draw->AddLine(point(11,12),point(17,16),color,line);draw->AddLine(point(17,16),point(25,5),color,line);}
++    else if(icon==3){draw->AddRect(point(2,7),point(26,22),color,6*u,line);draw->AddLine(point(7,14),point(13,14),color,line);draw->AddLine(point(10,11),point(10,17),color,line);draw->AddCircleFilled(point(20,12),1.5f*u,color);draw->AddCircleFilled(point(22,17),1.5f*u,color);}
++    else if(icon==4){draw->AddRect(point(3,10),point(9,19),color,1*u,line);draw->AddLine(point(9,10),point(15,5),color,line);draw->AddLine(point(15,5),point(15,24),color,line);draw->AddLine(point(15,24),point(9,19),color,line);draw->AddBezierCubic(point(20,7),point(28,10),point(28,20),point(20,23),color,line);}
++    else{draw->AddCircle(point(14,14),11*u,color,24,line);draw->AddLine(point(14,12),point(14,21),color,line);draw->AddCircleFilled(point(14,7),1.4f*u,color);}
++}
++int portal_slot=0;bool portal_coop=false;
++int PortalSelected(int kind){for(int i=0;i<sky_portal_count(kind);++i)if(sky_portal_state(kind,i)&2)return i;return -1;}
++bool PortalCard(const char* id,const char* name,int cell,float width,float height,bool selected,const char* detail=nullptr,int emblem=-1) {
++    const float scale=base_scale;const auto position=ImGui::GetCursorScreenPos();
++    ImGui::PushStyleColor(ImGuiCol_Button,selected?ImVec4(0.18f,0.22f,0.24f,1):ImVec4(0.15f,0.15f,0.17f,1));
++    ImGui::PushStyleColor(ImGuiCol_Border,selected?ImVec4(1,1,1,1):ImVec4(0.23f,0.23f,0.25f,1));
++    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,selected?2*scale:1*scale);
++    const bool pressed=ImGui::Button(id,{width,height});ImGui::PopStyleVar();ImGui::PopStyleColor(2);
++    const float side=std::min(width-12*scale,height-(detail?55:34)*scale);
++    const ImVec2 image{position.x+(width-side)*0.5f,position.y+6*scale};
++    if(cell>=0)PortalImage(cell,image,{side,side});else PcToolIcon(0,{image.x+side*0.28f,image.y+side*0.28f},side*0.44f,IM_COL32(185,190,198,255));
++    auto* draw=ImGui::GetWindowDrawList();const ImVec4 clip{position.x+5*scale,position.y,position.x+width-5*scale,position.y+height};
++    draw->AddText(ImGui::GetFont(),13*scale,{position.x+8*scale,image.y+side+5*scale},IM_COL32(250,250,250,255),name,nullptr,width-16*scale,&clip);
++    if(detail){float x=position.x+8*scale;if(emblem>=0){PortalImage(emblem,{x,position.y+height-22*scale},{17*scale,17*scale});x+=21*scale;}
++        draw->AddText(ImGui::GetFont(),11*scale,{x,position.y+height-21*scale},IM_COL32(191,191,201,255),detail,nullptr,width-16*scale,&clip);}
++    return pressed;
++}
++void PortalCollection(int kind) {
++    const float scale=base_scale;static char search[3][96]{};const int collection=kind==0&&portal_slot==3?3:kind;
++    if(kind==1){
++        ImGui::TextUnformatted("Place an empty trap");ImGui::Spacing();
++        const int count=sky_portal_trap_element_count?sky_portal_trap_element_count():0;const int columns=6;const float gap=6*scale;const float available=ImGui::GetContentRegionAvail().x;const float width=(available-gap*5)/6;
++        for(int row=0;row*columns<count;++row){const int n=std::min(columns,count-row*columns);const float start=ImGui::GetCursorPosX()+(available-(width*n+gap*(n-1)))*0.5f;
++            for(int col=0;col<n;++col){const int element=row*columns+col;if(col)ImGui::SameLine(0,gap);else ImGui::SetCursorPosX(start);ImGui::PushID(element);
++                const auto pos=ImGui::GetCursorScreenPos();const int current=PortalSelected(1);const bool selected=current>=0&&sky_portal_trap_capture(current)==0&&sky_portal_trap_element(current)==element;
++                ImGui::PushStyleColor(ImGuiCol_Button,selected?ImVec4(1,1,1,1):ImVec4(0.16f,0.16f,0.18f,1));
++                if(ImGui::Button("##element",{width,84*scale})&&sky_portal_action)sky_portal_action(12,element);ImGui::PopStyleColor();
++                PortalImage(sky_portal_element_portrait?sky_portal_element_portrait(element):-1,{pos.x+(width-36*scale)/2,pos.y+10*scale},{36*scale,36*scale});
++                const char* name=sky_portal_trap_element_name(element);const float text_width=ImGui::CalcTextSize(name).x*12*scale/ImGui::GetFontSize();
++                ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(),12*scale,{pos.x+(width-text_width)/2,pos.y+58*scale},selected?IM_COL32(17,17,17,255):IM_COL32(245,245,245,255),name);ImGui::PopID();
++            }
++        }
++        ImGui::Spacing();ImGui::TextUnformatted("Captured villains");ImGui::Spacing();
++    }else{
++        ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##collection_search",kind==2?"Search items...":"Search Skylanders...",search[kind],sizeof(search[kind]));
++        const float half=(ImGui::GetContentRegionAvail().x-ImGui::GetStyle().ItemSpacing.x)/2;
++        if(ImGui::Button(kind==2?"Create item":"Create figure",{half,44*scale}))ImGui::OpenPopup("create_figure");ImGui::SameLine();
++        if(ImGui::Button("Import file",{half,44*scale})&&sky_portal_action)sky_portal_action(collection==3?11:2,0);
++        ImGui::SetNextWindowSize({std::min(520*scale,ImGui::GetMainViewport()->WorkSize.x-30*scale),std::min(620*scale,ImGui::GetMainViewport()->WorkSize.y-40*scale)},ImGuiCond_Always);
++        if(ImGui::BeginPopup("create_figure")){
++            static char filter[96]{};ImGui::TextUnformatted(kind==2?"Create an item":"Create a Skylander");ImGui::TextWrapped("New figures start fresh. Your saved figures are kept.");ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##create_filter","Search characters and editions...",filter,sizeof(filter));
++            ImGui::BeginChild("creator_grid",{0,-52*scale});
++            if(sky_portal_creation_count&&ImGui::BeginTable("create_cards",3,ImGuiTableFlags_SizingStretchSame)){
++                for(int i=0;i<sky_portal_creation_count();++i){if(sky_portal_creation_kind(i)!=kind)continue;const std::string name=sky_portal_creation_name(i);if(!PortalMatches(name.c_str(),filter))continue;ImGui::TableNextColumn();ImGui::PushID(i);const float width=ImGui::GetContentRegionAvail().x;
++                    if(PortalCard("##create",name.c_str(),sky_portal_creation_portrait?sky_portal_creation_portrait(i):-1,width,width+40*scale,false)&&sky_portal_action){sky_portal_action(collection==3?10:5,i);ImGui::CloseCurrentPopup();}ImGui::PopID();}
++                ImGui::EndTable();}
++            ImGui::EndChild();if(ImGui::Button("Cancel",{-1,44*scale}))ImGui::CloseCurrentPopup();ImGui::EndPopup();}
++    }
++    int shown=0;std::vector<int> entries;
++    if(kind==1){for(int element=0;element<sky_portal_trap_element_count();++element)for(int i=0;i<sky_portal_count(1);++i)if(sky_portal_trap_element(i)==element)entries.push_back(i);}
++    else for(int i=0;i<sky_portal_count(kind);++i)entries.push_back(i);
++    if(ImGui::BeginTable("saved_cards",3,ImGuiTableFlags_SizingStretchSame)){
++        for(int i:entries){const auto state=sky_portal_state(collection,i);if(kind==1&&(!(state&1)||sky_portal_trap_capture(i)==0))continue;const std::string name=sky_portal_name(kind,i);if(kind!=1&&!PortalMatches(name.c_str(),search[kind]))continue;
++            ++shown;ImGui::TableNextColumn();ImGui::PushID(i);const float width=ImGui::GetContentRegionAvail().x;const auto* detail=kind==1?sky_portal_detail(kind,i):nullptr;const int emblem=kind==1&&sky_portal_element_portrait?sky_portal_element_portrait(sky_portal_trap_element(i)):-1;
++            if(PortalCard("##saved",name.c_str(),sky_portal_portrait(kind,i),width,width+(kind==1?55:38)*scale,(state&2)!=0,detail,emblem)&&sky_portal_action)sky_portal_action(kind==2?8:collection==3?6:kind,i);
++            ImGui::PopID();}
++        ImGui::EndTable();}
++    if(!shown)ImGui::TextWrapped(kind==1?"Captured villains appear here after an in-game capture.":"Create or import a figure to add it to your collection.");
++}
++void PortalPanel() {
++    const float scale=base_scale;static bool initialized=false;
++    if(!initialized){portal_coop=PortalSelected(3)>=0;initialized=true;}
++    const int kinds[]{0,3,1,2};const int columns=portal_coop?2:3;
++    if(ImGui::BeginTable("portal_slots",columns,ImGuiTableFlags_SizingStretchSame)){
++        for(int kind:kinds){if(kind==3&&!portal_coop)continue;ImGui::TableNextColumn();ImGui::PushID(kind);const int active=PortalSelected(kind);const auto* title=kind==0?"Player 1":kind==3?"Player 2":kind==1?"Trap":"Item";
++            const std::string name=active>=0?sky_portal_name(kind,active):"Empty";int portrait=active>=0?sky_portal_portrait(kind,active):-1;
++            if(kind==1&&active>=0&&portrait<0&&sky_portal_element_portrait)portrait=sky_portal_element_portrait(sky_portal_trap_element(active));
++            if(PortalCard("##slot",title,portrait,ImGui::GetContentRegionAvail().x,151*scale,portal_slot==kind,name.c_str()))portal_slot=kind;ImGui::PopID();}
++        ImGui::EndTable();}
++    const float half=(ImGui::GetContentRegionAvail().x-ImGui::GetStyle().ItemSpacing.x)/2;
++    if(ImGui::Button(portal_coop?"Remove Player 2":"Add Player 2",{half,44*scale})){
++        portal_coop=!portal_coop;if(!portal_coop){if(sky_portal_action)sky_portal_action(7,0);if(portal_slot==3)portal_slot=0;}else portal_slot=3;}
++    ImGui::SameLine();if(ImGui::Button(portal_slot==1?"Eject trap":portal_slot==2?"Remove item":"Remove figure",{half,44*scale})&&sky_portal_action)sky_portal_action(portal_slot==1?4:portal_slot==2?9:portal_slot==3?7:3,0);
++    ImGui::Spacing();PortalCollection(portal_slot==3?0:portal_slot);ImGui::Spacing();if(sky_portal_status)ImGui::TextWrapped("%s",sky_portal_status());
++}
++
++void PcMenu() {
++    static int resolution=std::clamp(PcChoice("SKY_PC_RESOLUTION",2),0,5);
++    static int quality=std::clamp(PcChoice("SKY_PC_QUALITY",1),0,2),page=-1;
++    static bool fullscreen=PcChoice("SKY_FULLSCREEN",0)!=0,counter=PcChoice("SKY_FPS_COUNTER",1)!=0,failed=false,portal_open=true;
++    static float expansion=0;
++    const auto* v=ImGui::GetMainViewport();const float scale=base_scale;
++    const float margin=16*scale,rail_height=442*scale;
++    const ImVec2 rail_pos{v->WorkPos.x+margin,v->WorkPos.y+margin};
++    const bool hover=ImGui::IsMouseHoveringRect(rail_pos,{rail_pos.x+(68+122*expansion)*scale,rail_pos.y+rail_height},false);
++    expansion+=(float(hover)-expansion)*std::min(1.0f,ImGui::GetIO().DeltaTime*14);
++    const float rail_width=(68+122*expansion)*scale;
++    const auto flags=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings;
++    ImGui::PushStyleColor(ImGuiCol_WindowBg,{0.075f,0.075f,0.08f,1});
++    ImGui::PushStyleColor(ImGuiCol_ChildBg,{0,0,0,0});ImGui::PushStyleColor(ImGuiCol_Header,{0.22f,0.22f,0.24f,1});
++    ImGui::PushStyleColor(ImGuiCol_Button,{0.17f,0.17f,0.19f,1});ImGui::PushStyleColor(ImGuiCol_ButtonHovered,{0.28f,0.28f,0.30f,1});
++    ImGui::PushStyleColor(ImGuiCol_FrameBg,{0.16f,0.16f,0.18f,1});
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{18*scale,18*scale});ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,12*scale);
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,22*scale);ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{8*scale,10*scale});
++    ImGui::SetNextWindowPos(rail_pos);ImGui::SetNextWindowSize({rail_width,std::min(rail_height,v->WorkSize.y-2*margin)});
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{8*scale,14*scale});ImGui::PushStyleColor(ImGuiCol_WindowBg,{0.055f,0.055f,0.055f,1});
++    if(ImGui::Begin("##pc_tool_rail",nullptr,flags|ImGuiWindowFlags_NoScrollbar)){
++        const char* labels[]{"Virtual portal","Display","Performance","Controls","Audio","About"};
++        for(int icon=0;icon<6;++icon){ImGui::PushID(icon);const auto pos=ImGui::GetCursorScreenPos();const bool selected=icon==0?portal_open:page==icon-1;
++            ImGui::PushStyleColor(ImGuiCol_Button,selected?ImVec4(1,1,1,1):ImVec4(0,0,0,0));
++            if(ImGui::Button("##tool",{-1,48*scale})){if(icon==0)portal_open=!portal_open;else page=page==icon-1?-1:icon-1;}ImGui::PopStyleColor();
++            PcToolIcon(icon,{pos.x+12*scale,pos.y+11*scale},26*scale,selected?IM_COL32(20,20,20,255):IM_COL32(245,245,245,255));
++            if(expansion>0.65f)ImGui::GetWindowDrawList()->AddText({pos.x+51*scale,pos.y+15*scale},selected?IM_COL32(20,20,20,255):IM_COL32(245,245,245,255),labels[icon]);
++            if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",labels[icon]);ImGui::PopID();if(icon==0){ImGui::Spacing();ImGui::Separator();ImGui::Spacing();}
++        }
++        if(ImGui::Button(expansion>0.65f?"Close":"X",{-1,40*scale}))SetOpen(false);
++    }ImGui::End();ImGui::PopStyleColor();ImGui::PopStyleVar();
++    const float panel_x=rail_pos.x+rail_width+12*scale;
++    if(page>=0){
++        const float width=std::min(350*scale,v->WorkSize.x-(panel_x-v->WorkPos.x)-margin);
++        ImGui::SetNextWindowPos({panel_x,rail_pos.y});ImGui::SetNextWindowSize({width,std::min(690*scale,v->WorkSize.y-2*margin)});
++        if(ImGui::Begin("##pc_settings_popout",nullptr,flags)){
++            const char* titles[]{"Display","Performance","Controls","Audio","About"};
++            const auto icon_pos=ImGui::GetCursorScreenPos();PcToolIcon(page+1,icon_pos,23*scale,IM_COL32(255,255,255,255));ImGui::Dummy({26*scale,25*scale});ImGui::SameLine();ImGui::TextUnformatted(titles[page]);
++            ImGui::SameLine(ImGui::GetWindowWidth()-52*scale);if(ImGui::SmallButton("X##settings"))page=-1;
++            ImGui::Spacing();ImGui::BeginChild("settings_body",{0,-126*scale});
++        if(page==0) {
++            ImGui::TextUnformatted("DISPLAY");ImGui::TextDisabled("Changes apply after restart");ImGui::Spacing();
++            ImGui::TextUnformatted("Render resolution");ImGui::SetNextItemWidth(-1);
++            ImGui::Combo("##resolution",&resolution,"1280 x 720\0" "1600 x 900\0" "1920 x 1080\0" "2560 x 1440\0" "2560 x 1600\0" "3840 x 2160\0");
++            ImGui::TextUnformatted("Graphics quality");ImGui::SetNextItemWidth(-1);
++            ImGui::Combo("##quality",&quality,"Performance\0Balanced\0High\0");
++            ImGui::TextWrapped("%s",quality==0?"Lighter shadows for more GPU headroom.":quality==1?"Original shadow detail.":"Sharper shadows with a higher GPU cost.");
++            ImGui::Checkbox("Fullscreen",&fullscreen);
++        } else if(page==1) {
++            ImGui::TextUnformatted("PERFORMANCE");ImGui::TextDisabled("Applies immediately");ImGui::Spacing();
++            if(sky_pc_frame_limit&&sky_pc_set_frame_limit) {
++                const bool automatic=sky_pc_frame_policy && sky_pc_frame_policy()!=0;
++                if(sky_pc_set_frame_policy && sky_pc_auto_available) {
++                    ImGui::BeginDisabled(!sky_pc_auto_available());
++                    if(ImGui::RadioButton("Automatic (30 / 60 FPS)",automatic))sky_pc_set_frame_policy(1);
++                    ImGui::EndDisabled();
++                    if(!sky_pc_auto_available())ImGui::TextWrapped("Automatic requires the verified game-state mod. Enable it in the launcher.");
++                }
++                const int cap=sky_pc_frame_limit();
++                if(ImGui::RadioButton("30 FPS",!automatic && cap==30))sky_pc_set_frame_limit(30);
++                ImGui::SameLine();ImGui::BeginDisabled(!PcChoice("SKY_ALLOW_60",0));
++                if(ImGui::RadioButton("60 FPS",!automatic && cap==60))sky_pc_set_frame_limit(60);ImGui::EndDisabled();
++            }
++            if(ImGui::Checkbox("Show FPS counter",&counter))BbSettings::Get().show_fps=counter;
++            ImGui::TextWrapped("Automatic keeps videos at 30 and supported in-engine cinematics at 60. Loading, menus and portal arrival retain protective gates. Manual buttons or Shift+F1 take control; select Automatic to resume scene switching.");
++            ImGui::TextWrapped("MangoHud is an optional external overlay.");
++        } else if(page==2) {
++            ImGui::TextUnformatted("CONTROLS");ImGui::Spacing();
++            if(sky_pc_controller_layout && sky_pc_set_controller_layout) {
++                int layout=sky_pc_controller_layout();
++                if(ImGui::Combo("Controller setup",&layout,"Controller(s)\0Keyboard + controller\0"))sky_pc_set_controller_layout(layout);
++                ImGui::TextWrapped("Apply settings and restart to change player assignments.");
++                ImGui::Spacing();
++            }
++            if(sky_pc_controller_glyphs && sky_pc_set_controller_glyphs) {
++                int style=sky_pc_controller_glyphs();
++                if(ImGui::Combo("Button glyphs",&style,"Automatic\0PlayStation\0Xbox\0Nintendo\0"))sky_pc_set_controller_glyphs(style);
++                const auto* active=std::getenv("SKY_ACTIVE_CONTROLLER_GLYPHS");
++                ImGui::Text("Game glyph pack: %s",active?active:"playstation");
++                ImGui::TextWrapped("Apply settings and restart to change the shared in-game font. Automatic uses the first mapped controller at launch. Mixed controllers share that font.");
++                ImGui::Spacing();
++            }
++            if(sky_controller_family)for(int player=0;player<2;++player) {
++                const int family=sky_controller_family(player);
++                const char* type=family==1?"PlayStation":family==2?"Xbox":family==3?"Nintendo":family==4?"Gamepad":player==0?"Keyboard":"Not connected";
++                ImGui::Text("Player %d: %s",player+1,type);
++                const char* buttons=family==1?"Confirm: Cross   Back: Circle\nAttack: Square   Secondary: Triangle":family==2?"Confirm: A   Back: B\nAttack: X   Secondary: Y":family==3?"Confirm: B   Back: A\nAttack: Y   Secondary: X":family==4?"Confirm: South   Back: East\nAttack: West   Secondary: North":player==0?"Confirm: Enter   Back: Escape\nAttack: Z   Secondary: X":"Connect a second controller to join.";
++                if(family>=1 && family<=3) {
++                    PcFaceHint(family,0,"Confirm / Jump");PcFaceHint(family,1,"Back / Attack 3");
++                    PcFaceHint(family,2,"Attack 1");PcFaceHint(family,3,"Attack 2");
++                } else ImGui::TextWrapped("%s",buttons);
++                ImGui::Spacing();
++            }
++            ImGui::TextWrapped("F6 / Insert     Open or close these panels\nL3 + R3     Controller shortcut\nShift + F1     30 / 60 FPS\nF2     Import Skylander\nF3     Remove Skylander\nF5     Eject trap");
++            ImGui::Spacing();ImGui::TextWrapped("The mouse is free to leave the window. Game controls are blocked while these panels are open. The world keeps running.");
++        } else if(page==3) {
++            ImGui::TextUnformatted("PORTAL SPEAKER");ImGui::Spacing();
++            if(sky_portal_volume&&sky_portal_set_volume) {
++                int volume=sky_portal_volume();ImGui::SetNextItemWidth(-1);
++                if(ImGui::SliderInt("##portal_volume",&volume,0,100,"%d%%"))sky_portal_set_volume(volume);
++            }
++            ImGui::TextWrapped("Portal voices play quietly through your PC speakers. Default: 30%%. Set to zero to mute only the portal.");
++        } else {
++            ImGui::TextUnformatted("YOUR PC PORTAL");ImGui::Spacing();
++            ImGui::TextWrapped("Choose an element to place an empty trap. Captured villains appear from the saved trap data; selecting a portrait keeps that trap's progress.");
++            ImGui::Spacing();ImGui::TextDisabled("Portraits: Activision / darkSpyro");
++            ImGui::TextWrapped("Portraits are cached locally. The game needs no network connection.");
++        }
++
++            ImGui::EndChild();ImGui::Separator();
++        ImGui::TextWrapped("Save game progress before restarting.");
++        ImGui::BeginDisabled(!std::getenv("SKY_PC_SETTINGS_REQUEST"));
++        if(ImGui::Button("Apply settings and restart",{-1,34*scale})) {
++            failed=!sky_pc_save_settings||!sky_pc_save_settings(resolution,quality,fullscreen,counter);
++            if(!failed){SDL_Event event{};event.type=SDL_EVENT_QUIT;SDL_PushEvent(&event);}
++        }
++        ImGui::EndDisabled();if(failed)ImGui::TextWrapped("Could not save settings. Try again.");
++
++        }ImGui::End();
++    }
++    if(portal_open&&(page<0||v->WorkSize.x>=1000*scale)){
++        const float right=std::min(450*scale,v->WorkSize.x-rail_width-3*margin);
++        ImGui::SetNextWindowPos({v->WorkPos.x+v->WorkSize.x-right-margin,v->WorkPos.y+margin});ImGui::SetNextWindowSize({right,v->WorkSize.y-2*margin});
++        if(ImGui::Begin("##pc_right_portal",nullptr,flags)){
++            ImGui::TextUnformatted("Virtual portal");ImGui::SameLine(ImGui::GetWindowWidth()-52*scale);if(ImGui::SmallButton("X##portal"))portal_open=false;ImGui::Spacing();
++            if(sky_portal_count&&sky_portal_state&&sky_portal_name&&sky_portal_trap_capture&&sky_portal_trap_element_count)PortalPanel();
++            else ImGui::TextWrapped("Virtual portal is unavailable in this build.");
++        }ImGui::End();
++    }
++    ImGui::PopStyleVar(4);ImGui::PopStyleColor(6);
++}
++
+ // The settings menu as in 0.3 and 0.4: one window (moved with the mouse, its place kept in
+ // bbport.ini), sections one under the other, ImGui's own widgets and keyboard/gamepad navigation.
+ void Menu() {
++    if(PcMenuEnabled()){PcMenu();return;}
+     auto& s = BbSettings::Get();
+     const ImGuiViewport* viewport = ImGui::GetMainViewport();
+     // Where it was moved last (bbport.ini menu_pos, a fraction of the screen), kept on screen.
+@@ -1014,6 +1335,7 @@
+         ImGui::DestroyContext();
+         return;
+     }
++    if(PcMenuEnabled())BbSettings::Get().show_fps=PcChoice("SKY_FPS_COUNTER",1)!=0;
+     initialized = true;
+     std::printf("Overlay: menu ready (Insert or L3+R3)\n");
+ }
+@@ -1032,6 +1354,8 @@
+         }
+     }
+ }
++
++extern "C" void bbgpu_pc_menu_toggle(){std::scoped_lock lock{imgui_mutex};if(initialized)SetOpen(!menu_open);}
+ 
+ bool HandleEvent(const SDL_Event& event) {
+     std::scoped_lock lock{imgui_mutex};
+--- a/gpu/shim/window.cpp
++++ b/gpu/shim/window.cpp
+@@ -16,6 +16,11 @@
+ 
+ 
+ namespace {
++// Compatibility hosts without mouse-look must not confine the desktop pointer.
++bool FreeMouse() {
++    static const bool enabled=[] {const char* p=std::getenv("BB_FREE_MOUSE");return p && !std::strcmp(p,"1");}();
++    return enabled;
++}
+ std::array<std::atomic<BbGpuEventFilter>, 4> event_filters{};
+ 
+ bool FilteredByModule(const SDL_Event* event, SDL_Window* window) {
+@@ -214,6 +219,7 @@
+ // Mouse look: relative mode while the window holds the mouse (runtime_pad.c turns its motion into
+ // the right stick). Motion from before is dropped, so taking the mouse does not turn the camera.
+ void WindowSDL::CaptureMouse(bool capture) {
++    if (capture && FreeMouse()) return;
+     if (capture == mouse_captured.load(std::memory_order_relaxed)) {
+         return;
+     }
+@@ -305,7 +311,7 @@
+             mouse_user_released = false; // the click takes the window back (it is not a game button)
+             continue;
+         }
+-        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !mouse_captured.load(std::memory_order_relaxed) &&
++        if (!FreeMouse() && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !mouse_captured.load(std::memory_order_relaxed) &&
+             mouse_look.load(std::memory_order_relaxed) && !BbOverlay::MenuOpen() && !pointer) {
+             CaptureMouse(true);
+             continue;
+@@ -384,7 +390,7 @@
+     }
+     {
+         const bool focused = (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+-        const bool hold = focused && !mouse_user_released;
++        const bool hold = focused && !mouse_user_released && !FreeMouse();
+         if (hold != mouse_grabbed) {
+             mouse_grabbed = hold;
+             SDL_SetWindowMouseGrab(window, hold);
+@@ -413,7 +419,7 @@
+     const u64 idle = SDL_GetTicks() - last_mouse_motion_ms;
+     const bool hide = !BbOverlay::MenuOpen() &&
+                       (mouse_captured.load(std::memory_order_relaxed) ||
+-                       (pointer_shown ? idle > 1500 : (fullscreen || idle > 3000)));
++                       (pointer_shown ? idle > 1500 : ((fullscreen && !FreeMouse()) || idle > 3000)));
+     if (hide != cursor_hidden) {
+         cursor_hidden = hide;
+         hide ? SDL_HideCursor() : SDL_ShowCursor();
+--- a/src/runtime_audio.c
++++ b/src/runtime_audio.c
+@@ -215,11 +215,26 @@
+ static ABI int32_t audio_outputs(const OutputParam *params, uint32_t count) {
+     if (!params) return ERR_INVALID_POINTER;
+     if (!count || count>PORTS) return ERR_PORT_FULL;
+-    int32_t result=0;
+-    /* One period per call for all ports (FMOD feeds main and BGM together): pacing every
+-       port would halve the rate and starve both. */
+-    for (uint32_t i=0;i<count;++i) { int32_t r=output_port(params[i].handle,params[i].data,i==0); if (r<0) return r; result=r; }
+-    return result;
++    /* Validate the whole group before submitting anything. The grouped API
++       returns frames per port, whereas Output returns interleaved samples. */
++    int frames=0;
++    pthread_mutex_lock(&table_lock);
++    for (uint32_t i=0;i<count;++i) {
++        int32_t error=0; Port *p=port_of(params[i].handle,&error);
++        if (!p) {pthread_mutex_unlock(&table_lock);return error;}
++        for (uint32_t j=0;j<i;++j) if (params[i].handle==params[j].handle) {
++            pthread_mutex_unlock(&table_lock);return ERR_INVALID_PORT;
++        }
++        if (i && p->frames!=frames) {pthread_mutex_unlock(&table_lock);return ERR_INVALID_SIZE;}
++        frames=p->frames;
++    }
++    pthread_mutex_unlock(&table_lock);
++    /* One period for the group; pacing every port would starve all ports. */
++    for (uint32_t i=0;i<count;++i) {
++        int32_t r=output_port(params[i].handle,params[i].data,i==0);
++        if (r<0) return r;
++    }
++    return frames;
+ }
+ static ABI int32_t audio_volume(int32_t handle, int32_t flags, const int32_t *volume) {
+     int32_t error=0;
+@@ -228,11 +243,12 @@
+     pthread_mutex_unlock(&table_lock);
+     if (!p) return error;
+     if (!volume) return ERR_INVALID_POINTER;
++    /* One scalar applies to every selected channel; this is not an array. */
++    const int32_t value=*volume;
++    if(getenv("BB_AUDIO_CONTROL_TRACE"))printf("Audio volume: handle=%x mask=%x value=%d\n",handle,flags,value);
++    if (value<0 || value>VOLUME_0DB) return ERR_INVALID_VOLUME;
+     pthread_mutex_lock(&p->lock);
+-    for (int c=0;c<8;++c) if (flags & (1<<c)) {
+-        if (volume[c]<0 || volume[c]>VOLUME_0DB) { pthread_mutex_unlock(&p->lock); return ERR_INVALID_VOLUME; }
+-        p->volume[c]=volume[c];
+-    }
++    for (int c=0;c<8;++c) if (flags & (1<<c)) p->volume[c]=value;
+     pthread_mutex_unlock(&p->lock);
+     return 0;
+ }
+--- /dev/null
++++ b/gpu/render/capture_window.h
+@@ -0,0 +1,36 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#pragma once
++#include <cstdint>
++
++namespace Vulkan {
++// A diagnostic interval in software flip counts, not a GPU/scanout frame boundary.
++class CaptureWindow {
++public:
++    enum class Action { None, Begin, FinishFlips, FinishBudget };
++    static constexpr unsigned MaxPolls = 8192;
++    Action Advance(bool armed, std::uint64_t flips, unsigned desired) {
++        if (desired < 1 || desired > 4) return Action::None;
++        if (armed) {
++            start = flips;
++            polls = 0;
++            running = true;
++            return Action::Begin;
++        }
++        if (!running) return Action::None;
++        if (flips >= start && flips - start >= desired) {
++            running = false;
++            return Action::FinishFlips;
++        }
++        if (++polls >= MaxPolls) {
++            running = false;
++            return Action::FinishBudget;
++        }
++        return Action::None;
++    }
++    std::uint64_t Start() const { return start; }
++private:
++    std::uint64_t start{};
++    unsigned polls{};
++    bool running{};
++};
++} // namespace Vulkan

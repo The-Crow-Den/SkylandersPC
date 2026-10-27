@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "runtime": {
+    "name": "shadPS4",
+    "version_from_archive": "0.20.0",
+    "source_commit": null,
+    "archive": "shadps4-linux-sdl-0.20.0.zip",
+    "archive_sha256": "be25d0324cd7b74068d32cdb66fa1b7b1e7bb499b062be51c7006d27d41d4255",
+    "member": "Shadps4-sdl.AppImage",
+    "member_sha256": "6cf48bb6f1d9526e347091d9a6d47a3e63f31a9e953ff1761baa1f1ad78b523d",
+    "status": "historical user-supplied reference binary; not the current native host; no redistribution approval established"
+  },
+  "references": [
+    {
+      "archive": "bbhost-master.zip",
+      "sha256": "eae71e42ec8602e33f2ab45a40b85adc774fe362ccffd91061df4cda8070a878",
+      "commit": "566184a74f071166299bb656c4af479e5bbe2771",
+      "role": "reference only; not integrated"
+    },
+    {
+      "archive": "bloodborne_pc-master.zip",
+      "sha256": "953c3da81c63915dfa70622289c505a7dd77498ba3cc5bf1bdd16943f80806c3",
+      "commit": "8185b88d80573fa300595d5c54450183b4109935",
+      "role": "GPU/platform/audio/memory provider adopted locally; canonical changes in LICENSES/bbport-source.json"
+    },
+    {
+      "archive": "bloodborne-recomp-main.zip",
+      "sha256": "0b2a5be69f897d91dda5d37a0e02a89f3acf1849775d31a9ce13e7f014ae623b",
+      "commit": "b9652d75edc0a281f06cec0da6ff72e9f5150a70",
+      "role": "reference only; not integrated"
+    }
+  ]
+}

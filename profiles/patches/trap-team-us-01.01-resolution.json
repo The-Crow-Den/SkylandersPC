@@ -1,0 +1,14 @@
+{
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "renderer_sha256": "157228fa90041b0641c337f3b93bea3e4e676ca4336deb29833f2408bfc06652",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "pack_sha256": {
+    "original": "b7161abd9337475591220cbe39509e13951461437c36cbfe46307e10545c1a84",
+    "60": "4053447875789815ee5ce771047a99e54ab549fe035543a25f286c8ef6ab0bdf",
+    "60-delta": "126e196a3104cf246af8e8503bbfd0461f4f4f54a065b7ec7f78cbc5ce204eb2"
+  },
+  "virtual_address": 4206588,
+  "expected_hex": "c7459080070000c7459438040000",
+  "status": "US 01.01 expected bytes verified; live gameplay validation pending"
+}

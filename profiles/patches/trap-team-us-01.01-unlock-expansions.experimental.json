@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "recipe_features": [
+    "iga-block-alignment"
+  ],
+  "revision": 1,
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "name": "Expansion eligibility",
+  "status": "Experimental: static getter-only patch; level selection and deferred introductions require live acceptance",
+  "behavior": "Reports global and slot expansion unlock reads as true; original setters and movie/first-play data untouched",
+  "assets": [
+    {
+      "asset": "permanent/global.bld",
+      "source_sha256": "00210f92ab2471bb55a6595d99a1a8f1c4b9617469b2966a4a51f5a74e055142",
+      "chunks": [
+        {
+          "offset": 919552,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "decoded_sha256": "8bcd5c759dd552e30a265337dd45e14909d90d824850a440ccf717be5a3767fa",
+          "encoding": "raw-lzma",
+          "edits": [
+            {
+              "offset": 20984,
+              "expected_hex": "f04a250000000000",
+              "replacement_hex": "60dd0a0000000000"
+            },
+            {
+              "offset": 21960,
+              "expected_hex": "f04a250000000000",
+              "replacement_hex": "60dd0a0000000000"
+            }
+          ],
+          "encoded_size": 3661,
+          "properties_hex": "5d00800000",
+          "alignment": 2048
+        }
+      ]
+    }
+  ]
+}

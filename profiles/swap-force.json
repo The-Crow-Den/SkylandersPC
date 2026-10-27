@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "swap-force",
+  "title": "Skylanders: SWAP Force",
+  "status": "awaiting dump; no validated builds",
+  "validated_builds": [],
+  "patches": [],
+  "acceptance_cases": [
+    "first level visible environment, movement and combat",
+    "swapped character halves recognized independently",
+    "figure insertion/removal and persistent upgrades",
+    "save/reload and two-player join/leave"
+  ]
+}

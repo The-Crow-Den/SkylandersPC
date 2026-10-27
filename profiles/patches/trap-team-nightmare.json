@@ -1,0 +1,18 @@
+{
+  "title_id": "CUSA00697",
+  "app_version": "01.00",
+  "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+  "asset": "level/title.bld",
+  "asset_sha256": "6185686228683d98679f4effa3c6222142fbce5d8bb08c4003887c2705cac57d",
+  "chunk_offset": 2236416,
+  "allocation_size": 4096,
+  "compressed_payload_size": 3878,
+  "lzma_properties_hex": "5d00800000",
+  "decoded_size": 32768,
+  "decoded_sha256": "91a0a488ed315ea11dfba63097e46f644c3c84fa896e169afd2f3654e3fa0de4",
+  "patch_offset_in_chunk": 32268,
+  "expected_hex": "284e020000000000",
+  "replacement_hex": "70c4060000000000",
+  "status": "fresh empty-slot selection, native confirmation, story start and new-slot save verified; sustained gameplay/reload pending",
+  "reason": "Menu-Diff-Create compares the returned eligibility flag with itself, then uses its existing local allow-nightmare assignment. Preserve the outer disallow guard, selected difficulty and completion/save logic."
+}

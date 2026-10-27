@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "language": "English",
+  "keep_tracks": [
+    7,
+    0
+  ],
+  "status": "English track 7 confirmed by user; Sunscraper English playback confirmed; other 12 movies have identical track IDs and verified encoded-payload preservation",
+  "assets": [
+    {
+      "asset": "movies/darkexp.mov",
+      "source_sha256": "98246147b9fe1b7199980eed14de6d45ed1bc48be6f8389b6b79aee475be4b06",
+      "output_sha256": "20e80fce19c5f8949c58a9a8d62a8d602c399f609ab8e5018ed9d3d59f23d09a",
+      "source_tracks": [
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 1558
+    },
+    {
+      "asset": "movies/flynnexp.mov",
+      "source_sha256": "4908896a3be52d6f96c1128949ff2668dbba4619c446f636355f34f2d714a229",
+      "output_sha256": "834e01c27b0f60baab28cf2e89a89e5fe0821753d5f7c04242816e1f32520b6a",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 679
+    },
+    {
+      "asset": "movies/fmv1.mov",
+      "source_sha256": "c6669f416bb8287c293c15f568fb036bb679464670ba30c69ea60e8b91e75eaf",
+      "output_sha256": "2b317b2b3b52f1275c3906313e2480b5a6ecc492c77e1787f52f5ad32954a495",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 6941
+    },
+    {
+      "asset": "movies/fmv10.mov",
+      "source_sha256": "38f46b3f1545881e9dee791490b02293c39b7fc220ca4a87b108f91723beb944",
+      "output_sha256": "407704c9c00380e22e44a9244e1aa30101a2e0eb494fe80ee281d6aa7b7cfa7e",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 4789
+    },
+    {
+      "asset": "movies/fmv2.mov",
+      "source_sha256": "5a15a73022e60273c2ae8399af924f78f595cbe92dcfeb3a1fb26f1fb2b5db67",
+      "output_sha256": "2ff5e41b6ed2a15e52094285bcc1411c69d02c42420241a475feef1e8b3a379e",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 5654
+    },
+    {
+      "asset": "movies/fmv3.mov",
+      "source_sha256": "db7d7a14b269cedb3896ace0d9fbcc82f8dca8814f0e5a9618e5f2e03ac3a2e3",
+      "output_sha256": "f49902dd46d8e845b1b0dc226c225ee58a6d62d224027fd42bc6ee9c2d688d00",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 3345
+    },
+    {
+      "asset": "movies/fmv4.mov",
+      "source_sha256": "0fd3eed4a57855c9735a3810436e3ca2bf4e8890f9656b2076bfac56fd45c0f5",
+      "output_sha256": "8cc637af0b993b06446753f76cf0ff59d549284d055adba09ad41b0e8ee46b6b",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 4758
+    },
+    {
+      "asset": "movies/fmv5.mov",
+      "source_sha256": "3873170152ca131cb7ba3d25c5e801360452bd8142944416c1635d6d6385fd79",
+      "output_sha256": "53e399ae82fdc5b0c40eca7f474e7b5035abc5bf6058c8a02e3d7064d84c845d",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 3185
+    },
+    {
+      "asset": "movies/fmv6.mov",
+      "source_sha256": "17b00f731cef568657c67b413bcbad8917d0fb61551dcbd78979747046bae0c3",
+      "output_sha256": "eee373ce7d15f9c1ea2f94c8b111169e8f0368c8465c2f7f3b22e9f894fe9a26",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 4169
+    },
+    {
+      "asset": "movies/fmv8.mov",
+      "source_sha256": "8be4209eed30eacc30e46ebfd56dcad15ea99e412a287c603fb87a50e14fd525",
+      "output_sha256": "7d7b899db764afb6b3c50940b19f34b86bc17c00f1204c23e4f6c2eb71eb02ab",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 1937
+    },
+    {
+      "asset": "movies/fmv9.mov",
+      "source_sha256": "377ea8ddf4869beb9d95b88df4d375c9a842adc7c28a84c46768cee20e62def0",
+      "output_sha256": "bf1f61d8b5801f8681ec5467db2dc312679dc1aee08a8b2dda8b73c1c2630c21",
+      "source_tracks": [
+        6,
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 4693
+    },
+    {
+      "asset": "movies/lightexp.mov",
+      "source_sha256": "38d3d30b981e54c7a3b7caa507579363538f0223e0546125677305179f4956b5",
+      "output_sha256": "1720eb2f4126ec7018ff1b55c167c22022bfab6d43fcf66ee260450b33d19837",
+      "source_tracks": [
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 1256
+    },
+    {
+      "asset": "movies/mirrorexp.mov",
+      "source_sha256": "40acaba8a555ff5435aa3d7519cdb2cc3f913d2f57f99e000736ab0b9af90f8c",
+      "output_sha256": "e370bf39555f62bd08958217a05afc6b19debc6bfb4ede96d13cd6891397c7fb",
+      "source_tracks": [
+        1,
+        7,
+        9,
+        20,
+        0
+      ],
+      "frames": 975
+    }
+  ]
+}

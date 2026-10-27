@@ -1,0 +1,497 @@
+{
+  "schema_version": 1,
+  "project_license": "GPL-3.0-or-later",
+  "scope": "source release preparation, not a complete binary SBOM",
+  "components": [
+    {
+      "name": "robin-map",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/robin-map.txt",
+      "notice_sha256": "11f2c685ba565a31aef1219f63a7a8845602c97bff70016b9e3278dfe51a2ec5",
+      "upstream": "https://github.com/Tessil/robin-map",
+      "role": "build dependency",
+      "revision": "188c45569cc2a5dd768077c193830b51d33a5020"
+    },
+    {
+      "name": "magic-enum",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/magic-enum.txt",
+      "notice_sha256": "bd227b8a5586dc73012262abfc0fc4eb84c2a91ad3f93b3591f8148fe17324d3",
+      "upstream": "https://github.com/Neargye/magic_enum",
+      "role": "build dependency",
+      "revision": "e046b69a3736d314fad813e159b1c192eaef92cd"
+    },
+    {
+      "name": "miniz",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/miniz.txt",
+      "notice_sha256": "0115478d567121238cf6cc1c0c361926cf07a49d9e4c9e66da97fac6a01646b3",
+      "upstream": "https://github.com/richgel999/miniz",
+      "role": "build dependency",
+      "revision": "77d0dce8627735138c51770d1799a1ef48f2117d"
+    },
+    {
+      "name": "zydis",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/zydis.txt",
+      "notice_sha256": "e5e99718209e94baaf3e9cbf6f64aa3329c9e73c63b1ab47e10f29d81974e6f3",
+      "upstream": "https://github.com/zyantific/zydis",
+      "role": "build dependency",
+      "revision": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc"
+    },
+    {
+      "name": "vma",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/vma.txt",
+      "notice_sha256": "8d70e4cf2a9941f6454da71cd60e38484dd3e34810c824760d550e982af6d97a",
+      "upstream": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator",
+      "role": "build dependency",
+      "revision": "1d8f600fd424278486eade7ed3e877c99f0846b1"
+    },
+    {
+      "name": "libatrac9",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/libatrac9.txt",
+      "notice_sha256": "cdb280ff931233bdefef0dfdd1d884217d97cb24a96530a41ce7848790df86f7",
+      "upstream": "https://github.com/Thealexbarney/LibAtrac9",
+      "role": "build dependency",
+      "revision": "efca2e3af35562a09a9bb6deed90e45b4b824dc4"
+    },
+    {
+      "name": "vulkan-headers",
+      "license": "Apache-2.0 OR MIT",
+      "notice": "LICENSES/third-party/vulkan-headers.txt",
+      "notice_sha256": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903",
+      "upstream": "https://github.com/KhronosGroup/Vulkan-Headers",
+      "role": "build dependency",
+      "revision": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    {
+      "name": "imgui",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/imgui.txt",
+      "notice_sha256": "173506a2d6f7fb67990d257fb2507f188690eca39060c39469ae7bef43aae2a3",
+      "upstream": "https://github.com/ocornut/imgui",
+      "role": "build dependency",
+      "revision": "f1cc2ae15e53a861a874c3034aae6798fde194ab"
+    },
+    {
+      "name": "fsr-vulkan",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/fsr-vulkan.txt",
+      "notice_sha256": "eb40809fd94f3fa526ab5641e067ed6f618a76178d8c635993d09f968508b9f2",
+      "upstream": "https://github.com/FireBurn/FSR-Vulkan",
+      "role": "build dependency",
+      "revision": "c64f093404125e960813f95f1996c14780f0dd69"
+    },
+    {
+      "name": "zycore",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/zycore.txt",
+      "notice_sha256": "7991ec4481a82c51d196f7440fda34c578aab51f8b9c7023935c6e03b57638bd",
+      "upstream": "https://github.com/zyantific/zycore-c",
+      "role": "build dependency",
+      "revision": "0b2432ced0884fd152b471d97ecf0258ff4d859f"
+    },
+    {
+      "name": "xbyak",
+      "license": "BSD-3-Clause",
+      "notice": "LICENSES/third-party/xbyak.txt",
+      "notice_sha256": "7e411d5c5d38501a504843f58afb6824439c828872b35d2ff1e892e73fd1a30d",
+      "upstream": "https://github.com/herumi/xbyak",
+      "role": "build dependency",
+      "revision": "cd6bad3cad2e07a3e277c23d2b1f065320024717"
+    },
+    {
+      "name": "vulkan-headers-Apache-2.0",
+      "license": "Apache-2.0",
+      "notice": "LICENSES/third-party/vulkan-headers-Apache-2.0.txt",
+      "notice_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "upstream": "https://github.com/KhronosGroup/Vulkan-Headers",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "vulkan-headers-MIT",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/vulkan-headers-MIT.txt",
+      "notice_sha256": "1ca3502222d967f3be5751c55f6b7ee735b5383909c3b501495f54b216dbf227",
+      "upstream": "https://github.com/KhronosGroup/Vulkan-Headers",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "bbport",
+      "license": "GPL-2.0-or-later",
+      "notice": "LICENSES/third-party/bbport.txt",
+      "notice_sha256": "edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6",
+      "upstream": "https://github.com/deadinside28/bloodborne_pc",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "sirit",
+      "license": "BSD-3-Clause",
+      "notice": "LICENSES/third-party/sirit.txt",
+      "notice_sha256": "85037eeef55658177becb552477576a41bbc933705534b529c4c4818bb490480",
+      "upstream": "https://github.com/shadps4-emu/sirit",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "spirv-headers",
+      "license": "MIT AND LicenseRef-SPIRV-Headers-Additional-Notices",
+      "notice": "LICENSES/third-party/spirv-headers.txt",
+      "notice_sha256": "ff04ae7e6a468587fe59434fee2e67c0e2a749b592c794b764ff80f30b94a084",
+      "upstream": "https://github.com/KhronosGroup/SPIRV-Headers",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "half",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/half.txt",
+      "notice_sha256": "1269110471a5506d5cc9c115c57b855206f69a90cc57bbbf27860907067ed946",
+      "upstream": "https://half.sourceforge.net/",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "cpp-httplib",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/cpp-httplib.txt",
+      "notice_sha256": "bb546eae5924d8ee842e0e567e6d533c5824bdebccf605f99a5b3429034e6697",
+      "upstream": "https://github.com/yhirose/cpp-httplib",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "DejaVu",
+      "license": "LicenseRef-DejaVu",
+      "notice": "LICENSES/third-party/DejaVu.txt",
+      "notice_sha256": "7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93",
+      "upstream": "https://dejavu-fonts.github.io/",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "fsr-vulkan-NOTICE",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/fsr-vulkan-NOTICE.txt",
+      "notice_sha256": "d7cbb336aaa29a100e1d2b5d30d0ede6e72ee3ce81f0345786a2ade2e3310163",
+      "upstream": "https://github.com/FireBurn/FSR-Vulkan",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "ffx-sdk-1.1.4",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/ffx-sdk-1.1.4.txt",
+      "notice_sha256": "82cf74fc23885107c7f69249ac3f1dac55898ff68320eb2c753984cae6b2d78a",
+      "upstream": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "dlss-bridge",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/dlss-bridge.txt",
+      "notice_sha256": "56b6f9b125691bbf1b34cf1c20870174124ddc8eef33c72bde5ede3b6e84a9ec",
+      "upstream": "https://github.com/IFreemz/shadPS4-Bloodborne-DLSS-FSR",
+      "role": "build dependency",
+      "revision": null
+    },
+    {
+      "name": "SDL3",
+      "license": "Zlib",
+      "notice": "LICENSES/third-party/SDL3.txt",
+      "notice_sha256": "1c040b8271b37e5076359f8fd54240e371114112924d2df81ef87c7d6a1dfdfd",
+      "upstream": "https://libsdl.org/",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "fmt",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/fmt.txt",
+      "notice_sha256": "a65fcc5a1095fc33cc37e4fff69366e49d7e92f613558a2b95ed1b70e33758b4",
+      "upstream": "https://github.com/fmtlib/fmt",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "X11",
+      "license": "LicenseRef-X11-Notices",
+      "notice": "LICENSES/third-party/X11.txt",
+      "notice_sha256": "eda0c2ed1cae0280c7fe79762eaad8ad31c044afc64e71e92ef2c6f3cd7bc395",
+      "upstream": "https://www.x.org/",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "xxHash",
+      "license": "BSD-2-Clause",
+      "notice": "LICENSES/third-party/xxHash.txt",
+      "notice_sha256": "6ffedbc0f7878612d2b23589f1ff2ab15633e1df7963a5d9fc750ec5500c7e7a",
+      "upstream": "https://github.com/Cyan4973/xxHash",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "PyQt6",
+      "license": "GPL-3.0-only",
+      "notice": "LICENSES/third-party/PyQt6.txt",
+      "notice_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "upstream": "https://riverbankcomputing.com/software/pyqt/",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "PyQt6-sip",
+      "license": "BSD-2-Clause",
+      "notice": "LICENSES/third-party/PyQt6-sip.txt",
+      "notice_sha256": "3e6f5b427c36f94ecf86bc01698af7030a1ed6eb3748110d5dbb8d142d804611",
+      "upstream": "https://riverbankcomputing.com/software/sip/",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "Pillow",
+      "license": "MIT-CMU AND LicenseRef-Pillow-Additional-Notices",
+      "notice": "LICENSES/third-party/Pillow.txt",
+      "notice_sha256": "15181e7363dca9aed78b79bebebc7fde7f1814b8bd311ea3b87ae8ccadfc185b",
+      "upstream": "https://python-pillow.org/",
+      "role": "system/optional dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "LGPL-2.1-or-later",
+      "license": "LGPL-2.1-or-later",
+      "notice": "LICENSES/third-party/LGPL-2.1-or-later.txt",
+      "notice_sha256": "1ccf09bf2f598308df4bed9cd8e9657dc5cd0973d2800318f2e241486e2edf3f",
+      "upstream": "https://qt.io/licensing/",
+      "role": "conditional binary-distribution terms",
+      "revision": null
+    },
+    {
+      "name": "LGPL-3.0-only",
+      "license": "LGPL-3.0-only",
+      "notice": "LICENSES/third-party/LGPL-3.0-only.txt",
+      "notice_sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+      "upstream": "https://qt.io/licensing/",
+      "role": "conditional binary-distribution terms",
+      "revision": null
+    },
+    {
+      "name": "GPL-3.0-only",
+      "license": "GPL-3.0-only",
+      "notice": "LICENSES/third-party/GPL-3.0-only.txt",
+      "notice_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "upstream": "https://qt.io/licensing/",
+      "role": "conditional binary-distribution terms",
+      "revision": null
+    },
+    {
+      "name": "Qt-GPL-exception-1.0",
+      "license": "Qt-GPL-exception-1.0",
+      "notice": "LICENSES/third-party/Qt-GPL-exception-1.0.txt",
+      "notice_sha256": "40678d338ce53cd93f8b22b281a2ecbcaa3ee65ce60b25ffb0c462b0530846b2",
+      "upstream": "https://qt.io/licensing/",
+      "role": "conditional binary-distribution terms",
+      "revision": null
+    },
+    {
+      "name": "BSL-1.0",
+      "license": "BSL-1.0",
+      "notice": "LICENSES/third-party/BSL-1.0.txt",
+      "notice_sha256": "3abd6471b9a9a08d65ce771143f8e278bb4c1aeb10c1c2d476935a6b049653f5",
+      "upstream": "https://qt.io/licensing/",
+      "role": "conditional binary-distribution terms",
+      "revision": null
+    },
+    {
+      "name": "amd-gcn",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/amd-gcn.txt",
+      "notice_sha256": "cc0edc88d90e9a0940d6bc671ab8470077ffba93766b2751eebe29698bae2caa",
+      "upstream": "https://github.com/GPUOpen-Drivers/",
+      "role": "embedded header copyright/permission notice",
+      "revision": null
+    },
+    {
+      "name": "amd-fsr1",
+      "license": "MIT",
+      "notice": "LICENSES/third-party/amd-fsr1.txt",
+      "notice_sha256": "fa03ac06b615023411349a3d40fa5e466d16c1c4712701ba5eb0344fed3c8990",
+      "upstream": "https://github.com/GPUOpen-Drivers/",
+      "role": "embedded header copyright/permission notice",
+      "revision": null
+    },
+    {
+      "name": "Cemu portal",
+      "license": "MPL-2.0",
+      "notice": "LICENSES/MPL-2.0.txt",
+      "notice_sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+      "upstream": "https://github.com/cemu-project/Cemu",
+      "role": "optional local source; public revision unresolved",
+      "revision": null
+    },
+    {
+      "name": "libusb",
+      "license": "LGPL-2.1-or-later",
+      "notice": "LICENSES/third-party/LGPL-2.1-or-later.txt",
+      "notice_sha256": "1ccf09bf2f598308df4bed9cd8e9657dc5cd0973d2800318f2e241486e2edf3f",
+      "upstream": "https://libusb.info/",
+      "role": "system library; not bundled",
+      "revision": "1.0.30"
+    },
+    {
+      "name": "FFmpeg current system build",
+      "license": "GPL-3.0-or-later",
+      "notice": "LICENSES/GPL-3.0-or-later.txt",
+      "notice_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "upstream": "https://ffmpeg.org/",
+      "role": "system libav* build; must be re-inventoried if bundled",
+      "revision": "libavcodec 63.1.102"
+    },
+    {
+      "name": "Boost",
+      "license": "BSL-1.0",
+      "notice": "LICENSES/third-party/BSL-1.0.txt",
+      "notice_sha256": "3abd6471b9a9a08d65ce771143f8e278bb4c1aeb10c1c2d476935a6b049653f5",
+      "upstream": "https://boost.org/",
+      "role": "build dependency; not bundled",
+      "revision": null
+    },
+    {
+      "name": "OpenSSL libcrypto",
+      "license": "Apache-2.0",
+      "notice": "LICENSES/third-party/OpenSSL-Apache-2.0.txt",
+      "notice_sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+      "upstream": "https://www.openssl.org/",
+      "role": "read-only trap metadata decoding; system dependency, not bundled",
+      "revision": "3.6.5"
+    },
+    {
+      "name": "cryptography",
+      "license": "Apache-2.0 OR BSD-3-Clause",
+      "notice": "LICENSES/third-party/cryptography.txt",
+      "notice_sha256": "afa26561d9018962afeda43db5cb372fd3b4509ff5c002438ca64ee7168d4d92",
+      "upstream": "https://github.com/pyca/cryptography",
+      "role": "optional local trophy XML decryption; system package, not vendored",
+      "revision": "50.0.2 (locally tested; not a bundled build)"
+    },
+    {
+      "name": "Lucide browser bundle",
+      "license": "ISC AND MIT",
+      "notice": "LICENSES/third-party/Lucide-ISC.txt",
+      "notice_sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "upstream": "https://github.com/lucide-icons/lucide",
+      "role": "vendored offline icons for the HTML PC overlay; includes Feather-derived MIT icons",
+      "revision": "1.17.0",
+      "vendored_source": "tools/pc_menu/lucide.js",
+      "vendored_sha256": "22a5787d225a34638e8e681d88200f93ef3f318893510bb4adf2222c3b5f8867"
+    }
+  ],
+  "acquisition": [
+    {
+      "name": "robin-map",
+      "repository": "Tessil/robin-map",
+      "requested_ref": "v1.3.0",
+      "commit": "188c45569cc2a5dd768077c193830b51d33a5020",
+      "url": "https://codeload.github.com/Tessil/robin-map/tar.gz/188c45569cc2a5dd768077c193830b51d33a5020",
+      "sha256": "2f4be670fa4f53c3261ed7af392b414a00e75591f87da0a8dd525de376430747"
+    },
+    {
+      "name": "magic-enum",
+      "repository": "Neargye/magic_enum",
+      "requested_ref": "v0.9.7",
+      "commit": "e046b69a3736d314fad813e159b1c192eaef92cd",
+      "url": "https://codeload.github.com/Neargye/magic_enum/tar.gz/e046b69a3736d314fad813e159b1c192eaef92cd",
+      "sha256": "a06b11989a7802de62a405c373b23c3fcc4caca27e0a0df5f9905bc322a14a40"
+    },
+    {
+      "name": "miniz",
+      "repository": "richgel999/miniz",
+      "requested_ref": "3.1.2",
+      "commit": "77d0dce8627735138c51770d1799a1ef48f2117d",
+      "url": "https://codeload.github.com/richgel999/miniz/tar.gz/77d0dce8627735138c51770d1799a1ef48f2117d",
+      "sha256": "baa14349e7c5efb4a493a03af7d2f29d0ef45d87d488567fe5360edb33f8b7ba"
+    },
+    {
+      "name": "zydis",
+      "repository": "zyantific/zydis",
+      "requested_ref": "v4.1.1",
+      "commit": "a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+      "url": "https://codeload.github.com/zyantific/zydis/tar.gz/a2278f1d254e492f6a6b39f6cb5d1f5d515659dc",
+      "sha256": "efbca210596ef954241ef40732376d50be5b6b7ca7d63a3834ef0c71f3471f36"
+    },
+    {
+      "name": "vma",
+      "repository": "GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator",
+      "requested_ref": "v3.3.0",
+      "commit": "1d8f600fd424278486eade7ed3e877c99f0846b1",
+      "url": "https://codeload.github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/tar.gz/1d8f600fd424278486eade7ed3e877c99f0846b1",
+      "sha256": "04b278f5a185ef75a7ea988e0e76ddd0b2f2186bf56dd90625159972a47dcb3b"
+    },
+    {
+      "name": "libatrac9",
+      "repository": "Thealexbarney/LibAtrac9",
+      "requested_ref": "efca2e3af35562a09a9bb6deed90e45b4b824dc4",
+      "commit": "efca2e3af35562a09a9bb6deed90e45b4b824dc4",
+      "url": "https://codeload.github.com/Thealexbarney/LibAtrac9/tar.gz/efca2e3af35562a09a9bb6deed90e45b4b824dc4",
+      "sha256": "84463f04d92692f14c9a77fb36fb3d521222e4acabed50d21e8cac7536158db7"
+    },
+    {
+      "name": "vulkan-headers",
+      "repository": "KhronosGroup/Vulkan-Headers",
+      "requested_ref": "v1.4.363",
+      "commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+      "url": "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+      "sha256": "9044fbb356160e43201dc2094acb44c8a906722a63a35f48fc0f051579db9bb6"
+    },
+    {
+      "name": "imgui",
+      "repository": "ocornut/imgui",
+      "requested_ref": "f1cc2ae15e53a861a874c3034aae6798fde194ab",
+      "commit": "f1cc2ae15e53a861a874c3034aae6798fde194ab",
+      "url": "https://codeload.github.com/ocornut/imgui/tar.gz/f1cc2ae15e53a861a874c3034aae6798fde194ab",
+      "sha256": "f30be7f3e2136615b1848a9afb72f6dfd8a60820ddf1c1a85997bf3b722e7cfc"
+    },
+    {
+      "name": "fsr-vulkan",
+      "repository": "FireBurn/FSR-Vulkan",
+      "requested_ref": "c64f093404125e960813f95f1996c14780f0dd69",
+      "commit": "c64f093404125e960813f95f1996c14780f0dd69",
+      "url": "https://codeload.github.com/FireBurn/FSR-Vulkan/tar.gz/c64f093404125e960813f95f1996c14780f0dd69",
+      "sha256": "85e43a54aafd56dcca2ae7d165874bb764d27bb69c7046f9afcee71f1cc6399d"
+    },
+    {
+      "name": "zycore",
+      "repository": "zyantific/zycore-c",
+      "commit": "0b2432ced0884fd152b471d97ecf0258ff4d859f",
+      "url": "https://codeload.github.com/zyantific/zycore-c/tar.gz/0b2432ced0884fd152b471d97ecf0258ff4d859f",
+      "sha256": "698e4623e661db312eb9da327519f53f0a9dd7fbbfacf02159687bca62369467"
+    },
+    {
+      "name": "xbyak",
+      "repository": "herumi/xbyak",
+      "requested_ref": "master",
+      "commit": "cd6bad3cad2e07a3e277c23d2b1f065320024717",
+      "url": "https://codeload.github.com/herumi/xbyak/tar.gz/cd6bad3cad2e07a3e277c23d2b1f065320024717",
+      "sha256": "cd3549fb1547c61c5b3fd399fa39ce6208732f908fb80b4ad5a14cbec524fcb2"
+    }
+  ],
+  "unresolved": [
+    {
+      "component": "Cemu portal source",
+      "scope": "playable binary release",
+      "issue": "Exact local portal/common sources are hash-recorded but have no attested upstream revision or public corresponding-source location."
+    },
+    {
+      "component": "System binaries and optional models",
+      "scope": "any binary bundle",
+      "issue": "Resolve exact Qt, FFmpeg, libusb, graphics-driver and optional upscaler/model build terms before bundling; source export contains none of them."
+    }
+  ]
+}

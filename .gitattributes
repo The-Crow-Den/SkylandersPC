@@ -1,0 +1,16 @@
+.local/** export-ignore
+out/** export-ignore
+Game/** export-ignore
+game/** export-ignore
+Games/** export-ignore
+games/** export-ignore
+dumps/** export-ignore
+vendor/** export-ignore
+build/** export-ignore
+profiles/patches/trap-team-us-01.01-traptanium.experimental.json export-ignore
+*.AppImage export-ignore
+*.pkg export-ignore
+*.sky export-ignore
+*.sprx export-ignore
+*.prx export-ignore
+*.elf export-ignore

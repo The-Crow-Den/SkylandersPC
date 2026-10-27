@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "project_license": "GPL-3.0-or-later",
+  "withheld": {
+    "profiles/patches/trap-team-us-01.01-traptanium.experimental.json": "Contains bulk literal game-asset bytes; keep local until converted to source-relative recipes."
+  },
+  "required": ["LICENSE", "LICENSE_SCOPE.md", "NOTICE.md", "THIRD_PARTY_NOTICES.md", "LICENSES/dependencies.json", "LICENSES/bbport-source.json", "LICENSES/portal-source.json", "docs/PUBLICATION.md", "CONTRIBUTING.md"],
+  "binary_release_ready": false,
+  "binary_release_blockers": [
+    "Publish/attest exact Cemu portal/common corresponding source and public revision.",
+    "Inventory every actually bundled binary, nested dependency, optional model and driver term.",
+    "Provide the exact modified corresponding source and build inputs for any executable release."
+  ]
+}

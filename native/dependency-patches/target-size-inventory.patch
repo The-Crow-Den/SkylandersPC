@@ -1,0 +1,43 @@
+--- a/gpu/render/raster_targets.cpp
++++ b/gpu/render/raster_targets.cpp
+@@ -3,10 +3,24 @@
+ // copies), target lookup, the render pass (BeginRendering) and the UI placement.
+ 
+ #include "render/raster_internal.h"
++#include <set>
++#include <tuple>
++#include <cstdlib>
++#include <cstdio>
+ 
+ namespace Vulkan {
+ 
+ namespace {
++// Optional bounded inventory of actual bound attachments, not presentation size.
++void TraceTargetSize(const VideoCore::Image& image, bool depth) {
++    static const bool enabled = [] { const auto* p = std::getenv("BB_TARGET_SIZE_TRACE"); return p && p[0] == '1'; }();
++    if (!enabled) return;
++    static std::set<std::tuple<u32,u32,u32,bool>> seen;
++    const auto& info = image.info;
++    const auto key = std::make_tuple(info.size.width, info.size.height, info.num_samples, depth);
++    if (seen.size() < 128 && seen.insert(key).second)
++        std::printf("Bound render target: %ux%u samples=%u depth=%u\n", info.size.width, info.size.height, info.num_samples, depth);
++}
+ 
+ /// What a draw is: a draw, nothing, or a pass the color/depth control registers ask for.
+ enum class DrawPass {
+@@ -160,6 +174,7 @@
+             col_buf, hint));
+         auto& image = texture_cache.GetImage(image_id);
+         image.binding.is_target = 1u;
++        TraceTargetSize(image, false);
+     }
+ 
+     if ((regs.depth_control.depth_enable && regs.depth_buffer.DepthValid()) ||
+@@ -177,6 +192,7 @@
+             tag, regs.depth_buffer, regs.depth_view, regs.depth_control, htile_address, hint));
+         auto& image = texture_cache.GetImage(image_id);
+         image.binding.is_target = 1u;
++        TraceTargetSize(image, true);
+     } else {
+         db_desc.first = {};
+     }

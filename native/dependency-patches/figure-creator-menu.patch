@@ -1,0 +1,46 @@
+--- a/gpu/shim/bbport_overlay.cpp
++++ b/gpu/shim/bbport_overlay.cpp
+@@ -375,6 +375,8 @@
+ extern "C" int sky_portal_portrait(int,int) __attribute__((weak));
+ extern "C" const char* sky_portal_status() __attribute__((weak));
+ extern "C" const char* sky_portal_atlas() __attribute__((weak));
++extern "C" int sky_portal_creation_count() __attribute__((weak));
++extern "C" const char* sky_portal_creation_name(int) __attribute__((weak));
+ extern "C" int sky_portal_action(int,int) __attribute__((weak));
+ extern "C" int sky_portal_volume() __attribute__((weak));
+ extern "C" void sky_portal_set_volume(int) __attribute__((weak));
+@@ -417,7 +419,33 @@
+     static const char* elements[]{"All elements","Air","Dark","Earth","Fire","Kaos","Life","Light","Magic","Tech","Undead","Water"};
+     ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##search","Search your collection...",search[kind],sizeof(search[kind]));
+     if(kind==1) {ImGui::SetNextItemWidth(-1);ImGui::Combo("##element",&element,elements,12);}
+-    else if(ImGui::Button("+ Import Skylander",{-1,32*base_scale})&&sky_portal_action)sky_portal_action(2,0);
++    else {
++        if(sky_portal_creation_count && sky_portal_creation_name && sky_portal_creation_count()>0) {
++            if(ImGui::Button("+ Create Skylander",{-1,32*base_scale}))ImGui::OpenPopup("create_skylander");
++            ImGui::SetNextWindowSize({350*base_scale,std::min(550*base_scale,ImGui::GetMainViewport()->WorkSize.y*0.75f)},ImGuiCond_Always);
++            if(ImGui::BeginPopup("create_skylander")) {
++                static char create_search[96]{};
++                ImGui::TextUnformatted("CREATE SKYLANDER");
++                ImGui::TextWrapped("Create a new figure and place it on the portal. Existing figures and their progress are kept.");
++                ImGui::TextDisabled("Single-tag characters through Trap Team");
++                ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##create_search","Search a Skylander...",create_search,sizeof(create_search));
++                ImGui::BeginChild("creation_list",{0,-38*base_scale});
++                for(int i=0;i<sky_portal_creation_count();++i) {
++                    const char* name=sky_portal_creation_name(i);
++                    if(!PortalMatches(name,create_search))continue;
++                    ImGui::PushID(i);
++                    if(ImGui::Selectable(name) && sky_portal_action) {
++                        sky_portal_action(5,i);ImGui::CloseCurrentPopup();
++                    }
++                    ImGui::PopID();
++                }
++                ImGui::EndChild();
++                if(ImGui::Button("Cancel",{-1,28*base_scale}))ImGui::CloseCurrentPopup();
++                ImGui::EndPopup();
++            }
++        }
++        if(ImGui::Button("+ Import Skylander",{-1,32*base_scale})&&sky_portal_action)sky_portal_action(2,0);
++    }
+     ImGui::Spacing();
+     auto* atlas=PortalAtlas();
+     ImGui::BeginChild("collection",{0,-66*base_scale});

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "license": "MPL-2.0",
+  "upstream": "https://github.com/cemu-project/Cemu",
+  "upstream_revision": null,
+  "status": "local sources only; public provenance unresolved",
+  "files": [
+    {
+      "path": "src/runtime/cemu_portal.cpp",
+      "sha256": "9b37a7accd044b4811cfd2ffcc6e67bb2b9a53669356379b5746629e23af6ca9"
+    },
+    {
+      "path": "src/runtime/cemu_portal.hpp",
+      "sha256": "328ed690bf5808305f804e62e3fbbf28aa774cc5b54ed6f5d5a17347255bac35"
+    },
+    {
+      "path": "Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp",
+      "sha256": "a404e042dd57cec027fe0f5b868e988873f7989e9782cafc98e37cf57a6c7e6a"
+    },
+    {
+      "path": "Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.h",
+      "sha256": "d4926d9ecdb0496e6edcccedea72163e16a60ae734207fff8c521b997daee8ee"
+    },
+    {
+      "path": "Cemu-main/src/Common/unix/FileStream_unix.cpp",
+      "sha256": "f3b5143987cbc835525b3660cf8381ea9f88ba7b8ccdb8c4afc992d9ffd40325"
+    },
+    {
+      "path": "Cemu-main/src/Common/FileStream.h",
+      "sha256": "9f985efb587ed8fe9b43b7029f3dac9c71e07cce367ca8de85568902d8c7bb82"
+    },
+    {
+      "path": "Cemu-main/src/Common/precompiled.h",
+      "sha256": "d4acb2c328647a64bd5e5d7c83440afaadaad596538b600da8f548ce66cce22d"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "upstream": "https://github.com/deadinside28/bloodborne_pc",
+  "commit": "8185b88d80573fa300595d5c54450183b4109935",
+  "archive_sha256": "953c3da81c63915dfa70622289c505a7dd77498ba3cc5bf1bdd16943f80806c3",
+  "license": "GPL-2.0-or-later",
+  "patch": "native/dependency-patches/bbport-local-changes.patch",
+  "patch_sha256": "0efd0f04e5af839d2e9fbc8e3389f0304a2b5b9f41baa06be50c1d5837323876",
+  "files": [
+    {
+      "path": "gpu/platform/videoout/display.cpp",
+      "source_sha256": "c4d1c92581c28fc2ae4b467101433f101ca0d9a946f06b8212b782f6009a316b",
+      "modified_sha256": "6c5cd3c598c328ab1d45b8647caf0a26ea7559203f09e59bd6c0480093ba6cf6"
+    },
+    {
+      "path": "gpu/platform/videoout/frame_stats.cpp",
+      "source_sha256": "49808fdc67d061acde6769fae8a2216054663a501b67de327aa2ec733ca1c90e",
+      "modified_sha256": "e2ca366ee8c9196d119c705f400432b5da8e68fa2e5c80025a93a5826bbda8f7"
+    },
+    {
+      "path": "gpu/render/pipeline_cache.cpp",
+      "source_sha256": "7e7ddd8068c0cc4dcffdb0099a5ea4bd2bc68ba1d4dcc5706dd42e14ec2fcd3b",
+      "modified_sha256": "606ac75308b42cda6134b6b52be22c17c42ad93bd0b180f1fa8294c9f559a971"
+    },
+    {
+      "path": "gpu/render/raster_targets.cpp",
+      "source_sha256": "efa04932e1412c56af21929f8d80f782f614507b12b74a2c9da07807fedefb90",
+      "modified_sha256": "4738bc0ca7a45b254486453f72281deaba8099a86203058742f490c4d886d9e9"
+    },
+    {
+      "path": "gpu/render/raster_textures.cpp",
+      "source_sha256": "6d0c15fbb1add396ecd19c952f09eca5318ffd62a4de7cc3648c23e7e72c4786",
+      "modified_sha256": "7beaff1a40847a3038b0416d5fc62ba45bd067991a64d5a140d81c7b71e63a4b"
+    },
+    {
+      "path": "gpu/render/rasterizer.cpp",
+      "source_sha256": "33275180c3c7552a1cbb3eb2a207849eaaacffd5e0e9dd8735fb4ef5c23d5135",
+      "modified_sha256": "b0a0e2db50c0d8cc5bfec2d1ca496f3f0c12f90ef7d096a5293c6951c8ef7635"
+    },
+    {
+      "path": "gpu/render/vk_frame_capture.cpp",
+      "source_sha256": "edfea6a40e09e20ecfacbff883ff1bc298a697e6fe557c8376a2dc22d644680c",
+      "modified_sha256": "ff2c574cf7a180265394d72d7ac847eb123cd669f81f3ff776e7310993fb6a9b"
+    },
+    {
+      "path": "gpu/shim/bbgpu.cpp",
+      "source_sha256": "71fdc7f891d311815021e49b98b24a4b5b1d400fab39514a14a3d93fa84f0a3f",
+      "modified_sha256": "da78994627a2adfb86fcc73b1a1a634c0d91e74b6fdc74d63e9a4c56bc488c78"
+    },
+    {
+      "path": "gpu/shim/bbport_overlay.cpp",
+      "source_sha256": "ce326484d6733c00f7125dedc4a26415ca1035c60c630aa2b6df577f89eec6b7",
+      "modified_sha256": "48ba7907d4a107d87ac23792730aabba545c0ad62f85b276d444f3aace4a2102"
+    },
+    {
+      "path": "gpu/shim/window.cpp",
+      "source_sha256": "d291e4dd91e665005c16dfa83709bf86326a10aff0e0af3068e2826bf183ec9b",
+      "modified_sha256": "7206a2d72139da6a5c5c7c3a6cface8955eb5c7c93a794f2a6a067d1d54f3206"
+    },
+    {
+      "path": "src/runtime_audio.c",
+      "source_sha256": "1cfaa7ea0ddf1b512b763102a5b5572b6b96e88c3d768c7aa69bd6e04b9d4093",
+      "modified_sha256": "86f39a0f945d3c7f43164509ad570957d05ab3617ea228e31136a3ec795676df"
+    },
+    {
+      "path": "gpu/render/capture_window.h",
+      "added": true,
+      "modified_sha256": "a687703b8cbd291b48d11b0666266fa6fa39b788c4813d1292730321711401db"
+    }
+  ]
+}

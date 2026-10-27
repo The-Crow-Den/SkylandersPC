@@ -1,0 +1,143 @@
+--- a/gpu/render/vk_frame_capture.cpp
++++ b/gpu/render/vk_frame_capture.cpp
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ #include "render/vk_frame_capture.h"
++#include "render/capture_window.h"
+ 
+ #include <algorithm>
+ #include <cstdlib>
+@@ -49,6 +50,21 @@
+     }
+     pending_buffers.clear();
+ }
++// Opt-in: Trap Team writes display buffers more than once per frame. Capture
++// a bounded software-flip interval without treating each such pass as a frame.
++const unsigned window_flips = [] {
++    const char* value = std::getenv("BB_CAPTURE_FLIPS");
++    if (!value) return 0u;
++    char* end = nullptr;
++    const unsigned long count = std::strtoul(value, &end, 10);
++    if (end == value || *end || count > 4) {
++        std::fprintf(stderr, "BB_CAPTURE_FLIPS must be 0..4; using legacy capture\n");
++        return 0u;
++    }
++    return static_cast<unsigned>(count);
++}();
++CaptureWindow capture_window;
++const char* window_end_reason = "pending";
+ bool pass_open = false;
+ std::mutex display_mutex;
+ std::vector<VAddr> display_buffers;
+@@ -97,6 +113,12 @@
+         return;
+     }
+     std::fprintf(f, "presented buffer %#llx\n", static_cast<unsigned long long>(presented));
++    if (window_flips) {
++        std::fprintf(f, "capture window: software flips %llu..%llu target=%u end=%s; may include partial frames\n",
++                     static_cast<unsigned long long>(capture_window.Start()),
++                     static_cast<unsigned long long>(FrameCapture::Flips()), window_flips,
++                     window_end_reason);
++    }
+     u32 index = 0;
+     for (const auto& e : entries) {
+         if (e.compute) {
+@@ -144,7 +166,29 @@
+     }
+ }
+ 
+-void FrameCapture::Poll() {}
++void FrameCapture::Poll() {
++    if (!window_flips) return;
++    const u32 current = state.load(std::memory_order_relaxed);
++    if (current == Idle) return;
++    const auto action = capture_window.Advance(current == Armed, Flips(), window_flips);
++    if (action == CaptureWindow::Action::Begin) {
++        entries.clear();
++        pending_sampled.clear();
++        pending_buffers.clear();
++        pass_open = false;
++        window_end_reason = "pending";
++        state.store(Recording, std::memory_order_release);
++    } else if (action == CaptureWindow::Action::FinishFlips ||
++               action == CaptureWindow::Action::FinishBudget) {
++        window_end_reason = action == CaptureWindow::Action::FinishFlips ? "flip-count" : "poll-budget";
++        Write(last_presented.load(std::memory_order_relaxed));
++        entries.clear();
++        pending_sampled.clear();
++        pending_buffers.clear();
++        pass_open = false;
++        state.store(Idle, std::memory_order_release);
++    }
++}
+ 
+ bool FrameCapture::IsDisplayBuffer(VAddr address) {
+     const u32 count = display_count.load(std::memory_order_acquire);
+@@ -187,7 +231,7 @@
+     // Frame boundaries in the command stream: the pass that writes a display buffer.
+     const bool new_pass = !(pass_open && !entries.empty() && !entries.back().compute &&
+                             entries.back().colors == targets);
+-    if (display && new_pass) {
++    if (display && new_pass && !window_flips) {
+         if (state.load(std::memory_order_relaxed) == Recording) {
+             Write(last_presented.load(std::memory_order_relaxed));
+             entries.clear();
+--- a/gpu/render/rasterizer.cpp
++++ b/gpu/render/rasterizer.cpp
+@@ -885,8 +885,8 @@
+ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_indexed,
+                                     const IndirectDraw& indirect) {
+     buffer_cache.NewPacket();
++    FrameCapture::Poll();
+     if (DrawPipe::OnStageB()) {
+-        FrameCapture::Poll();
+         scheduler.PopPendingOperations();
+     }
+     const VAddr count_address = indirect.count;
+@@ -1144,6 +1144,7 @@
+ void Rasterizer::DispatchIndirectRecord(const ComputePipeline* pipeline, VAddr address,
+                                         u32 size) {
+     buffer_cache.NewPacket();
++    FrameCapture::Poll();
+     scheduler.PopPendingOperations();
+     if (!BindResources(pipeline)) {
+         return;
+--- /dev/null
++++ b/gpu/render/capture_window.h
+@@ -0,0 +1,36 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#pragma once
++#include <cstdint>
++
++namespace Vulkan {
++// A diagnostic interval in software flip counts, not a GPU/scanout frame boundary.
++class CaptureWindow {
++public:
++    enum class Action { None, Begin, FinishFlips, FinishBudget };
++    static constexpr unsigned MaxPolls = 8192;
++    Action Advance(bool armed, std::uint64_t flips, unsigned desired) {
++        if (desired < 1 || desired > 4) return Action::None;
++        if (armed) {
++            start = flips;
++            polls = 0;
++            running = true;
++            return Action::Begin;
++        }
++        if (!running) return Action::None;
++        if (flips >= start && flips - start >= desired) {
++            running = false;
++            return Action::FinishFlips;
++        }
++        if (++polls >= MaxPolls) {
++            running = false;
++            return Action::FinishBudget;
++        }
++        return Action::None;
++    }
++    std::uint64_t Start() const { return start; }
++private:
++    std::uint64_t start{};
++    unsigned polls{};
++    bool running{};
++};
++} // namespace Vulkan

@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Optional free desktop mouse policy for the externally built GPU component.
+--- a/gpu/shim/window.cpp
++++ b/gpu/shim/window.cpp
+@@ -16,6 +16,11 @@
+ 
+ 
+ namespace {
++// Compatibility hosts without mouse-look must not confine the desktop pointer.
++bool FreeMouse() {
++    static const bool enabled=[] {const char* p=std::getenv("BB_FREE_MOUSE");return p && !std::strcmp(p,"1");}();
++    return enabled;
++}
+ std::array<std::atomic<BbGpuEventFilter>, 4> event_filters{};
+ 
+ bool FilteredByModule(const SDL_Event* event, SDL_Window* window) {
+@@ -214,6 +219,7 @@
+ // Mouse look: relative mode while the window holds the mouse (runtime_pad.c turns its motion into
+ // the right stick). Motion from before is dropped, so taking the mouse does not turn the camera.
+ void WindowSDL::CaptureMouse(bool capture) {
++    if (capture && FreeMouse()) return;
+     if (capture == mouse_captured.load(std::memory_order_relaxed)) {
+         return;
+     }
+@@ -305,7 +311,7 @@
+             mouse_user_released = false; // the click takes the window back (it is not a game button)
+             continue;
+         }
+-        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !mouse_captured.load(std::memory_order_relaxed) &&
++        if (!FreeMouse() && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !mouse_captured.load(std::memory_order_relaxed) &&
+             mouse_look.load(std::memory_order_relaxed) && !BbOverlay::MenuOpen() && !pointer) {
+             CaptureMouse(true);
+             continue;
+@@ -384,7 +390,7 @@
+     }
+     {
+         const bool focused = (SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS) != 0;
+-        const bool hold = focused && !mouse_user_released;
++        const bool hold = focused && !mouse_user_released && !FreeMouse();
+         if (hold != mouse_grabbed) {
+             mouse_grabbed = hold;
+             SDL_SetWindowMouseGrab(window, hold);
+@@ -413,7 +419,7 @@
+     const u64 idle = SDL_GetTicks() - last_mouse_motion_ms;
+     const bool hide = !BbOverlay::MenuOpen() &&
+                       (mouse_captured.load(std::memory_order_relaxed) ||
+-                       (pointer_shown ? idle > 1500 : (fullscreen || idle > 3000)));
++                       (pointer_shown ? idle > 1500 : ((fullscreen && !FreeMouse()) || idle > 3000)));
+     if (hide != cursor_hidden) {
+         cursor_hidden = hide;
+         hide ? SDL_HideCursor() : SDL_ShowCursor();

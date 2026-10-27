@@ -1,0 +1,37 @@
+--- a/gpu/platform/videoout/display.cpp
++++ b/gpu/platform/videoout/display.cpp
+@@ -300,6 +300,18 @@
+ }
+ 
+ void Display::Flip(const Request& request) {
++    // Complete the guest-image copy before handing the Frame to the separate
++    // presenter. Present() releases Frame objects back to the recording pool;
++    // reading ready_tick after queueing it can race reuse of that same object.
++    // BB_HONEST_FLIPS=1 (an experiment): the flip completes once the GPU has finished the frame,
++    // as on the console (a vblank after the frame's commands end), instead of when it is queued.
++    static const bool honest_flips = [] {
++        const char* env = std::getenv("BB_HONEST_FLIPS");
++        return env && env[0] == '1';
++    }();
++    if (honest_flips) {
++        presenter->WaitRendered(request.frame);
++    }
+     RunPresenter([frame = request.frame, hdr = request.port->is_hdr] {
+         presenter->SetHDR(hdr);
+         presenter->Present(frame);
+@@ -309,15 +321,6 @@
+                                                     : 0);
+     if (FrameStatsEnabled()) {
+         OnFlipStats();
+-    }
+-    // BB_HONEST_FLIPS=1 (an experiment): the flip completes once the GPU has finished the frame,
+-    // as on the console (a vblank after the frame's commands end), instead of when it is queued.
+-    static const bool honest_flips = [] {
+-        const char* env = std::getenv("BB_HONEST_FLIPS");
+-        return env && env[0] == '1';
+-    }();
+-    if (honest_flips) {
+-        presenter->WaitRendered(request.frame);
+     }
+     {
+         std::scoped_lock lock{port->status_mutex};

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Source publication checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check tracked source and notices
+        run: python3 tools/release_audit.py --tracked
+      - name: Synthetic tooling tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python3 -m unittest discover -s tests -v

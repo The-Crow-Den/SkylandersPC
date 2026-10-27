@@ -1,0 +1,194 @@
+--- a/gpu/shim/bbport_overlay.cpp
++++ b/gpu/shim/bbport_overlay.cpp
+@@ -376,11 +376,48 @@
+ extern "C" const char* sky_portal_status() __attribute__((weak));
+ extern "C" const char* sky_portal_atlas() __attribute__((weak));
+ extern "C" int sky_portal_creation_count() __attribute__((weak));
++extern "C" int sky_portal_creation_kind(int) __attribute__((weak));
++extern "C" int sky_controller_family(int) __attribute__((weak));
++extern "C" int sky_pc_controller_layout() __attribute__((weak));
++extern "C" int sky_pc_controller_glyphs() __attribute__((weak));
++extern "C" int sky_pc_set_controller_glyphs(int) __attribute__((weak));
++extern "C" int sky_pc_set_controller_layout(int) __attribute__((weak));
+ extern "C" const char* sky_portal_creation_name(int) __attribute__((weak));
+ extern "C" int sky_portal_action(int,int) __attribute__((weak));
+ extern "C" int sky_portal_volume() __attribute__((weak));
+ extern "C" void sky_portal_set_volume(int) __attribute__((weak));
+ 
++// Images supplied by the user's installed Steam client, imported privately.
++ImTextureData* ControllerGlyphAtlas() {
++    static ImTextureData* texture=nullptr;static bool attempted=false;
++    if(attempted)return texture;attempted=true;
++    const auto* path=std::getenv("SKY_CONTROLLER_GLYPH_ATLAS");if(!path)return nullptr;
++    FILE* file=std::fopen(path,"rb");if(!file)return nullptr;
++    unsigned size[2]{};
++    if(std::fread(size,sizeof(size),1,file)!=1||size[0]!=512||size[1]!=256){std::fclose(file);return nullptr;}
++    auto* image=IM_NEW(ImTextureData)();image->Create(ImTextureFormat_RGBA32,512,256);
++    if(std::fread(image->Pixels,1,image->GetSizeInBytes(),file)!=static_cast<size_t>(image->GetSizeInBytes())){
++        std::fclose(file);IM_DELETE(image);return nullptr;
++    }
++    std::fclose(file);image->UseColors=true;image->UniqueID=10002;
++    ImGui::RegisterUserTexture(image);texture=image;return texture;
++}
++void PcFaceHint(int family,int button,const char* action) {
++    auto* atlas=ControllerGlyphAtlas();
++    if(atlas) {
++        const int positions[]{0,2,1,3};
++        const int cell=family==1?20+button:(family==3?10:0)+positions[button];
++        const ImVec2 uv0{float(cell%8)/8.0f,float(cell/8)/4.0f};
++        const ImVec2 uv1{uv0.x+1.0f/8.0f,uv0.y+1.0f/4.0f};
++        ImGui::Image(atlas->GetTexRef(),{27,27},uv0,uv1);
++    } else {
++        const char* ps[]{"Cross","Circle","Square","Triangle"};
++        const char* xbox[]{"A","B","X","Y"};const char* nintendo[]{"B","A","Y","X"};
++        ImGui::TextUnformatted(family==1?ps[button]:family==3?nintendo[button]:xbox[button]);
++    }
++    ImGui::SameLine();ImGui::TextUnformatted(action);
++}
++
+ bool PcMenuEnabled() {
+     static const bool value=[] {const auto* p=std::getenv("SKY_PC_MENU");return p&&!std::strcmp(p,"1");}();return value;
+ }
+@@ -415,27 +452,30 @@
+     return a.find(b)!=std::string::npos;
+ }
+ void PortalCollection(int kind) {
+-    static char search[2][96]{};static int element=0;
++    static char search[3][96]{};static int element=0,player=0;
++    if(kind==0) {ImGui::RadioButton("Player 1",&player,0);ImGui::SameLine();ImGui::RadioButton("Player 2",&player,1);}
++    const int collection_kind=kind==0 && player==1?3:kind;
+     static const char* elements[]{"All elements","Air","Dark","Earth","Fire","Kaos","Life","Light","Magic","Tech","Undead","Water"};
+     ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##search","Search your collection...",search[kind],sizeof(search[kind]));
+     if(kind==1) {ImGui::SetNextItemWidth(-1);ImGui::Combo("##element",&element,elements,12);}
+     else {
+         if(sky_portal_creation_count && sky_portal_creation_name && sky_portal_creation_count()>0) {
+-            if(ImGui::Button("+ Create Skylander",{-1,32*base_scale}))ImGui::OpenPopup("create_skylander");
++            if(ImGui::Button(kind==2?"+ Create item":"+ Create Skylander",{-1,32*base_scale}))ImGui::OpenPopup("create_skylander");
+             ImGui::SetNextWindowSize({350*base_scale,std::min(550*base_scale,ImGui::GetMainViewport()->WorkSize.y*0.75f)},ImGuiCond_Always);
+             if(ImGui::BeginPopup("create_skylander")) {
+                 static char create_search[96]{};
+-                ImGui::TextUnformatted("CREATE SKYLANDER");
++                ImGui::TextUnformatted(kind==2?"CREATE MAGIC / ADVENTURE ITEM":"CREATE SKYLANDER");
+                 ImGui::TextWrapped("Create a new figure and place it on the portal. Existing figures and their progress are kept.");
+-                ImGui::TextDisabled("Single-tag characters through Trap Team");
++                ImGui::TextDisabled(kind==2?"Magic items and adventure pieces through Trap Team":"Single-tag characters through Trap Team");
+                 ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##create_search","Search a Skylander...",create_search,sizeof(create_search));
+                 ImGui::BeginChild("creation_list",{0,-38*base_scale});
+                 for(int i=0;i<sky_portal_creation_count();++i) {
+                     const char* name=sky_portal_creation_name(i);
++                    if(sky_portal_creation_kind && sky_portal_creation_kind(i)!=kind)continue;
+                     if(!PortalMatches(name,create_search))continue;
+                     ImGui::PushID(i);
+                     if(ImGui::Selectable(name) && sky_portal_action) {
+-                        sky_portal_action(5,i);ImGui::CloseCurrentPopup();
++                        sky_portal_action(kind==0 && player==1?10:5,i);ImGui::CloseCurrentPopup();
+                     }
+                     ImGui::PopID();
+                 }
+@@ -444,7 +484,7 @@
+                 ImGui::EndPopup();
+             }
+         }
+-        if(ImGui::Button("+ Import Skylander",{-1,32*base_scale})&&sky_portal_action)sky_portal_action(2,0);
++        if(ImGui::Button(kind==2?"+ Import item":"+ Import Skylander",{-1,32*base_scale})&&sky_portal_action)sky_portal_action(kind==0 && player==1?11:2,0);
+     }
+     ImGui::Spacing();
+     auto* atlas=PortalAtlas();
+@@ -456,7 +496,7 @@
+             const char* detail=sky_portal_detail(kind,i);
+             if(!PortalMatches(name.c_str(),search[kind])||(kind==1&&element&&std::strcmp(detail,elements[element])))continue;
+             ++shown;ImGui::TableNextColumn();ImGui::PushID(i);
+-            const int state=sky_portal_state(kind,i);
++            const int state=sky_portal_state(collection_kind,i);
+             const auto accent=PortalColor(detail);
+             ImGui::PushStyleColor(ImGuiCol_Button,state&2?ImVec4(0.08f,0.4f,0.4f,1):ImVec4(0.11f,0.16f,0.23f,1));
+             ImGui::PushStyleColor(ImGuiCol_Border,state&2?ImVec4(0.3f,0.95f,0.84f,1):ImVec4(0.2f,0.26f,0.34f,1));
+@@ -468,18 +508,18 @@
+                 const ImVec2 uv1{uv0.x+1.0f/8.0f,uv0.y+1.0f/6.0f};
+                 pressed=ImGui::ImageButton("##portrait",atlas->GetTexRef(),{side,side},uv0,uv1);
+             } else pressed=ImGui::Button(name.c_str(),{side,side});
+-            if(pressed&&sky_portal_action)sky_portal_action(kind,i);
++            if(pressed&&sky_portal_action)sky_portal_action(kind==2?8:kind==0 && player==1?6:kind,i);
+             if(ImGui::IsItemHovered())ImGui::SetTooltip(kind==1?"Insert %s's dedicated %s trap. Starts empty for capture.":"Place %s on the portal.",name.c_str(),detail);
+             ImGui::PopStyleVar();ImGui::PopStyleColor(2);
+             ImGui::TextWrapped("%s",name.c_str());
+-            ImGui::TextColored(accent,"%s",state&2?"INSERTED":kind==1?(state&1?"Saved trap":detail):"Skylander");
++            ImGui::TextColored(accent,"%s",state&2?"INSERTED":kind==1?(state&1?"Saved trap":detail):kind==2?"Item":"Skylander");
+             ImGui::Dummy({0,8*base_scale});ImGui::PopID();
+         }
+         ImGui::EndTable();
+     }
+     if(!shown)ImGui::TextWrapped(kind==0?"Import a Skylander dump to add it to your collection.":"No villains match this filter.");
+     ImGui::EndChild();
+-    if(ImGui::Button(kind==1?"Eject trap":"Remove Skylander",{-1,30*base_scale})&&sky_portal_action)sky_portal_action(kind==1?4:3,0);
++    if(ImGui::Button(kind==1?"Eject trap":kind==2?"Remove item":"Remove Skylander",{-1,30*base_scale})&&sky_portal_action)sky_portal_action(kind==1?4:kind==2?9:player==1?7:3,0);
+     ImGui::TextDisabled("%d in collection",count);
+ }
+ void PcMenu() {
+@@ -532,10 +572,35 @@
+                 if(ImGui::RadioButton("60 FPS",!automatic && cap==60))sky_pc_set_frame_limit(60);ImGui::EndDisabled();
+             }
+             if(ImGui::Checkbox("Show FPS counter",&counter))BbSettings::Get().show_fps=counter;
+-            ImGui::TextWrapped("Automatic follows loading, menus, cutscenes and portal arrival. Manual buttons or Shift+F1 take control; select Automatic to resume scene switching.");
++            ImGui::TextWrapped("Automatic keeps videos at 30 and supported in-engine cinematics at 60. Loading, menus and portal arrival retain protective gates. Manual buttons or Shift+F1 take control; select Automatic to resume scene switching.");
+             ImGui::TextWrapped("MangoHud is an optional external overlay.");
+         } else if(page==2) {
+             ImGui::TextUnformatted("CONTROLS");ImGui::Spacing();
++            if(sky_pc_controller_layout && sky_pc_set_controller_layout) {
++                int layout=sky_pc_controller_layout();
++                if(ImGui::Combo("Controller setup",&layout,"Controller(s)\0Keyboard + controller\0"))sky_pc_set_controller_layout(layout);
++                ImGui::TextWrapped("Apply settings and restart to change player assignments.");
++                ImGui::Spacing();
++            }
++            if(sky_pc_controller_glyphs && sky_pc_set_controller_glyphs) {
++                int style=sky_pc_controller_glyphs();
++                if(ImGui::Combo("Button glyphs",&style,"Automatic\0PlayStation\0Xbox\0Nintendo\0"))sky_pc_set_controller_glyphs(style);
++                const auto* active=std::getenv("SKY_ACTIVE_CONTROLLER_GLYPHS");
++                ImGui::Text("Game glyph pack: %s",active?active:"playstation");
++                ImGui::TextWrapped("Apply settings and restart to change the shared in-game font. Automatic uses the first mapped controller at launch. Mixed controllers share that font.");
++                ImGui::Spacing();
++            }
++            if(sky_controller_family)for(int player=0;player<2;++player) {
++                const int family=sky_controller_family(player);
++                const char* type=family==1?"PlayStation":family==2?"Xbox":family==3?"Nintendo":family==4?"Gamepad":player==0?"Keyboard":"Not connected";
++                ImGui::Text("Player %d: %s",player+1,type);
++                const char* buttons=family==1?"Confirm: Cross   Back: Circle\nAttack: Square   Secondary: Triangle":family==2?"Confirm: A   Back: B\nAttack: X   Secondary: Y":family==3?"Confirm: B   Back: A\nAttack: Y   Secondary: X":family==4?"Confirm: South   Back: East\nAttack: West   Secondary: North":player==0?"Confirm: Enter   Back: Escape\nAttack: Z   Secondary: X":"Connect a second controller to join.";
++                if(family>=1 && family<=3) {
++                    PcFaceHint(family,0,"Confirm / Jump");PcFaceHint(family,1,"Back / Attack 3");
++                    PcFaceHint(family,2,"Attack 1");PcFaceHint(family,3,"Attack 2");
++                } else ImGui::TextWrapped("%s",buttons);
++                ImGui::Spacing();
++            }
+             ImGui::TextWrapped("F6 / Insert     Open or close these panels\nL3 + R3     Controller shortcut\nShift + F1     30 / 60 FPS\nF2     Import Skylander\nF3     Remove Skylander\nF5     Eject trap");
+             ImGui::Spacing();ImGui::TextWrapped("The mouse is free to leave the window. Game controls are blocked while these panels are open. The world keeps running.");
+         } else if(page==3) {
+@@ -544,7 +609,7 @@
+                 int volume=sky_portal_volume();ImGui::SetNextItemWidth(-1);
+                 if(ImGui::SliderInt("##portal_volume",&volume,0,100,"%d%%"))sky_portal_set_volume(volume);
+             }
+-            ImGui::TextWrapped("Portal voices play quietly through your PC speakers. Default: 15%%. Set to zero to mute only the portal.");
++            ImGui::TextWrapped("Portal voices play quietly through your PC speakers. Default: 30%%. Set to zero to mute only the portal.");
+         } else {
+             ImGui::TextUnformatted("YOUR PC PORTAL");ImGui::Spacing();
+             ImGui::TextWrapped("Each villain has its own trap. New traps start empty. Capture a villain in-game, then switch freely without replacing another trap's progress.");
+@@ -565,16 +630,17 @@
+         ImGui::TextColored({0.36f,0.94f,0.83f,1},"VIRTUAL PORTAL");ImGui::TextDisabled("TRAPTANIUM / YOUR COLLECTION");
+         ImGui::Spacing();
+         if(sky_portal_count&&sky_portal_state&&sky_portal_name) {
+-            for(int kind=0;kind<2;++kind) {
+-                std::string active=kind?"No trap inserted":"No Skylander placed";
++            for(int kind: {0,3,1,2}) {
++                std::string active=kind==1?"No trap inserted":kind==2?"No item placed":"No Skylander placed";
+                 for(int i=0;i<sky_portal_count(kind);++i)if(sky_portal_state(kind,i)&2){active=sky_portal_name(kind,i);break;}
+-                ImGui::TextDisabled("%s",kind?"TRAP SLOT":"SKYLANDER");ImGui::TextWrapped("%s",active.c_str());
++                ImGui::TextDisabled("%s",kind==1?"TRAP SLOT":kind==2?"ITEM SLOT":kind==3?"PLAYER 2":"PLAYER 1");ImGui::TextWrapped("%s",active.c_str());
+             }
+             ImGui::Separator();if(sky_portal_status)ImGui::TextWrapped("%s",sky_portal_status());
+             ImGui::Spacing();
+             if(ImGui::BeginTabBar("portal_tabs")) {
+                 if(ImGui::BeginTabItem("Villain traps")){PortalCollection(1);ImGui::EndTabItem();}
+                 if(ImGui::BeginTabItem("Skylanders")){PortalCollection(0);ImGui::EndTabItem();}
++                if(ImGui::BeginTabItem("Items")){PortalCollection(2);ImGui::EndTabItem();}
+                 ImGui::EndTabBar();
+             }
+         } else ImGui::TextWrapped("Virtual portal is unavailable in this build.");

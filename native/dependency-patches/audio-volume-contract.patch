@@ -1,0 +1,51 @@
+--- a/src/runtime_audio.c
++++ b/src/runtime_audio.c
+@@ -215,11 +215,26 @@
+ static ABI int32_t audio_outputs(const OutputParam *params, uint32_t count) {
+     if (!params) return ERR_INVALID_POINTER;
+     if (!count || count>PORTS) return ERR_PORT_FULL;
+-    int32_t result=0;
+-    /* One period per call for all ports (FMOD feeds main and BGM together): pacing every
+-       port would halve the rate and starve both. */
+-    for (uint32_t i=0;i<count;++i) { int32_t r=output_port(params[i].handle,params[i].data,i==0); if (r<0) return r; result=r; }
+-    return result;
++    /* Validate the whole group before submitting anything. The grouped API
++       returns frames per port, whereas Output returns interleaved samples. */
++    int frames=0;
++    pthread_mutex_lock(&table_lock);
++    for (uint32_t i=0;i<count;++i) {
++        int32_t error=0; Port *p=port_of(params[i].handle,&error);
++        if (!p) {pthread_mutex_unlock(&table_lock);return error;}
++        for (uint32_t j=0;j<i;++j) if (params[i].handle==params[j].handle) {
++            pthread_mutex_unlock(&table_lock);return ERR_INVALID_PORT;
++        }
++        if (i && p->frames!=frames) {pthread_mutex_unlock(&table_lock);return ERR_INVALID_SIZE;}
++        frames=p->frames;
++    }
++    pthread_mutex_unlock(&table_lock);
++    /* One period for the group; pacing every port would starve all ports. */
++    for (uint32_t i=0;i<count;++i) {
++        int32_t r=output_port(params[i].handle,params[i].data,i==0);
++        if (r<0) return r;
++    }
++    return frames;
+ }
+ static ABI int32_t audio_volume(int32_t handle, int32_t flags, const int32_t *volume) {
+     int32_t error=0;
+@@ -228,11 +243,12 @@
+     pthread_mutex_unlock(&table_lock);
+     if (!p) return error;
+     if (!volume) return ERR_INVALID_POINTER;
++    /* One scalar applies to every selected channel; this is not an array. */
++    const int32_t value=*volume;
++    if(getenv("BB_AUDIO_CONTROL_TRACE"))printf("Audio volume: handle=%x mask=%x value=%d\n",handle,flags,value);
++    if (value<0 || value>VOLUME_0DB) return ERR_INVALID_VOLUME;
+     pthread_mutex_lock(&p->lock);
+-    for (int c=0;c<8;++c) if (flags & (1<<c)) {
+-        if (volume[c]<0 || volume[c]>VOLUME_0DB) { pthread_mutex_unlock(&p->lock); return ERR_INVALID_VOLUME; }
+-        p->volume[c]=volume[c];
+-    }
++    for (int c=0;c<8;++c) if (flags & (1<<c)) p->volume[c]=value;
+     pthread_mutex_unlock(&p->lock);
+     return 0;
+ }

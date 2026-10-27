@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Apply after pc-menu.patch. Live automatic policy selection and status.
+--- a/gpu/shim/bbport_overlay.cpp
++++ b/gpu/shim/bbport_overlay.cpp
+@@ -364,6 +364,9 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ extern "C" int sky_pc_frame_limit() __attribute__((weak));
+ extern "C" void sky_pc_set_frame_limit(int) __attribute__((weak));
++extern "C" int sky_pc_frame_policy() __attribute__((weak));
++extern "C" int sky_pc_auto_available() __attribute__((weak));
++extern "C" int sky_pc_set_frame_policy(int) __attribute__((weak));
+ extern "C" int sky_pc_save_settings(int,int,int,int) __attribute__((weak));
+ extern "C" int sky_portal_count(int) __attribute__((weak));
+ extern "C" const char* sky_portal_name(int,int) __attribute__((weak));
+@@ -488,13 +491,20 @@
+         } else if(page==1) {
+             ImGui::TextUnformatted("PERFORMANCE");ImGui::TextDisabled("Applies immediately");ImGui::Spacing();
+             if(sky_pc_frame_limit&&sky_pc_set_frame_limit) {
++                const bool automatic=sky_pc_frame_policy && sky_pc_frame_policy()!=0;
++                if(sky_pc_set_frame_policy && sky_pc_auto_available) {
++                    ImGui::BeginDisabled(!sky_pc_auto_available());
++                    if(ImGui::RadioButton("Automatic (30 / 60 FPS)",automatic))sky_pc_set_frame_policy(1);
++                    ImGui::EndDisabled();
++                    if(!sky_pc_auto_available())ImGui::TextWrapped("Automatic requires the verified game-state mod. Enable it in the launcher.");
++                }
+                 const int cap=sky_pc_frame_limit();
+-                if(ImGui::RadioButton("30 FPS",cap==30))sky_pc_set_frame_limit(30);
++                if(ImGui::RadioButton("30 FPS",!automatic && cap==30))sky_pc_set_frame_limit(30);
+                 ImGui::SameLine();ImGui::BeginDisabled(!PcChoice("SKY_ALLOW_60",0));
+-                if(ImGui::RadioButton("60 FPS",cap==60))sky_pc_set_frame_limit(60);ImGui::EndDisabled();
++                if(ImGui::RadioButton("60 FPS",!automatic && cap==60))sky_pc_set_frame_limit(60);ImGui::EndDisabled();
+             }
+             if(ImGui::Checkbox("Show FPS counter",&counter))BbSettings::Get().show_fps=counter;
+-            ImGui::TextWrapped("Use 30 FPS for the Skylander arrival animation. Shift+F1 switches between 30 and 60.");
++            ImGui::TextWrapped("Automatic follows loading, menus, cutscenes and portal arrival. Manual buttons or Shift+F1 take control; select Automatic to resume scene switching.");
+             ImGui::TextWrapped("MangoHud is an optional external overlay.");
+         } else if(page==2) {
+             ImGui::TextUnformatted("CONTROLS");ImGui::Spacing();

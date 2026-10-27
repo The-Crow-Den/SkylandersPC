@@ -1,0 +1,15 @@
+--- a/gpu/platform/videoout/display.cpp
++++ b/gpu/platform/videoout/display.cpp
+@@ -373,7 +373,11 @@
+                 EmulatorSettings.GetVblankFrequency(), frame_limit);
+     // With a frame limit or the uncapped presets a flip is shown as soon as it arrives (and its
+     // slot allows), between vblanks, instead of at the next vblank.
+-    const bool immediate_flips = frame_limit != 0 || EmulatorSettings.IsUncappedVblank();
++    // Native hosts can already pace submissions. Let their completed frames reach
++    // the presenter without snapping them to a second independent software clock.
++    // Guest vblank frequency and nonzero guest flip intervals remain unchanged.
++    const bool immediate_flips = frame_limit != 0 || EmulatorSettings.IsUncappedVblank() ||
++                                 EmulatorSettingsImpl::Flag("BB_PRESENT_AS_READY", false);
+     const auto flip = [&](const Request& request, std::chrono::steady_clock::time_point now) {
+         if (frame_limit) {
+             next_flip = std::max(next_flip + frame_period, now - frame_period);

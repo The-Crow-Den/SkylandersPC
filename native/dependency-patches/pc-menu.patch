@@ -1,0 +1,228 @@
+--- a/gpu/shim/bbport_overlay.cpp
++++ b/gpu/shim/bbport_overlay.cpp
+@@ -6,6 +6,7 @@
+ #include <atomic>
+ #include <chrono>
+ #include <cmath>
++#include <cctype>
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
+@@ -19,6 +20,7 @@
+ #include "bbport_frame_rate.h"
+ #include "bbport_settings.h"
+ #include "imgui.h"
++#include "imgui_internal.h"
+ #include "imgui_impl_vulkan.h"
+ #include "vulkan/instance.h"
+ #include "render/scheduler.h"
+@@ -359,9 +361,192 @@
+     }
+ }
+ 
++// SPDX-License-Identifier: GPL-2.0-or-later
++extern "C" int sky_pc_frame_limit() __attribute__((weak));
++extern "C" void sky_pc_set_frame_limit(int) __attribute__((weak));
++extern "C" int sky_pc_save_settings(int,int,int,int) __attribute__((weak));
++extern "C" int sky_portal_count(int) __attribute__((weak));
++extern "C" const char* sky_portal_name(int,int) __attribute__((weak));
++extern "C" const char* sky_portal_detail(int,int) __attribute__((weak));
++extern "C" int sky_portal_state(int,int) __attribute__((weak));
++extern "C" int sky_portal_portrait(int,int) __attribute__((weak));
++extern "C" const char* sky_portal_status() __attribute__((weak));
++extern "C" const char* sky_portal_atlas() __attribute__((weak));
++extern "C" int sky_portal_action(int,int) __attribute__((weak));
++extern "C" int sky_portal_volume() __attribute__((weak));
++extern "C" void sky_portal_set_volume(int) __attribute__((weak));
++
++bool PcMenuEnabled() {
++    static const bool value=[] {const auto* p=std::getenv("SKY_PC_MENU");return p&&!std::strcmp(p,"1");}();return value;
++}
++int PcChoice(const char* key,int fallback) {const auto* p=std::getenv(key);return p?std::atoi(p):fallback;}
++ImVec4 PortalColor(const char* element) {
++    const std::string_view e=element?element:"";
++    if(e=="Water")return {0.22f,0.64f,1,1}; if(e=="Life")return {0.4f,0.85f,0.34f,1};
++    if(e=="Fire")return {1,0.4f,0.2f,1}; if(e=="Magic")return {0.75f,0.4f,1,1};
++    if(e=="Earth")return {0.85f,0.62f,0.3f,1}; if(e=="Tech")return {1,0.77f,0.25f,1};
++    if(e=="Undead")return {0.77f,0.78f,0.95f,1}; if(e=="Air")return {0.54f,0.86f,0.95f,1};
++    if(e=="Light")return {1,0.96f,0.7f,1};return {0.76f,0.5f,0.74f,1};
++}
++ImTextureData* PortalAtlas() {
++    static ImTextureData* texture=nullptr;
++    static bool attempted=false;
++    if(attempted)return texture;attempted=true;
++    if(!sky_portal_atlas)return nullptr;
++    FILE* f=std::fopen(sky_portal_atlas(),"rb");if(!f)return nullptr;
++    unsigned size[2]{};
++    if(std::fread(size,sizeof(size),1,f)!=1||size[0]!=1024||size[1]!=768){std::fclose(f);return nullptr;}
++    auto* t=IM_NEW(ImTextureData)();t->Create(ImTextureFormat_RGBA32,1024,768);
++    if(std::fread(t->Pixels,1,t->GetSizeInBytes(),f)!=static_cast<size_t>(t->GetSizeInBytes())){std::fclose(f);IM_DELETE(t);return nullptr;}
++    std::fclose(f);t->UseColors=true;t->UniqueID=10001;
++    // Pinned ImGui rebuilds PlatformIO.Textures each frame. Register ownership
++    // so the Vulkan backend uploads the atlas and retains its descriptor.
++    ImGui::RegisterUserTexture(t);texture=t;return texture;
++}
++bool PortalMatches(const char* name,const char* search) {
++    std::string a=name?name:"",b=search?search:"";
++    std::transform(a.begin(),a.end(),a.begin(),[](unsigned char c){return char(std::tolower(c));});
++    std::transform(b.begin(),b.end(),b.begin(),[](unsigned char c){return char(std::tolower(c));});
++    return a.find(b)!=std::string::npos;
++}
++void PortalCollection(int kind) {
++    static char search[2][96]{};static int element=0;
++    static const char* elements[]{"All elements","Air","Dark","Earth","Fire","Kaos","Life","Light","Magic","Tech","Undead","Water"};
++    ImGui::SetNextItemWidth(-1);ImGui::InputTextWithHint("##search","Search your collection...",search[kind],sizeof(search[kind]));
++    if(kind==1) {ImGui::SetNextItemWidth(-1);ImGui::Combo("##element",&element,elements,12);}
++    else if(ImGui::Button("+ Import Skylander",{-1,32*base_scale})&&sky_portal_action)sky_portal_action(2,0);
++    ImGui::Spacing();
++    auto* atlas=PortalAtlas();
++    ImGui::BeginChild("collection",{0,-66*base_scale});
++    const int count=sky_portal_count(kind);int shown=0;
++    if(ImGui::BeginTable("portrait_grid",3,ImGuiTableFlags_SizingStretchSame)) {
++        for(int i=0;i<count;++i) {
++            const std::string name=sky_portal_name(kind,i);
++            const char* detail=sky_portal_detail(kind,i);
++            if(!PortalMatches(name.c_str(),search[kind])||(kind==1&&element&&std::strcmp(detail,elements[element])))continue;
++            ++shown;ImGui::TableNextColumn();ImGui::PushID(i);
++            const int state=sky_portal_state(kind,i);
++            const auto accent=PortalColor(detail);
++            ImGui::PushStyleColor(ImGuiCol_Button,state&2?ImVec4(0.08f,0.4f,0.4f,1):ImVec4(0.11f,0.16f,0.23f,1));
++            ImGui::PushStyleColor(ImGuiCol_Border,state&2?ImVec4(0.3f,0.95f,0.84f,1):ImVec4(0.2f,0.26f,0.34f,1));
++            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,state&2?3.0f:1.0f);
++            const float side=std::max(35.0f,ImGui::GetContentRegionAvail().x-6*base_scale);
++            const int cell=sky_portal_portrait(kind,i);bool pressed=false;
++            if(atlas&&cell>=0) {
++                const ImVec2 uv0{float(cell%8)/8.0f,float(cell/8)/6.0f};
++                const ImVec2 uv1{uv0.x+1.0f/8.0f,uv0.y+1.0f/6.0f};
++                pressed=ImGui::ImageButton("##portrait",atlas->GetTexRef(),{side,side},uv0,uv1);
++            } else pressed=ImGui::Button(name.c_str(),{side,side});
++            if(pressed&&sky_portal_action)sky_portal_action(kind,i);
++            if(ImGui::IsItemHovered())ImGui::SetTooltip(kind==1?"Insert %s's dedicated %s trap. Starts empty for capture.":"Place %s on the portal.",name.c_str(),detail);
++            ImGui::PopStyleVar();ImGui::PopStyleColor(2);
++            ImGui::TextWrapped("%s",name.c_str());
++            ImGui::TextColored(accent,"%s",state&2?"INSERTED":kind==1?(state&1?"Saved trap":detail):"Skylander");
++            ImGui::Dummy({0,8*base_scale});ImGui::PopID();
++        }
++        ImGui::EndTable();
++    }
++    if(!shown)ImGui::TextWrapped(kind==0?"Import a Skylander dump to add it to your collection.":"No villains match this filter.");
++    ImGui::EndChild();
++    if(ImGui::Button(kind==1?"Eject trap":"Remove Skylander",{-1,30*base_scale})&&sky_portal_action)sky_portal_action(kind==1?4:3,0);
++    ImGui::TextDisabled("%d in collection",count);
++}
++void PcMenu() {
++    static int resolution=std::clamp(PcChoice("SKY_PC_RESOLUTION",2),0,5);
++    static int quality=std::clamp(PcChoice("SKY_PC_QUALITY",1),0,2),page=0;
++    static bool fullscreen=PcChoice("SKY_FULLSCREEN",0)!=0,counter=PcChoice("SKY_FPS_COUNTER",1)!=0,failed=false;
++    static double last=0;static float opening=0;
++    const double now=ImGui::GetTime();if(now-last>0.15)opening=0;last=now;
++    opening+=(1-opening)*std::min(1.0f,ImGui::GetIO().DeltaTime*16);
++    const auto* v=ImGui::GetMainViewport();const float scale=base_scale;
++    const float left=std::min(v->WorkSize.x*0.32f,370*scale),right=std::min(v->WorkSize.x*0.40f,470*scale);
++    const auto flags=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings;
++    ImGui::PushStyleColor(ImGuiCol_WindowBg,{0.035f,0.055f,0.09f,0.98f});
++    ImGui::PushStyleColor(ImGuiCol_ChildBg,{0,0,0,0});ImGui::PushStyleColor(ImGuiCol_Header,{0.08f,0.32f,0.34f,1});
++    ImGui::PushStyleColor(ImGuiCol_Button,{0.10f,0.19f,0.26f,1});ImGui::PushStyleColor(ImGuiCol_ButtonHovered,{0.1f,0.4f,0.42f,1});
++    ImGui::PushStyleColor(ImGuiCol_FrameBg,{0.09f,0.13f,0.20f,1});
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,{20*scale,22*scale});ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,7*scale);
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0);ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,{8*scale,10*scale});
++    ImGui::SetNextWindowPos({v->WorkPos.x-left*(1-opening),v->WorkPos.y});ImGui::SetNextWindowSize({left,v->WorkSize.y});
++    if(ImGui::Begin("##pc_left_drawer",nullptr,flags)) {
++        ImGui::TextColored({0.36f,0.94f,0.83f,1},"SKYLANDERS / PC");
++        ImGui::SameLine(ImGui::GetWindowWidth()-65*scale);
++        if(ImGui::SmallButton("Close"))SetOpen(false);
++        ImGui::TextDisabled("TRAP TEAM");ImGui::Spacing();ImGui::Separator();
++        const char* pages[]{"Display","Performance","Controls","Audio","About"};
++        for(int i=0;i<5;++i)if(ImGui::Selectable(pages[i],page==i,0,{0,25*scale}))page=i;
++        ImGui::Separator();ImGui::Spacing();
++        ImGui::BeginChild("settings_body",{0,-100*scale});
++        if(page==0) {
++            ImGui::TextUnformatted("DISPLAY");ImGui::TextDisabled("Changes apply after restart");ImGui::Spacing();
++            ImGui::TextUnformatted("Render resolution");ImGui::SetNextItemWidth(-1);
++            ImGui::Combo("##resolution",&resolution,"1280 x 720\0" "1600 x 900\0" "1920 x 1080\0" "2560 x 1440\0" "2560 x 1600\0" "3840 x 2160\0");
++            ImGui::TextUnformatted("Graphics quality");ImGui::SetNextItemWidth(-1);
++            ImGui::Combo("##quality",&quality,"Performance\0Balanced\0High\0");
++            ImGui::TextWrapped("%s",quality==0?"Lighter shadows for more GPU headroom.":quality==1?"Original shadow detail.":"Sharper shadows with a higher GPU cost.");
++            ImGui::Checkbox("Fullscreen",&fullscreen);
++        } else if(page==1) {
++            ImGui::TextUnformatted("PERFORMANCE");ImGui::TextDisabled("Applies immediately");ImGui::Spacing();
++            if(sky_pc_frame_limit&&sky_pc_set_frame_limit) {
++                const int cap=sky_pc_frame_limit();
++                if(ImGui::RadioButton("30 FPS",cap==30))sky_pc_set_frame_limit(30);
++                ImGui::SameLine();ImGui::BeginDisabled(!PcChoice("SKY_ALLOW_60",0));
++                if(ImGui::RadioButton("60 FPS",cap==60))sky_pc_set_frame_limit(60);ImGui::EndDisabled();
++            }
++            if(ImGui::Checkbox("Show FPS counter",&counter))BbSettings::Get().show_fps=counter;
++            ImGui::TextWrapped("Use 30 FPS for the Skylander arrival animation. Shift+F1 switches between 30 and 60.");
++            ImGui::TextWrapped("MangoHud is an optional external overlay.");
++        } else if(page==2) {
++            ImGui::TextUnformatted("CONTROLS");ImGui::Spacing();
++            ImGui::TextWrapped("F6 / Insert     Open or close these panels\nL3 + R3     Controller shortcut\nShift + F1     30 / 60 FPS\nF2     Import Skylander\nF3     Remove Skylander\nF5     Eject trap");
++            ImGui::Spacing();ImGui::TextWrapped("The mouse is free to leave the window. Game controls are blocked while these panels are open. The world keeps running.");
++        } else if(page==3) {
++            ImGui::TextUnformatted("PORTAL SPEAKER");ImGui::Spacing();
++            if(sky_portal_volume&&sky_portal_set_volume) {
++                int volume=sky_portal_volume();ImGui::SetNextItemWidth(-1);
++                if(ImGui::SliderInt("##portal_volume",&volume,0,100,"%d%%"))sky_portal_set_volume(volume);
++            }
++            ImGui::TextWrapped("Portal voices play quietly through your PC speakers. Default: 15%%. Set to zero to mute only the portal.");
++        } else {
++            ImGui::TextUnformatted("YOUR PC PORTAL");ImGui::Spacing();
++            ImGui::TextWrapped("Each villain has its own trap. New traps start empty. Capture a villain in-game, then switch freely without replacing another trap's progress.");
++            ImGui::Spacing();ImGui::TextDisabled("Portraits: Activision / darkSpyro");
++            ImGui::TextWrapped("Portraits are cached locally. The game needs no network connection.");
++        }
++        ImGui::EndChild();ImGui::Separator();
++        ImGui::TextWrapped("Save game progress before restarting.");
++        ImGui::BeginDisabled(!std::getenv("SKY_PC_SETTINGS_REQUEST"));
++        if(ImGui::Button("Apply settings and restart",{-1,34*scale})) {
++            failed=!sky_pc_save_settings||!sky_pc_save_settings(resolution,quality,fullscreen,counter);
++            if(!failed){SDL_Event event{};event.type=SDL_EVENT_QUIT;SDL_PushEvent(&event);}
++        }
++        ImGui::EndDisabled();if(failed)ImGui::TextWrapped("Could not save settings. Try again.");
++    }ImGui::End();
++    ImGui::SetNextWindowPos({v->WorkPos.x+v->WorkSize.x-right*opening,v->WorkPos.y});ImGui::SetNextWindowSize({right,v->WorkSize.y});
++    if(ImGui::Begin("##pc_right_portal",nullptr,flags)) {
++        ImGui::TextColored({0.36f,0.94f,0.83f,1},"VIRTUAL PORTAL");ImGui::TextDisabled("TRAPTANIUM / YOUR COLLECTION");
++        ImGui::Spacing();
++        if(sky_portal_count&&sky_portal_state&&sky_portal_name) {
++            for(int kind=0;kind<2;++kind) {
++                std::string active=kind?"No trap inserted":"No Skylander placed";
++                for(int i=0;i<sky_portal_count(kind);++i)if(sky_portal_state(kind,i)&2){active=sky_portal_name(kind,i);break;}
++                ImGui::TextDisabled("%s",kind?"TRAP SLOT":"SKYLANDER");ImGui::TextWrapped("%s",active.c_str());
++            }
++            ImGui::Separator();if(sky_portal_status)ImGui::TextWrapped("%s",sky_portal_status());
++            ImGui::Spacing();
++            if(ImGui::BeginTabBar("portal_tabs")) {
++                if(ImGui::BeginTabItem("Villain traps")){PortalCollection(1);ImGui::EndTabItem();}
++                if(ImGui::BeginTabItem("Skylanders")){PortalCollection(0);ImGui::EndTabItem();}
++                ImGui::EndTabBar();
++            }
++        } else ImGui::TextWrapped("Virtual portal is unavailable in this build.");
++    }ImGui::End();ImGui::PopStyleVar(4);ImGui::PopStyleColor(6);
++}
++
+ // The settings menu as in 0.3 and 0.4: one window (moved with the mouse, its place kept in
+ // bbport.ini), sections one under the other, ImGui's own widgets and keyboard/gamepad navigation.
+ void Menu() {
++    if(PcMenuEnabled()){PcMenu();return;}
+     auto& s = BbSettings::Get();
+     const ImGuiViewport* viewport = ImGui::GetMainViewport();
+     // Where it was moved last (bbport.ini menu_pos, a fraction of the screen), kept on screen.
+@@ -1014,6 +1199,7 @@
+         ImGui::DestroyContext();
+         return;
+     }
++    if(PcMenuEnabled())BbSettings::Get().show_fps=PcChoice("SKY_FPS_COUNTER",1)!=0;
+     initialized = true;
+     std::printf("Overlay: menu ready (Insert or L3+R3)\n");
+ }
+@@ -1032,6 +1218,8 @@
+         }
+     }
+ }
++
++extern "C" void bbgpu_pc_menu_toggle(){std::scoped_lock lock{imgui_mutex};if(initialized)SetOpen(!menu_open);}
+ 
+ bool HandleEvent(const SDL_Event& event) {
+     std::scoped_lock lock{imgui_mutex};

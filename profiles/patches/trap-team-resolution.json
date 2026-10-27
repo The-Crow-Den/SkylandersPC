@@ -1,0 +1,14 @@
+{
+  "title_id": "CUSA00697",
+  "app_version": "01.00",
+  "renderer_sha256": "157228fa90041b0641c337f3b93bea3e4e676ca4336deb29833f2408bfc06652",
+  "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+  "pack_sha256": {
+    "original": "bd5cab31200382619a2203cd3cff0fe25e54cd9c4dd2140cc458b74d5a1b8f98",
+    "60": "a2f386b6d6b8dc701cdc6dc9de56b2c5059191be50ede1e86afc3a7b2010747d",
+    "60-delta": "fd9c3b3fd7c583298035b515612b4c99fa6a6aaec89059aad833e7f811f4fd96"
+  },
+  "virtual_address": 4206588,
+  "expected_hex": "c7459080070000c7459438040000",
+  "status": "experimental paired graphics-device and renderer target sizes"
+}

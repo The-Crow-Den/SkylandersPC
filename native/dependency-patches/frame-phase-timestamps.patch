@@ -1,0 +1,35 @@
+--- a/gpu/platform/videoout/frame_stats.cpp
++++ b/gpu/platform/videoout/frame_stats.cpp
+@@ -241,7 +241,7 @@
+                                "images,image_mb,buffer_mb,protect_ms,resident_ms,create_ms,"
+                                "refresh_ms,write_fault_ms,read_faults,guest_copy_mb,draws,"
+                                "dispatches,submissions,compiles,preupload_mb,kernel_ms,alloc_mb,"
+-                               "free_mb\n");
++                               "free_mb,monotonic_us\n");
+         }
+         return file;
+     }();
+@@ -257,9 +257,13 @@
+             last_value = now_value;
+             return d;
+         };
++        timespec stamp{};
++        clock_gettime(CLOCK_MONOTONIC, &stamp);
++        const auto monotonic_us = static_cast<unsigned long long>(stamp.tv_sec) * 1000000ull +
++                                  static_cast<unsigned long long>(stamp.tv_nsec) / 1000ull;
+         std::fprintf(frame_log,
+                      "%.4f,%.2f,%.2f,%.2f,%.2f,%llu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%llu,"
+-                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f\n",
++                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f,%llu\n",
+                      std::chrono::duration<double>(now - log_start).count(), frame_ms,
+                      delta(present, log_present) / 1e6, delta(tick, log_tick) / 1e6,
+                      last_gpu_ns ? (gpu_ns - last_gpu_ns) / 1e6 : 0.0,
+@@ -277,7 +281,7 @@
+                      delta(BbStats::preupload_bytes.load(), log_preupload) / 1e6,
+                      last_gpu_ns ? (sys_us - last_sys) / 1e3 : 0.0,
+                      delta(BbStats::device_alloc_bytes.load(), log_alloc) / 1e6,
+-                     delta(BbStats::device_free_bytes.load(), log_free) / 1e6);
++                     delta(BbStats::device_free_bytes.load(), log_free) / 1e6, monotonic_us);
+         static u32 unflushed = 0;
+         if (++unflushed >= 120) {
+             std::fflush(frame_log);

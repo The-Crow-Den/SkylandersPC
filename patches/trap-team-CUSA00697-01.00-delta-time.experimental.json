@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "title_id": "CUSA00697",
+  "app_version": "01.00",
+  "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+  "experimental": true,
+  "patches": [
+    {
+      "id": "experimental-remove-minimum-delta-clamp",
+      "kind": "enhancement",
+      "reason": "Adapt the supplied Wii U FPS pack behavior: bypass only the half-nominal minimum delta-time clamp while retaining the upper clamp. PS4 semantic match; gameplay speed remains unverified.",
+      "file_offset": 632578,
+      "expected_hex": "7606",
+      "replacement_hex": "eb06"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+.local/
+out/
+game/
+games/
+Game/
+Games/
+dumps/
+vendor/
+build/
+__pycache__/
+*.pyc
+*.AppImage
+*.pkg
+*.sprx
+*.prx
+*.elf
+*.sky
+*.log
+eboot.bin
+.DS_Store
+# Private experimental recipe currently contains bulk game-asset literals.
+/profiles/patches/trap-team-us-01.01-traptanium.experimental.json
+# Distribution inputs and private device/save data.
+*.rar
+*.zip
+*.7z
+*.tar.gz
+*.pack
+*.bld
+*.arc
+*.pak
+*.key
+*.pem
+*.pfx

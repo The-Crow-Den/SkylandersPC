@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "experimental": true,
+  "patches": [
+    {
+      "id": "experimental-one-vblank",
+      "kind": "enhancement",
+      "reason": "Force the renderer initialization interval to one vblank. Experimental; simulation speed and phase behavior unverified.",
+      "file_offset": 2501967,
+      "expected_hex": "418b4618",
+      "replacement_hex": "31c0ffc0"
+    }
+  ]
+}

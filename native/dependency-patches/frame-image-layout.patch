@@ -1,0 +1,32 @@
+--- a/gpu/render/vk_frame_capture.cpp
++++ b/gpu/render/vk_frame_capture.cpp
+@@ -18,7 +18,7 @@
+ struct Target {
+     VAddr address{};
+     vk::Format format{};
+-    u32 width{}, height{};
++    u32 width{}, height{}, pitch{}, tile{}, bytes{}, mip_pitch{}, mip_height{};
+     bool operator==(const Target&) const = default;
+ };
+ 
+@@ -57,14 +57,18 @@
+ std::atomic<u32> display_count{0};
+ 
+ Target ToTarget(const VideoCore::ImageInfo& info) {
+-    return {info.guest_address, info.pixel_format, info.size.width, info.size.height};
++    return {info.guest_address, info.pixel_format, info.size.width, info.size.height,
++            info.pitch, u32(info.tile_mode), info.guest_size,
++            info.mips_layout[0].pitch, info.mips_layout[0].height};
+ }
+ 
+ std::string Describe(const Target& t) {
+     if (!t.address) {
+         return "-";
+     }
+-    return std::format("{:#x} {} {}x{}", t.address, vk::to_string(t.format), t.width, t.height);
++    return std::format("{:#x} {} {}x{} pitch={} tile={} bytes={} mip0_pitch={} mip0_height={}",
++                       t.address, vk::to_string(t.format), t.width, t.height,
++                       t.pitch, t.tile, t.bytes, t.mip_pitch, t.mip_height);
+ }
+ 
+ void AddSampled(Entry& entry) {

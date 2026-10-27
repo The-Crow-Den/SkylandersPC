@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Avoid repeated diagnostic atomic writes without changing sampler quality.
+--- a/gpu/render/raster_textures.cpp
++++ b/gpu/render/raster_textures.cpp
+@@ -488,7 +488,11 @@
+         static std::atomic<u64> seen{0};
+         const u32 kind = u32(sharp.xy_min_filter) * 3 * 5 + u32(sharp.mip_filter) * 5 +
+                          u32(sharp.max_aniso);
+-        if (kind < 64 && !(seen.fetch_or(1ull << kind) & (1ull << kind))) {
++        // After a kind was reported, sampler binding only needs a relaxed read.
++        // Avoid a locked RMW on every bind; the second check still elects exactly
++        // one reporter when recording threads encounter a new kind together.
++        if (kind < 64 && !(seen.load(std::memory_order_relaxed) & (1ull << kind)) &&
++            !(seen.fetch_or(1ull << kind, std::memory_order_relaxed) & (1ull << kind))) {
+             std::printf("Sampler: game uses min filter %u, mip filter %u, anisotropy %.0fx\n",
+                         u32(sharp.xy_min_filter), u32(sharp.mip_filter),
+                         sharp.MaxAniso());
