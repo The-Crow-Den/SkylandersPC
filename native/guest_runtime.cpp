@@ -6,6 +6,7 @@
 #include "thread_context.hpp"
 #include "gpu_backend.hpp"
 #include "game_hooks.hpp"
+#include "frame_profile.hpp"
 #include "hle/kernel_data.hpp"
 #include "hle/kernel_sync.hpp"
 #include "hle/kernel_memory.hpp"
@@ -116,6 +117,8 @@ struct GuestRuntime::Impl {
     std::atomic<bool> common_dialog_initialized = false;
     enum class ServiceKind { Special, KernelMemory, KernelClock, UserService, KernelSemaphore, KernelThread, KernelFile, KernelEvent, OfflineNetwork, SystemService, LocalNp, AppContent, LocalPlayGo, KeyboardPad, SaveData, VirtualPortal, EmptyUsbBus, SkyGpu, KernelSync };
     std::vector<ServiceKind> service_kinds;
+    std::vector<FrameProfile::Bucket> profile_buckets;
+    std::vector<bool> ends_frame;
     std::vector<unsigned> stack_counts;
     std::vector<unsigned> service_calls;
     std::mutex logging;
@@ -148,6 +151,15 @@ struct GuestRuntime::Impl {
             else if (SkyGpu::supports(identity)) kind = ServiceKind::SkyGpu;
             else if (KernelSync::supports(identity)) kind = ServiceKind::KernelSync;
             service_kinds.push_back(kind);
+            using B = FrameProfile::Bucket;
+            profile_buckets.push_back(kind == ServiceKind::SkyGpu ? B::Gpu :
+                kind == ServiceKind::KernelSync || kind == ServiceKind::KernelSemaphore || kind == ServiceKind::KernelEvent ? B::Sync :
+                kind == ServiceKind::KernelClock ? B::Clock :
+                kind == ServiceKind::KernelFile || kind == ServiceKind::SaveData ? B::File : B::Other);
+            // sceVideoOutSubmitFlip and the two sceGnmSubmitAndFlip variants end a guest frame.
+            ends_frame.push_back(identity == "U46NwOiJpys#libSceVideoOut#libSceVideoOut" ||
+                identity == "xbxNatawohc#libSceGnmDriver#libSceGnmDriver" ||
+                identity == "Ga6r7H6Y0RI#libSceGnmDriver#libSceGnmDriver");
             stack_counts.push_back(std::max(SkyGpu::stack_arguments(identity),VirtualPortal::stack_arguments(identity)));
         }
         if (names.size() != types.size() || names.size() > 1000000)
@@ -199,6 +211,7 @@ struct GuestRuntime::Impl {
              identity == "fzyMKs9kim0#libkernel#libkernel");
         const auto wait_started = timed_wait ? std::chrono::steady_clock::now()
                                             : std::chrono::steady_clock::time_point{};
+        const std::uint64_t profile_started = FrameProfile::enabled() ? FrameProfile::now_ns() : 0;
         try {
             std::uint64_t result = 0;
             // Frequent providers are disjoint from startup special services.
@@ -300,6 +313,10 @@ struct GuestRuntime::Impl {
                     for (;;) pause();
                 }
                 _exit(20);
+            }
+            if (profile_started) {
+                FrameProfile::record(active->profile_buckets[id], FrameProfile::now_ns() - profile_started);
+                if (active->ends_frame[id]) FrameProfile::frame();
             }
             // The import table is fixed before guest threads start. Once the
             // four startup samples are logged, normal calls need neither a
@@ -429,6 +446,8 @@ std::uint64_t GuestRuntime::address(std::uint64_t index) const {
     });
     impl_->kernel_thread.attach_main(thread);
     Impl::active = impl_.get();
+    FrameProfile::configure();
+    FrameProfile::thread_started(true);
     if (sky_guest_configure_trap(&Impl::trap) || sky_guest_configure_fault(&Impl::fault) ||
         sky_guest_configure_call(&Impl::call))
         throw std::runtime_error("guest diagnostics already active");

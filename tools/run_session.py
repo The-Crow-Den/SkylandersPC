@@ -168,6 +168,11 @@ def main(argv=None):
     parser.add_argument('--shadows', choices=SHADOWS, default=None,
                         help='experimental independent shadow atlas quality (default native)')
     parser.add_argument('--timing', action='store_true')
+    parser.add_argument('--profile', action='store_true',
+                        help='write per-frame renderer (frames.csv) and guest (frame-profile.csv) profiles; '
+                             'summarize with tools/frame_profile.py')
+    parser.add_argument('--cold-cache', action='store_true',
+                        help='start from empty renderer and driver shader caches inside the session')
     parser.add_argument('--level-events', action='store_true',
                         help='enable the exact-build engine lifecycle mod')
     parser.add_argument('--frame-policy', choices=('manual','auto'), default='manual',
@@ -397,6 +402,20 @@ def main(argv=None):
         env['SKY_PORTAL_FIGURE'] = str(args.figure.resolve())
     if args.timing:
         env['SKY_TIMING_TRACE'] = '1'
+    if args.profile:
+        env['SKY_FRAME_PROFILE'] = str(session/'frame-profile.csv')
+        env['BB_FRAME_STATS'] = '1'
+        env['BB_FRAME_LOG'] = str(session/'frames.csv')
+    if args.cold_cache:
+        # Renderer settings are kept; only compiled shader/pipeline caches start empty.
+        cold = session/'gpu-user'
+        cold.mkdir()
+        settings = ROOT/'out/native-gpu-user/bbport.ini'
+        if settings.is_file():
+            (cold/'bbport.ini').write_bytes(settings.read_bytes())
+        env['SKY_GPU_USER_DIR'] = str(cold)
+        env['__GL_SHADER_DISK_CACHE_PATH'] = str(session/'driver-shader-cache')
+        env['MESA_SHADER_CACHE_DIR'] = str(session/'driver-shader-cache')
     if args.present_limit is not None:
         env['BB_FPS_LIMIT'] = args.present_limit
     command = [str(host), '--trace-start', *map(str, files),
@@ -407,6 +426,8 @@ def main(argv=None):
             'SKY_TLS_BRIDGE',
             'SKY_LEVEL_EVENT_MAILBOX','SKY_FRAME_POLICY','SKY_MANUAL_FRAME_LIMIT','SKY_AUTO_FRAME_POLICY_AVAILABLE',
             'SKY_VIRTUAL_PORTAL', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
+            'SKY_FRAME_PROFILE', 'BB_FRAME_STATS', 'BB_FRAME_LOG', 'SKY_GPU_USER_DIR',
+            '__GL_SHADER_DISK_CACHE_PATH', 'MESA_SHADER_CACHE_DIR',
             'SKY_ALLOW_INCOMPLETE_PIPELINES', 'SKY_TRAP_PHASE_PROBE', 'SKY_TRAP_CLOCK_PROBE',
             'SKY_PORTAL_VOLUME','SKY_CONTROLLER_LAYOUT','SKY_FRAME_LIMIT','SKY_FULLSCREEN','SKY_FPS_COUNTER','SKY_PC_RESOLUTION','SKY_PC_QUALITY')
     preparation_checkpoint('runtime_configuration')

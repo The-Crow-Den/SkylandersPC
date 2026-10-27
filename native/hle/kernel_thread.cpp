@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "kernel_thread.hpp"
 #include "../guest_start.hpp"
+#include "../frame_profile.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -182,7 +183,9 @@ U KernelThread::call(std::string_view identity, const U* a) {
         try {
             record->host = std::thread([this, record, entry, argument] {
                 try {
+                    FrameProfile::thread_started(false);
                     const auto result = record->owned_context->run(entry, reinterpret_cast<const void*>(argument));
+                    FrameProfile::thread_finished();
                     if (impl_->finalizer) impl_->finalizer(*record->owned_context);
                     std::lock_guard guard(impl_->lock);
                     record->result = result; record->finished = true;

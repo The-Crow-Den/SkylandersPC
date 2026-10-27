@@ -351,7 +351,10 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
     PortalLibrary::initialize(std::getenv("SKY_PORTAL_FIGURE"));
     VirtualPortal::bind_audio(&portal_speaker);
     if(const auto* volume=std::getenv("SKY_PORTAL_VOLUME"))portal_volume=std::clamp(std::atoi(volume),0,100);
-    gpu_user_directory = std::filesystem::absolute("out/native-gpu-user").string();
+    // SKY_GPU_USER_DIR selects another settings/pipeline-cache directory,
+    // e.g. an empty one for cold-cache profiling.
+    const auto* user_directory = std::getenv("SKY_GPU_USER_DIR");
+    gpu_user_directory = std::filesystem::absolute(user_directory && *user_directory ? user_directory : "out/native-gpu-user").string();
     std::filesystem::create_directories(gpu_user_directory);
     setenv("BB_GPU_USER_DIR", gpu_user_directory.c_str(), 1);
     setenv("BB_CONFIG", (gpu_user_directory + "/bbport.ini").c_str(), 1);
