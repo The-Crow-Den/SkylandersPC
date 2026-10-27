@@ -59,6 +59,13 @@ struct KernelThread::Impl {
     std::map<U, Attributes> attributes;
     std::map<U, std::shared_ptr<Thread>> threads;
     ~Impl() { for (auto& [id, thread] : threads) if (thread->host.joinable()) thread->host.join(); }
+    // Caller holds lock. The record's context is freed with the last
+    // shared_ptr, after its guest entry has returned.
+    void release(const std::shared_ptr<Thread>& record) {
+        if (record->host.joinable()) record->host.detach();
+        for (auto it = threads.begin(); it != threads.end(); ++it)
+            if (it->second == record) { threads.erase(it); break; }
+    }
 };
 KernelThread::KernelThread() : impl_(std::make_unique<Impl>()) {}
 KernelThread::~KernelThread() = default;
@@ -179,6 +186,9 @@ U KernelThread::call(std::string_view identity, const U* a) {
                     if (impl_->finalizer) impl_->finalizer(*record->owned_context);
                     std::lock_guard guard(impl_->lock);
                     record->result = result; record->finished = true;
+                    // Nobody may join a detached thread: release its record,
+                    // stack and TLS now instead of at process teardown.
+                    if (record->detached) impl_->release(record);
                 } catch (const std::exception& e) {
                     dprintf(STDERR_FILENO, "guest thread failed: %s\n", e.what()); _exit(74);
                 }
@@ -200,8 +210,9 @@ U KernelThread::call(std::string_view identity, const U* a) {
     }
     if (operation == 16) {
         if (record->detached || record->joining) return 0x80020016;
-        // Keep the native thread joinable internally for orderly process teardown.
         record->detached = true;
+        // A running thread releases itself when it finishes.
+        if (record->finished) impl_->release(record);
         return 0;
     }
     if (operation == 18) { if (!a[1]) return 0x80020016; *reinterpret_cast<int*>(a[1]) = record->attr.priority; return 0; }

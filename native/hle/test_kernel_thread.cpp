@@ -2,6 +2,8 @@
 #include "kernel_thread.hpp"
 #include "../guest_start.hpp"
 #include <array>
+#include <chrono>
+#include <thread>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -100,6 +102,31 @@ int main() {
             check(call("onNY9Byn-W8", {handles[i], pointer(&result)}) == 0x80020003);
         }
         check(template_value == 41);
+        // Reusing the outermost callback stack must not disturb a second callback.
+        check(main_context.run(reinterpret_cast<std::uintptr_t>(&synthetic_callback_worker),nullptr) == 106);
+        // Finished detached threads release their record, stack and TLS.
+        const auto gone = [&](std::uint64_t handle) {
+            int priority = 0;
+            for (int i = 0; i < 2000; ++i) {
+                if (call("1tKyG7RlMJo", {handle, pointer(&priority)}) == 0x80020003) return true;
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            return false;
+        };
+        std::uint64_t detached_attr = 0;
+        check(call("nsYoNRywwNg", {pointer(&detached_attr)}) == 0);
+        check(call("-Wreprtu0Qs", {pointer(&detached_attr), 1}) == 0);
+        std::array<std::uint64_t, 32> detached{};
+        for (auto& handle : detached)
+            check(call("6UgtwV+0zb4", {pointer(&handle), pointer(&detached_attr),
+                reinterpret_cast<std::uintptr_t>(&synthetic_worker), 1}) == 0);
+        for (auto handle : detached) check(gone(handle));
+        check(call("62KCwEMmzcM", {pointer(&detached_attr)}) == 0);
+        std::uint64_t late = 0;
+        check(call("6UgtwV+0zb4", {pointer(&late), 0, reinterpret_cast<std::uintptr_t>(&synthetic_worker), 1}) == 0);
+        for (int i = 0; i < 200; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        check(call("4qGrR6eoP9Y", {late}) == 0);
+        check(gone(late));
         check(sky_guest_configure_call(nullptr) == 0);
         std::cout << "guest thread creation, TLS isolation, join and explicit exit passed\n";
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }

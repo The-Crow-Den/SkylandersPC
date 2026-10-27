@@ -70,9 +70,10 @@ python3 tools/prepare_native.py /absolute/path/to/eboot.bin --out out/my-native-
 
 The preparation output directory must be new and inside ignored `out/`. Pack
 bytes are game-derived and private. `--load` maps/links only and reports unresolved
-imports; it does not launch the game. No unknown import returns a fabricated
-success. On the initial Linux x86-64 target, the CPU code can run directly;
-OS services, TLS/module startup and graphics translation still need implementation.
+imports; it does not launch the game. Normal play goes through
+`tools/run_session.py`, which prepares the linked pack and starts the host with
+`--run` (alias `--trace-start`). No unknown import returns a fabricated success.
+See [the native host README](native/README.md) for the runtime layout.
 
 ## Prepare the workspace
 

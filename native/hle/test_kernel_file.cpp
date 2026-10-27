@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "kernel_file.hpp"
 #include <array>
+#include <chrono>
+#include <fcntl.h>
+#include <future>
+#include <sys/stat.h>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -48,6 +52,31 @@ int main() {
                 check(static_cast<std::int64_t>(call("1G3lF1Gg1k8", {pointer(denied), 0})) < 0);
             check(static_cast<std::int64_t>(call("1G3lF1Gg1k8", {pointer("/app0/data.bin"), 0x401})) < 0);
             check(std::filesystem::file_size(directory / "game/data.bin") == 6);
+
+            // A read blocked on one descriptor must not stall other file calls.
+            check(mkfifo((directory / "game/stream").c_str(), 0600) == 0);
+            const int writer = open((directory / "game/stream").c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+            check(writer >= 0);
+            const auto stream = call("1G3lF1Gg1k8", {pointer("/app0/stream"), 0});
+            check(stream >= 3 && stream < 1024);
+            std::array<char, 4> streamed{};
+            auto blocked = std::async(std::launch::async, [&] {
+                return call("Cg4srZ6TKbU", {stream, pointer(streamed.data()), 2});
+            });
+            check(blocked.wait_for(std::chrono::milliseconds(50)) == std::future_status::timeout);
+            auto other = std::async(std::launch::async, [&] {
+                const auto again = call("1G3lF1Gg1k8", {pointer("/app0/data.bin"), 0});
+                std::array<char, 2> bytes{};
+                const auto count = call("Cg4srZ6TKbU", {again, pointer(bytes.data()), 2});
+                call("UK2Tl2DWUns", {again});
+                return count;
+            });
+            const bool independent = other.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
+            check(write(writer, "xy", 2) == 2);
+            check(blocked.get() == 2 && std::string(streamed.data(), 2) == "xy");
+            check(independent && other.get() == 2);
+            check(call("UK2Tl2DWUns", {stream}) == 0);
+            close(writer);
         }
         std::filesystem::remove_all(directory);
         std::cout << "read-only game file and directory confinement tests passed\n";

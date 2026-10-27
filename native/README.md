@@ -1,11 +1,10 @@
 # Original native pack host
 
-This C++20 host loads the framework's privately prepared `SKYPS401` image packs.
-It is independent of shadPS4 and does not invoke the AppImage. It validates pack
-structure, optionally maps guest memory, applies supported internal relocations
-and binds a small exact-scope libc service set. Inspect/load modes never call the
-guest entry. The separate `--trace-start PACK IMPORT_TYPES` diagnostic attempts
-startup and stops at the first imported call or fault; it is not a full runtime.
+This C++20 host loads and runs the framework's privately prepared `SKYPS401`
+image packs. It is independent of shadPS4 and does not invoke the AppImage.
+`--inspect`/`--load` only validate and map a pack and never call the guest
+entry. `--run PACK IMPORT_TYPES [BOOT_PLAN [GAME_ROOT]]` (alias `--trace-start`)
+executes the guest through `GuestRuntime`; `tools/run_session.py` uses it.
 
 ```sh
 cmake -S native -B .local/native-build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -49,59 +48,38 @@ RELATIVE (8). Bit 63 marks an imported relocation; its symbol value is then an
 import-record index. Defined symbols are guest VAs. RELATIVE requires symbol zero
 and computes base slide plus addend. ABS64 adds its signed addend to its defined
 or resolved symbol. GLOB_DAT/JUMP_SLOT require zero addend. Imported RELATIVE and
-other relocation types are refused. TLS relocations are not supported.
+other relocation types are refused. Local DTPMOD64 (16) stores a TLS module ID 1..16 with zero addend; other TLS
+relocations are refused.
 
 Import names use canonical `NID#actualLibraryName#actualModuleName` identities.
 `hle/pure_libc.cpp` binds only its explicitly implemented exact identities; it is
 not an allocator, OS, threading, TLS or exception runtime. The host reports
 resolved/pending import records and relocation-site counts separately.
 
-## Current real-data structural evidence
+## Runtime layout
 
-The first private Trap Team pack inspected and loaded at guest base `0x400000`:
-two segments spanning 22,585,344 bytes; 114,973 internal relocations applied;
-640 import records; six pure libc bindings resolved six sites; 634 import records
-and 1,446 sites remained unresolved. The entry was not called and no guest
-executable permissions were enabled. Private results are under
-`out/native-trap-team-initial/`; game bytes and packs remain ignored.
+| Piece | Files | Role |
+| --- | --- | --- |
+| Loader | `main.cpp` | Pack validation, fixed no-replace mapping, relocations, permissions |
+| Runtime | `guest_runtime.*` | Import thunks, service dispatch, fault reporting, module init and entry |
+| Bridge | `guest_start.*`, `bridge_features.cpp` | Guest/host FS (TLS) switching, calls, callbacks, thread exit |
+| Threads | `thread_context.*`, `hle/kernel_thread.*` | Guest stacks, TCB/DTV, per-thread TLS blocks |
+| Services | `hle/*` | Exact-NID HLE services; unknown imports terminate with a report |
+| Graphics/audio | `gpu_backend.*` | Optional pinned bbport component (`SKY_BBPORT_GPU`) |
+| Game hooks | `game_hooks.*`, `trap_team_hooks.*` | Exact-build (executable SHA-256) game-specific probes |
 
-CTest runs synthetic pack validation/loading cases and the pure-libc ABI tests.
-The synthetic executable entry is an INT3 trap so accidental execution would
-fail the test. This infrastructure milestone does not establish boot,
-gameplay, renderer support or correctness of unimplemented PS4 services.
+Game-specific host code must go through `GameHooks`. A hook activates only when
+the game root's `eboot.bin` matches a registered executable hash; shared code
+never checks a title ID before reading fixed guest addresses.
 
-## Diagnostic startup checkpoint
+Threads: finished detached guest threads release their stack and TLS; joinable
+threads release on join. Guest-visible stacks and TLS are mapped below 2 GiB
+(`MAP_32BIT`) as during bring-up; whether any title requires this is unverified.
 
-The linked eboot/libc/Fios image under `out/native-linked-initial` was attempted
-once with `--trace-start`, under a five-second external timeout. It executed
-startup instructions and stopped with exit70 on the unresolved libkernel data
-import `__stack_chk_guard` (NID f7uOxY9mM1U), in linked libc at PC27070048.
-Private evidence: `out/native-linked-initial/entry-trace.log`.
+File I/O: `hle/kernel_file.cpp` guards its descriptor tables with a lock but
+performs blocking reads/writes outside it, so one stalled read does not block
+other threads' file calls.
 
-Function imports are redirected to named stopping thunks, including otherwise
-implemented libc functions, because a returning host-call bridge is not ready.
-Unimplemented data imports point at inaccessible guard pages. Fault/import bridges restore
-host FS and stack before reporting and terminating. The diagnostic TCB is a
-minimal zeroed observation context, not complete PS4 TLS initialization. Linked
-module initializers have not been run. No rendered custom-host boot is claimed.
-
-The linked pack adds bounded local DTPMOD64 relocation support: type16 stores
-the assigned TLS module ID1..16 with zero addend; imported/other TLS forms remain
-unsupported. Module placement, TLS templates and exact binding evidence are
-recorded in the private linked-pack metadata.
-
-The next startup attempt passed the libc stack-canary read after adding an
-exact-scope, object-only `__stack_chk_guard` binding. The diagnostic process
-generates its guard with Linux `getrandom` before guest entry and exposes a
-read-only page for its lifetime. Randomness/protection failures abort setup.
-This provider currently belongs to diagnostic execution; normal loader binding
-counts are unchanged. Synthetic execution tests cover a successful read followed
-by a named function trap, wrong scope/type rejection and write protection.
-
-Private evidence: `out/native-linked-initial/entry-trace-canary.log`. Startup now
-stops at `F8bUHwAG284#libkernel#libkernel`, identified by the supplied reference
-import table as `scePthreadMutexattrInit`. The next prerequisite is a tested
-returning host-call bridge that restores host FS around services and guest FS
-before resuming, followed by real mutex-attribute semantics. Returning dummy
-success from the stopping thunk would not provide those semantics. This remains
-startup execution evidence, with no custom rendering or visible boot yet.
+The bring-up history (first structural load, first entry attempt, startup
+stops) is kept in `docs/NATIVE_BRINGUP_20261021.md` and
+`docs/CUSTOM_BOOT_PROGRESS_20261021.md`.

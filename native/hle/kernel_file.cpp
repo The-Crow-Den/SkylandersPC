@@ -12,7 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
-#include <set>
+#include <atomic>
+#include <memory>
 
 namespace {
 using U = std::uint64_t;
@@ -60,14 +61,22 @@ void convert(const struct stat& s, GuestStat* out) {
 }
 }
 struct KernelFile::Impl {
+    // The lock guards the tables only. Blocking I/O runs on a shared
+    // descriptor outside it; the last user closes the host fd, so a
+    // concurrent guest close never lets a read reach a reused fd.
+    struct Descriptor {
+        int fd;
+        std::string owner; // Save mount name; empty for read-only game files.
+        std::atomic<bool> dirty = false;
+        Descriptor(int host, std::string mount) : fd(host), owner(std::move(mount)) {}
+        ~Descriptor() { if (fd >= 0) close(fd); }
+    };
     std::mutex lock;
     int root = -1, next = 3;
-    std::map<int, int> descriptors;
+    std::map<int, std::shared_ptr<Descriptor>> descriptors;
     struct SaveMount { int fd; bool read_only; };
     std::map<std::string, SaveMount> mounts;
-    std::map<int, std::string> owners;
-    std::set<int> dirty;
-    ~Impl() { for (auto [guest, host] : descriptors) close(host); for(auto& [name,m]:mounts)close(m.fd); if (root >= 0) close(root); }
+    ~Impl() { for(auto& [name,m]:mounts)close(m.fd); if (root >= 0) close(root); }
     // Walk from the configured directory descriptor. Never follow a symlink or
     // resolve '..', even when a game path names a host absolute path.
     int open_path(const char* input, int flags, std::string* owner = nullptr) {
@@ -136,7 +145,7 @@ bool KernelFile::unmount_save(const std::string& guest) {
     std::lock_guard lock(impl_->lock);
     const auto mount=impl_->mounts.find(guest);
     if(mount==impl_->mounts.end())return false;
-    for(const auto& [id,name]:impl_->owners)if(name==guest)return false;
+    for(const auto& [id,file]:impl_->descriptors)if(file->owner==guest)return false;
     close(mount->second.fd);impl_->mounts.erase(mount);return true;
 }
 void KernelFile::configure(const std::string& root) {
@@ -149,7 +158,6 @@ bool KernelFile::supports(std::string_view identity) noexcept {
 }
 U KernelFile::call(std::string_view identity, const U* a) {
     const auto operation = std::find(names.begin(), names.end(), identity) - names.begin();
-    std::lock_guard lock(impl_->lock);
     if (operation == 0) {
         if ((a[1]&3)==3)return error(EINVAL);
         if (a[1] & ~0x20e8full) throw std::runtime_error("unsupported file-open flags");
@@ -159,18 +167,23 @@ U KernelFile::call(std::string_view identity, const U* a) {
         if(a[1]&0x400)flags|=O_TRUNC;
         if(a[1]&0x800)flags|=O_EXCL;
         if(a[1]&0x20000)flags|=O_DIRECTORY;
+        std::lock_guard lock(impl_->lock);
         std::string owner;
         const int fd = impl_->open_path(reinterpret_cast<const char*>(a[0]), flags,&owner);
         if (fd < 0) return error(errno);
+        auto file = std::make_shared<Impl::Descriptor>(fd, std::move(owner));
         const int id = impl_->next++;
-        impl_->descriptors.emplace(id, fd);
-        if(!owner.empty())impl_->owners.emplace(id,owner);
+        impl_->descriptors.emplace(id, std::move(file));
         dprintf(STDERR_FILENO, "{\"event\":\"game-file-open\",\"descriptor\":%d}\n", id);
         return static_cast<U>(id);
     }
     if (operation == 6) {
         if (!a[1]) return error(EFAULT);
-        const int fd = impl_->open_path(reinterpret_cast<const char*>(a[0]), O_RDONLY);
+        int fd;
+        {
+            std::lock_guard lock(impl_->lock);
+            fd = impl_->open_path(reinterpret_cast<const char*>(a[0]), O_RDONLY);
+        }
         if (fd < 0) return error(errno);
         struct stat info{};
         const int status = fstat(fd, &info), saved = errno;
@@ -179,18 +192,25 @@ U KernelFile::call(std::string_view identity, const U* a) {
         convert(info, reinterpret_cast<GuestStat*>(a[1]));
         return 0;
     }
-    const auto found = impl_->descriptors.find(static_cast<int>(a[0]));
-    if (found == impl_->descriptors.end()) return error(EBADF);
-    const int fd = found->second;
+    std::shared_ptr<Impl::Descriptor> file;
+    {
+        std::lock_guard lock(impl_->lock);
+        const auto found = impl_->descriptors.find(static_cast<int>(a[0]));
+        if (found == impl_->descriptors.end()) return error(EBADF);
+        file = found->second;
+        if (operation == 1) impl_->descriptors.erase(found);
+    }
+    const int fd = file->fd;
+    const bool writable = !file->owner.empty();
     if (operation == 1) {
-        const int guest=static_cast<int>(a[0]);
-        const int sync_status=impl_->dirty.contains(guest)?fsync(fd):0;
+        const int sync_status=file->dirty ? fsync(fd) : 0;
         const int sync_error=errno;
-        const int status = close(fd), saved = errno;
-        impl_->descriptors.erase(found);
-        impl_->owners.erase(static_cast<int>(a[0]));
-        impl_->dirty.erase(guest);
         if(sync_status)return error(sync_error);
+        // Another thread is still in a call on this descriptor; the last user
+        // closes it. Otherwise close here so its status reaches the guest.
+        if(file.use_count()>1)return 0;
+        const int status = close(fd), saved = errno;
+        file->fd = -1;
         return status ? error(saved) : 0;
     }
     if (operation == 2 || operation == 3) {
@@ -213,22 +233,22 @@ U KernelFile::call(std::string_view identity, const U* a) {
     }
     if(operation==9){
         if(fsync(fd))return error(errno);
-        impl_->dirty.erase(static_cast<int>(a[0]));return 0;
+        file->dirty=false;return 0;
     }
     if(operation==10){
-        if(!impl_->owners.contains(static_cast<int>(a[0])))return error(EROFS);
+        if(!writable)return error(EROFS);
         if(a[1]>1024ull*1024*1024)return error(EINVAL);
         if(ftruncate(fd,static_cast<off_t>(a[1])))return error(errno);
-        impl_->dirty.insert(static_cast<int>(a[0]));return 0;
+        file->dirty=true;return 0;
     }
     if (operation == 7 || operation == 8) {
-        if(!impl_->owners.contains(static_cast<int>(a[0])))return error(EROFS);
+        if(!writable)return error(EROFS);
         if(!a[1]&&a[2])return error(EFAULT);
         if(a[2]>1024ull*1024*1024)return error(EINVAL);
         if(operation==8 && static_cast<std::int64_t>(a[3])<0)return error(EINVAL);
         const auto count=operation==7 ? write(fd,reinterpret_cast<const void*>(a[1]),a[2]):
             pwrite(fd,reinterpret_cast<const void*>(a[1]),a[2],static_cast<off_t>(a[3]));
-        if(count>0)impl_->dirty.insert(static_cast<int>(a[0]));
+        if(count>0)file->dirty=true;
         return count<0?error(errno):static_cast<U>(count);
     }
     throw std::runtime_error("unsupported file import");

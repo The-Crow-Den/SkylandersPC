@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 // Optional read-only research probe. No game state or timing is modified.
+// Fixed addresses are valid only for builds matched in trap_team_hooks.cpp.
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -191,9 +192,9 @@ inline PauseStack pause_stack(std::uintptr_t address) {
         !read(storage+(count-1)*sizeof(std::uint32_t),&result.token,sizeof(result.token)))) return {};
     return result;
 }
-inline void clock_sample(std::string_view serial) {
+inline void clock_sample() {
     static const bool active=[] {const auto* p=std::getenv("SKY_TRAP_CLOCK_PROBE");return p && !std::strcmp(p,"1");}();
-    if(!active || (serial!="CUSA00697" && serial!="CUSA00626"))return;
+    if(!active)return;
     static std::atomic<std::uint64_t> last=0;
     const auto now=timestamp();auto previous=last.load();
     if(now-previous<500000 || !last.compare_exchange_strong(previous,now))return;
@@ -211,9 +212,9 @@ inline void clock_sample(std::string_view serial) {
         field<std::int32_t>(data,28)/8192.0,field<float>(data,32),shader_valid?"true":"false",shader_seconds);
     render_node_clocks(now);
 }
-inline void sample(std::string_view serial) {
-    clock_sample(serial);
-    if(!enabled() || (serial!="CUSA00697" && serial!="CUSA00626")) return;
+inline void sample() {
+    clock_sample();
+    if(!enabled()) return;
     static std::atomic<std::uint64_t> last_sample=0;
     const auto now=timestamp();
     auto previous=last_sample.load(std::memory_order_relaxed);

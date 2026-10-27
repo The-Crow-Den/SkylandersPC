@@ -7,8 +7,7 @@
 #include "guest_start.hpp"
 #include "hle/kernel_clock.hpp"
 #include "hle/keyboard_pad.hpp"
-#include "trap_team_probe.hpp"
-#include "level_events.hpp"
+#include "game_hooks.hpp"
 #include "pc_settings.hpp"
 #include "controller_layout.hpp"
 #include "portal_library.hpp"
@@ -413,10 +412,8 @@ unsigned stack_arguments(std::string_view identity) noexcept {
 }
 std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
 #ifdef SKY_BBPORT_GPU
-    if(identity=="yvZ73uQUqrk#libSceGnmDriver#libSceGnmDriver") {
-        LevelEvents::sample(game_serial,bbgpu_overlay_captures_input()!=0);
-        TrapTeamProbe::sample(game_serial);
-    }
+    if(identity=="yvZ73uQUqrk#libSceGnmDriver#libSceGnmDriver")
+        GameHooks::frame(bbgpu_overlay_captures_input()!=0);
     if (identity == "rVjRvHJ0X6c#libkernel#libkernel") return memory_call(identity, a);
     if (identity == "i6-sR91Wt-4#libSceVideoOut#libSceVideoOut") {
         const auto width = static_cast<std::uint32_t>(a[4]);
@@ -448,8 +445,12 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
                 }
                 if (!found) throw std::runtime_error("unsupported SKY_WINDOW_SIZE preset");
             }
-            SDL_SetHint(SDL_HINT_APP_ID,"org.skylanders.TrapTeam");
-            const BbGpuConfig config{"Skylanders PS4 — custom native runtime", game_serial.c_str(), gpu_user_directory.c_str(),
+            // SDL_APP_ID from the launcher environment takes precedence.
+            SDL_SetHint(SDL_HINT_APP_ID,"org.skylanders.PS4Native");
+            const auto* build = GameHooks::active();
+            const auto title = (build ? std::string(build->window_title) : "PS4 native runtime — " + game_serial) +
+                " (custom native runtime)";
+            const BbGpuConfig config{title.c_str(), game_serial.c_str(), gpu_user_directory.c_str(),
                 sdk_version, psf_attributes, window_width, window_height};
             if (bbgpu_init(&config)) throw std::runtime_error("Vulkan presenter initialization failed");
             apply_window_icon();

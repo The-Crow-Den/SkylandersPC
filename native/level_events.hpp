@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-// Exact-build guest lifecycle events plus native UI/cutscene gates.
+// Guest lifecycle events plus native UI/cutscene gates. Callers must first
+// match an exact Trap Team build (trap_team_hooks.cpp); no check happens here.
 // Automatic mode fails closed to 30 FPS; manual mode only observes.
 #include "trap_team_probe.hpp"
 #include "level_event_protocol.hpp"
@@ -12,7 +13,7 @@
 #include <charconv>
 
 namespace LevelEvents {
-inline TrapFramePolicy::Gates runtime_gates(std::uint64_t now,bool pc_menu,std::string_view serial) {
+inline TrapFramePolicy::Gates runtime_gates(std::uint64_t now,bool pc_menu,bool us_update) {
     TrapFramePolicy::Gates gates;gates.pc_menu=pc_menu;
     std::uintptr_t directory=0,type=0,list=0;
     if(!TrapTeamProbe::read(0x10a0a30,&directory,8) ||
@@ -24,7 +25,7 @@ inline TrapFramePolicy::Gates runtime_gates(std::uint64_t now,bool pc_menu,std::
     gates.cutscenes_valid=true;gates.cutscenes=items.count;
     // These additional offsets are corroborated for the updated US build.
     // Other builds retain their existing conservative cutscene policy.
-    if(serial=="CUSA00626") {
+    if(us_update) {
         TrapPortalAudioProbe::sample(TrapTeamProbe::read);
         const auto movies=TrapMovieGate::sample(TrapTeamProbe::read);
         gates.movies_valid=movies.valid;gates.movies=movies.count;
@@ -54,7 +55,7 @@ inline TrapFramePolicy::Gates runtime_gates(std::uint64_t now,bool pc_menu,std::
     }
     return gates;
 }
-inline void sample(std::string_view serial,bool pc_menu=false) {
+inline void sample(bool us_update,bool pc_menu=false) {
     static const auto address=[] {
         const char* text=std::getenv("SKY_LEVEL_EVENT_MAILBOX");
         std::uintptr_t value=0;
@@ -65,7 +66,7 @@ inline void sample(std::string_view serial,bool pc_menu=false) {
            value>0x20000000-20480 || value%8)return std::uintptr_t{0};
         return value;
     }();
-    if(!address || (serial!="CUSA00697" && serial!="CUSA00626"))return;
+    if(!address)return;
     const auto now=TrapTeamProbe::timestamp();
     static std::atomic<std::uint64_t> last=0;
     auto previous=last.load(std::memory_order_relaxed);
@@ -73,7 +74,7 @@ inline void sample(std::string_view serial,bool pc_menu=false) {
     static std::mutex lock;
     std::unique_lock guard(lock,std::try_to_lock);
     if(!guard.owns_lock())return;
-    const auto gates=runtime_gates(now,pc_menu,serial);
+    const auto gates=runtime_gates(now,pc_menu,us_update);
     static TrapFramePolicy::State policy;
     static LevelProtocol::Cursor cursor;
     const auto result=LevelProtocol::drain(address,cursor,TrapTeamProbe::read,[now](const LevelProtocol::Event& event) {

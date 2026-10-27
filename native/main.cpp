@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Original SKYPS401 pack loader. Never executes guest code.
+// Original SKYPS401 pack loader and runtime entry. --inspect/--load only
+// validate and map a pack; --run (alias --trace-start) executes the guest
+// through GuestRuntime.
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -20,7 +22,7 @@
 #include <unistd.h>
 
 #include "hle/pure_libc.hpp"
-#include "diagnostic.hpp"
+#include "guest_runtime.hpp"
 #include <cstdlib>
 
 namespace {
@@ -201,7 +203,7 @@ public:
 
     bool resolved(u64 id) const { return !diagnostic_ && id < import_addresses_.size() && import_addresses_[index(id)] != 0; }
 
-    void load(const Pack& pack, SkyDiagnostic* diagnostic = nullptr) {
+    void load(const Pack& pack, GuestRuntime* diagnostic = nullptr) {
         diagnostic_ = diagnostic != nullptr;
         const auto raw_page = sysconf(_SC_PAGESIZE);
         if (raw_page <= 0) fail("cannot determine page size");
@@ -339,13 +341,13 @@ SkyBootPlan read_boot_plan(const std::string& path, const Pack& pack) {
 int main(int argc, char** argv) {
     try {
         if (argc == 2 && std::string(argv[1]) == "--help") {
-            std::cout << "usage: skylanders-native-host [--inspect|--load] PACK\n       skylanders-native-host --trace-start PACK IMPORT_TYPES\nOnly --trace-start attempts guest entry, stopping at imports/faults.\n";
+            std::cout << "usage: skylanders-native-host [--inspect|--load] PACK\n       skylanders-native-host --run PACK IMPORT_TYPES [BOOT_PLAN [GAME_ROOT]]\nOnly --run (alias --trace-start) executes the guest; unknown imports/faults stop it.\n";
             return 0;
         }
         bool load = false;
         bool trace = false;
         std::string path;
-        if ((argc >= 4 && argc <= 6) && std::string(argv[1]) == "--trace-start") {
+        if ((argc >= 4 && argc <= 6) && (std::string(argv[1]) == "--run" || std::string(argv[1]) == "--trace-start")) {
             trace = true;
             path = argv[2];
         } else if (argc == 2 && std::string(argv[1]) != "--load" && std::string(argv[1]) != "--inspect") path = argv[1];
@@ -353,7 +355,7 @@ int main(int argc, char** argv) {
             load = std::string(argv[1]) == "--load";
             path = argv[2];
         } else {
-            std::cerr << "usage: skylanders-native-host [--inspect|--load] PACK\nGuest entry is never called.\n";
+            std::cerr << "usage: skylanders-native-host [--inspect|--load] PACK | --run PACK IMPORT_TYPES [BOOT_PLAN [GAME_ROOT]]\n";
             return 2;
         }
         Pack pack(path);
@@ -367,7 +369,7 @@ int main(int argc, char** argv) {
             stream.seekg(0);
             if (!types.empty() && !stream.read(reinterpret_cast<char*>(types.data()), static_cast<std::streamsize>(types.size())))
                 fail("cannot read import types");
-            SkyDiagnostic diagnostic(pack.imports, types);
+            GuestRuntime diagnostic(pack.imports, types);
             const auto boot = argc >= 5 ? read_boot_plan(argv[4], pack) : SkyBootPlan{};
             arena.load(pack, &diagnostic);
             diagnostic.enter(pack.entry, boot, argc == 6 ? argv[5] : "");

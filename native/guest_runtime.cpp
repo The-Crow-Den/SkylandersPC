@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "diagnostic.hpp"
+#include "guest_runtime.hpp"
 #include "hle/virtual_portal.hpp"
 #include "hle/save_data.hpp"
 #include "guest_start.hpp"
 #include "thread_context.hpp"
 #include "gpu_backend.hpp"
+#include "game_hooks.hpp"
 #include "hle/kernel_data.hpp"
 #include "hle/kernel_sync.hpp"
 #include "hle/kernel_memory.hpp"
@@ -81,7 +82,7 @@ bool startup_service(std::string_view name) {
 }
 }
 
-struct SkyDiagnostic::Impl {
+struct GuestRuntime::Impl {
     std::vector<std::string> names;
     std::vector<unsigned char> types;
     std::vector<bool> weak;
@@ -372,13 +373,13 @@ struct SkyDiagnostic::Impl {
     }
 };
 
-SkyDiagnostic::Impl* SkyDiagnostic::Impl::active = nullptr;
+GuestRuntime::Impl* GuestRuntime::Impl::active = nullptr;
 
-SkyDiagnostic::SkyDiagnostic(const std::vector<std::string>& names, const std::vector<unsigned char>& types)
+GuestRuntime::GuestRuntime(const std::vector<std::string>& names, const std::vector<unsigned char>& types)
     : impl_(std::make_unique<Impl>(names, types)) {}
-SkyDiagnostic::~SkyDiagnostic() = default;
+GuestRuntime::~GuestRuntime() = default;
 
-std::uint64_t SkyDiagnostic::address(std::uint64_t index) const {
+std::uint64_t GuestRuntime::address(std::uint64_t index) const {
     if (index >= impl_->names.size()) throw std::runtime_error("diagnostic import index outside table");
     const auto i = static_cast<std::size_t>(index);
     if (const auto* data = impl_->kernel_data.resolve(impl_->names[i], impl_->types[i]))
@@ -395,7 +396,7 @@ std::uint64_t SkyDiagnostic::address(std::uint64_t index) const {
     return reinterpret_cast<std::uintptr_t>(base + i * (impl_->types[i] == 2 ? 32 : impl_->page));
 }
 
-[[noreturn]] void SkyDiagnostic::enter(std::uint64_t entry, const SkyBootPlan& boot, const std::string& game_root) {
+[[noreturn]] void GuestRuntime::enter(std::uint64_t entry, const SkyBootPlan& boot, const std::string& game_root) {
     impl_->boot = boot;
     impl_->main_native_thread = std::this_thread::get_id();
     const auto* suspend = std::getenv("SKY_SUSPEND_UNSUPPORTED_NET_WORKERS");
@@ -415,6 +416,7 @@ std::uint64_t SkyDiagnostic::address(std::uint64_t index) const {
         impl_->save_data.configure(save_root && *save_root?std::filesystem::path(save_root):default_save,impl_->app_content.title_id());
     }
     impl_->local_playgo.configure(game_root);
+    GameHooks::configure(impl_->app_content.title_id(), game_root);
     SkyGpu::configure(impl_->app_content.title_id(), impl_->app_content.system_version(), impl_->app_content.attributes());
     SkyGpu::bind_keyboard(&impl_->keyboard_pad);
     if (VirtualPortal::enabled()) SkyGpu::bind_portal(

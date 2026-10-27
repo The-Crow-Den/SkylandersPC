@@ -10,11 +10,14 @@
 
 namespace {
 thread_local GuestThreadContext* current_context = nullptr;
+// Guest-visible stacks and TLS stay below 2 GiB as before; no requirement for
+// this is documented, so it is kept until a guest is verified without it.
+// Host-only memory such as the signal stack passes low = false.
 struct Memory {
     void* pointer;
     std::size_t size;
-    Memory(std::size_t length, int protection) : size(length) {
-        pointer = mmap(nullptr, length, protection, MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
+    Memory(std::size_t length, int protection, bool low = true) : size(length) {
+        pointer = mmap(nullptr, length, protection, MAP_PRIVATE | MAP_ANONYMOUS | (low ? MAP_32BIT : 0), -1, 0);
         if (pointer == MAP_FAILED) throw std::runtime_error("cannot allocate guest thread memory");
     }
     ~Memory() { munmap(pointer, size); }
@@ -23,6 +26,13 @@ std::size_t page_size() {
     const auto size = sysconf(_SC_PAGESIZE);
     if (size <= 0) throw std::runtime_error("cannot query thread page size");
     return static_cast<std::size_t>(size);
+}
+std::unique_ptr<Memory> guarded_stack(std::size_t usable, std::size_t page) {
+    auto stack = std::make_unique<Memory>(usable + 2 * page, PROT_READ | PROT_WRITE);
+    if (mprotect(stack->pointer, page, PROT_NONE) ||
+        mprotect(static_cast<unsigned char*>(stack->pointer) + stack->size - page, page, PROT_NONE))
+        throw std::runtime_error("cannot guard guest callback stack");
+    return stack;
 }
 }
 struct GuestThreadContext::Impl {
@@ -34,11 +44,14 @@ struct GuestThreadContext::Impl {
     std::array<unsigned char*, 17> tls_blocks{};
     std::array<std::uint64_t, 17> tls_sizes{};
     std::vector<std::unique_ptr<Memory>> module_tls;
+    // Outermost callbacks reuse one stack; nested callbacks get their own.
+    std::unique_ptr<Memory> callback_stack;
+    unsigned callback_depth = 0;
     Impl(const SkyBootPlan& boot, std::size_t stack_size, std::size_t guard_size)
         : guard(std::max<std::size_t>(page, ((guard_size + page - 1) / page) * page)),
           stack(((stack_size + page - 1) / page) * page + 2 * guard, PROT_READ | PROT_WRITE),
           tls(2 * 1024 * 1024 + page, PROT_READ | PROT_WRITE),
-          alternate(128 * 1024, PROT_READ | PROT_WRITE),
+          alternate(128 * 1024, PROT_READ | PROT_WRITE, false),
           tcb(static_cast<unsigned char*>(tls.pointer) + 2 * 1024 * 1024) {
         if (mprotect(stack.pointer, guard, PROT_NONE) ||
             mprotect(static_cast<unsigned char*>(stack.pointer) + stack.size - guard, guard, PROT_NONE))
@@ -121,15 +134,23 @@ std::uint64_t GuestThreadContext::callback(std::uint64_t entry, const void* argu
     // A service callback must not reuse the suspended caller's live guest stack.
     // Reuse this thread's TCB/TLS and enter on a separate guarded stack.
     if (current_context != this || !entry) throw std::runtime_error("invalid guest callback context");
-    const auto page = page_size();
-    Memory stack(1024 * 1024 + 2 * page, PROT_READ | PROT_WRITE);
-    if (mprotect(stack.pointer, page, PROT_NONE) ||
-        mprotect(static_cast<unsigned char*>(stack.pointer) + stack.size - page, page, PROT_NONE))
-        throw std::runtime_error("cannot guard guest callback stack");
+    constexpr std::size_t usable = 1024 * 1024;
+    std::unique_ptr<Memory> nested;
+    Memory* stack;
+    if (impl_->callback_depth == 0) {
+        if (!impl_->callback_stack) impl_->callback_stack = guarded_stack(usable, impl_->page);
+        stack = impl_->callback_stack.get();
+    } else {
+        nested = guarded_stack(usable, impl_->page);
+        stack = nested.get();
+    }
     SkyGuestStartContext context{reinterpret_cast<void*>(entry),
-        static_cast<unsigned char*>(stack.pointer) + stack.size - page - 64,
+        static_cast<unsigned char*>(stack->pointer) + stack->size - impl_->page - 64,
         impl_->tcb, argument, nullptr};
     std::uint64_t result = 0;
-    if (sky_guest_start(&context, &result)) throw std::runtime_error("guest callback entry failed");
+    ++impl_->callback_depth;
+    const auto status = sky_guest_start(&context, &result);
+    --impl_->callback_depth;
+    if (status) throw std::runtime_error("guest callback entry failed");
     return result;
 }
