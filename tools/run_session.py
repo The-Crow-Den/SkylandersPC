@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 import signal
 import subprocess
+import threading
 import time
 import uuid
 import sys
@@ -101,6 +102,26 @@ def renderer_environment(environment, idle='adaptive'):
     return result
 
 
+WINDOW_READY = b'Window backend:'
+
+
+def announce_window(log_path, process, marker=WINDOW_READY, interval=0.1):
+    """Tell the launcher the game is visible once the runtime opens its window."""
+    seen = b''
+    with open(log_path, 'rb') as log:
+        while True:
+            chunk = log.read()
+            if chunk:
+                seen = (seen + chunk)[-4096:]
+                if marker in seen:
+                    print('SKYLANDERS_RUNTIME_STARTED', flush=True)
+                    return True
+            elif process.poll() is not None:
+                return False
+            else:
+                time.sleep(interval)
+
+
 def run_logged(command, directory, *, cwd, env=None, seconds=0):
     started = time.monotonic()
     reason = 'process-exit'
@@ -108,7 +129,8 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
         process = subprocess.Popen(command, cwd=cwd, env=runtime_environment, stdout=output,
                                    stderr=subprocess.STDOUT, start_new_session=True)
         try:
-            print('SKYLANDERS_RUNTIME_STARTED', flush=True)
+            print('SKYLANDERS_RUNTIME_LAUNCHED', flush=True)
+            threading.Thread(target=announce_window, args=(directory / 'runtime.log', process), daemon=True).start()
             code = process.wait(timeout=seconds if seconds else None)
         except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
             reason = 'requested-time-limit' if isinstance(error, subprocess.TimeoutExpired) else 'user-interrupt'

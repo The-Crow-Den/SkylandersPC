@@ -125,6 +125,24 @@ class LauncherUITests(unittest.TestCase):
         self.assertEqual(self.window.values(),universal)
         self.assertEqual(launcher_model.load(self.window.preferences),universal)
 
+    def test_loading_wheel_and_stop_until_game_window(self):
+        self.window.select_game('trap-team')
+        script="import time;print('SKYLANDERS_RUNTIME_LAUNCHED',flush=True);time.sleep(.3);print('SKYLANDERS_RUNTIME_STARTED',flush=True);time.sleep(60)"
+        with patch('tools.launcher_model.command',return_value=['python3','-c',script]):
+            self.window.launch()
+        self.assertEqual(self.window.primary.text(),'LOADING')
+        self.assertTrue(self.window.session_stop.isVisibleTo(self.window))
+        self.assertTrue(self.window.loading_wheel.isVisibleTo(self.window))
+        self.wait(lambda:self.window.launch_status.text()=='Starting game…')
+        self.assertTrue(self.window.loading_wheel.isVisibleTo(self.window))
+        self.wait(lambda:self.window.runtime_started)
+        self.assertFalse(self.window.loading_wheel.isVisibleTo(self.window))
+        self.assertTrue(self.window.session_stop.isVisibleTo(self.window))
+        self.window.stop_game()
+        self.wait(lambda:self.window.process is None)
+        self.assertFalse(self.window.session_stop.isVisibleTo(self.window))
+        self.assertEqual(self.window.status.text(),'Game stopped at your request.')
+
     def test_extractor_success_and_matching_update(self):
         tool=self.extractor('import sys,json,base64\nfrom pathlib import Path\n'
             'out=Path(sys.argv[2]);(out/"sce_sys").mkdir()\n'

@@ -300,7 +300,10 @@ def renovated(base):
 
         def read_output(self):
             super().read_output()
-            if hasattr(self,'loading_wheel') and not self.stopping and 'SKYLANDERS_RUNTIME_STARTED' in self.output_buffer:
+            if not hasattr(self,'loading_wheel') or self.stopping or getattr(self,'runtime_started',True): return
+            if 'SKYLANDERS_RUNTIME_LAUNCHED' in self.output_buffer:
+                self.launch_status.setText('Starting game…')
+            if 'SKYLANDERS_RUNTIME_STARTED' in self.output_buffer:
                 self.runtime_started=True;self.loading_wheel.set_active(False)
                 self.launch_status.setText('Game running');self.primary.setText('RUNNING')
                 self.status.setText('Session active · F6 opens PC settings in game')

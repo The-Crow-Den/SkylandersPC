@@ -5,9 +5,10 @@ import io
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 
-from tools.run_session import run_logged, overlay_environment, overlay_pci_configuration, renderer_environment, main
+from tools.run_session import announce_window, run_logged, overlay_environment, overlay_pci_configuration, renderer_environment, main
 
 
 class RunSessionTests(unittest.TestCase):
@@ -78,6 +79,29 @@ class RunSessionTests(unittest.TestCase):
             self.assertEqual(result['stop_reason'], 'process-exit')
             self.assertIn('unsupported-call', (root / 'runtime.log').read_text())
             self.assertEqual(json.loads((root / 'exit.json').read_text()), result)
+
+    def test_started_marker_waits_for_game_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script = 'import time; time.sleep(.3); print("Window backend: x11", flush=True); time.sleep(.3)'
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                run_logged([sys.executable, '-c', script], root, cwd=root)
+                time.sleep(.3)
+            lines = output.getvalue().split()
+            self.assertEqual(lines[0], 'SKYLANDERS_RUNTIME_LAUNCHED')
+            self.assertIn('SKYLANDERS_RUNTIME_STARTED', lines)
+
+    def test_no_started_marker_if_game_exits_before_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / 'runtime.log'
+            log.write_text('booting\n')
+            class Exited:
+                def poll(self): return 1
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertFalse(announce_window(log, Exited()))
+            self.assertEqual(output.getvalue(), '')
 
     def test_requested_timeout_is_distinguished_from_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
