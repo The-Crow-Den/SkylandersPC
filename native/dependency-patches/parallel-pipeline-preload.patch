@@ -1,0 +1,162 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Create cached graphics pipelines on several threads during startup preload.
+--- a/gpu/render/pipeline_cache.h
++++ b/gpu/render/pipeline_cache.h
+@@ -193,7 +193,11 @@
+     void SaveProfile();
+     void DropPreloaded();
+     bool LoadComputePipeline(Serialization::Archive& ar);
+-    bool LoadGraphicsPipeline(Serialization::Archive& ar);
++    /// A cached graphics pipeline whose stages are loaded; WarmUp creates the pipelines of all
++    /// entries in parallel, then inserts them (skylanders: parallel-pipeline-preload).
++    struct PendingGraphics;
++    bool LoadGraphicsPipeline(Serialization::Archive& ar, std::vector<PendingGraphics>& pending);
++    void CreatePendingGraphics(std::vector<PendingGraphics>& pending);
+     bool LoadPipelineStage(Serialization::Archive& ar, size_t stage);
+ 
+     const Instance& instance;
+--- a/gpu/render/pipeline_store.cpp
++++ b/gpu/render/pipeline_store.cpp
+@@ -1,8 +1,14 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ // bbport render: saving to and preloading from the pipeline cache on disk (pipeline_store.h).
+ 
++#include <algorithm>
+ #include <array>
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
+ #include <cstring>
++#include <exception>
++#include <thread>
+ #include <unordered_set>
+ 
+ #include "common/serdes.h"
+@@ -249,7 +255,19 @@
+     return true;
+ }
+ 
+-bool PipelineCache::LoadGraphicsPipeline(Serialization::Archive& ar) {
++struct PipelineCache::PendingGraphics {
++    GraphicsPipelineKey key;
++    GraphicsPipeline::SerializationSupport sdata;
++    std::array<const Shader::Info*, MaxShaderStages> infos;
++    std::array<Shader::RuntimeInfo, MaxShaderStages> runtime_infos;
++    std::optional<Shader::Gcn::FetchShaderData> fetch_shader;
++    std::array<vk::ShaderModule, MaxShaderStages> modules;
++    std::unique_ptr<GraphicsPipeline> pipeline;
++    std::exception_ptr error;
++};
++
++bool PipelineCache::LoadGraphicsPipeline(Serialization::Archive& ar,
++                                         std::vector<PendingGraphics>& pending) {
+     // An entry left half loaded must not lend its stages to this one.
+     sel.infos.fill(nullptr);
+     sel.modules.fill(nullptr);
+@@ -273,12 +291,11 @@
+             return false;
+         }
+     }
+-    auto pipeline = std::make_unique<GraphicsPipeline>(
+-        instance, scheduler, desc_heap, profile, sel.graphics_key, *pipeline_cache, sel.infos,
+-        sel.runtime_infos, sel.fetch_shader, sel.modules, sdata, true);
+-    const auto [it, is_new] = graphics_pipelines.try_emplace(sel.graphics_key);
+-    ASSERT(is_new);
+-    it.value() = std::move(pipeline);
++    // Creating the pipeline is the driver's compile, the slow part; it waits for
++    // CreatePendingGraphics. Infos point into program_cache's stable Programs, which later
++    // entries never rewrite, and modules are handles.
++    pending.push_back(PendingGraphics{sel.graphics_key, std::move(sdata), sel.infos,
++                                      sel.runtime_infos, sel.fetch_shader, sel.modules, {}, {}});
+     sel.infos.fill(nullptr);
+     sel.modules.fill(nullptr);
+     sel.fetch_shader.reset();
+@@ -322,6 +339,45 @@
+     program_cache.clear();
+ }
+ 
++void PipelineCache::CreatePendingGraphics(std::vector<PendingGraphics>& pending) {
++    // vkCreate*Pipelines and the layout creations in the constructor are safe on several
++    // threads; the VkPipelineCache is created without EXTERNALLY_SYNCHRONIZED. BB_PRELOAD_THREADS
++    // sets the count (1 keeps the original one-at-a-time preload).
++    unsigned threads = std::clamp(std::thread::hardware_concurrency(), 1u, 16u);
++    if (const char* value = std::getenv("BB_PRELOAD_THREADS"); value && *value) {
++        threads = static_cast<unsigned>(std::clamp(std::atoi(value), 1, 64));
++    }
++    threads = std::min<unsigned>(threads, static_cast<unsigned>(std::max<size_t>(pending.size(), 1)));
++    std::atomic<size_t> next{0};
++    const auto work = [&] {
++        for (size_t i; (i = next.fetch_add(1, std::memory_order_relaxed)) < pending.size();) {
++            auto& entry = pending[i];
++            try {
++                entry.pipeline = std::make_unique<GraphicsPipeline>(
++                    instance, scheduler, desc_heap, profile, entry.key, *pipeline_cache,
++                    entry.infos, entry.runtime_infos, entry.fetch_shader, entry.modules,
++                    entry.sdata, true);
++            } catch (...) {
++                entry.error = std::current_exception();
++            }
++        }
++    };
++    const auto started = std::chrono::steady_clock::now();
++    std::vector<std::thread> workers;
++    for (unsigned i = 1; i < threads; ++i) {
++        workers.emplace_back(work);
++    }
++    work();
++    for (auto& worker : workers) {
++        worker.join();
++    }
++    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
++                             std::chrono::steady_clock::now() - started)
++                             .count();
++    std::printf("Pipeline preload: %zu graphics pipelines on %u threads in %lld ms\n",
++                pending.size(), threads, static_cast<long long>(elapsed));
++}
++
+ void PipelineCache::WarmUp() {
+     if (!EmulatorSettings.IsPipelineCacheEnabled()) {
+         return;
+@@ -358,6 +414,7 @@
+     }
+ 
+     u32 num_pipelines = 0, num_total = 0, num_damaged = 0;
++    std::vector<PendingGraphics> pending;
+     Store().ForEachBlob(BbCache::BlobType::PipelineKey, [&](std::vector<u8>&& data) {
+         ++num_total;
+         // A damaged entry (cut short by a crash or a power loss, or rejected by the driver) used
+@@ -372,7 +429,7 @@
+                 return;
+             }
+             reader.Read(is_compute);
+-            if (is_compute ? LoadComputePipeline(ar) : LoadGraphicsPipeline(ar)) {
++            if (is_compute ? LoadComputePipeline(ar) : LoadGraphicsPipeline(ar, pending)) {
+                 ++num_pipelines;
+             }
+         } catch (const std::exception& e) {
+@@ -385,6 +442,25 @@
+         }
+     });
+ 
++    CreatePendingGraphics(pending);
++    for (auto& entry : pending) {
++        if (entry.error) {
++            try {
++                std::rethrow_exception(entry.error);
++            } catch (const std::exception& e) {
++                if (num_damaged++ == 0) {
++                    LOG_WARNING(Render, "Pipeline cache: damaged entry ({})", e.what());
++                }
++            }
++            --num_pipelines;
++            continue;
++        }
++        const auto [it, is_new] = graphics_pipelines.try_emplace(entry.key);
++        ASSERT(is_new);
++        it.value() = std::move(entry.pipeline);
++    }
++    pending.clear();
++
+     if (num_damaged) {
+         LOG_WARNING(Render, "Pipeline cache: {} damaged entries, rebuilding it", num_damaged);
+         DropPreloaded();
