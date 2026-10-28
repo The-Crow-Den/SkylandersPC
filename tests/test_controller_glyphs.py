@@ -62,6 +62,28 @@ class ControllerGlyphTests(unittest.TestCase):
         self.assertEqual(source,before)
         with self.assertRaises(ValueError):glyph.recipe(b'unknown',profile,'xbox')
 
+    def test_round_cells_key_out_labels_and_keep_alpha(self):
+        # Synthetic texture: key colour everywhere, a dark pill and a dark label in the
+        # Menu cell, standing in for the Options button and its OPTIONS caption.
+        texture=bytearray(bytes((*glyph.KEY,200))*(1024*192))
+        _,left,top,w,h=glyph.CELLS[9]
+        for y in range(top,top+h):
+            for x in range(left,left+w):
+                if y<top+12 or (left+30<=x<left+60 and y>=top+16):
+                    at=glyph.tiled_offset(x,y);texture[at:at+3]=b'\x30\x30\x30'
+        source=bytes(texture)
+        profile=dict(asset='permanent/bootstrap.bld',texture_offset=0,
+                     source_sha256=asset_mod.digest(source),chunks=[])
+        for at in range(0,len(source),32768):
+            profile['chunks'].append(dict(plain_offset=at,offset=at,allocation=32768,
+                decoded_size=32768,decoded_sha256=asset_mod.digest(source[at:at+32768]),encoding='raw'))
+        result,_=asset_mod.patch_asset(source,glyph.recipe(source,profile,'xbox'))
+        pixel=lambda x,y:result[glyph.tiled_offset(x,y):glyph.tiled_offset(x,y)+4]
+        self.assertEqual(pixel(left+2,top+2)[:3],bytes(glyph.KEY))          # label keyed out
+        self.assertEqual(pixel(left+w//2,top)[:3],bytes(glyph.KEY))
+        self.assertNotEqual(pixel(left+w//2,top+h//2)[:3],bytes(glyph.KEY)) # round button drawn
+        self.assertTrue(all(result[i]==200 for i in range(3,len(result),4)))  # alpha untouched
+
     def test_raw_lzma_uses_external_decoded_size_and_checks_block_bounds(self):
         plain=b'a'*32768
         encoded=lzma.compress(plain+b'padding',format=lzma.FORMAT_RAW,

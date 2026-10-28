@@ -117,9 +117,22 @@ def _write_blocks(profile,blocks):
 
 
 
-# Cells whose PlayStation outline (the unedited alpha texture) differs from the
-# artwork's shape: the symbol is fitted inside the outline instead of filling the cell.
+# Font 001's button texture is opaque; the exact colour KEY marks its transparent
+# background (verified: ~97,000 of the original cells' pixels, and only that colour).
+# So a button's shape is every non-key pixel.
+KEY=(255,251,255)
+# Cells whose PlayStation shape differs from the artwork's: the symbol is fitted
+# inside the shape instead of filling the cell.
 FITTED=(4,5,8,9)
+# View (touchpad) and Menu (Options pill with its OPTIONS label) become round
+# buttons like Xbox's and Nintendo's; everything else in those cells is keyed out.
+ROUND=(8,9)
+ROUND_FILL=(33,32,33)
+
+
+def disc(width,height):
+    radius=min(width,height)/2-2;cx,cy=width/2,height/2
+    return [[(x+.5-cx)**2+(y+.5-cy)**2<=radius*radius for x in range(width)] for y in range(height)]
 
 
 def button_shape(original,width,height):
@@ -137,6 +150,7 @@ def button_shape(original,width,height):
                     if 0<=nx<width and 0<=ny<height and dark[ny][nx] and not seen[ny][nx]:
                         seen[ny][nx]=True;stack.append((nx,ny))
             if len(region)>len(best):best=region
+    if not best:return disc(width,height)  # no original button: draw a round one
     inside=[[False]*width for _ in range(height)];spans={}
     for x,y in best:
         low,high=spans.get(y,(x,x));spans[y]=(min(low,x),max(high,x))
@@ -177,19 +191,16 @@ def fitted(art,width,height,inside,margin=0.2):
 
 
 def menu_bars(width,height,inside):
-    """Xbox Menu as three bold white bars: the supplied artwork's thin lines
-    become illegible when scaled into the narrow Options pill."""
-    rows=[y for y in range(height) if any(inside[y])]
-    top,bottom=rows[0],rows[-1]+1;middle=(top+bottom)/2
-    spans=[(min(x for x in range(width) if inside[y][x]),max(x for x in range(width) if inside[y][x])) for y in rows]
-    left=max(low for low,_ in spans[len(spans)//4:3*len(spans)//4])+4
-    right=min(high for _,high in spans[len(spans)//4:3*len(spans)//4])-3
-    thick=max(3,round((bottom-top)/10));gap=thick*2
+    """Xbox Menu as three bold white bars centred in the button: the supplied
+    artwork's thin lines become illegible at this size."""
+    rows=[y for y in range(height) if any(inside[y])];cols=[x for x in range(width) if any(inside[y][x] for y in rows)]
+    size=min(rows[-1]-rows[0]+1,cols[-1]-cols[0]+1);middle_y=(rows[0]+rows[-1]+1)/2;middle_x=(cols[0]+cols[-1]+1)/2
+    half=round(size*0.24);thick=max(3,round(size/11));gap=round(thick*2.3)
     result=bytearray(width*height*4)
     for bar in (-1,0,1):
-        y0=round(middle+bar*gap-thick/2)
+        y0=round(middle_y+bar*gap-thick/2)
         for y in range(y0,y0+thick):
-            for x in range(left,right+1):
+            for x in range(round(middle_x)-half,round(middle_x)+half):
                 result[(y*width+x)*4:(y*width+x)*4+4]=b'\xff\xff\xff\xff'
     return bytes(result)
 
@@ -211,20 +222,21 @@ def recipe(source,profile,mode):
         original=b''.join(bytes(modified[at:at+4]) for modified,at in places)
         pixels=raster(mode,index)
         if index in FITTED:
-            inside=button_shape(original,width,height)
+            inside=disc(width,height) if index in ROUND else button_shape(original,width,height)
             pixels=menu_bars(width,height,inside) if (mode,index)==('xbox',9) else fitted(pixels,width,height,inside)
         else:
             inside=[[min(original[(y*width+x)*4:(y*width+x)*4+3])<235 for x in range(width)] for y in range(height)]
-        # Font 001's shapes come from a separate alpha texture; this one holds colour
-        # only, opaque and white around the buttons, and text drawn from that white
-        # turned black when artwork wrote transparent black. Keep the original alpha
-        # byte; inside the original button the artwork goes over black, outside it
-        # over the original colour.
+        # Keep the original (opaque) alpha byte. Inside the button the artwork goes
+        # over a dark fill; outside it over the original colour, normally KEY, so
+        # transparent artwork stays transparent (writing black there showed as black).
         for i,(modified,at) in enumerate(places):
             y,x=divmod(i,width);alpha=pixels[i*4+3]
-            if index in FITTED and not inside[y][x]:continue  # e.g. the Options label keeps its colour
+            if index in ROUND and not inside[y][x]:
+                modified[at:at+3]=bytes(KEY);continue  # e.g. removes the OPTIONS label
+            if index in FITTED and not inside[y][x]:continue
+            fill=ROUND_FILL if index in ROUND else (0,0,0)
             for channel in range(3):
-                base=0 if inside[y][x] else modified[at+channel]
+                base=fill[channel] if inside[y][x] else modified[at+channel]
                 modified[at+channel]=(pixels[i*4+channel]*alpha+base*(255-alpha)+127)//255
     return _write_blocks(profile,blocks)
 
