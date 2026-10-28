@@ -176,6 +176,24 @@ def fitted(art,width,height,inside,margin=0.2):
     return bytes(result)
 
 
+def menu_bars(width,height,inside):
+    """Xbox Menu as three bold white bars: the supplied artwork's thin lines
+    become illegible when scaled into the narrow Options pill."""
+    rows=[y for y in range(height) if any(inside[y])]
+    top,bottom=rows[0],rows[-1]+1;middle=(top+bottom)/2
+    spans=[(min(x for x in range(width) if inside[y][x]),max(x for x in range(width) if inside[y][x])) for y in rows]
+    left=max(low for low,_ in spans[len(spans)//4:3*len(spans)//4])+4
+    right=min(high for _,high in spans[len(spans)//4:3*len(spans)//4])-3
+    thick=max(3,round((bottom-top)/10));gap=thick*2
+    result=bytearray(width*height*4)
+    for bar in (-1,0,1):
+        y0=round(middle+bar*gap-thick/2)
+        for y in range(y0,y0+thick):
+            for x in range(left,right+1):
+                result[(y*width+x)*4:(y*width+x)*4+4]=b'\xff\xff\xff\xff'
+    return bytes(result)
+
+
 def recipe(source,profile,mode):
     """Materialize an expected-byte font recipe, without stored game bytes."""
     if mode not in LABELS:raise ValueError('invalid glyph pack')
@@ -193,7 +211,8 @@ def recipe(source,profile,mode):
         original=b''.join(bytes(modified[at:at+4]) for modified,at in places)
         pixels=raster(mode,index)
         if index in FITTED:
-            inside=button_shape(original,width,height);pixels=fitted(pixels,width,height,inside)
+            inside=button_shape(original,width,height)
+            pixels=menu_bars(width,height,inside) if (mode,index)==('xbox',9) else fitted(pixels,width,height,inside)
         else:
             inside=[[min(original[(y*width+x)*4:(y*width+x)*4+3])<235 for x in range(width)] for y in range(height)]
         # Font 001's shapes come from a separate alpha texture; this one holds colour
