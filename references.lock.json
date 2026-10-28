@@ -22,7 +22,7 @@
       "sha256": "953c3da81c63915dfa70622289c505a7dd77498ba3cc5bf1bdd16943f80806c3",
       "commit": "8185b88d80573fa300595d5c54450183b4109935",
       "role": "GPU/platform/audio/memory provider adopted locally; canonical changes in LICENSES/bbport-source.json",
-      "fork": {"name": "skyrender", "location": ".local/skyrender", "commit": "26ee562fe836431749572faa9f809eb34ce883b6"}
+      "fork": {"name": "skyrender", "location": ".local/skyrender", "commit": "366e9dc0bc0b32645f92e1a7d08f75c539831278"}
     },
     {
       "archive": "bloodborne-recomp-main.zip",
