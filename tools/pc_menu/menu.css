@@ -132,9 +132,22 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .slot-name { min-height:14.3px; }
 #trap-rail-demo .bridge-message { color:#c3c3cc; font-size:12px; }
 #trap-rail-demo button:focus-visible,#trap-rail-demo select:focus-visible { outline:2px solid #ffffff; outline-offset:3px; }
-#trap-rail-demo.pad-focus :is(button,select,input):focus { outline:2px solid #ffffff; outline-offset:3px; }
-#trap-rail-demo.pad-focus .check:focus-within { outline:2px solid #ffffff; outline-offset:3px; border-radius:8px; }
+#trap-rail-demo.pad-focus .pad-current { outline:3px solid var(--accent); outline-offset:3px; box-shadow:0 0 0 6px #98dfef33; }
+#trap-rail-demo.pad-focus .check:has(.pad-current) { outline:3px solid var(--accent); outline-offset:3px; border-radius:8px; }
+#trap-rail-demo.pad-focus .check .pad-current { outline:0; box-shadow:none; }
 #trap-rail-demo .slot .empty svg { width:30px; height:30px; }
 @media(max-width:640px) { #trap-rail-demo .portal-panel { position:absolute; left:12px; right:12px; top:92px; margin:0; width:auto; max-height:calc(100% - 110px); } #trap-rail-demo .settings-panel { max-height:calc(100vh - 110px); } }
 
 #trap-rail-demo .settings-panel input[type="range"] { width:100%; accent-color:#98dfef; }
+
+/* Controller mode: the side without focus dims, and a hint bar names the buttons. */
+#trap-rail-demo .portal-panel, #trap-rail-demo .settings-panel, #trap-rail-demo .rail { transition:opacity 120ms ease; }
+#trap-rail-demo.pad-focus.zone-rail :is(.portal-panel,.settings-panel) { opacity:.55; }
+#trap-rail-demo.pad-focus.zone-panel .rail { opacity:.6; }
+#trap-rail-demo .pad-hints { display:none; position:absolute; z-index:6; left:50%; bottom:18px; transform:translateX(-50%); gap:16px; padding:8px 16px; border-radius:999px; background:#111111e6; box-shadow:0 8px 26px #00000055; font-size:13px; line-height:20px; white-space:nowrap; pointer-events:none; }
+#trap-rail-demo.pad-focus .pad-hints { display:flex; }
+#trap-rail-demo .pad-hints span { display:flex; align-items:center; gap:6px; color:#d8d8de; }
+#trap-rail-demo .pad-hints kbd { font:inherit; font-weight:600; min-width:22px; padding:0 6px; text-align:center; border-radius:6px; background:#ffffff; color:#171313; }
+#trap-rail-demo .scene:has(.left-tools:focus-within) .game-title, #trap-rail-demo.zone-rail .game-title { opacity:0; }
+#trap-rail-demo.zone-rail .rail { width:var(--rail-open); }
+#trap-rail-demo.zone-rail .nav-label { opacity:1; }

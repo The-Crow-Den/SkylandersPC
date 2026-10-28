@@ -70,7 +70,7 @@
     slots();const isTrap=ui.slot===1;
     root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;root.querySelector('.section-title').hidden=isTrap;
     if(isTrap)traps();else figures();message.textContent=ui.snapshot?.status||'Waiting for the game…';icon();
-    if(focused){const match=[...root.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')===focused);match?.focus({preventScroll:true});}
+    if(focused){const match=[...root.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')===focused);if(match){match.focus({preventScroll:true});mark(match);}}
   }
   function initializeSettings(settings){
     if(ui.dirty)return;
@@ -79,20 +79,46 @@
   }
   function receive(text){
     let snapshot;try{snapshot=JSON.parse(text);}catch{return;}if(snapshot.version!==1)return;
+    const opened=snapshot.visible&&!ui.visible;ui.visible=!!snapshot.visible;
     if(snapshot.collections){const comparable=JSON.stringify([snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});}
     if(snapshot.inputSequence!==ui.sequence){ui.sequence=snapshot.inputSequence;for(const key of snapshot.keys||[])if(key>0)navigate(key);}
+    if(opened)setTimeout(enterPanel,0);
   }
   // Controller and keyboard navigation. Keys from the host: 1-4 up/down/left/right, 5 activate,
-  // 6 close the overlay (Start/Select), 7 back (B), 8/9 previous/next tab (LB/RB).
+  // 6 close the overlay (Start/Select), 7 back (B), 8 left side: tab rail (LB), 9 right side: open panel (RB).
   const tabs=()=>[...root.querySelectorAll('.rail [data-view]')];
   const currentTab=()=>tabs().find(node=>node.dataset.view===ui.view&&(!node.dataset.page||node.dataset.page===ui.page))||tabs()[0];
   const openPanel=()=>root.querySelector(ui.view==='portal'?'.portal-panel':'.settings-panel');
   const usable=node=>!node.disabled&&node.getClientRects().length&&!node.closest('[hidden]');
   // The corner X and the search box are mouse/keyboard only: a controller backs out with B.
   const targets=area=>[...area.querySelectorAll('button,input,select')].filter(node=>usable(node)&&!node.matches('[data-close],[data-search]'));
-  function focus(node){if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});node.scrollIntoView({block:'nearest',inline:'nearest'});}
+  const hints=root.querySelector('.pad-hints');
+  // Button names follow the "Button icons" setting: 1 PlayStation, 3 Nintendo, otherwise Xbox.
+  const glyphs=()=>({1:{a:'✕',b:'○',lb:'L1',rb:'R1',start:'Options'},3:{a:'B',b:'A',lb:'L',rb:'R',start:'+'}})[ui.snapshot?.settings?.glyphs]||{a:'A',b:'B',lb:'LB',rb:'RB',start:'Start'};
+  const remembered=new Map(); // panel → last focused control, restored by RB
+  const identity=node=>node.id||node.getAttribute('aria-label')||node.textContent.trim();
+  const panelKey=()=>ui.view==='portal'?'portal':'settings:'+ui.page;
+  function updateHints(){
+    const active=document.activeElement;const inRail=!!active?.closest('.rail');const g=glyphs();
+    root.classList.toggle('zone-rail',inRail);root.classList.toggle('zone-panel',!inRail&&!!active?.closest('.portal-panel,.settings-panel'));
+    const value=active instanceof HTMLSelectElement||active?.type==='range';
+    const items=inRail?[['▲▼','Switch tab'],[g.a+' / '+g.rb,'Enter'],[g.b,'Close'],[g.start,'Close']]
+      :[[value?'◀▶':'✚',value?'Change':'Move'],[g.a,value?'Next':'Select'],[g.lb,'Tabs'],[g.b,'Back'],[g.start,'Close']];
+    hints.replaceChildren(...items.map(([button,label])=>{const item=document.createElement('span');const key=document.createElement('kbd');key.textContent=button;item.append(key,label);return item;}));
+  }
+  // The overlay window may not hold OS focus while the game does, so :focus is unreliable:
+  // the controller highlight is a class on the current control.
+  function mark(node){root.querySelectorAll('.pad-current').forEach(other=>other!==node&&other.classList.remove('pad-current'));node?.classList.add('pad-current');updateHints();}
+  function focus(node){
+    if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});mark(node);node.scrollIntoView({block:'nearest',inline:'nearest'});
+    if(!node.closest('.rail'))remembered.set(panelKey(),identity(node));
+  }
   function openTab(tab){if(!tab)return;tab.click();focus(tab);}
-  function enterPanel(){const area=openPanel();if(!area||area.hidden)return;const pressed=area.querySelector('[aria-pressed="true"]');focus(pressed&&usable(pressed)?pressed:targets(area)[0]);}
+  function enterPanel(){
+    const area=openPanel();if(!area||area.hidden){focus(currentTab());return;}
+    const list=targets(area);const last=remembered.get(panelKey());const pressed=area.querySelector('[aria-pressed="true"]');
+    focus(list.find(node=>identity(node)===last)||(pressed&&usable(pressed)?pressed:list[0]));
+  }
   function nearest(nodes,active,key){
     const rect=active.getBoundingClientRect();const x=rect.x+rect.width/2,y=rect.y+rect.height/2;let best=null,score=Infinity;
     // Sideways offset is the gap between the two spans (0 when they overlap), so a small
@@ -114,20 +140,21 @@
   function navigate(key){
     if(key===6){send('close');return;}
     if(key===7){back();return;}
-    if(key===8||key===9){const list=tabs();const index=list.indexOf(currentTab());openTab(list[(index+(key===9?1:list.length-1))%list.length]);enterPanel();return;}
+    if(key===8){focus(currentTab());return;}
+    if(key===9){enterPanel();return;}
     const active=document.activeElement;const inRail=!!active?.closest('.rail');const area=openPanel();
-    if(!active||active===document.body||!root.contains(active)){focus(currentTab());return;}
+    if(!active||active===document.body||!root.contains(active)){enterPanel();return;}
     if(inRail){
       if(key===1||key===2){const list=tabs();const index=list.indexOf(active);openTab(list[Math.min(list.length-1,Math.max(0,index+(key===2?1:-1)))]);return;}
-      if(key===4||key===5){if(key===5)active.click();enterPanel();return;}
+      if(key===4||key===5)enterPanel();
       return;
     }
     const value=active instanceof HTMLSelectElement||active.type==='range';
-    if(key===5){if(active instanceof HTMLSelectElement)adjust(active,1);else active.click();return;}
+    if(key===5){if(active instanceof HTMLSelectElement)adjust(active,1);else{active.click();updateHints();}return;}
     if(value&&(key===3||key===4)){adjust(active,key===4?1:-1);return;}
     const next=area?nearest(targets(area),active,key):null;
     if(next){focus(next);return;}
-    if(key===3)focus(currentTab()); // past the panel's left edge: back to its tab
+    if(key===3)focus(currentTab()); // past the panel's left edge: back to the tabs
   }
   root.querySelectorAll('[data-view]').forEach(node=>node.onclick=()=>{ui.view=node.dataset.view;if(node.dataset.page)ui.page=node.dataset.page;render();});
   root.querySelectorAll('[data-close]').forEach(node=>node.onclick=()=>{ui.view='none';render();});
@@ -148,7 +175,8 @@
     const keys={ArrowUp:1,ArrowDown:2,ArrowLeft:3,ArrowRight:4};
     if(keys[event.key]&&!event.target.matches?.('[data-search]')){event.preventDefault();navigate(keys[event.key]);}
   });
-  document.addEventListener('pointerdown',()=>root.classList.remove('pad-focus'));
+  document.addEventListener('pointerdown',()=>root.classList.remove('pad-focus','zone-rail','zone-panel'));
+  document.addEventListener('focusin',event=>{if(root.contains(event.target))mark(event.target);});
   window.portalReceive=receive;window.portalNavigate=navigate;
   icon();
   new QWebChannel(qt.webChannelTransport,channel=>{bridge=channel.objects.portal;bridge.changed.connect(receive);bridge.ready();bridge.snapshot(receive);});
