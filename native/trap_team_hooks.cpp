@@ -8,6 +8,7 @@ namespace {
 constexpr std::string_view kTitle = "Skylanders: Trap Team";
 void frame(const GameHooks::Build& build, bool pc_menu) {
     LevelEvents::sample(build.id == "us-01-01", pc_menu);
+    TrapTeamProbe::frame_clock();
     TrapTeamProbe::sample();
 }
 constexpr GameHooks::Build eur_0100{"eur-01-00", "CUSA00697",

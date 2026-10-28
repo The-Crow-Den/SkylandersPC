@@ -7,6 +7,15 @@
 
 int main() {
     const auto check=[](bool v){if(!v)throw std::runtime_error("PC settings contract failed");};
+    // Frame periods lock to whole display refreshes when within 1% of the request.
+    check(SkyPc::frame_period_ns(30)==33'333'333 && SkyPc::frame_period_ns(0)==0);
+    SkyPc::display_refresh_ns.store(4'167'709); // 239.94 Hz
+    check(SkyPc::frame_period_ns(30)==8*4'167'709 && SkyPc::frame_period_ns(60)==4*4'167'709);
+    SkyPc::display_refresh_ns.store(13'333'333); // 75 Hz: 30 FPS is not a whole number of refreshes
+    check(SkyPc::frame_period_ns(30)==33'333'333);
+    SkyPc::display_refresh_ns.store(16'683'350); // 59.94 Hz
+    check(SkyPc::frame_period_ns(30)==2*16'683'350);
+    SkyPc::display_refresh_ns.store(0);
     check(sky_pc_set_fps_counter(0) && sky_pc_fps_counter()==0);
     check(!sky_pc_set_fps_counter(2) && sky_pc_fps_counter()==0);
     check(sky_pc_set_fps_counter(1) && sky_pc_fps_counter()==1);

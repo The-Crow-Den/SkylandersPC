@@ -43,6 +43,21 @@ inline std::atomic<int> controller_glyphs{[] {
     return !value?0:!std::strcmp(value,"playstation")?1:!std::strcmp(value,"xbox")?2:!std::strcmp(value,"nintendo")?3:0;
 }()};
 inline std::mutex frame_policy_mutex;
+// The display's refresh period (0: unknown), set once the game window exists.
+inline std::atomic<long long> display_refresh_ns{0};
+// The frame period for `fps`: a whole number of display refreshes when the refresh rate is known,
+// so frames reach the display on a fixed refresh cadence (30 FPS on 240 Hz: every 8th refresh)
+// instead of drifting against it.
+inline long long frame_period_ns(int fps) {
+    if (fps <= 0) return 0;
+    const long long nominal = 1'000'000'000LL / fps;
+    const long long refresh = display_refresh_ns.load(std::memory_order_relaxed);
+    if (refresh <= 0 || refresh > nominal) return nominal;
+    const long long count = (nominal + refresh / 2) / refresh;
+    const long long locked = count * refresh;
+    // Only lock when the rate stays within 1% of the request (e.g. not 30 on a 75 Hz display).
+    return locked * 100 >= nominal * 99 && locked * 100 <= nominal * 101 ? locked : nominal;
+}
 inline bool apply_frame_limit(int fps) {
     const auto* allow=std::getenv("SKY_ALLOW_60");
     if(fps!=0 && fps!=30 && !(fps==60 && allow && !std::strcmp(allow,"1")))return false;
@@ -63,7 +78,7 @@ inline void pace() {
     thread_local int previous = 0;
     const int fps = frame_limit.load(std::memory_order_relaxed);
     if (fps == 0) { previous = 0; deadline = Clock::now(); return; }
-    const auto period = std::chrono::nanoseconds(1'000'000'000 / fps);
+    const auto period = std::chrono::nanoseconds(frame_period_ns(fps));
     const auto now = Clock::now();
     if (previous != fps || now - deadline > period) deadline = now;
     previous = fps;
@@ -80,6 +95,14 @@ extern "C" __attribute__((used,visibility("default"))) inline void sky_pc_report
     if(milliseconds>0.0f && milliseconds<1000.0f)SkyPc::frame_time_ms.store(milliseconds,std::memory_order_relaxed);
 }
 extern "C" __attribute__((used,visibility("default"))) inline float sky_pc_frame_time() {return SkyPc::frame_time_ms.load(std::memory_order_relaxed);}
+// For the renderer's present pacing: the period the guest is paced at (0: uncapped) and the
+// display refresh period (0: unknown).
+extern "C" __attribute__((used,visibility("default"))) inline long long sky_pc_frame_period_ns() {
+    return SkyPc::frame_period_ns(SkyPc::frame_limit.load(std::memory_order_relaxed));
+}
+extern "C" __attribute__((used,visibility("default"))) inline long long sky_pc_display_refresh_ns() {
+    return SkyPc::display_refresh_ns.load(std::memory_order_relaxed);
+}
 extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_frame_limit() { return SkyPc::frame_limit.load(std::memory_order_relaxed); }
 extern "C" __attribute__((used,visibility("default"))) inline void sky_pc_set_frame_limit(int fps) {
     std::lock_guard guard(SkyPc::frame_policy_mutex);

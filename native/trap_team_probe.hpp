@@ -212,6 +212,24 @@ inline void clock_sample() {
         field<std::int32_t>(data,28)/8192.0,field<float>(data,32),shader_valid?"true":"false",shader_seconds);
     render_node_clocks(now);
 }
+// SKY_TRAP_CLOCK_TRACE=<file>: one CSV row per submitted frame with the game
+// clock's seconds and the delta it last applied, for pacing analysis.
+inline void frame_clock() {
+    static FILE* out=[]()->FILE* {
+        const auto* path=std::getenv("SKY_TRAP_CLOCK_TRACE");
+        FILE* file=path&&*path?std::fopen(path,"w"):nullptr;
+        if(file)std::fprintf(file,"monotonic_us,seconds,delta,scale\n");
+        return file;
+    }();
+    if(!out)return;
+    std::uintptr_t app=0,core=0,clock=0,vt=0;
+    std::array<unsigned char,40> data{};
+    if(!read(0x1087480,&app,8) || !app || !read(app+96,&core,8) || !core ||
+       !read(core+40,&clock,8) || !clock || !read(clock,&vt,8) || vt!=0xfd0570 ||
+       !read(clock,data.data(),data.size()))return;
+    std::fprintf(out,"%llu,%.6f,%.6f,%.6f\n",static_cast<unsigned long long>(timestamp()),
+        field<std::int32_t>(data,28)/8192.0,field<float>(data,32),field<float>(data,16));
+}
 inline void sample() {
     clock_sample();
     if(!enabled()) return;

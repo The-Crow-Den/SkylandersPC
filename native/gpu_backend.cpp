@@ -496,6 +496,17 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
                 if (count > 0) SDL_SetWindowFullscreen(windows[0],true);
                 SDL_free(windows);
             }
+            {
+                int count=0; auto** windows=SDL_GetWindows(&count);
+                const auto* mode=count>0?SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(windows[0])):nullptr;
+                if (mode && mode->refresh_rate>=23.0f && mode->refresh_rate<=1000.0f) {
+                    const double rate=mode->refresh_rate_numerator&&mode->refresh_rate_denominator?
+                        double(mode->refresh_rate_numerator)/mode->refresh_rate_denominator:mode->refresh_rate;
+                    SkyPc::display_refresh_ns.store(static_cast<long long>(1e9/rate+0.5));
+                    std::printf("Display: %.3f Hz; capped frames are paced to whole refreshes\n",rate);
+                }
+                SDL_free(windows);
+            }
             portal_action_event=SDL_RegisterEvents(1);
             std::printf("PC menu: F6 / Insert / L3+R3; F10 minimizes the game; Shift+F1 switches native 30/60 cap\n");
             std::printf("Window backend: %s\n", SDL_GetCurrentVideoDriver());
