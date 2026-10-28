@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Raw LZMA1 (lc=3, lp=0, pb=2) encoder whose output size can be raised.
 
-IGA archives locate the next compressed block by aligning the previous block's
-encoded length, and the game rejects zero padding after a stream. A recompressed
-block that shrinks past an alignment unit therefore needs a stream that is
-genuinely longer. This encoder only chooses a less efficient parse (shorter
+The game rejected zero padding after a stream inside an IGA block's declared
+length. To keep each recompressed block ending at its original boundary, a block
+that shrinks past an alignment unit gets a stream that is genuinely longer. This encoder only chooses a less efficient parse (shorter
 matches); the decoded bytes are identical. Streams carry no end marker, like
 the original archive streams; the decoded size is known from the archive.
 """

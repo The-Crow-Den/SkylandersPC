@@ -125,13 +125,12 @@ def patch_asset(data, recipe):
             check = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
             if check.decompress(compressed, max_length=size + 1) != modified:
                 raise ValueError('asset recompression verification failed')
-            # IGA finds the next block by aligning this encoded length, and the
-            # game rejects bytes after the stream inside that length: both a
-            # zero-padded stream (crash) and a shorter unpadded one (misread
-            # following blocks, black font) failed in the US 01.01 game with the
-            # Xbox prompt font, 2026-10-28. So the stream itself must end where
-            # the original allocation ends; when better compression shrinks it,
-            # a less efficient parse of the same bytes lengthens it.
+            # Zero padding inside the declared length crashed the US 01.01 game
+            # (Xbox prompt font, 2026-10-28). The archive's block table gives block
+            # positions, so a short stream may be acceptable, but that was never
+            # isolated (black text then came from the colour edit). Conservatively
+            # the stream itself reaches the original boundary: when compression
+            # shrinks it, a less efficient parse of the same bytes lengthens it.
             minimum = allocation - alignment - 6 if alignment is not None else encoded_size
             if len(compressed) < minimum:
                 compressed = lzma_fill.fill(modified, dictionary, minimum, min(allocation - 7, 65535))
