@@ -1,0 +1,104 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Separate shader-translation counts/time from pipeline creation in BB_FRAME_LOG.
+# Applies after frame-phase-timestamps.patch and bbport-local-changes.patch.
+--- a/gpu/render/pipeline_cache.cpp
++++ b/gpu/render/pipeline_cache.cpp
+@@ -54,6 +54,10 @@
+ // Shader/pipeline compile time on the GPU thread, reported by BB_FRAME_STATS.
+ std::atomic<u64> g_bb_compile_ns;
+ std::atomic<u32> g_bb_compiles;
++// Never reset (BB_FRAME_LOG takes deltas): shader translations alone, and all compile time.
++std::atomic<u32> g_bb_module_compiles;
++std::atomic<u64> g_bb_module_compile_ns;
++std::atomic<u64> g_bb_compile_total_ns;
+ 
+ namespace {
+ 
+@@ -68,11 +72,24 @@
+ };
+ 
+ void AddCompileTime(std::chrono::steady_clock::time_point start) {
+-    g_bb_compile_ns += u64(std::chrono::duration_cast<std::chrono::nanoseconds>(
+-                               std::chrono::steady_clock::now() - start)
+-                               .count());
++    const u64 elapsed = u64(std::chrono::duration_cast<std::chrono::nanoseconds>(
++                                std::chrono::steady_clock::now() - start)
++                                .count());
++    g_bb_compile_ns += elapsed;
++    g_bb_compile_total_ns += elapsed;
+ }
+ 
++/// A shader translation (GCN to SPIR-V and its module), counted apart from pipelines.
++struct ModuleCompileTimer {
++    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
++    ~ModuleCompileTimer() {
++        g_bb_module_compile_ns += u64(std::chrono::duration_cast<std::chrono::nanoseconds>(
++                                          std::chrono::steady_clock::now() - start)
++                                          .count());
++        ++g_bb_module_compiles;
++    }
++};
++
+ struct CompileTimer {
+     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+     ~CompileTimer() {
+@@ -1164,6 +1181,7 @@
+              perm_idx != 0 ? "(permutation)" : "");
+     DumpShader(code, info.pgm_hash, info.hw_stage, perm_idx, "bin");
+     CompileTimer timer;
++    ModuleCompileTimer module_timer;
+ 
+     // BB_SHADER_CAPTURE: the inputs as they were, for the record.
+     const bool capture = BbShaderCapture::Enabled();
+--- a/gpu/platform/videoout/frame_stats.cpp
++++ b/gpu/platform/videoout/frame_stats.cpp
+@@ -33,6 +33,9 @@
+ namespace Vulkan {
+ extern std::atomic<u64> g_bb_compile_ns;
+ extern std::atomic<u32> g_bb_compiles;
++extern std::atomic<u32> g_bb_module_compiles;
++extern std::atomic<u64> g_bb_module_compile_ns;
++extern std::atomic<u64> g_bb_compile_total_ns;
+ } // namespace Vulkan
+ 
+ namespace BbVideoOut {
+@@ -241,7 +244,8 @@
+                                "images,image_mb,buffer_mb,protect_ms,resident_ms,create_ms,"
+                                "refresh_ms,write_fault_ms,read_faults,guest_copy_mb,draws,"
+                                "dispatches,submissions,compiles,preupload_mb,kernel_ms,alloc_mb,"
+-                               "free_mb,monotonic_us\n");
++                               "free_mb,monotonic_us,module_compiles,module_compile_ms,"
++                               "compile_ms\n");
+         }
+         return file;
+     }();
+@@ -249,6 +253,7 @@
+         static const auto log_start = now;
+         static u64 log_twf, log_tick, log_present, log_compiles, log_rf, log_preupload;
+         static u64 log_alloc, log_free;
++        static u64 log_module_compiles, log_module_ns, log_compile_total_ns;
+         const u64 tick = BbStats::tick_wait_ns.load(), present = BbStats::present_wait_ns.load();
+         const u64 compiles_now = Vulkan::g_bb_compiles.load();
+         // tick_wait_ns and the compile count are reset every stats window.
+@@ -263,7 +268,7 @@
+                                   static_cast<unsigned long long>(stamp.tv_nsec) / 1000ull;
+         std::fprintf(frame_log,
+                      "%.4f,%.2f,%.2f,%.2f,%.2f,%llu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%llu,"
+-                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f,%llu\n",
++                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f,%llu,%llu,%.2f,%.2f\n",
+                      std::chrono::duration<double>(now - log_start).count(), frame_ms,
+                      delta(present, log_present) / 1e6, delta(tick, log_tick) / 1e6,
+                      last_gpu_ns ? (gpu_ns - last_gpu_ns) / 1e6 : 0.0,
+@@ -281,7 +286,11 @@
+                      delta(BbStats::preupload_bytes.load(), log_preupload) / 1e6,
+                      last_gpu_ns ? (sys_us - last_sys) / 1e3 : 0.0,
+                      delta(BbStats::device_alloc_bytes.load(), log_alloc) / 1e6,
+-                     delta(BbStats::device_free_bytes.load(), log_free) / 1e6, monotonic_us);
++                     delta(BbStats::device_free_bytes.load(), log_free) / 1e6, monotonic_us,
++                     static_cast<unsigned long long>(
++                         delta(Vulkan::g_bb_module_compiles.load(), log_module_compiles)),
++                     delta(Vulkan::g_bb_module_compile_ns.load(), log_module_ns) / 1e6,
++                     delta(Vulkan::g_bb_compile_total_ns.load(), log_compile_total_ns) / 1e6);
+         static u32 unflushed = 0;
+         if (++unflushed >= 120) {
+             std::fflush(frame_log);

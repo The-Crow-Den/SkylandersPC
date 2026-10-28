@@ -132,12 +132,22 @@ def summarize(frames_text, guest_text, runtime_text, settling_ms=1000, long_fact
                     render_thread_cpu_ms=row['stage_a_cpu_ms'],
                     guest_main_cpu_ms=match['main_cpu_ms'] if match else None))
         long_frames.sort(key=lambda item: -item['frame_ms'])
+        # Present when the renderer splits shader translations from pipeline creation.
+        split = None
+        if group['renderer'] and 'module_compiles' in group['renderer'][0]:
+            modules = sum(row['module_compiles'] for row in group['renderer'])
+            module_ms = sum(row['module_compile_ms'] for row in group['renderer'])
+            total_ms = sum(row['compile_ms'] for row in group['renderer'])
+            split = dict(shader_translations=int(modules), translation_ms=round(module_ms, 1),
+                         pipelines_and_other=int(sum(row['compiles'] for row in group['renderer']) - modules),
+                         pipeline_ms=round(total_ms - module_ms, 1))
         guest_rows = group['guest']
         report.append(dict(
             phase=phase, requested_fps=fps, budget_ms=round(budget, 3),
             renderer_frames=distribution(frame_times),
             renderer_mean_ms={column: mean([row[column] for row in group['renderer']]) for column in RENDERER},
             pipeline_compiles=int(sum(row['compiles'] for row in group['renderer'])),
+            compile_split=split,
             guest_frames=distribution([row['frame_ms'] for row in guest_rows]),
             guest_mean_ms={column: mean([row[column] for row in guest_rows]) for column in GUEST},
             guest_p95_main_cpu_ms=percentile([row['main_cpu_ms'] for row in guest_rows], .95),
@@ -176,6 +186,8 @@ def main():
             print(f"  guest means: main CPU {g['main_cpu_ms']} (p95 {phase['guest_p95_main_cpu_ms']}, "
                   f"{phase['guest_main_cpu_budget_share']} of budget), workers CPU {g['worker_cpu_ms']}; main in services: "
                   f"gpu {g['main_gpu_ms']}, sync {g['main_sync_ms']}, clock {g['main_clock_ms']}, file {g['main_file_ms']}")
+        if phase['compile_split']:
+            print(f"  compiles: {phase['compile_split']}")
         print(f"  long frames: {phase['long_frames']['count']} {phase['long_frames']['by_cause']}")
     print(report['measurement'])
 

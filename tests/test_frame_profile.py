@@ -54,6 +54,20 @@ class FrameProfileTests(unittest.TestCase):
         self.assertEqual(gameplay['long_frames']['worst'][0]['frame_ms'], 80.0)
         self.assertEqual(by_phase['loading']['renderer_frames']['frames'], 1)
 
+    def test_compile_split_when_columns_present(self):
+        header = ['t_s', 'frame_ms', 'compiles', 'monotonic_us', *RENDERER, 'module_compiles', 'module_compile_ms', 'compile_ms']
+        lines = [','.join(header)]
+        for i in range(20):
+            values = dict.fromkeys(header, 0.0)
+            values.update(frame_ms=16.67, monotonic_us=6_000_000 + i * 16_667)
+            if i == 5:
+                values.update(frame_ms=200.0, compiles=10, module_compiles=4, module_compile_ms=40.0, compile_ms=180.0)
+            lines.append(','.join(str(values[name]) for name in header))
+        report = summarize('\n'.join(lines) + '\n', '', self.runtime)
+        gameplay = [entry for entry in report['phases'] if entry['phase'] == 'gameplay'][0]
+        self.assertEqual(gameplay['compile_split'], dict(shader_translations=4, translation_ms=40.0,
+                                                         pipelines_and_other=6, pipeline_ms=140.0))
+
     def test_settling_excludes_transition_frames(self):
         report = summarize(self.frames, self.guest, self.runtime, settling_ms=10_000)
         self.assertEqual(report['phases'], [])
