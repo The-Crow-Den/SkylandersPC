@@ -146,6 +146,36 @@ void update_gamepad(const SDL_Event* event = nullptr) {
     if (keyboard_pad) keyboard_pad->set_physical(state,slot);
     }
 }
+// The web PC menu's extra controller keys (tools/pc_menu/menu.js): B goes back, Start/Select
+// close, LB/RB switch tabs, the left stick moves like the D-pad. D-pad, A and L3+R3 stay with
+// the renderer. Consumed here, so the renderer's own "B closes" mapping never sees them.
+bool menu_gamepad(const SDL_Event& event) {
+    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+        const auto button = event.gbutton.button;
+        const int key = button == SDL_GAMEPAD_BUTTON_EAST ? 7 :
+            button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_BACK ? 6 :
+            button == SDL_GAMEPAD_BUTTON_LEFT_SHOULDER ? 8 : button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER ? 9 : 0;
+        if (!key) return false;
+        sky_pc_menu_gamepad(event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? key : -key);
+        return true;
+    }
+    if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION &&
+        (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX || event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY)) {
+        // One step per push: press past 20000, release below 12000. SDL window thread only.
+        static std::array<int, 2> held{};
+        const unsigned axis = event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY ? 1 : 0;
+        const int value = event.gaxis.value;
+        int direction = held[axis];
+        if (!direction && std::abs(value) > 20000) direction = value > 0 ? 1 : -1;
+        else if (direction && std::abs(value) < 12000) direction = 0;
+        if (direction != held[axis]) {
+            held[axis] = direction;
+            if (direction) sky_pc_menu_gamepad(axis ? (direction > 0 ? 2 : 1) : (direction > 0 ? 4 : 3));
+        }
+        return true;
+    }
+    return false;
+}
 int keyboard_event(const void* raw_event, void*) {
     if (!keyboard_pad) return 0;
     const auto& event = *static_cast<const SDL_Event*>(raw_event);
@@ -180,7 +210,10 @@ int keyboard_event(const void* raw_event, void*) {
     }
     if (Renderer::overlay_captures_input()) {
         pressed_keys.fill(false); keyboard_pad->release_keys();
-        if (event.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && event.type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) update_gamepad(&event);
+        if (event.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && event.type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) {
+            update_gamepad(&event);
+            if (sky_pc_external_menu() && menu_gamepad(event)) return 1;
+        }
         return 0; // The renderer routes this event into the PC menu.
     }
     if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
@@ -355,11 +388,8 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
     Renderer::set_option("GPU_USER_DIR", gpu_user_directory.c_str(), true);
     Renderer::set_option("CONFIG", (gpu_user_directory + "/" + Renderer::settings_file).c_str(), true);
     Renderer::set_option("GAME_PROFILE", "none", true);
-    Renderer::set_option("GAME_MENU", "0", true);
     setenv("SKY_PC_MENU", "1", 1);
-    Renderer::set_option("NATIVE_MOUSE", "0", true);
     Renderer::set_option("FREE_MOUSE", "1", true);
-    Renderer::set_option("CURSOR", "0", true);
     Renderer::set_option("UPSCALER", "off", true);
     Renderer::set_option("OBJECT_MOTION", "0", true);
     Renderer::set_option("FRAME_GEN", "0", true);
