@@ -132,6 +132,8 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .slot-name { min-height:14.3px; }
 #trap-rail-demo .bridge-message { color:#c3c3cc; font-size:12px; }
 #trap-rail-demo button:focus-visible,#trap-rail-demo select:focus-visible { outline:2px solid #ffffff; outline-offset:3px; }
+#trap-rail-demo.pad-focus :is(button,select,input):focus { outline:2px solid #ffffff; outline-offset:3px; }
+#trap-rail-demo.pad-focus .check:focus-within { outline:2px solid #ffffff; outline-offset:3px; border-radius:8px; }
 #trap-rail-demo .slot .empty svg { width:30px; height:30px; }
 @media(max-width:640px) { #trap-rail-demo .portal-panel { position:absolute; left:12px; right:12px; top:92px; margin:0; width:auto; max-height:calc(100% - 110px); } #trap-rail-demo .settings-panel { max-height:calc(100vh - 110px); } }
 

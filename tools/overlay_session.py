@@ -22,6 +22,13 @@ def html_overlay(directory,root,environment):
         if importlib.util.find_spec('PyQt6.QtWebEngineWidgets') is None:raise RuntimeError('PyQt6 WebEngine is unavailable')
         private=directory/'pc-overlay';private.mkdir(mode=0o700)
         ui_env=dict(environment);ui_env['MANGOHUD']='0';ui_env['DISABLE_MANGOHUD']='1'
+        # The menu is a small 2D page: render it in software. On hybrid-GPU laptops the game's
+        # Vulkan driver selection made Chromium draw on one GPU while Qt composited on the other
+        # (Mesa), and the overlay crashed about 30 s in ("Compositor returned null texture"),
+        # leaving only the renderer's fallback menu.
+        flags=ui_env.get('QTWEBENGINE_CHROMIUM_FLAGS','').split()
+        ui_env['QTWEBENGINE_CHROMIUM_FLAGS']=' '.join(flags+[flag for flag in ('--disable-gpu','--disable-gpu-compositing') if flag not in flags])
+        ui_env['QT_QUICK_BACKEND']='software'
         if ui_env.get('SDL_VIDEO_DRIVER')=='x11':ui_env.setdefault('QT_QPA_PLATFORM','xcb')
         with (directory/'pc-overlay.log').open('x') as output:
             process=subprocess.Popen([sys.executable,str(root/'tools/pc_overlay.py'),'--directory',str(private)],cwd=root,env=ui_env,stdout=output,stderr=subprocess.STDOUT,start_new_session=True)

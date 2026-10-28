@@ -88,7 +88,11 @@ def main(argv=None):
         last_pid=state.get('pid')
         visible=state['visible']
         if visible:
-            x,y,width,height=state['geometry'];view.setGeometry(x,y,width,height);view.setZoomFactor(max(0.75,min(height/1080,3.0)))
+            # The game reports device pixels; Qt positions in logical pixels (e.g. 125% scaling
+            # made the overlay 25% too large and pushed the portal panel off the screen).
+            scale=(view.screen() or app.primaryScreen()).devicePixelRatio() or 1.0
+            x,y,width,height=(round(value/scale) for value in state['geometry'])
+            view.setGeometry(x,y,width,height);view.setZoomFactor(max(0.75,min(height/1080,3.0)))
             page.setLifecycleState(QWebEnginePage.LifecycleState.Active)
             if not was_visible:view.show();view.raise_();view.activateWindow();view.setFocus()
         elif was_visible:

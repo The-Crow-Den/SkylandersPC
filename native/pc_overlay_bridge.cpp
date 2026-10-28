@@ -93,4 +93,4 @@ void geometry(int x,int y,int width,int height){if(width<100||height<100||width>
 }
 extern "C" int sky_pc_external_menu(){return connected?1:0;}
 extern "C" void sky_pc_menu_visibility(int shown){visible=shown!=0;}
-extern "C" int sky_pc_menu_gamepad(int key){if(!connected||!visible||!key||std::abs(key)>6)return 0;std::lock_guard lock(input_mutex);if(input.size()<32)input.push_back(key);return 1;}
+extern "C" int sky_pc_menu_gamepad(int key){if(!connected||!visible||!key||std::abs(key)>9)return 0;std::lock_guard lock(input_mutex);if(input.size()<32)input.push_back(key);return 1;}

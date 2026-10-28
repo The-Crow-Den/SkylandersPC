@@ -82,13 +82,52 @@
     if(snapshot.collections){const comparable=JSON.stringify([snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});}
     if(snapshot.inputSequence!==ui.sequence){ui.sequence=snapshot.inputSequence;for(const key of snapshot.keys||[])if(key>0)navigate(key);}
   }
-  function navigate(key){
-    if(key===6){send('close');return;}if(key===5){if(document.activeElement instanceof HTMLButtonElement)document.activeElement.click();else document.activeElement?.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));return;}
-    const nodes=[...root.querySelectorAll('button,input,select')].filter(node=>!node.disabled&&node.getClientRects().length);
-    if(!nodes.length)return;const active=document.activeElement;if(!nodes.includes(active)){nodes[0].focus();return;}
+  // Controller and keyboard navigation. Keys from the host: 1-4 up/down/left/right, 5 activate,
+  // 6 close the overlay (Start/Select), 7 back (B), 8/9 previous/next tab (LB/RB).
+  const tabs=()=>[...root.querySelectorAll('.rail [data-view]')];
+  const currentTab=()=>tabs().find(node=>node.dataset.view===ui.view&&(!node.dataset.page||node.dataset.page===ui.page))||tabs()[0];
+  const openPanel=()=>root.querySelector(ui.view==='portal'?'.portal-panel':'.settings-panel');
+  const usable=node=>!node.disabled&&node.getClientRects().length&&!node.closest('[hidden]');
+  // The corner X and the search box are mouse/keyboard only: a controller backs out with B.
+  const targets=area=>[...area.querySelectorAll('button,input,select')].filter(node=>usable(node)&&!node.matches('[data-close],[data-search]'));
+  function focus(node){if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});node.scrollIntoView({block:'nearest',inline:'nearest'});}
+  function openTab(tab){if(!tab)return;tab.click();focus(tab);}
+  function enterPanel(){const area=openPanel();if(!area||area.hidden)return;const pressed=area.querySelector('[aria-pressed="true"]');focus(pressed&&usable(pressed)?pressed:targets(area)[0]);}
+  function nearest(nodes,active,key){
     const rect=active.getBoundingClientRect();const x=rect.x+rect.width/2,y=rect.y+rect.height/2;let best=null,score=Infinity;
-    for(const node of nodes){if(node===active)continue;const r=node.getBoundingClientRect();const dx=r.x+r.width/2-x,dy=r.y+r.height/2-y;const forward=key===1?-dy:key===2?dy:key===3?-dx:dx;if(forward<4)continue;const cross=key<3?Math.abs(dx):Math.abs(dy);const candidate=forward+cross*2.5;if(candidate<score){best=node;score=candidate;}}
-    best?.focus();best?.scrollIntoView({block:'nearest',inline:'nearest'});
+    // Sideways offset is the gap between the two spans (0 when they overlap), so a small
+    // control just below a wide one is preferred over a centred one further away.
+    const gap=(a0,a1,b0,b1)=>Math.max(0,Math.max(a0,b0)-Math.min(a1,b1));
+    for(const node of nodes){if(node===active)continue;const r=node.getBoundingClientRect();const dx=r.x+r.width/2-x,dy=r.y+r.height/2-y;const forward=key===1?-dy:key===2?dy:key===3?-dx:dx;if(forward<4)continue;const cross=key<3?gap(rect.left,rect.right,r.left,r.right):gap(rect.top,rect.bottom,r.top,r.bottom);const candidate=forward+cross*2.5;if(candidate<score){best=node;score=candidate;}}
+    return best;
+  }
+  function adjust(node,step){
+    if(node instanceof HTMLSelectElement){const count=node.options.length;if(!count)return;node.selectedIndex=(node.selectedIndex+step+count)%count;node.dispatchEvent(new Event('change',{bubbles:true}));}
+    else if(node.type==='range'){const value=Math.min(Number(node.max),Math.max(Number(node.min),Number(node.value)+step*5));node.value=String(value);node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));}
+  }
+  function back(){
+    const creator=root.querySelector('.figure-creator');
+    if(!creator.hidden&&creator.contains(document.activeElement)){creator.hidden=true;focus(root.querySelector('[data-add]'));return;}
+    if(openPanel()?.contains(document.activeElement)){focus(currentTab());return;}
+    send('close');
+  }
+  function navigate(key){
+    if(key===6){send('close');return;}
+    if(key===7){back();return;}
+    if(key===8||key===9){const list=tabs();const index=list.indexOf(currentTab());openTab(list[(index+(key===9?1:list.length-1))%list.length]);enterPanel();return;}
+    const active=document.activeElement;const inRail=!!active?.closest('.rail');const area=openPanel();
+    if(!active||active===document.body||!root.contains(active)){focus(currentTab());return;}
+    if(inRail){
+      if(key===1||key===2){const list=tabs();const index=list.indexOf(active);openTab(list[Math.min(list.length-1,Math.max(0,index+(key===2?1:-1)))]);return;}
+      if(key===4||key===5){if(key===5)active.click();enterPanel();return;}
+      return;
+    }
+    const value=active instanceof HTMLSelectElement||active.type==='range';
+    if(key===5){if(active instanceof HTMLSelectElement)adjust(active,1);else active.click();return;}
+    if(value&&(key===3||key===4)){adjust(active,key===4?1:-1);return;}
+    const next=area?nearest(targets(area),active,key):null;
+    if(next){focus(next);return;}
+    if(key===3)focus(currentTab()); // past the panel's left edge: back to its tab
   }
   root.querySelectorAll('[data-view]').forEach(node=>node.onclick=()=>{ui.view=node.dataset.view;if(node.dataset.page)ui.page=node.dataset.page;render();});
   root.querySelectorAll('[data-close]').forEach(node=>node.onclick=()=>{ui.view='none';render();});
@@ -102,7 +141,14 @@
   root.querySelector('#trap-demo-fps').onchange=event=>{ui.dirty=true;send('fps',event.target.selectedIndex);};
   root.querySelector('#trap-demo-audio').oninput=event=>{ui.dirty=true;root.querySelector('[data-volume]').textContent=event.target.value+'%';send('volume',event.target.value);};
   root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('.check input').checked),Number(ui.snapshot?.settings?.counter??true),root.querySelector('#trap-demo-pad').selectedIndex,root.querySelector('#trap-demo-glyphs').selectedIndex);
-  document.addEventListener('keydown',event=>{if(['Escape','F6','Insert'].includes(event.key)){event.preventDefault();send('close');return;}const keys={ArrowUp:1,ArrowDown:2,ArrowLeft:3,ArrowRight:4};if(keys[event.key]&&!(event.target instanceof HTMLInputElement)&&!(event.target instanceof HTMLSelectElement)){event.preventDefault();navigate(keys[event.key]);}});
+  document.addEventListener('keydown',event=>{
+    if(['F6','Insert'].includes(event.key)){event.preventDefault();send('close');return;}
+    if(event.key==='Escape'){event.preventDefault();navigate(7);return;}
+    if(event.key==='PageUp'||event.key==='PageDown'){event.preventDefault();navigate(event.key==='PageDown'?9:8);return;}
+    const keys={ArrowUp:1,ArrowDown:2,ArrowLeft:3,ArrowRight:4};
+    if(keys[event.key]&&!event.target.matches?.('[data-search]')){event.preventDefault();navigate(keys[event.key]);}
+  });
+  document.addEventListener('pointerdown',()=>root.classList.remove('pad-focus'));
   window.portalReceive=receive;window.portalNavigate=navigate;
   icon();
   new QWebChannel(qt.webChannelTransport,channel=>{bridge=channel.objects.portal;bridge.changed.connect(receive);bridge.ready();bridge.snapshot(receive);});
