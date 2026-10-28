@@ -85,18 +85,29 @@ def overlay_pci_configuration(directory, pci_device):
     return path
 
 
+RENDERER_OPTION = 'SKY_RENDERER_'
+# The renderer still reads its options under this prefix; the host maps
+# SKY_RENDERER_* onto it (native/renderer_adapter.cpp). Accepted here as a
+# deprecated spelling for one transition.
+LEGACY_RENDERER_OPTION = 'BB_'
+# The renderer's settings file inside the GPU user directory.
+RENDERER_SETTINGS = 'bbport.ini'
+
+
 def renderer_environment(environment, idle='adaptive'):
     """Keep guest filtering unless requested; sleeping preserves work/notifications."""
     result = dict(environment)
-    result.setdefault('BB_ANISO','0')
+    for key in [k for k in result if k.startswith(LEGACY_RENDERER_OPTION)]:
+        result.setdefault(RENDERER_OPTION + key[len(LEGACY_RENDERER_OPTION):], result.pop(key))
+    result.setdefault('SKY_RENDERER_ANISO','0')
     # The native host already paces guest submissions. Avoid re-quantizing
     # completed frames to an independent software vblank phase. Hardware FIFO
     # retains tear-free output; nonzero guest flip intervals remain honored.
-    result.setdefault('BB_PRESENT_AS_READY','1')
-    result.setdefault('BB_PRESENT_MODE','Fifo')
+    result.setdefault('SKY_RENDERER_PRESENT_AS_READY','1')
+    result.setdefault('SKY_RENDERER_PRESENT_MODE','Fifo')
     if idle == 'sleep':
-        result['BB_GPU_SPIN_US'] = '0'
-        result['BB_PIPE_SPIN_US'] = '0'
+        result['SKY_RENDERER_GPU_SPIN_US'] = '0'
+        result['SKY_RENDERER_PIPE_SPIN_US'] = '0'
     elif idle != 'adaptive':
         raise ValueError('unknown renderer idle policy')
     return result
@@ -376,11 +387,11 @@ def main(argv=None):
                 'SKY_FPS_COUNTER': '1' if args.fps_counter else '0'})
     if args.manual_phase_cap: env['SKY_EXTERNAL_FRAME_CAP'] = '1'
     else: env.pop('SKY_EXTERNAL_FRAME_CAP',None)
-    env.setdefault('BB_FPS_LIMIT','0')
+    env.setdefault('SKY_RENDERER_FPS_LIMIT','0')
     if args.memory_mode == 'compact':
         env.setdefault('MALLOC_ARENA_MAX','4')
         env.setdefault('MALLOC_TRIM_THRESHOLD_','262144')
-        env['BB_TRIM_SHADER_WARMUP']='1'
+        env['SKY_RENDERER_TRIM_SHADER_WARMUP']='1'
     window = args.window_resolution or args.resolution
     if window:
         env['SKY_WINDOW_SIZE'] = 'x'.join(map(str, PRESETS[window]))
@@ -404,20 +415,20 @@ def main(argv=None):
         env['SKY_TIMING_TRACE'] = '1'
     if args.profile:
         env['SKY_FRAME_PROFILE'] = str(session/'frame-profile.csv')
-        env['BB_FRAME_STATS'] = '1'
-        env['BB_FRAME_LOG'] = str(session/'frames.csv')
+        env['SKY_RENDERER_FRAME_STATS'] = '1'
+        env['SKY_RENDERER_FRAME_LOG'] = str(session/'frames.csv')
     if args.cold_cache:
         # Renderer settings are kept; only compiled shader/pipeline caches start empty.
         cold = session/'gpu-user'
         cold.mkdir()
-        settings = ROOT/'out/native-gpu-user/bbport.ini'
+        settings = ROOT/'out/native-gpu-user'/RENDERER_SETTINGS
         if settings.is_file():
-            (cold/'bbport.ini').write_bytes(settings.read_bytes())
+            (cold/RENDERER_SETTINGS).write_bytes(settings.read_bytes())
         env['SKY_GPU_USER_DIR'] = str(cold)
         env['__GL_SHADER_DISK_CACHE_PATH'] = str(session/'driver-shader-cache')
         env['MESA_SHADER_CACHE_DIR'] = str(session/'driver-shader-cache')
     if args.present_limit is not None:
-        env['BB_FPS_LIMIT'] = args.present_limit
+        env['SKY_RENDERER_FPS_LIMIT'] = args.present_limit
     command = [str(host), '--trace-start', *map(str, files),
                str(game_root)]
     if args.mangohud:
@@ -426,7 +437,7 @@ def main(argv=None):
             'SKY_TLS_BRIDGE',
             'SKY_LEVEL_EVENT_MAILBOX','SKY_FRAME_POLICY','SKY_MANUAL_FRAME_LIMIT','SKY_AUTO_FRAME_POLICY_AVAILABLE',
             'SKY_VIRTUAL_PORTAL', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
-            'SKY_FRAME_PROFILE', 'BB_FRAME_STATS', 'BB_FRAME_LOG', 'SKY_GPU_USER_DIR',
+            'SKY_FRAME_PROFILE', 'SKY_RENDERER_FRAME_STATS', 'SKY_RENDERER_FRAME_LOG', 'SKY_GPU_USER_DIR',
             '__GL_SHADER_DISK_CACHE_PATH', 'MESA_SHADER_CACHE_DIR',
             'SKY_ALLOW_INCOMPLETE_PIPELINES', 'SKY_TRAP_PHASE_PROBE', 'SKY_TRAP_CLOCK_PROBE',
             'SKY_PORTAL_VOLUME','SKY_CONTROLLER_LAYOUT','SKY_FRAME_LIMIT','SKY_FULLSCREEN','SKY_FPS_COUNTER','SKY_PC_RESOLUTION','SKY_PC_QUALITY')
@@ -453,7 +464,7 @@ def main(argv=None):
                 'sha256': {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                            for path in [host, *files]},
                 'diagnostic_environment': {k: env[k] for k in keys if k in env},
-                'renderer_environment': {k: v for k, v in env.items() if k.startswith('BB_')},
+                'renderer_environment': {k: v for k, v in env.items() if k.startswith(RENDERER_OPTION)},
                 'overlay_environment': {k: env[k] for k in ('MANGOHUD', 'MANGOHUD_CONFIG', 'MANGOHUD_CONFIGFILE', 'DISABLE_MANGOHUD') if k in env},
                 'graphics_environment': {k: env[k] for k in ('VK_DRIVER_FILES', 'VK_ICD_FILENAMES') if k in env},
                 'overlay_configuration': {'path': env['MANGOHUD_CONFIGFILE'],

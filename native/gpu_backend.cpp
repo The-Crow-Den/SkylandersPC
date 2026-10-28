@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "gpu_backend.hpp"
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
 #include "window_icon.hpp"
 #endif
 #include "thread_context.hpp"
@@ -26,19 +26,15 @@
 #include <unordered_map>
 #include <signal.h>
 
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
 #include <csetjmp>
 #include <pthread.h>
-#include "bbgpu.h"
+#include "renderer_adapter.hpp"
 #include <SDL3/SDL.h>
 extern "C" {
 #include "runtime.h"
 }
 
-extern "C" void bbgpu_pc_menu_toggle() __attribute__((weak));
-namespace BbGnm {
-std::uint32_t sceGnmDrawInitDefaultHardwareState(std::uint32_t*, std::uint32_t);
-}
 namespace {
 using U = std::uint64_t;
 KernelClock gpu_clock;
@@ -128,7 +124,7 @@ void update_gamepad(const SDL_Event* event = nullptr) {
     controller_families[slot].store(family);
     KeyboardPad::PhysicalState state;
     state.connected = physical_gamepad && SDL_GamepadConnected(physical_gamepad);
-    if (state.connected && !bbgpu_overlay_captures_input()) {
+    if (state.connected && !Renderer::overlay_captures_input()) {
         constexpr std::pair<SDL_GamepadButton, std::uint32_t> buttons[]{
             {SDL_GAMEPAD_BUTTON_SOUTH,0x4000}, {SDL_GAMEPAD_BUTTON_EAST,0x2000},
             {SDL_GAMEPAD_BUTTON_WEST,0x8000}, {SDL_GAMEPAD_BUTTON_NORTH,0x1000},
@@ -167,14 +163,14 @@ int keyboard_event(const void* raw_event, void*) {
         else if(event.user.code==5 || event.user.code==10)PortalLibrary::create_character(index,true,event.user.code==10?1:0);
         else if(event.user.code==12)PortalLibrary::select_empty_trap(index);
         else if(event.user.code==7 || event.user.code==9)PortalLibrary::remove(event.user.code==7?3:2);
-        else if(event.user.code==20){if(bbgpu_overlay_captures_input()&&bbgpu_pc_menu_toggle)bbgpu_pc_menu_toggle();}
+        else if(event.user.code==20){if(Renderer::overlay_captures_input())Renderer::toggle_menu();}
         else if(event.user.code==21){SDL_Event quit{};quit.type=SDL_EVENT_QUIT;SDL_PushEvent(&quit);}
         return 1;
     }
     if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
-        (event.key.scancode == SDL_SCANCODE_F6 || event.key.scancode == SDL_SCANCODE_INSERT) && bbgpu_pc_menu_toggle) {
+        (event.key.scancode == SDL_SCANCODE_F6 || event.key.scancode == SDL_SCANCODE_INSERT) && Renderer::has_menu_toggle()) {
         pressed_keys.fill(false); keyboard_pad->release_keys();
-        bbgpu_pc_menu_toggle(); return 1;
+        Renderer::toggle_menu(); return 1;
     }
     if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
         event.key.scancode == SDL_SCANCODE_F1 && (event.key.mod & SDL_KMOD_SHIFT) &&
@@ -182,7 +178,7 @@ int keyboard_event(const void* raw_event, void*) {
         sky_pc_set_frame_limit(sky_pc_frame_limit() == 30 ? 60 : 30);
         return 1;
     }
-    if (bbgpu_overlay_captures_input()) {
+    if (Renderer::overlay_captures_input()) {
         pressed_keys.fill(false); keyboard_pad->release_keys();
         if (event.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && event.type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) update_gamepad(&event);
         return 0; // The renderer routes this event into the PC menu.
@@ -293,7 +289,7 @@ const GpuContract* contract(std::string_view identity) {
     const auto found = index.find(identity);
     return found == index.end() ? nullptr : found->second;
 }
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
 const char* media_symbol(const char* identity) {
     const auto* item = contract(identity);
     return item && item->provider ? item->symbol : nullptr;
@@ -302,15 +298,15 @@ const char* media_symbol(const char* identity) {
 }
 namespace SkyGpu {
 bool captures_input() {
-#ifdef SKY_BBPORT_GPU
-    return presenter_ready && bbgpu_overlay_captures_input();
+#ifdef SKY_RENDERER
+    return presenter_ready && Renderer::overlay_captures_input();
 #else
     return false;
 #endif
 }
 
 void bind_portal(void (*load)(const char*), void (*remove)(),void (*trap)(const char*),void (*remove_trap)()) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     portal_load=load; portal_remove=remove;
     portal_trap=trap;portal_remove_trap=remove_trap;
 #else
@@ -318,7 +314,7 @@ void bind_portal(void (*load)(const char*), void (*remove)(),void (*trap)(const 
 #endif
 }
 void bind_keyboard(KeyboardPad* pad) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     keyboard_pad = pad;
     if(pad)for(unsigned slot=0;slot<2;++slot)pad->bind_rumble([slot](unsigned char large,unsigned char small){
         std::lock_guard guard(gamepad_mutex);
@@ -326,27 +322,27 @@ void bind_keyboard(KeyboardPad* pad) {
         return controller && SDL_GamepadConnected(controller) &&
             SDL_RumbleGamepad(controller,static_cast<Uint16>(large*257u),static_cast<Uint16>(small*257u),1000);
     },slot);
-    bbgpu_add_event_filter(&keyboard_event);
+    Renderer::add_event_filter(&keyboard_event);
 #else
     (void)pad;
 #endif
 }
 void prepare_cpu_write(std::uint64_t address, std::uint64_t size) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     if (address && size) runtime_memory_prepare_cpu_write(address, size);
 #else
     (void)address; (void)size;
 #endif
 }
 void note_cpu_write(std::uint64_t address, std::uint64_t size) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     if (address && size) runtime_memory_note_write(address, size);
 #else
     (void)address; (void)size;
 #endif
 }
 void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attributes) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     game_serial = serial; sdk_version = sdk; psf_attributes = attributes;
     PortalLibrary::initialize(std::getenv("SKY_PORTAL_FIGURE"));
     VirtualPortal::bind_audio(&portal_speaker);
@@ -356,49 +352,50 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
     const auto* user_directory = std::getenv("SKY_GPU_USER_DIR");
     gpu_user_directory = std::filesystem::absolute(user_directory && *user_directory ? user_directory : "out/native-gpu-user").string();
     std::filesystem::create_directories(gpu_user_directory);
-    setenv("BB_GPU_USER_DIR", gpu_user_directory.c_str(), 1);
-    setenv("BB_CONFIG", (gpu_user_directory + "/bbport.ini").c_str(), 1);
-    setenv("BB_GAME_PROFILE", "none", 1);
-    setenv("BB_GAME_MENU", "0", 1);
+    Renderer::set_option("GPU_USER_DIR", gpu_user_directory.c_str(), true);
+    Renderer::set_option("CONFIG", (gpu_user_directory + "/" + Renderer::settings_file).c_str(), true);
+    Renderer::set_option("GAME_PROFILE", "none", true);
+    Renderer::set_option("GAME_MENU", "0", true);
     setenv("SKY_PC_MENU", "1", 1);
-    setenv("BB_NATIVE_MOUSE", "0", 1);
-    setenv("BB_FREE_MOUSE", "1", 1);
-    setenv("BB_CURSOR", "0", 1);
-    setenv("BB_UPSCALER", "off", 1);
-    setenv("BB_OBJECT_MOTION", "0", 1);
-    setenv("BB_FRAME_GEN", "0", 1);
-    setenv("BB_SUBMIT_LOCK", "gpu", 1);
-    // The external renderer defaults to forced 16x filtering for Bloodborne.
-    // Preserve this title's own samplers unless the user explicitly overrides.
-    setenv("BB_ANISO", "0", 0);
-    std::printf("Texture filtering: BB_ANISO=%s (0 preserves game samplers)\n",std::getenv("BB_ANISO"));
+    Renderer::set_option("NATIVE_MOUSE", "0", true);
+    Renderer::set_option("FREE_MOUSE", "1", true);
+    Renderer::set_option("CURSOR", "0", true);
+    Renderer::set_option("UPSCALER", "off", true);
+    Renderer::set_option("OBJECT_MOTION", "0", true);
+    Renderer::set_option("FRAME_GEN", "0", true);
+    Renderer::set_option("SUBMIT_LOCK", "gpu", true);
+    // The renderer defaults to forced 16x filtering, which this title does not
+    // use. Preserve its own samplers unless the user explicitly overrides.
+    Renderer::set_option("ANISO", "0", false);
+    std::printf("Texture filtering: SKY_RENDERER_ANISO=%s (0 preserves game samplers)\n",Renderer::option("ANISO"));
     const auto* incomplete=std::getenv("SKY_ALLOW_INCOMPLETE_PIPELINES");
     const bool skip_draws=incomplete && std::strcmp(incomplete,"1")==0;
-    setenv("BB_ASYNC_PIPELINES",skip_draws?"1":"0",1);
-    setenv("BB_PIPELINE_CACHE","1",1);
+    Renderer::set_option("ASYNC_PIPELINES",skip_draws?"1":"0",true);
+    Renderer::set_option("PIPELINE_CACHE","1",true);
     std::printf("Renderer: pipeline cache on; incomplete pipeline draw skipping %s\n",skip_draws?"enabled (diagnostic)":"disabled");
     if (const char* timing = std::getenv("SKY_TIMING_TRACE"); timing && std::strcmp(timing, "1") == 0) {
-        setenv("BB_FRAME_STATS", "1", 1);
-        setenv("BB_AUDIO_STATS", "1", 1);
+        Renderer::set_option("FRAME_STATS", "1", true);
+        Renderer::set_option("AUDIO_STATS", "1", true);
         std::printf("{\"event\":\"timing-diagnostics\",\"enabled\":true,\"changes_frame_limit\":false}\n");
     }
-    bbgpu_register_kernel();
+    Renderer::export_options();
+    Renderer::register_kernel();
 #else
     (void)serial; (void)sdk; (void)attributes;
 #endif
 }
 bool handle_fault(int signal, void* info, void* context) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     if (signal != SIGSEGV && signal != SIGBUS) return false;
     if (runtime_fault_recover) siglongjmp(*runtime_fault_recover, 1);
-    return presenter_ready && bbgpu_handle_fault(context, static_cast<siginfo_t*>(info)->si_addr);
+    return presenter_ready && Renderer::handle_fault(context, static_cast<siginfo_t*>(info)->si_addr);
 #else
     (void)signal; (void)info; (void)context;
     return false;
 #endif
 }
 bool enabled() noexcept {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     return true;
 #else
     return false;
@@ -414,9 +411,9 @@ unsigned stack_arguments(std::string_view identity) noexcept {
     return item && item->parameters > 6 ? item->parameters - 6 : 0;
 }
 std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     if(identity=="yvZ73uQUqrk#libSceGnmDriver#libSceGnmDriver")
-        GameHooks::frame(bbgpu_overlay_captures_input()!=0);
+        GameHooks::frame(Renderer::overlay_captures_input());
     if (identity == "rVjRvHJ0X6c#libkernel#libkernel") return memory_call(identity, a);
     if (identity == "i6-sR91Wt-4#libSceVideoOut#libSceVideoOut") {
         const auto width = static_cast<std::uint32_t>(a[4]);
@@ -433,7 +430,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
     // Interface: https://ps4-opengnm.github.io/opengnm/reference/driver/
     if (identity == "jg33rEKLfVs#libSceGnmDriver#libSceGnmDriver") return 0;
     if (identity == "Idffwf3yh8s#libSceGnmDriver#libSceGnmDriver")
-        return BbGnm::sceGnmDrawInitDefaultHardwareState(reinterpret_cast<std::uint32_t*>(a[0]), static_cast<std::uint32_t>(a[1]));
+        return Renderer::draw_init_default_hardware_state(reinterpret_cast<std::uint32_t*>(a[0]), static_cast<std::uint32_t>(a[1]));
     if (identity == "Up36PTk687E#libSceVideoOut#libSceVideoOut") {
         std::call_once(presenter_once, [] {
             std::int32_t window_width = 1280, window_height = 720;
@@ -452,9 +449,9 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
             SDL_SetHint(SDL_HINT_APP_ID,"org.skylanders.PS4Native");
             const auto* build = GameHooks::active();
             const auto title = build ? std::string(build->window_title) : "PS4 native runtime — " + game_serial;
-            const BbGpuConfig config{title.c_str(), game_serial.c_str(), gpu_user_directory.c_str(),
+            const Renderer::WindowConfig config{title.c_str(), game_serial.c_str(), gpu_user_directory.c_str(),
                 sdk_version, psf_attributes, window_width, window_height};
-            if (bbgpu_init(&config)) throw std::runtime_error("Vulkan presenter initialization failed");
+            if (!Renderer::init(config)) throw std::runtime_error("Vulkan presenter initialization failed");
             apply_window_icon();
             if (const auto* fullscreen = std::getenv("SKY_FULLSCREEN"); fullscreen && !std::strcmp(fullscreen,"1")) {
                 int count=0; auto** windows=SDL_GetWindows(&count);
@@ -485,7 +482,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
     auto function = cached.load(std::memory_order_relaxed);
     if (!function) {
         function = item->provider == 1 ? runtime_ajm_resolve(item->identity.data()) :
-            item->provider == 2 ? runtime_audio_resolve(item->identity.data()) : bbgpu_resolve(item->identity.data());
+            item->provider == 2 ? runtime_audio_resolve(item->identity.data()) : Renderer::resolve(item->identity.data());
         if (function) cached.store(function, std::memory_order_relaxed);
     }
     if (!function) throw std::runtime_error("scoped GPU provider is missing");
@@ -497,7 +494,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
     throw std::runtime_error("unsupported GPU import");
 }
 std::uint64_t memory_call(std::string_view identity, const std::uint64_t* a) {
-#ifdef SKY_BBPORT_GPU
+#ifdef SKY_RENDERER
     // Canonical identities are checked before the reference's broader resolver.
     std::size_t operation = 0;
     while (operation < memory_symbols.size() && identity != memory_symbols[operation].identity) ++operation;

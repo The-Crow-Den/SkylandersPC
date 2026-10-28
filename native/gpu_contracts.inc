@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Interface facts audited against supplied bbport commit 8185b88d80573fa300595d5c54450183b4109935.
+// Interface facts audited against supplied renderer upstream commit 8185b88d80573fa300595d5c54450183b4109935.
 // Scalar integer/pointer SysV ABI only. Stub table entries and workload placeholders are excluded.
     {"b0xyllnVY-I#libSceGnmDriver#libSceGnmDriver", 3, false}, // sceGnmAddEqEvent
     {"b08AgtPlHPg#libSceGnmDriver#libSceGnmDriver", 0, false}, // sceGnmAreSubmitsAllowed

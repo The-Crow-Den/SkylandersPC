@@ -5,7 +5,7 @@
 #include <string>
 class KeyboardPad;
 
-// Optional, privately built GPL bbport GPU/memory component. Unknown APIs stop.
+// Optional, privately built GPL renderer/memory component. Unknown APIs stop.
 namespace SkyGpu {
 bool captures_input();
 bool enabled() noexcept;

@@ -65,7 +65,7 @@ resolved/pending import records and relocation-site counts separately.
 | Bridge | `guest_start.*`, `bridge_features.cpp` | Guest/host FS (TLS) switching, calls, callbacks, thread exit |
 | Threads | `thread_context.*`, `hle/kernel_thread.*` | Guest stacks, TCB/DTV, per-thread TLS blocks |
 | Services | `hle/*` | Exact-NID HLE services; unknown imports terminate with a report |
-| Graphics/audio | `gpu_backend.*` | Optional pinned bbport component (`SKY_BBPORT_GPU`) |
+| Graphics/audio | `gpu_backend.*` | Optional renderer component (`SKY_RENDERER`; library calls go through `renderer_adapter.*`) |
 | Game hooks | `game_hooks.*`, `trap_team_hooks.*` | Exact-build (executable SHA-256) game-specific probes |
 
 Game-specific host code must go through `GameHooks`. A hook activates only when

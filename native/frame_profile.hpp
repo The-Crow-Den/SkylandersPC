@@ -2,7 +2,7 @@
 #pragma once
 // Opt-in per-frame guest profile (SKY_FRAME_PROFILE=path). Writes one CSV row
 // per guest flip: game-thread CPU time and time spent inside host services,
-// keyed by CLOCK_MONOTONIC microseconds like the renderer's BB_FRAME_LOG.
+// keyed by CLOCK_MONOTONIC microseconds like the renderer's frame log (SKY_RENDERER_FRAME_LOG).
 // Disabled, every entry point is a single predictable branch.
 #include <cstdint>
 
