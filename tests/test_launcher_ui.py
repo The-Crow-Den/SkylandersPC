@@ -209,16 +209,17 @@ class LauncherUITests(unittest.TestCase):
 
     def test_extractor_success_and_matching_update(self):
         tool=self.extractor('import sys,json,base64\nfrom pathlib import Path\n'
-            'out=Path(sys.argv[2]);(out/"sce_sys").mkdir()\n'
+            'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'
             '(out/"sce_sys/param.sfo").write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))\n'
             '(out/"eboot.bin").write_bytes(b"synthetic")\nprint("Synthetic extraction complete")\n')
         self.window.select_game('trap-team');dialog=InstallDialog(self.window)
-        dialog.fields['extractor'].setText(str(tool))
+        self.assertNotIn('extractor',dialog.fields)
         for key,cat,ver in [('game_pkg','gd','01.00'),('update_pkg','gp','01.01')]:
             pkg=self.root/(key+'.pkg')
             pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY=cat,APP_VER=ver,CONTENT_ID='test'))).decode())
             dialog.fields[key].setText(str(pkg))
-        dialog.begin();self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
+        self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
         self.assertEqual(len(self.window.game['installed_paths']),2)
         self.assertFalse(self.window.play.isEnabled()) # no prepared runtime
         dialog.close()
@@ -227,15 +228,17 @@ class LauncherUITests(unittest.TestCase):
         tool=self.extractor('import sys\nprint("synthetic failure")\nsys.exit(7)\n')
         pkg=self.root/'base.pkg';pkg.write_bytes(b'synthetic')
         dialog=InstallDialog(self.window)
-        dialog.fields['extractor'].setText(str(tool));dialog.fields['game_pkg'].setText(str(pkg))
-        dialog.begin();self.wait(lambda: 'exit 7' in dialog.output.toPlainText())
+        dialog.fields['game_pkg'].setText(str(pkg))
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
+        self.wait(lambda: 'exit 7' in dialog.output.toPlainText())
         self.assertNotIn('installed_paths',self.window.game);dialog.close()
 
     def test_cancel_reaps_extractor_without_publishing(self):
         tool=self.extractor('import time\ntime.sleep(30)\n')
         pkg=self.root/'base.pkg';pkg.write_bytes(b'synthetic')
         dialog=InstallDialog(self.window)
-        dialog.fields['extractor'].setText(str(tool));dialog.fields['game_pkg'].setText(str(pkg))
-        dialog.begin();dialog.reject();self.wait(lambda: dialog.process is None)
+        dialog.fields['game_pkg'].setText(str(pkg))
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
+        dialog.reject();self.wait(lambda: dialog.process is None)
         self.assertIn('cancelled',dialog.output.toPlainText())
         self.assertNotIn('installed_paths',self.window.game);dialog.close()

@@ -8,7 +8,8 @@ copyright ownership is claimed.
 
 File-specific notices take precedence for these components:
 
-- `native/dependency-patches/` and `tools/controller_glyphs.py` retain the adopted
+- `native/dependency-patches/`, `tools/controller_glyphs.py`, `tools/pkg_extract.py` and
+  `tools/pkg_entry_names.json` retain the adopted
   GPL-2.0-or-later component terms. Their code may be combined under the GPL v3
   option; their upstream notices must remain intact.
 - `native/hle/portal_library_adapter.cpp` is MPL-2.0. The separately supplied Cemu

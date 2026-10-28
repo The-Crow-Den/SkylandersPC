@@ -1,0 +1,52 @@
+{
+  "component": "shadPS4 PKG/PFS extractor",
+  "commit": "99332e4ec281dc6541948cd94c8f7dad83dacee4",
+  "license": "GPL-2.0-or-later",
+  "keys": {
+    "path": "src/core/crypto/keys.h",
+    "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/crypto/keys.h",
+    "sha256": "44a738064e208e0349f161afe58bf13e1a8ab7653f09f6f7fd370c9ee6417e2b"
+  },
+  "files": [
+    {
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/LICENSE",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "path": "src/core/file_format/pkg.cpp",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/file_format/pkg.cpp",
+      "sha256": "96c181e4da09b476b7c09184bef8d4e0efb1a58182406bae46d5f14e313fd107"
+    },
+    {
+      "path": "src/core/file_format/pkg.h",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/file_format/pkg.h",
+      "sha256": "bdd1298adc40efa291de90e6c4460d1bf78ac9f26a5fce442d825059d715506d"
+    },
+    {
+      "path": "src/core/file_format/pfs.h",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/file_format/pfs.h",
+      "sha256": "db5ad836310acf543f21b951190ec4be58be1dca7d8434daa4eed577ef982590"
+    },
+    {
+      "path": "src/core/crypto/crypto.cpp",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/crypto/crypto.cpp",
+      "sha256": "459b6cf65d17b3d069924bbfc0a4d0ff40ef1dad1b14e2938b964d18e783348d"
+    },
+    {
+      "path": "src/core/crypto/crypto.h",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/crypto/crypto.h",
+      "sha256": "1ffdd7d4bf13aba566809acd6c5c9c117176b032d329d9ff3c6c98962aecbb92"
+    },
+    {
+      "path": "src/core/file_format/pkg_type.cpp",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/file_format/pkg_type.cpp",
+      "sha256": "e79609f587681eb61c236a1fe2d038d42116aceb533ad7daecde4be2c38cad6d"
+    },
+    {
+      "path": "src/core/file_format/pkg_type.h",
+      "url": "https://raw.githubusercontent.com/shadps4-emu/shadPS4/99332e4ec281dc6541948cd94c8f7dad83dacee4/src/core/file_format/pkg_type.h",
+      "sha256": "ab925041145177ee960af02b2ccf4a163a5dc8d398e71decb70661d1bf1a025e"
+    }
+  ]
+}

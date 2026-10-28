@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Responsive, sequential PKG extraction using the supplied standalone tool."""
-import os
+"""Responsive, sequential PKG extraction using the built-in Python extractor."""
+import sys
 from pathlib import Path
 import uuid
 from PyQt6.QtCore import QProcess
@@ -22,13 +22,12 @@ class InstallDialog(QDialog):
                       'Extraction does not prepare the native runtime or verify gameplay.')
         note.setWordWrap(True); column.addWidget(note)
         form = QFormLayout(); column.addLayout(form); self.fields = {}
-        for key,title,initial in [('extractor','Package extractor',owner.library.get('extractor',str(packages.DEFAULT_EXTRACTOR))),
-                                  ('game_pkg','Game PKG',self.game['game_pkg']),
+        for key,title,initial in [('game_pkg','Game PKG',self.game['game_pkg']),
                                   ('update_pkg','Update PKG (optional)',self.game['update_pkg'])]:
             row = QHBoxLayout(); field=QLineEdit(initial); self.fields[key]=field; row.addWidget(field)
             button=QPushButton('Browse…'); row.addWidget(button)
             def browse(checked=False,key=key,field=field):
-                path,_=QFileDialog.getOpenFileName(self,'Select '+key,'','All files (*)' if key=='extractor' else 'PS4 packages (*.pkg)')
+                path,_=QFileDialog.getOpenFileName(self,'Select '+key,'','PS4 packages (*.pkg)')
                 if path: field.setText(path)
             button.clicked.connect(browse); form.addRow(title,row)
         self.output=QTextEdit();self.output.setReadOnly(True);self.output.document().setMaximumBlockCount(1500);column.addWidget(self.output)
@@ -37,9 +36,6 @@ class InstallDialog(QDialog):
         self.cancel=QPushButton('Close');self.cancel.clicked.connect(self.reject);actions.addWidget(self.cancel)
 
     def begin(self):
-        extractor=Path(self.fields['extractor'].text().strip())
-        if not extractor.is_file() or not os.access(extractor,os.X_OK):
-            QMessageBox.warning(self,'Extractor unavailable','Choose an executable ps4-pkg-tool.');return
         jobs=[]
         for key,kind in [('game_pkg','base'),('update_pkg','update')]:
             path=self.fields[key].text().strip()
@@ -48,8 +44,8 @@ class InstallDialog(QDialog):
                     QMessageBox.warning(self,'Invalid package','Choose an existing .pkg file for '+kind);return
                 jobs.append((kind,str(Path(path).resolve())))
         self.game.update({key:self.fields[key].text().strip() for key in ('game_pkg','update_pkg')})
-        self.owner.library['extractor']=str(extractor.resolve());self.owner.persist()
-        self.extractor=str(extractor.resolve());self.jobs=jobs
+        self.owner.persist()
+        self.extractor=packages.BUILTIN_EXTRACTOR;self.jobs=jobs
         self.staging=self.owner.root / '.local/pkg-imports' / uuid.uuid4().hex
         try: self.staging.mkdir(parents=True)
         except OSError as error:
@@ -70,16 +66,13 @@ class InstallDialog(QDialog):
             except (OSError,ValueError) as error: self.fail(str(error))
             return
         kind,path=self.jobs.pop(0);target=self.staging / kind
-        try: target.mkdir()
-        except OSError as error:
-            self.fail(str(error)); return
         self.output.append('Extracting '+kind+' package…\nOutput: '+str(target))
         process=QProcess(self);self.process=process
         process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         process.readyReadStandardOutput.connect(self.read_output)
         process.finished.connect(self.finished)
         process.errorOccurred.connect(self.error)
-        process.start(self.extractor,[path,str(target)])
+        process.start(sys.executable,['-u',str(self.extractor),path,str(target)])
 
     def read_output(self):
         if self.process:

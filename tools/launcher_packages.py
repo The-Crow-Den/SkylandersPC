@@ -10,7 +10,7 @@ except ImportError:
     from workspace import read_sfo
     from game_install import version
 
-DEFAULT_EXTRACTOR = Path('/home/temp/Downloads/ps4-pkg-tools-Linux/ps4-pkg-tool')
+BUILTIN_EXTRACTOR = Path(__file__).resolve().with_name('pkg_extract.py')
 
 
 def extracted_root(directory):
