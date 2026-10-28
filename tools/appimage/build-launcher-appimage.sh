@@ -46,7 +46,53 @@ rm -f "$appdir"/usr/python/lib/python3*/EXTERNALLY-MANAGED
 rm -rf "$appdir"/usr/python/lib/python3*/test "$appdir"/usr/python/lib/python3*/idlelib
 uv pip install --python "$python" --require-hashes --only-binary :all: --link-mode copy \
     --compile-bytecode -r "$here/requirements.txt"
-"$python" -c 'import PyQt6.QtWidgets, PyQt6.QtWebEngineWidgets, cryptography.hazmat.primitives.ciphers'
+
+# Trim to what the launcher uses: QtCore, QtGui and QtWidgets with their platform
+# plugins, and the interpreter without Tk, pip, headers, terminfo or the shared
+# libpython the statically linked python3 does not load.
+python_lib=("$appdir"/usr/python/lib/python3*)
+rm -rf "$appdir"/usr/python/{include,share} "$appdir"/usr/python/lib/{libpython3*,libtcl*,libtk*,tcl*,tk*,itcl*,thread*,pkgconfig} \
+    "${python_lib[0]}"/{tkinter,turtledemo,ensurepip,config-3*} "${python_lib[0]}"/lib-dynload/_tkinter* \
+    "${python_lib[0]}"/site-packages/{pip,pip-*.dist-info}
+find "$appdir/usr/python/bin" -type f ! -name 'python3*' -delete
+find "$appdir/usr/python/bin" -type l ! -name 'python*' -delete
+rm -f "$appdir"/usr/python/bin/python3*-config
+"$python" - "${python_lib[0]}/site-packages/PyQt6" <<'EOF'
+import pathlib, re, shutil, subprocess, sys
+pyqt = pathlib.Path(sys.argv[1]); qt = pyqt / 'Qt6'
+MODULES = {'QtCore', 'QtGui', 'QtWidgets', 'QtDBus'}
+LIBS = re.compile(r'lib(Qt6(Core|Gui|Widgets|DBus|XcbQpa|WaylandClient|WlShellIntegration|Svg|OpenGL)|icu(data|i18n|uc))\.so')
+PLUGINS = {'platforms', 'platformthemes', 'platforminputcontexts', 'imageformats', 'iconengines',
+           'xcbglintegrations', 'wayland-decoration-client', 'wayland-graphics-integration-client',
+           'wayland-shell-integration'}
+for path in pyqt.iterdir():
+    module = path.name.split('.')[0]
+    if path.is_dir() and path.name not in ('Qt6', '__pycache__'):
+        shutil.rmtree(path)
+    elif path.is_file() and module.startswith('Qt') and module not in MODULES:
+        path.unlink()
+for path in qt.iterdir():
+    if path.name not in ('lib', 'plugins'):
+        shutil.rmtree(path) if path.is_dir() else path.unlink()
+for path in (qt / 'lib').iterdir():
+    if not LIBS.match(path.name):
+        shutil.rmtree(path) if path.is_dir() else path.unlink()
+for path in (qt / 'plugins').iterdir():
+    if path.name not in PLUGINS:
+        shutil.rmtree(path)
+# A plugin needing a removed Qt library could never load: drop it, but never a core platform.
+for path in sorted(pyqt.rglob('*.so*')):
+    missing = [line.split()[0] for line in subprocess.run(['ldd', str(path)], capture_output=True, text=True).stdout.splitlines()
+               if 'not found' in line and line.split()[0].startswith(('libQt6', 'libicu'))]
+    if missing:
+        if path.name in ('libqxcb.so', 'libqwayland.so') or 'plugins' not in path.relative_to(pyqt).parts:
+            sys.exit(f'{path} needs removed Qt libraries: {missing}')
+        print('Dropping', path.relative_to(qt), 'needs', ', '.join(missing)); path.unlink()
+EOF
+QT_QPA_PLATFORM=offscreen "$python" -c '
+import cryptography.hazmat.primitives.ciphers
+from PyQt6.QtWidgets import QApplication, QWidget
+app = QApplication([]); QWidget().show(); app.processEvents()'
 
 # Retained notices: the interpreter's licence and each package's dist-info.
 cp "$appdir"/usr/python/lib/python3*/LICENSE.txt "$appdir/usr/share/licenses/CPython-LICENSE.txt"
@@ -91,5 +137,7 @@ fi
 ln -sf org.skylanders.Launcher.png "$appdir/.DirIcon"
 
 ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$cache/appimagetool" --no-appstream \
-    --runtime-file "$cache/runtime" "$appdir" "$output"
+    --runtime-file "$cache/runtime" "$appdir" "$output.part"
+# Renaming keeps a running copy of the previous image intact.
+mv -f "$output.part" "$output"
 echo "Built $output"
