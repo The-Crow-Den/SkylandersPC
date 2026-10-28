@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 import tempfile
 
+# 2: LZMA blocks are stored unpadded (padded streams crashed the game).
+OUTPUT_REVISION=2
+
 
 def digest_file(path):
     value=hashlib.sha256()
@@ -25,7 +28,8 @@ def stage(cache,source_data,recipe,destination,patch):
     cache=Path(cache).absolute()
     if cache.resolve()!=cache or cache.is_symlink():raise ValueError('redirected asset cache')
     cache.mkdir(parents=True,exist_ok=True)
-    key=hashlib.sha256(json.dumps(recipe,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    # OUTPUT_REVISION changes when patch output for the same recipe changes.
+    key=hashlib.sha256(json.dumps(dict(recipe=recipe,output_revision=OUTPUT_REVISION),sort_keys=True,separators=(',',':')).encode()).hexdigest()
     entry=cache/key;data_path=entry/'asset';manifest=entry/'manifest.json';record=None
     if entry.exists():
         try:

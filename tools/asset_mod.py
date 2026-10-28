@@ -123,17 +123,11 @@ def patch_asset(data, recipe):
             check = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
             if check.decompress(compressed, max_length=size + 1) != modified:
                 raise ValueError('asset recompression verification failed')
-            # IGA finds the next block by aligning this encoded length, not
-            # from our recipe's allocation. Preserve at least the original
-            # length when compression improves, so it cannot step into the
-            # allocation's padding and mistake that padding for another block.
-            # With a verified IGA alignment, add padding only if the new
-            # payload would otherwise cross an allocation boundary. Retaining
-            # the entire old length unnecessarily changes known-working files.
-            minimum = allocation - alignment - 6 if alignment is not None else encoded_size
-            stored_size = max(minimum, len(compressed))
-            replacement = (struct.pack('<H', stored_size) + props + compressed +
-                           bytes(stored_size - len(compressed)))
+            # Store the stream at its real length; the following block keeps its
+            # original offset. Zero padding inside the declared length crashed
+            # the US 01.01 game while loading bootstrap.bld (Xbox prompt font,
+            # 2026-10-28), whereas unpadded shorter streams load correctly.
+            replacement = struct.pack('<H', len(compressed)) + props + compressed
             output[at:end] = replacement + bytes(allocation - len(replacement))
         else:
             output[at:at + size] = modified

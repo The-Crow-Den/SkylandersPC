@@ -50,7 +50,7 @@ class AssetModTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'overlap'):
             asset_mod.edits(original, [move, dict(offset=6, expected_hex='4242', replacement_hex='4343')])
 
-    def test_better_compression_preserves_following_archive_block(self):
+    def test_better_compression_is_stored_unpadded_before_following_block(self):
         plain = random.Random(481).randbytes(8192)
         filters = [dict(id=lzma.FILTER_LZMA1, dict_size=32768, lc=3, lp=0, pb=2)]
         encoded = lzma.compress(plain, format=lzma.FORMAT_RAW, filters=filters)
@@ -67,11 +67,13 @@ class AssetModTests(unittest.TestCase):
                                                replacement_hex=bytes(len(plain)).hex())])])
         output, _ = asset_mod.patch_asset(original, recipe)
         stored_size = struct.unpack_from('<H', output)[0]
-        next_offset = (7 + stored_size + 2047) // 2048 * 2048
-        self.assertEqual(stored_size, allocation - 2048 - 6)
-        self.assertEqual(output[next_offset:], following)
+        self.assertLess(7 + stored_size, allocation - 2048)  # shrank by more than a block
+        self.assertEqual(output[7 + stored_size:allocation], bytes(allocation - 7 - stored_size))
+        self.assertEqual(output[allocation:], following)
         decoder = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
         self.assertEqual(decoder.decompress(output[7:7+stored_size]), bytes(len(plain)))
+        self.assertTrue(decoder.eof)  # the declared length ends at the stream's end marker
+        self.assertEqual(decoder.unused_data, b'')
 
     def test_alignment_must_match_original_archive_boundary(self):
         data, recipe, _, _ = fixture()
