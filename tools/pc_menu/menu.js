@@ -80,7 +80,7 @@
   function receive(text){
     let snapshot;try{snapshot=JSON.parse(text);}catch{return;}if(snapshot.version!==1)return;
     const opened=snapshot.visible&&!ui.visible;ui.visible=!!snapshot.visible;
-    if(snapshot.collections){const comparable=JSON.stringify([snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});}
+    if(snapshot.collections){const comparable=JSON.stringify([snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});updateHints();}
     if(snapshot.inputSequence!==ui.sequence){ui.sequence=snapshot.inputSequence;for(const key of snapshot.keys||[])if(key>0)navigate(key);}
     if(opened)setTimeout(enterPanel,0);
   }
@@ -93,8 +93,9 @@
   // The corner X and the search box are mouse/keyboard only: a controller backs out with B.
   const targets=area=>[...area.querySelectorAll('button,input,select')].filter(node=>usable(node)&&!node.matches('[data-close],[data-search]'));
   const hints=root.querySelector('.pad-hints');
-  // Button names follow the "Button icons" setting: 1 PlayStation, 3 Nintendo, otherwise Xbox.
-  const glyphs=()=>({1:{a:'✕',b:'○',lb:'L1',rb:'R1',start:'Options'},3:{a:'B',b:'A',lb:'L',rb:'R',start:'+'}})[ui.snapshot?.settings?.glyphs]||{a:'A',b:'B',lb:'LB',rb:'RB',start:'Start'};
+  // Button names match the prompts the game was started with, so menu and game always agree;
+  // a changed "Button icons" setting takes effect for both after Apply and restart.
+  const glyphs=()=>({xbox:{a:'A',b:'B',lb:'LB',rb:'RB',start:'Start'},nintendo:{a:'B',b:'A',lb:'L',rb:'R',start:'+'}})[ui.snapshot?.settings?.activeGlyphs]||{a:'✕',b:'○',lb:'L1',rb:'R1',start:'Options'};
   const remembered=new Map(); // panel → last focused control, restored by RB
   const identity=node=>node.id||node.getAttribute('aria-label')||node.textContent.trim();
   const panelKey=()=>ui.view==='portal'?'portal':'settings:'+ui.page;
@@ -165,6 +166,7 @@
   root.querySelector('[data-create-figure]').onclick=()=>{const choice=Number(root.querySelector('#trap-create-character').value);if(Number.isInteger(choice)&&choice>=0){send('portal',ui.slot===3?10:5,choice);root.querySelector('.figure-creator').hidden=true;}};
   search.oninput=()=>{figures();icon();};
   root.querySelectorAll('.settings-panel input,.settings-panel select').forEach(node=>node.addEventListener('change',()=>ui.dirty=true));
+  root.querySelector('#trap-demo-glyphs').addEventListener('change',()=>root.querySelector('[data-settings-message]').textContent='Button icons change in the game and this menu after Apply settings and restart.');
   root.querySelector('#trap-demo-fps').onchange=event=>{ui.dirty=true;send('fps',event.target.selectedIndex);};
   root.querySelector('#trap-demo-audio').oninput=event=>{ui.dirty=true;root.querySelector('[data-volume]').textContent=event.target.value+'%';send('volume',event.target.value);};
   root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('.check input').checked),Number(ui.snapshot?.settings?.counter??true),root.querySelector('#trap-demo-pad').selectedIndex,root.querySelector('#trap-demo-glyphs').selectedIndex);
