@@ -95,6 +95,9 @@ if(BUILD_TESTING)
   target_compile_features(pc-settings-test PRIVATE cxx_std_20)
   target_link_libraries(pc-settings-test PRIVATE Threads::Threads)
   add_test(NAME native-pc-settings COMMAND pc-settings-test)
+  add_executable(pc-menu-frame-test tests/test_pc_menu_frame.cpp)
+  target_compile_features(pc-menu-frame-test PRIVATE cxx_std_20)
+  add_test(NAME native-pc-menu-frame COMMAND pc-menu-frame-test)
   find_package(Python3 3.11 COMPONENTS Interpreter REQUIRED)
   add_test(NAME native-pack-loader
            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_loader.py

@@ -5,6 +5,7 @@
 #trap-rail-demo button, #trap-rail-demo input, #trap-rail-demo select { font:inherit; }
 #trap-rail-demo button { color:inherit; }
 #trap-rail-demo [hidden] { display:none!important; }
+#trap-rail-demo .fps-readout { position:absolute; z-index:9; top:14px; left:50%; transform:translateX(-50%); padding:5px 9px; border-radius:5px; background:#111111b8; color:#f5f5f7; font-size:13px; font-variant-numeric:tabular-nums; pointer-events:none; }
 #trap-rail-demo .scene { position:relative; min-height:680px; padding:24px 18px 58px 96px; overflow:hidden; border-radius:18px; background:#243d3c center/cover no-repeat; }
 #trap-rail-demo .scene::before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#00000028,#00000000 40%,#00000024); pointer-events:none; }
 #trap-rail-demo .left-tools { position:absolute; z-index:5; left:16px; top:16px; display:flex; align-items:flex-start; gap:12px; pointer-events:none; }
@@ -139,6 +140,9 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 @media(max-width:640px) { #trap-rail-demo .portal-panel { position:absolute; left:12px; right:12px; top:92px; margin:0; width:auto; max-height:calc(100% - 110px); } #trap-rail-demo .settings-panel { max-height:calc(100vh - 110px); } }
 
 #trap-rail-demo .settings-panel input[type="range"] { width:100%; accent-color:#98dfef; }
+#trap-rail-demo .embedded-options { position:fixed; z-index:20; max-height:260px; overflow-y:auto; padding:5px; border:1px solid #414146; border-radius:10px; background:#29292d; box-shadow:0 10px 24px #0008; }
+#trap-rail-demo .embedded-options button { display:block; width:100%; padding:8px; border:0; border-radius:6px; background:transparent; color:var(--ink); text-align:left; font-size:13px; }
+#trap-rail-demo .embedded-options button:hover,#trap-rail-demo .embedded-options button[aria-selected="true"] { background:#45454c; }
 
 /* Controller mode: the side without focus dims, and a hint bar names the buttons. */
 #trap-rail-demo .portal-panel, #trap-rail-demo .settings-panel, #trap-rail-demo .rail { transition:opacity 120ms ease; }

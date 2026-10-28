@@ -7,6 +7,11 @@
 
 int main() {
     const auto check=[](bool v){if(!v)throw std::runtime_error("PC settings contract failed");};
+    check(sky_pc_set_fps_counter(0) && sky_pc_fps_counter()==0);
+    check(!sky_pc_set_fps_counter(2) && sky_pc_fps_counter()==0);
+    check(sky_pc_set_fps_counter(1) && sky_pc_fps_counter()==1);
+    sky_pc_report_frame_time(16.0f);check(sky_pc_frame_time()==16.0f);
+    sky_pc_report_frame_time(-1.0f);sky_pc_report_frame_time(1000.0f);check(sky_pc_frame_time()==16.0f);
     unsetenv("SKY_AUTO_FRAME_POLICY_AVAILABLE");
     check(!sky_pc_set_frame_policy(1));check(!sky_pc_set_frame_policy(2));
     unsetenv("SKY_ALLOW_60");

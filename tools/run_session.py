@@ -167,7 +167,8 @@ def main(argv=None):
     parser.add_argument('--variant', choices=PACKS, default='original')
     parser.add_argument('--figure', type=Path)
     parser.add_argument('--trophy-config',type=Path,help='private shadPS4 config or trophy-key file; never copied into logs')
-    parser.add_argument('--pc-menu',choices=('web','native'),default='web',help='HTML desktop overlay or native fallback menu')
+    parser.add_argument('--pc-menu',choices=('web','native'),default='web',
+                        help='HTML PC menu inside the game window (default), with a native fallback when WebEngine is unavailable')
     parser.add_argument('--save-root', type=Path, help='explicit save directory; overrides the selected play profile')
     parser.add_argument('--save-backups',action=argparse.BooleanOptionalAction,default=True,
                         help='verified rotating save snapshots before launch and after normal exit')

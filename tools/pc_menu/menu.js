@@ -5,6 +5,27 @@
   const ui={view:'portal',slot:0,coop:false,page:'display',snapshot:null,dirty:false,sequence:-1};
   const slotNames={0:'Player 1',3:'Player 2',1:'Trap',2:'Item'};
   const images=new Map();let bridge=null;let previous='';
+  let selectPopup=null;
+  function closeSelect(){if(selectPopup){const select=selectPopup.select;selectPopup.node.remove();selectPopup=null;select.focus({preventScroll:true});}}
+  function chooseSelect(){if(!selectPopup)return;const {select,index}=selectPopup;select.selectedIndex=index;select.dispatchEvent(new Event('change',{bubbles:true}));closeSelect();}
+  function moveSelect(step){if(!selectPopup)return;const popup=selectPopup;popup.index=Math.max(0,Math.min(popup.select.options.length-1,popup.index+step));[...popup.node.children].forEach((node,index)=>node.setAttribute('aria-selected',String(index===popup.index)));popup.node.children[popup.index]?.scrollIntoView({block:'nearest'});}
+  // Browser select popups are separate native windows. In embedded mode, draw
+  // their option list in this same page so it is captured in the game texture.
+  document.addEventListener('mousedown',event=>{
+    if(!ui.snapshot?.embedded)return;
+    const select=event.target.closest('select');
+    if(!select){if(selectPopup&&!selectPopup.node.contains(event.target))closeSelect();return;}
+    event.preventDefault();event.stopPropagation();
+    const same=selectPopup?.select===select;closeSelect();if(same)return;
+    select.focus();const node=document.createElement('div');node.className='embedded-options';node.setAttribute('role','listbox');
+    const rect=select.getBoundingClientRect();node.style.left=rect.left+'px';node.style.width=rect.width+'px';
+    for(const [index,option] of [...select.options].entries()){
+      const item=document.createElement('button');item.type='button';item.textContent=option.text;item.setAttribute('role','option');item.setAttribute('aria-selected',String(index===select.selectedIndex));
+      item.onclick=()=>{selectPopup.index=index;chooseSelect();};node.append(item);
+    }
+    root.append(node);const height=Math.min(node.scrollHeight,260);node.style.top=(rect.bottom+height<innerHeight-12?rect.bottom+4:Math.max(12,rect.top-height-4))+'px';
+    selectPopup={node,select,index:select.selectedIndex};moveSelect(0);
+  },true);
   const search=root.querySelector('[data-search]');const message=root.querySelector('[data-message]');
   const icon=()=>window.lucide?.createIcons({attrs:{width:18,height:18}});
   const collection=kind=>ui.snapshot?.collections?.[String(kind)]||[];
@@ -75,11 +96,15 @@
   function initializeSettings(settings){
     if(ui.dirty)return;
     for(const [id,key] of [['trap-demo-res','resolution'],['trap-demo-quality','quality'],['trap-demo-fps','framePolicy'],['trap-demo-pad','layout'],['trap-demo-glyphs','glyphs']])root.querySelector('#'+id).selectedIndex=settings[key]??0;
-    root.querySelector('.check input').checked=!!settings.fullscreen;root.querySelector('#trap-demo-audio').value=String(settings.volume??30);root.querySelector('[data-volume]').textContent=(settings.volume??30)+'%';
+    root.querySelector('#trap-demo-fullscreen').checked=!!settings.fullscreen;root.querySelector('#trap-demo-counter').checked=!!settings.counter;root.querySelector('#trap-demo-audio').value=String(settings.volume??30);root.querySelector('[data-volume]').textContent=(settings.volume??30)+'%';
   }
   function receive(text){
     let snapshot;try{snapshot=JSON.parse(text);}catch{return;}if(snapshot.version!==1)return;
     const opened=snapshot.visible&&!ui.visible;ui.visible=!!snapshot.visible;
+    if(!ui.visible)closeSelect();
+    const badge=root.querySelector('[data-fps-readout]');const ms=Number(snapshot.frameTimeMs)||0;
+    badge.hidden=!!snapshot.embedded||!snapshot.settings?.counter;
+    badge.textContent=ms>0?`${Math.round(1000/ms)} FPS  ${ms.toFixed(1)} ms`:'— FPS';
     if(snapshot.collections){const comparable=JSON.stringify([snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});updateHints();}
     if(snapshot.inputSequence!==ui.sequence){ui.sequence=snapshot.inputSequence;for(const key of snapshot.keys||[])if(key>0)navigate(key);}
     if(opened)setTimeout(enterPanel,0);
@@ -139,6 +164,7 @@
     send('close');
   }
   function navigate(key){
+    if(selectPopup){if(key>=1&&key<=4)moveSelect(key===1||key===3?-1:1);else if(key===5)chooseSelect();else closeSelect();return;}
     if(key===6){send('close');return;}
     if(key===7){back();return;}
     if(key===8){focus(currentTab());return;}
@@ -169,8 +195,14 @@
   root.querySelector('#trap-demo-glyphs').addEventListener('change',()=>root.querySelector('[data-settings-message]').textContent='Button icons change in the game and this menu after Apply settings and restart.');
   root.querySelector('#trap-demo-fps').onchange=event=>{ui.dirty=true;send('fps',event.target.selectedIndex);};
   root.querySelector('#trap-demo-audio').oninput=event=>{ui.dirty=true;root.querySelector('[data-volume]').textContent=event.target.value+'%';send('volume',event.target.value);};
-  root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('.check input').checked),Number(ui.snapshot?.settings?.counter??true),root.querySelector('#trap-demo-pad').selectedIndex,root.querySelector('#trap-demo-glyphs').selectedIndex);
+  root.querySelector('#trap-demo-counter').onchange=event=>send('counter',Number(event.target.checked));
+  root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('#trap-demo-fullscreen').checked),Number(root.querySelector('#trap-demo-counter').checked),root.querySelector('#trap-demo-pad').selectedIndex,root.querySelector('#trap-demo-glyphs').selectedIndex);
   document.addEventListener('keydown',event=>{
+    if(selectPopup&&['ArrowUp','ArrowDown','Enter','Escape','Tab'].includes(event.key)){
+      event.preventDefault();event.stopPropagation();
+      if(event.key==='Enter')chooseSelect();else if(event.key==='Escape'||event.key==='Tab')closeSelect();else moveSelect(event.key==='ArrowUp'?-1:1);return;
+    }
+    if(event.key==='F10'){event.preventDefault();if(!event.repeat)send('minimize');return;}
     if(['F6','Insert'].includes(event.key)){event.preventDefault();send('close');return;}
     if(event.key==='Escape'){event.preventDefault();navigate(7);return;}
     if(event.key==='PageUp'||event.key==='PageDown'){event.preventDefault();navigate(event.key==='PageDown'?9:8);return;}

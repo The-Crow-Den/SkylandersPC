@@ -111,7 +111,7 @@ class Launcher(QMainWindow):
         row=QHBoxLayout();row.addWidget(volume,1);row.addWidget(self.volume_label);portal.addRow('Portal speaker',row)
         self.devices=text_label('');portal.addRow('Controllers',self.devices)
         refresh=QPushButton('Refresh controllers');refresh.clicked.connect(self.refresh_devices);portal.addRow(refresh)
-        portal.addRow(text_label('F6 / Insert / L3+R3   ·   PC settings & virtual portal\nF2   ·   Choose a Skylander\n\nNew villain traps start empty, ready for in-game capture. Virtual Traptanium is available; physical portal support is still in development.','muted'))
+        portal.addRow(text_label('F6 / Insert / L3+R3   ·   PC settings & virtual portal\nF2   ·   Choose a Skylander\nF10   ·   Minimize game for recording\n\nNew villain traps start empty, ready for in-game capture. Virtual Traptanium is available; physical portal support is still in development.','muted'))
         portal.addRow(PortraitStrip(self.root))
 
         mods=self.page('Game mods','Your adventure. Your rules.','PC features that respect your existing progress.')

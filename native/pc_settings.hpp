@@ -12,6 +12,11 @@
 
 extern "C" int sky_portal_volume() __attribute__((weak));
 namespace SkyPc {
+inline std::atomic<bool> show_fps{[] {
+    const auto* value=std::getenv("SKY_FPS_COUNTER");
+    return !value || std::strcmp(value,"0")!=0;
+}()};
+inline std::atomic<float> frame_time_ms{0.0f};
 inline std::atomic<int> frame_limit{[] {
     const auto* value = std::getenv("SKY_FRAME_LIMIT");
     return value && !std::strcmp(value,"0") ? 0 : value && !std::strcmp(value,"60") ? 60 : 30;
@@ -66,6 +71,15 @@ inline void pace() {
     deadline += period;
 }
 }
+extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_fps_counter() {return SkyPc::show_fps.load()?1:0;}
+extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_set_fps_counter(int enabled) {
+    if(enabled!=0 && enabled!=1)return 0;
+    SkyPc::show_fps.store(enabled!=0);return 1;
+}
+extern "C" __attribute__((used,visibility("default"))) inline void sky_pc_report_frame_time(float milliseconds) {
+    if(milliseconds>0.0f && milliseconds<1000.0f)SkyPc::frame_time_ms.store(milliseconds,std::memory_order_relaxed);
+}
+extern "C" __attribute__((used,visibility("default"))) inline float sky_pc_frame_time() {return SkyPc::frame_time_ms.load(std::memory_order_relaxed);}
 extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_frame_limit() { return SkyPc::frame_limit.load(std::memory_order_relaxed); }
 extern "C" __attribute__((used,visibility("default"))) inline void sky_pc_set_frame_limit(int fps) {
     std::lock_guard guard(SkyPc::frame_policy_mutex);

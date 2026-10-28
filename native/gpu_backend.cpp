@@ -176,7 +176,14 @@ bool menu_gamepad(const SDL_Event& event) {
     }
     return false;
 }
-int keyboard_event(const void* raw_event, void*) {
+void minimize_game_window(SDL_Window* window) {
+    pressed_keys.fill(false);
+    if (keyboard_pad) keyboard_pad->release_keys();
+    if (Renderer::overlay_captures_input()) Renderer::toggle_menu();
+    if (window && !SDL_MinimizeWindow(window))
+        std::fprintf(stderr,"Could not minimize game window: %s\n",SDL_GetError());
+}
+int keyboard_event(const void* raw_event, void* raw_window) {
     if (!keyboard_pad) return 0;
     const auto& event = *static_cast<const SDL_Event*>(raw_event);
     if(event.type==SDL_EVENT_WINDOW_MOVED||event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_FOCUS_GAINED||event.type==SDL_EVENT_KEY_DOWN) {
@@ -195,7 +202,11 @@ int keyboard_event(const void* raw_event, void*) {
         else if(event.user.code==7 || event.user.code==9)PortalLibrary::remove(event.user.code==7?3:2);
         else if(event.user.code==20){if(Renderer::overlay_captures_input())Renderer::toggle_menu();}
         else if(event.user.code==21){SDL_Event quit{};quit.type=SDL_EVENT_QUIT;SDL_PushEvent(&quit);}
+        else if(event.user.code==22)minimize_game_window(static_cast<SDL_Window*>(raw_window));
         return 1;
+    }
+    if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F10) {
+        minimize_game_window(static_cast<SDL_Window*>(raw_window)); return 1;
     }
     if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
         (event.key.scancode == SDL_SCANCODE_F6 || event.key.scancode == SDL_SCANCODE_INSERT) && Renderer::has_menu_toggle()) {
@@ -210,6 +221,7 @@ int keyboard_event(const void* raw_event, void*) {
     }
     if (Renderer::overlay_captures_input()) {
         pressed_keys.fill(false); keyboard_pad->release_keys();
+        if(PcOverlay::event(event))return 1;
         if (event.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && event.type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) {
             update_gamepad(&event);
             if (sky_pc_external_menu() && menu_gamepad(event)) return 1;
@@ -485,7 +497,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
                 SDL_free(windows);
             }
             portal_action_event=SDL_RegisterEvents(1);
-            std::printf("PC menu: F6 / Insert / L3+R3; Shift+F1 switches native 30/60 cap\n");
+            std::printf("PC menu: F6 / Insert / L3+R3; F10 minimizes the game; Shift+F1 switches native 30/60 cap\n");
             std::printf("Window backend: %s\n", SDL_GetCurrentVideoDriver());
             if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD))
                 std::fprintf(stderr,"Controller initialization failed: %s\n",SDL_GetError());

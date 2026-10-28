@@ -2,6 +2,7 @@
 #include "pc_overlay_bridge.hpp"
 #include "portal_library.hpp"
 #include "pc_settings.hpp"
+#include "pc_menu_frame.hpp"
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
@@ -25,6 +26,9 @@ std::atomic<bool> connected{false},visible{false};
 std::mutex geometry_mutex,input_mutex;
 std::array<int,4> window_geometry{0,0,1280,720};
 std::vector<int> input;
+std::vector<std::pair<unsigned long long,std::string>> desktop_input;
+unsigned long long desktop_sequence=0;
+bool embedded(){const auto* mode=std::getenv("SKY_PC_MENU_EMBEDDED");return mode&&std::strcmp(mode,"1")==0;}
 std::string quote(const char* text){std::ostringstream out;out<<'"';for(const unsigned char ch:std::string(text?text:"")){if(ch=='"'||ch=='\\')out<<'\\'<<char(ch);else if(ch<32)out<<"\\u"<<std::hex<<std::setw(4)<<std::setfill('0')<<unsigned(ch)<<std::dec;else out<<char(ch);}out<<'"';return out.str();}
 bool regular(const fs::path& path,std::uintmax_t limit){std::error_code ec;return !fs::is_symlink(path,ec)&&fs::is_regular_file(path,ec)&&fs::file_size(path,ec)<=limit&&!ec;}
 std::string read(const fs::path& path,std::uintmax_t limit){if(!regular(path,limit))return {};std::ifstream file(path,std::ios::binary);return {(std::istreambuf_iterator<char>(file)),{}};}
@@ -33,7 +37,9 @@ std::string snapshot(unsigned long long sequence,const std::vector<int>& keys){
     std::array<int,4> geometry;{std::lock_guard lock(geometry_mutex);geometry=window_geometry;}
     std::ostringstream out;out<<"{\"version\":1,\"pid\":"<<getpid()<<",\"visible\":"<<(visible?"true":"false")<<",\"geometry\":["<<geometry[0]<<','<<geometry[1]<<','<<geometry[2]<<','<<geometry[3]<<"],\"inputSequence\":"<<sequence<<",\"keys\":[";
     for(unsigned i=0;i<keys.size();++i){if(i)out<<',';out<<keys[i];}out<<']';
-    if(visible){out<<",\"collections\":{";
+    out<<",\"embedded\":"<<(embedded()?"true":"false")<<",\"events\":[";
+    {std::lock_guard lock(input_mutex);for(unsigned i=0;i<desktop_input.size();++i){if(i)out<<',';out<<'['<<desktop_input[i].first<<','<<desktop_input[i].second<<']';}}out<<']';
+    if(visible){out<<",\"frameTimeMs\":"<<sky_pc_frame_time()<<",\"collections\":{";
         for(int kind=0;kind<4;++kind){if(kind)out<<',';out<<'"'<<kind<<"\":[";const int count=std::min(1024,sky_portal_count(kind));
             for(int i=0;i<count;++i){if(i)out<<',';out<<"{\"index\":"<<i<<",\"name\":"<<quote(sky_portal_name(kind,i))<<",\"detail\":"<<quote(sky_portal_detail(kind,i))<<",\"state\":"<<sky_portal_state(kind,i)<<",\"portrait\":"<<sky_portal_portrait(kind,i);
                 if(kind==1)out<<",\"element\":"<<sky_portal_trap_element(i)<<",\"capture\":"<<sky_portal_trap_capture(i);out<<'}';}out<<']';}
@@ -41,15 +47,18 @@ std::string snapshot(unsigned long long sequence,const std::vector<int>& keys){
         for(int i=0;i<sky_portal_trap_element_count();++i){if(i)out<<',';out<<"{\"index\":"<<i<<",\"name\":"<<quote(sky_portal_trap_element_name(i))<<",\"portrait\":"<<sky_portal_element_portrait(i)<<'}';}
         out<<"],\"creation\":[";
         for(int i=0;i<sky_portal_creation_count();++i){if(i)out<<',';out<<"{\"index\":"<<i<<",\"name\":"<<quote(sky_portal_creation_name(i))<<",\"kind\":"<<sky_portal_creation_kind(i)<<",\"portrait\":"<<sky_portal_creation_portrait(i)<<'}';}
-        out<<"],\"status\":"<<quote(sky_portal_status())<<",\"settings\":{\"resolution\":"<<(std::getenv("SKY_PC_RESOLUTION")?std::atoi(std::getenv("SKY_PC_RESOLUTION")):2)<<",\"quality\":"<<(std::getenv("SKY_PC_QUALITY")?std::atoi(std::getenv("SKY_PC_QUALITY")):1)<<",\"fullscreen\":"<<(std::getenv("SKY_FULLSCREEN")&&!std::strcmp(std::getenv("SKY_FULLSCREEN"),"1")?"true":"false")<<",\"counter\":true,\"framePolicy\":"<<(sky_pc_frame_policy()?0:sky_pc_frame_limit()==60?2:1)<<",\"autoAvailable\":"<<(sky_pc_auto_available()?"true":"false")<<",\"allow60\":"<<(std::getenv("SKY_ALLOW_60")&&!std::strcmp(std::getenv("SKY_ALLOW_60"),"1")?"true":"false")<<",\"layout\":"<<sky_pc_controller_layout()<<",\"glyphs\":"<<sky_pc_controller_glyphs()<<",\"activeGlyphs\":"<<quote(std::getenv("SKY_ACTIVE_CONTROLLER_GLYPHS")?std::getenv("SKY_ACTIVE_CONTROLLER_GLYPHS"):"playstation")<<",\"volume\":"<<sky_portal_volume()<<'}';
+        out<<"],\"status\":"<<quote(sky_portal_status())<<",\"settings\":{\"resolution\":"<<(std::getenv("SKY_PC_RESOLUTION")?std::atoi(std::getenv("SKY_PC_RESOLUTION")):2)<<",\"quality\":"<<(std::getenv("SKY_PC_QUALITY")?std::atoi(std::getenv("SKY_PC_QUALITY")):1)<<",\"fullscreen\":"<<(std::getenv("SKY_FULLSCREEN")&&!std::strcmp(std::getenv("SKY_FULLSCREEN"),"1")?"true":"false")<<",\"counter\":"<<(sky_pc_fps_counter()?"true":"false")<<",\"framePolicy\":"<<(sky_pc_frame_policy()?0:sky_pc_frame_limit()==60?2:1)<<",\"autoAvailable\":"<<(sky_pc_auto_available()?"true":"false")<<",\"allow60\":"<<(std::getenv("SKY_ALLOW_60")&&!std::strcmp(std::getenv("SKY_ALLOW_60"),"1")?"true":"false")<<",\"layout\":"<<sky_pc_controller_layout()<<",\"glyphs\":"<<sky_pc_controller_glyphs()<<",\"activeGlyphs\":"<<quote(std::getenv("SKY_ACTIVE_CONTROLLER_GLYPHS")?std::getenv("SKY_ACTIVE_CONTROLLER_GLYPHS"):"playstation")<<",\"volume\":"<<sky_portal_volume()<<'}';
     }out<<'}';return out.str();
 }
 void command(const std::string& data){
     std::istringstream stream(data);std::string verb;stream>>verb;
     if(verb=="portal"){int action=-1,index=-1;if(stream>>action>>index && action>=0&&action<=12&&index>=0&&index<2048)sky_portal_action(action,index);}
     else if(verb=="close")sky_portal_action(20,0);
+    else if(verb=="minimize")sky_portal_action(22,0);
+    else if(verb=="counter"){int n=-1;if(stream>>n)sky_pc_set_fps_counter(n);}
     else if(verb=="volume"){int n=-1;if(stream>>n&&n>=0&&n<=100)sky_portal_set_volume(n);}
     else if(verb=="fps"){int n=-1;if(stream>>n){if(n==0)sky_pc_set_frame_policy(1);else if(n==1)sky_pc_set_frame_limit(30);else if(n==2)sky_pc_set_frame_limit(60);}}
+    else if(verb=="import-dialog"){int player=-1;if(stream>>player&&player>=0&&player<2)sky_portal_action(player?11:2,0);}
     else if(verb=="import"){int player=-1;stream>>player;std::string path;std::getline(stream,path);std::getline(stream,path);if(player>=0&&player<2&&!path.empty()&&path.size()<4096&&path.find('\0')==std::string::npos)PortalLibrary::import_character(path.c_str(),true,static_cast<unsigned>(player));}
     else if(verb=="settings"){
         int resolution=-1,quality=-1,fullscreen=-1,counter=-1,layout=-1,glyphs=-1;
@@ -74,14 +83,14 @@ public:
             std::sort(requests.begin(),requests.end());if(requests.size()>32)requests.resize(32);
             if(alive)for(const auto& path:requests){const auto data=read(path,8192);if(!data.empty())command(data);fs::remove(path,ec);}
             const auto now=std::chrono::steady_clock::now();
-            if(now-last>=std::chrono::milliseconds(150)){
+            if(now-last>=std::chrono::milliseconds(embedded()&&visible?25:150)){
                 last=now;std::vector<int> keys;{std::lock_guard lock(input_mutex);keys.swap(input);}if(!keys.empty())++sequence;
                 const auto state=snapshot(sequence,keys);
                 if(state!=previous){const auto temporary=directory/"state.tmp";if(!fs::is_symlink(temporary,ec)){
                     std::ofstream file(temporary,std::ios::binary|std::ios::trunc);file<<state;file.close();if(file){fs::rename(temporary,directory/"state.json",ec);if(!ec)previous=state;}}
                 }
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(40));
+            std::this_thread::sleep_for(std::chrono::milliseconds(embedded()&&visible?8:40));
         }
         connected=false;
     }){}
@@ -90,7 +99,43 @@ public:
 namespace PcOverlay {
 void start(){const auto* value=std::getenv("SKY_PC_OVERLAY_DIR");if(!value||!*value)return;const fs::path path(value);if(!path.is_absolute()||!owner_directory(path))return;static Worker worker(path);}
 void geometry(int x,int y,int width,int height){if(width<100||height<100||width>16384||height>16384)return;std::lock_guard lock(geometry_mutex);window_geometry={x,y,width,height};}
+bool event(const SDL_Event& event){
+    if(!embedded()||!connected||!visible)return false;
+    std::ostringstream data;
+    switch(event.type){
+    case SDL_EVENT_MOUSE_MOTION:data<<"\"move\","<<event.motion.x<<','<<event.motion.y;break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:case SDL_EVENT_MOUSE_BUTTON_UP:
+        data<<"\"button\","<<(event.type==SDL_EVENT_MOUSE_BUTTON_DOWN?1:0)<<','<<int(event.button.button)<<','<<event.button.x<<','<<event.button.y;break;
+    case SDL_EVENT_MOUSE_WHEEL:data<<"\"wheel\","<<event.wheel.x<<','<<event.wheel.y;break;
+    case SDL_EVENT_KEY_DOWN:case SDL_EVENT_KEY_UP:
+        data<<"\"key\","<<(event.type==SDL_EVENT_KEY_DOWN?1:0)<<','<<quote(SDL_GetKeyName(event.key.key))<<','<<event.key.mod;break;
+    case SDL_EVENT_TEXT_INPUT:data<<"\"text\","<<quote(event.text.text);break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:data<<"\"blur\"";break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:data<<"\"focus\"";break;
+    default:return false;
+    }
+    std::lock_guard lock(input_mutex);
+    // Keep unconsumed history across polls; replacing state.json never loses a click.
+    if(event.type==SDL_EVENT_MOUSE_MOTION&&!desktop_input.empty()&&desktop_input.back().second.starts_with("\"move\""))desktop_input.pop_back();
+    desktop_input.emplace_back(++desktop_sequence,data.str());
+    if(desktop_input.size()>256)desktop_input.erase(desktop_input.begin());
+    return true;
+}
 }
 extern "C" int sky_pc_external_menu(){return connected?1:0;}
 extern "C" void sky_pc_menu_visibility(int shown){visible=shown!=0;}
-extern "C" int sky_pc_menu_gamepad(int key){if(!connected||!visible||!key||std::abs(key)>9)return 0;std::lock_guard lock(input_mutex);if(input.size()<32)input.push_back(key);return 1;}
+extern "C" int sky_pc_menu_gamepad(int key){
+    if(!connected||!visible||!key||std::abs(key)>9)return 0;
+    std::lock_guard lock(input_mutex);
+    if(embedded()){
+        desktop_input.emplace_back(++desktop_sequence,"\"pad\","+std::to_string(key));
+        if(desktop_input.size()>256)desktop_input.erase(desktop_input.begin());
+    }else if(input.size()<32)input.push_back(key);
+    return 1;
+}
+extern "C" int sky_pc_menu_frame(void* pixels,int size,int* width,int* height,unsigned* generation){
+    const auto* directory=std::getenv("SKY_PC_OVERLAY_DIR");
+    static const std::string path=directory?std::string(directory)+"/frame.rgba":"";
+    static PcOverlay::FrameReader reader(path.c_str());
+    return connected&&embedded()&&reader.copy(pixels,size,width,height,generation)?1:0;
+}

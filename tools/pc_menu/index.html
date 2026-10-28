@@ -6,6 +6,7 @@
 <script src="qrc:///qtwebchannel/qwebchannel.js" defer></script><script src="lucide.js" defer></script><script src="menu.js" defer></script>
 </head><body><div id="trap-rail-demo" aria-label="Trap Team PC menu">
 <div class="scene">
+  <div class="fps-readout" data-fps-readout hidden aria-label="Frame rate"></div>
   <div class="game-title">SKYLANDERS · TRAP TEAM</div>
   <div class="left-tools">
     <nav class="rail" aria-label="PC tools">
@@ -22,9 +23,10 @@
         <div class="setting"><label for="trap-demo-res">Resolution</label><select id="trap-demo-res"><option>1280 × 720</option><option>1600 × 900</option><option>1920 × 1080</option><option>2560 × 1440</option><option>2560 × 1600</option><option>3840 × 2160</option></select></div>
         <div class="setting"><label for="trap-demo-quality">Graphics quality</label><select id="trap-demo-quality"><option>Low</option><option selected>Balanced</option><option>High</option></select></div>
         <div class="setting"><label for="trap-demo-fps">Frame rate</label><select id="trap-demo-fps"><option>Automatic · 30 / 60 FPS</option><option>30 FPS</option><option>60 FPS</option></select></div>
-        <label class="check"><input type="checkbox" checked>Fullscreen</label>
+        <label class="check"><input id="trap-demo-fullscreen" type="checkbox" checked>Fullscreen</label>
+        <label class="check"><input id="trap-demo-counter" type="checkbox" checked>Show FPS counter</label>
       </div>
-      <div data-settings-page="controls" hidden><div class="setting"><label for="trap-demo-pad">Player setup</label><select id="trap-demo-pad"><option>Controller(s)</option><option>Keyboard + controller</option></select></div><div class="setting"><label for="trap-demo-glyphs">Button icons</label><select id="trap-demo-glyphs"><option>Automatic</option><option>PlayStation</option><option>Xbox</option><option>Nintendo</option></select></div><p>Button icons change in the game after Apply settings and restart. Automatic matches the controller connected at launch.</p><p>Controller: LB jumps to the tabs on the left, RB to the panel on the right. D-pad or left stick moves, A selects, B goes back, Start closes. Keyboard: arrows, Enter, Escape (back), Page Up / Page Down (tabs / panel), F6 closes.</p></div>
+      <div data-settings-page="controls" hidden><div class="setting"><label for="trap-demo-pad">Player setup</label><select id="trap-demo-pad"><option>Controller(s)</option><option>Keyboard + controller</option></select></div><div class="setting"><label for="trap-demo-glyphs">Button icons</label><select id="trap-demo-glyphs"><option>Automatic</option><option>PlayStation</option><option>Xbox</option><option>Nintendo</option></select></div><p>Button icons change in the game after Apply settings and restart. Automatic matches the controller connected at launch.</p><p>Controller: LB jumps to the tabs on the left, RB to the panel on the right. D-pad or left stick moves, A selects, B goes back, Start closes. Keyboard: arrows, Enter, Escape (back), Page Up / Page Down (tabs / panel), F6 closes, F10 minimizes the game.</p></div>
       <div data-settings-page="audio" hidden><div class="setting"><label for="trap-demo-audio">Portal speaker volume <span data-volume>30%</span></label><input id="trap-demo-audio" type="range" min="0" max="100" value="30"></div><p>Portal voices play through your PC speakers.</p></div>
       <button type="button" class="primary-action cursor-interaction" data-apply>Apply settings and restart</button><p class="message" data-settings-message aria-live="polite">Some settings apply after restart.</p>
     </section>
