@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import re
 
-NAMES = ('element-gates', 'traptanium', 'unlock-expansions')
+NAMES = ('element-gates', 'traptanium', 'unlock-expansions', 'replay-expansion-intros')
 
 
 def selection(root, title_id, overrides=None):

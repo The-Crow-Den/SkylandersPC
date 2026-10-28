@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Launcher controls for existing guarded Trap Team gameplay recipes."""
-NAMES=('element-gates','traptanium')
+try:
+    from .gameplay_mods import NAMES
+except ImportError:
+    from gameplay_mods import NAMES
 
 
 def validate(value):

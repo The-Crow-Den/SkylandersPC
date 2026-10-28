@@ -101,7 +101,9 @@ class SettingsPage(QWidget):
                 for key,label,hint in [
                     ('any-portal','Any portal','Physical portal compatibility is not implemented. The virtual portal is available.'),
                     ('element-gates','No Trap Master required for gates','Open elemental gates with a matching-element Skylander. Experimental · US 01.01.'),
-                    ('traptanium','No Trap Master required for Traptanium','Break Traptanium with any Skylander. Experimental · US 01.01.')]:
+                    ('traptanium','No Trap Master required for Traptanium','Break Traptanium with any Skylander. Experimental · US 01.01.'),
+                    ('unlock-expansions','Unlock adventure packs','Access all four adventure packs without placing their toys on the portal. Experimental · US 01.01.'),
+                    ('replay-expansion-intros','Replay adventure pack introductions','Play the selected pack’s introduction after confirming travel at its Academy statue. Experimental · US 01.01.')]:
                     card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
                     copy=QVBoxLayout();heading=QLabel(label);heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
                     detail=QLabel(hint);detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail);line.addLayout(copy,1)
@@ -162,7 +164,7 @@ class SettingsPage(QWidget):
         for row in self.mod_rows:row.setVisible(game is not None and game['id']=='trap-team')
         for key,field in self.mod_fields.items():
             field.setChecked(selected.get(key,False));field.setEnabled(self.owner.process is None and key!='any-portal')
-            if key in ('element-gates','traptanium'):
+            if key!='any-portal':
                 recipe=self.owner.root/'profiles/patches'/f'trap-team-us-01.01-{key}.experimental.json'
                 if not recipe.is_file():field.setEnabled(False);field.setToolTip('The mod recipe is unavailable in this checkout.')
         self.save_button.setEnabled(self.owner.process is None)

@@ -38,8 +38,32 @@ class LauncherModelTests(unittest.TestCase):
     def test_gameplay_mod_switches_are_forwarded_explicitly(self):
         argv=model.command('/project','python',model.DEFAULTS,mods={'element-gates':True,'traptanium':False})
         self.assertIn('--element-gates',argv);self.assertIn('--no-traptanium',argv)
+        for enabled, flag in ((True,'--unlock-expansions'),(False,'--no-unlock-expansions')):
+            argv=model.command('/project','python',model.DEFAULTS,mods={'unlock-expansions':enabled})
+            self.assertIn(flag,argv)
+        for enabled, flag in ((True,'--replay-expansion-intros'),(False,'--no-replay-expansion-intros')):
+            argv=model.command('/project','python',model.DEFAULTS,mods={'replay-expansion-intros':enabled})
+            self.assertIn(flag,argv)
         with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'any-portal':True})
         with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'traptanium':'yes'})
+
+    def test_legacy_game_mod_preferences_keep_their_values(self):
+        from tools import launcher_mods, launcher_library
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            library=launcher_library.defaults()
+            game=next(g for g in library['games'] if g['id']=='trap-team')
+            game['mods']={'element-gates':True,'traptanium':False}
+            path=root/'library.json';launcher_library.save(path,library)
+            library=launcher_library.load(path)
+            game=next(g for g in library['games'] if g['id']=='trap-team')
+            selected=launcher_mods.selection(root,game)
+            self.assertEqual(selected,{'element-gates':True,'traptanium':False,'unlock-expansions':False,'replay-expansion-intros':False})
+            selected['unlock-expansions']=True
+            game['mods']=selected;launcher_library.save(path,library)
+            game=next(g for g in launcher_library.load(path)['games'] if g['id']=='trap-team')
+            self.assertTrue(game['mods']['unlock-expansions'])
+            self.assertIn('--unlock-expansions',model.command(root,'python',model.DEFAULTS,mods=selected))
 
     def test_bad_settings_refused_without_replacing_preferences(self):
         with tempfile.TemporaryDirectory() as directory:

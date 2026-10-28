@@ -8,6 +8,7 @@ dumps/** export-ignore
 vendor/** export-ignore
 build/** export-ignore
 profiles/patches/trap-team-us-01.01-traptanium.experimental.json export-ignore
+profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json export-ignore
 *.AppImage export-ignore
 *.pkg export-ignore
 *.sky export-ignore

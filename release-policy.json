@@ -2,7 +2,8 @@
   "schema_version": 1,
   "project_license": "GPL-3.0-or-later",
   "withheld": {
-    "profiles/patches/trap-team-us-01.01-traptanium.experimental.json": "Contains bulk literal game-asset bytes; keep local until converted to source-relative recipes."
+    "profiles/patches/trap-team-us-01.01-traptanium.experimental.json": "Contains bulk literal game-asset bytes; keep local until converted to source-relative recipes.",
+    "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json": "About 347 kB of literal expected/replacement game bytes across shifted metadata; keep local until converted to source-relative or semantic recipes."
   },
   "required": ["LICENSE", "LICENSE_SCOPE.md", "NOTICE.md", "THIRD_PARTY_NOTICES.md", "LICENSES/dependencies.json", "LICENSES/bbport-source.json", "LICENSES/portal-source.json", "docs/PUBLICATION.md", "CONTRIBUTING.md"],
   "binary_release_ready": false,

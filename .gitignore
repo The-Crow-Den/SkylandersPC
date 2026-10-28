@@ -20,6 +20,7 @@ eboot.bin
 .DS_Store
 # Private experimental recipe currently contains bulk game-asset literals.
 /profiles/patches/trap-team-us-01.01-traptanium.experimental.json
+/profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json
 # Distribution inputs and private device/save data.
 *.rar
 *.zip
