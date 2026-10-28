@@ -117,28 +117,96 @@ def _write_blocks(profile,blocks):
 
 
 
+# Cells whose PlayStation outline (the unedited alpha texture) differs from the
+# artwork's shape: the symbol is fitted inside the outline instead of filling the cell.
+FITTED=(4,5,8,9)
+
+
+def button_shape(original,width,height):
+    """The original button's outline in a cell: the largest dark region, with
+    each row filled between its ends (so symbols inside it count as inside)."""
+    dark=[[min(original[(y*width+x)*4:(y*width+x)*4+3])<235 for x in range(width)] for y in range(height)]
+    seen=[[False]*width for _ in range(height)];best=[]
+    for y in range(height):
+        for x in range(width):
+            if not dark[y][x] or seen[y][x]:continue
+            region=[];stack=[(x,y)];seen[y][x]=True
+            while stack:
+                cx,cy=stack.pop();region.append((cx,cy))
+                for nx,ny in ((cx+1,cy),(cx-1,cy),(cx,cy+1),(cx,cy-1)):
+                    if 0<=nx<width and 0<=ny<height and dark[ny][nx] and not seen[ny][nx]:
+                        seen[ny][nx]=True;stack.append((nx,ny))
+            if len(region)>len(best):best=region
+    inside=[[False]*width for _ in range(height)];spans={}
+    for x,y in best:
+        low,high=spans.get(y,(x,x));spans[y]=(min(low,x),max(high,x))
+    # Rows much wider than the body are an attached label (Options), not the button.
+    widths=sorted(high-low+1 for low,high in spans.values());typical=widths[len(widths)//2]
+    for y,(low,high) in spans.items():
+        if high-low+1>1.6*typical:continue
+        for x in range(low,high+1):inside[y][x]=True
+    return inside
+
+
+def fitted(art,width,height,inside,margin=0.2):
+    """Scale the artwork's visible part uniformly into the outline's bounds, centred,
+    by area averaging with premultiplied alpha. Pure Python: no imaging dependency."""
+    rows=[y for y in range(height) if any(inside[y])];cols=[x for x in range(width) if any(inside[y][x] for y in rows)]
+    if not rows:return bytes(width*height*4)
+    visible=[(x,y) for y in range(height) for x in range(width) if art[(y*width+x)*4+3]]
+    ax0=min(x for x,_ in visible);ax1=max(x for x,_ in visible)+1;ay0=min(y for _,y in visible);ay1=max(y for _,y in visible)+1
+    bx0,bx1,by0,by1=cols[0],cols[-1]+1,rows[0],rows[-1]+1
+    pad=round(min(bx1-bx0,by1-by0)*margin)
+    scale=min((bx1-bx0-2*pad)/(ax1-ax0),(by1-by0-2*pad)/(ay1-ay0))
+    tw,th=max(1,round((ax1-ax0)*scale)),max(1,round((ay1-ay0)*scale))
+    ox,oy=bx0+(bx1-bx0-tw)//2,by0+(by1-by0-th)//2
+    result=bytearray(width*height*4)
+    for ty in range(th):
+        sy0=ay0+ty/scale;sy1=ay0+(ty+1)/scale
+        for tx in range(tw):
+            sx0=ax0+tx/scale;sx1=ax0+(tx+1)/scale;total=[0.0]*4;area=0.0
+            for sy in range(int(sy0),min(ay1,int(sy1-1e-9)+1)):
+                wy=min(sy+1,sy1)-max(sy,sy0)
+                for sx in range(int(sx0),min(ax1,int(sx1-1e-9)+1)):
+                    w=wy*(min(sx+1,sx1)-max(sx,sx0));i=(sy*width+sx)*4;a=art[i+3]
+                    total[0]+=art[i]*a*w;total[1]+=art[i+1]*a*w;total[2]+=art[i+2]*a*w;total[3]+=a*w;area+=w
+            if not area or not total[3]:continue
+            o=((oy+ty)*width+ox+tx)*4
+            result[o:o+4]=bytes((round(total[0]/total[3]),round(total[1]/total[3]),round(total[2]/total[3]),round(total[3]/area)))
+    return bytes(result)
+
+
 def recipe(source,profile,mode):
     """Materialize an expected-byte font recipe, without stored game bytes."""
     if mode not in LABELS:raise ValueError('invalid glyph pack')
     blocks=_read_blocks(source,profile)
     for index,(_,left,top,width,height) in enumerate(CELLS):
-        pixels=raster(mode,index)
+        places=[]
         for y in range(height):
             for x in range(width):
                 absolute=profile['texture_offset']+tiled_offset(left+x,top+y)
                 base=absolute//32768*32768
                 if base not in blocks:raise ValueError('glyph exceeds verified font blocks')
-                _,_,modified=blocks[base];at=absolute-base;src=(y*width+x)*4
+                _,_,modified=blocks[base];at=absolute-base
                 if at+4>len(modified):raise ValueError('glyph pixel exceeds block')
-                # Font 001's shapes come from a separate alpha texture; this one holds
-                # colour only, opaque and white around the buttons, and text drawn
-                # from that white turned black when artwork wrote transparent black.
-                # Keep the original alpha byte; blend the artwork over the white
-                # background, or over black inside the original button (dark pixels).
-                alpha=pixels[src+3];background=min(modified[at:at+3])>=235
-                for channel in range(3):
-                    base=modified[at+channel] if background else 0
-                    modified[at+channel]=(pixels[src+channel]*alpha+base*(255-alpha)+127)//255
+                places.append((modified,at))
+        original=b''.join(bytes(modified[at:at+4]) for modified,at in places)
+        pixels=raster(mode,index)
+        if index in FITTED:
+            inside=button_shape(original,width,height);pixels=fitted(pixels,width,height,inside)
+        else:
+            inside=[[min(original[(y*width+x)*4:(y*width+x)*4+3])<235 for x in range(width)] for y in range(height)]
+        # Font 001's shapes come from a separate alpha texture; this one holds colour
+        # only, opaque and white around the buttons, and text drawn from that white
+        # turned black when artwork wrote transparent black. Keep the original alpha
+        # byte; inside the original button the artwork goes over black, outside it
+        # over the original colour.
+        for i,(modified,at) in enumerate(places):
+            y,x=divmod(i,width);alpha=pixels[i*4+3]
+            if index in FITTED and not inside[y][x]:continue  # e.g. the Options label keeps its colour
+            for channel in range(3):
+                base=0 if inside[y][x] else modified[at+channel]
+                modified[at+channel]=(pixels[i*4+channel]*alpha+base*(255-alpha)+127)//255
     return _write_blocks(profile,blocks)
 
 
