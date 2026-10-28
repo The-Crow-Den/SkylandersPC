@@ -390,9 +390,6 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
     Renderer::set_option("GAME_PROFILE", "none", true);
     setenv("SKY_PC_MENU", "1", 1);
     Renderer::set_option("FREE_MOUSE", "1", true);
-    Renderer::set_option("UPSCALER", "off", true);
-    Renderer::set_option("OBJECT_MOTION", "0", true);
-    Renderer::set_option("FRAME_GEN", "0", true);
     Renderer::set_option("SUBMIT_LOCK", "gpu", true);
     // The renderer defaults to forced 16x filtering, which this title does not
     // use. Preserve its own samplers unless the user explicitly overrides.
