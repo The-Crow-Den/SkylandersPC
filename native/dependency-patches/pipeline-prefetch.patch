@@ -1,0 +1,282 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Step 1 of docs/FIRST_PLAY_COMPILE_PLAN.md: draw-preparation workers start compiles of
+# missing pipelines; the GPU thread waits for them (BB_PREFETCH_PIPELINES=0: off).
+# Applies after parallel-pipeline-preload.patch and compile-split-counters.patch.
+--- a/gpu/render/pipeline_cache.h
++++ b/gpu/render/pipeline_cache.h
+@@ -19,7 +19,9 @@
+ #include <span>
+ #include <string>
+ #include <tuple>
++#include <mutex>
+ #include <unordered_map>
++#include <unordered_set>
+ #include <vector>
+ 
+ #include <boost/container/small_vector.hpp>
+@@ -147,6 +149,10 @@
+     /// Worker side of draw preparation: selects the pipeline key for `sel.regs` without
+     /// creating anything. False when a program or permutation does not exist yet.
+     bool PrepareGraphicsPipeline(PipelineSelection& sel);
++    /// skylanders (pipeline-prefetch): a draw-preparation worker selected `worker_sel` ahead
++    /// of the GPU thread; a pipeline neither created nor compiling starts compiling now, and the
++    /// GPU thread waits for it instead of compiling serially (BB_PREFETCH_PIPELINES=0: off).
++    void PrefetchGraphicsPipeline(const PipelineSelection& worker_sel);
+ 
+     /// GPU-thread side: the pipeline for a prepared draw after checking that registers and
+     /// flattened user data match; null to take the regular path.
+@@ -245,6 +251,15 @@
+     u64 frame_start_draws = 0, last_frame_draws = 0;
+     u32 stats_printed = 0;
+     u64 async_started = 0, async_skipped = 0, async_waited = 0; ///< statistics
++    // skylanders (pipeline-prefetch). Keys created or compiling, readable by workers, and the
++    // prefetched jobs the GPU thread has not adopted yet.
++    void NoteGraphicsKey(const GraphicsPipelineKey& key);
++    std::shared_ptr<PendingPipeline> TakePrefetched(const GraphicsPipelineKey& key);
++    PipelineCompiler& Compiler();
++    std::shared_mutex prefetch_mutex;
++    std::unordered_set<GraphicsPipelineKey> known_graphics;
++    std::unordered_map<GraphicsPipelineKey, std::shared_ptr<PendingPipeline>> prefetched;
++    std::once_flag compiler_once;
+     std::unique_ptr<PipelineCompiler> compiler; ///< last: its threads are joined first
+ };
+ 
+--- a/gpu/render/pipeline_cache.cpp
++++ b/gpu/render/pipeline_cache.cpp
+@@ -58,6 +58,9 @@
+ std::atomic<u32> g_bb_module_compiles;
+ std::atomic<u64> g_bb_module_compile_ns;
+ std::atomic<u64> g_bb_compile_total_ns;
++// skylanders (pipeline-prefetch): jobs started by draw-preparation workers, and adopted.
++std::atomic<u32> g_bb_prefetch_started;
++std::atomic<u32> g_bb_prefetch_adopted;
+ 
+ namespace {
+ 
+@@ -728,6 +731,19 @@
+         pending_graphics.erase(sel.graphics_key);
+         return FinishPipeline(sel.graphics_key, *job);
+     }
++    if (const auto job = TakePrefetched(sel.graphics_key)) {
++        {
++            std::unique_lock lk{job->mutex};
++            if (!job->done) {
++                const auto start = std::chrono::steady_clock::now();
++                job->cv.wait(lk, [&] { return job->done; });
++                AddCompileTime(start); // only the part not hidden by the look-ahead
++            }
++        }
++        ++g_bb_prefetch_adopted;
++        sel.fetch_shader.reset();
++        return FinishPipeline(sel.graphics_key, *job);
++    }
+     if (skippable) {
+         return CompileInBackground(sel);
+     }
+@@ -736,6 +752,7 @@
+     LOG_INFO(Render_Vulkan, "Compiling graphics pipeline {:#x}", pipeline_hash);
+     CompileTimer timer;
+     GraphicsPipeline::SerializationSupport sdata{};
++    NoteGraphicsKey(sel.graphics_key);
+     auto& slot = graphics_pipelines[sel.graphics_key];
+     slot = std::make_unique<GraphicsPipeline>(instance, scheduler, desc_heap, profile,
+                                               sel.graphics_key, *pipeline_cache, sel.infos,
+@@ -747,22 +764,12 @@
+ }
+ 
+ const GraphicsPipeline* PipelineCache::CompileInBackground(const PipelineSelection& selection) {
+-    if (!compiler) {
+-        const char* env = std::getenv("BB_ASYNC_PIPELINE_THREADS");
+-        const u32 threads =
+-            std::max(env && *env ? u32(std::strtoul(env, nullptr, 10))
+-                                 : std::clamp(std::thread::hardware_concurrency() / 4, 1u, 4u),
+-                     1u);
+-        compiler = std::make_unique<PipelineCompiler>(threads);
+-        std::printf("GPU: new pipelines of passes drawn every frame compile on %u threads "
+-                    "(BB_ASYNC_PIPELINES=0: on the GPU thread, the game waits)\n",
+-                    threads);
+-    }
+     auto job = std::make_shared<PendingPipeline>();
+     pending_graphics.emplace(selection.graphics_key, job);
+     ++async_started;
+     ++g_bb_compiles;
+-    compiler->Submit([this, job, key = selection.graphics_key, infos = selection.infos,
++    NoteGraphicsKey(selection.graphics_key);
++    Compiler().Submit([this, job, key = selection.graphics_key, infos = selection.infos,
+                       runtime_infos = selection.runtime_infos, fetch = selection.fetch_shader,
+                       modules = selection.modules]() mutable {
+         GraphicsPipeline::SerializationSupport sdata{};
+@@ -779,6 +786,92 @@
+     return nullptr;
+ }
+ 
++PipelineCompiler& PipelineCache::Compiler() {
++    // Workers (prefetch) and the GPU thread (async passes) share one pool, created once.
++    std::call_once(compiler_once, [this] {
++        const char* env = std::getenv("BB_ASYNC_PIPELINE_THREADS");
++        const u32 threads =
++            std::max(env && *env ? u32(std::strtoul(env, nullptr, 10))
++                                 : std::clamp(std::thread::hardware_concurrency() / 2, 1u, 8u),
++                     1u);
++        compiler = std::make_unique<PipelineCompiler>(threads);
++        std::printf("GPU: background pipeline compiles on %u threads\n", threads);
++    });
++    return *compiler;
++}
++
++void PipelineCache::NoteGraphicsKey(const GraphicsPipelineKey& key) {
++    std::unique_lock lk{prefetch_mutex};
++    known_graphics.insert(key);
++}
++
++std::shared_ptr<PipelineCache::PendingPipeline> PipelineCache::TakePrefetched(
++    const GraphicsPipelineKey& key) {
++    std::unique_lock lk{prefetch_mutex};
++    const auto found = prefetched.find(key);
++    if (found == prefetched.end()) {
++        return nullptr;
++    }
++    auto job = std::move(found->second);
++    prefetched.erase(found);
++    return job;
++}
++
++void PipelineCache::PrefetchGraphicsPipeline(const PipelineSelection& worker_sel) {
++    static const bool enabled = [] {
++        const char* value = std::getenv("BB_PREFETCH_PIPELINES");
++        return !(value && value[0] == '0');
++    }();
++    if (!enabled || !worker_sel.worker) {
++        return;
++    }
++    const auto& key = worker_sel.graphics_key;
++    {
++        std::shared_lock lk{prefetch_mutex};
++        if (known_graphics.contains(key)) {
++            return;
++        }
++    }
++    // The worker's Infos are its own copies; the pipeline takes the canonical ones, as the GPU
++    // thread's selection (and CompileInBackground) does.
++    std::array<const Shader::Info*, MaxShaderStages> infos{};
++    for (u32 stage = 0; stage < MaxShaderStages; ++stage) {
++        if (!worker_sel.infos[stage]) {
++            continue;
++        }
++        for (const auto& [program, copy] : worker_sel.worker->infos) {
++            if (&copy == worker_sel.infos[stage]) {
++                infos[stage] = &program->info;
++                break;
++            }
++        }
++        if (!infos[stage]) {
++            return;
++        }
++    }
++    auto job = std::make_shared<PendingPipeline>();
++    {
++        std::unique_lock lk{prefetch_mutex};
++        if (!known_graphics.insert(key).second) {
++            return;
++        }
++        prefetched.emplace(key, job);
++    }
++    ++g_bb_prefetch_started;
++    Compiler().Submit([this, job, key, infos, runtime_infos = worker_sel.runtime_infos,
++                       fetch = worker_sel.fetch_shader, modules = worker_sel.modules]() mutable {
++        GraphicsPipeline::SerializationSupport sdata{};
++        auto pipeline = std::make_unique<GraphicsPipeline>(
++            instance, scheduler, desc_heap, profile, key, *pipeline_cache, infos, runtime_infos,
++            fetch, modules, sdata, false);
++        std::scoped_lock lk{job->mutex};
++        job->pipeline = std::move(pipeline);
++        job->sdata = std::move(sdata);
++        job->done = true;
++        job->cv.notify_all();
++    });
++}
++
+ const GraphicsPipeline* PipelineCache::FinishPipeline(const GraphicsPipelineKey& key,
+                                                       PendingPipeline& job) {
+     PipelineStore::SaveGraphics(key, std::hash<GraphicsPipelineKey>{}(key), job.sdata);
+--- a/gpu/render/pipeline_store.cpp
++++ b/gpu/render/pipeline_store.cpp
+@@ -322,6 +322,10 @@
+     // preloaded is kept.
+     graphics_pipelines.clear();
+     compute_pipelines.clear();
++    {
++        std::unique_lock lk{prefetch_mutex};
++        known_graphics.clear();
++    }
+     std::unordered_set<VkShaderModule> modules;
+     for (const auto& [_, program] : program_cache) {
+         if (!program) {
+@@ -455,6 +459,7 @@
+             --num_pipelines;
+             continue;
+         }
++        NoteGraphicsKey(entry.key);
+         const auto [it, is_new] = graphics_pipelines.try_emplace(entry.key);
+         ASSERT(is_new);
+         it.value() = std::move(entry.pipeline);
+--- a/gpu/render/vk_draw_prep.cpp
++++ b/gpu/render/vk_draw_prep.cpp
+@@ -522,6 +522,7 @@
+                 prep_worker.failed = false;
+                 sel.draw_indirect_params = {};
+                 if (pipeline_cache.PrepareGraphicsPipeline(sel)) {
++                    pipeline_cache.PrefetchGraphicsPipeline(sel);
+                     draw.reg_checksum = checksum;
+                     draw.key = sel.graphics_key;
+                     draw.num_stages = static_cast<u32>(prep_worker.stages.size());
+--- a/gpu/platform/videoout/frame_stats.cpp
++++ b/gpu/platform/videoout/frame_stats.cpp
+@@ -36,6 +36,8 @@
+ extern std::atomic<u32> g_bb_module_compiles;
+ extern std::atomic<u64> g_bb_module_compile_ns;
+ extern std::atomic<u64> g_bb_compile_total_ns;
++extern std::atomic<u32> g_bb_prefetch_started;
++extern std::atomic<u32> g_bb_prefetch_adopted;
+ } // namespace Vulkan
+ 
+ namespace BbVideoOut {
+@@ -245,7 +247,7 @@
+                                "refresh_ms,write_fault_ms,read_faults,guest_copy_mb,draws,"
+                                "dispatches,submissions,compiles,preupload_mb,kernel_ms,alloc_mb,"
+                                "free_mb,monotonic_us,module_compiles,module_compile_ms,"
+-                               "compile_ms\n");
++                               "compile_ms,prefetch_started,prefetch_adopted\n");
+         }
+         return file;
+     }();
+@@ -254,6 +256,7 @@
+         static u64 log_twf, log_tick, log_present, log_compiles, log_rf, log_preupload;
+         static u64 log_alloc, log_free;
+         static u64 log_module_compiles, log_module_ns, log_compile_total_ns;
++        static u64 log_prefetch_started, log_prefetch_adopted;
+         const u64 tick = BbStats::tick_wait_ns.load(), present = BbStats::present_wait_ns.load();
+         const u64 compiles_now = Vulkan::g_bb_compiles.load();
+         // tick_wait_ns and the compile count are reset every stats window.
+@@ -268,7 +271,7 @@
+                                   static_cast<unsigned long long>(stamp.tv_nsec) / 1000ull;
+         std::fprintf(frame_log,
+                      "%.4f,%.2f,%.2f,%.2f,%.2f,%llu,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%llu,"
+-                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f,%llu,%llu,%.2f,%.2f\n",
++                     "%.2f,%llu,%llu,%llu,%llu,%.2f,%.2f,%.1f,%.1f,%llu,%llu,%.2f,%.2f,%llu,%llu\n",
+                      std::chrono::duration<double>(now - log_start).count(), frame_ms,
+                      delta(present, log_present) / 1e6, delta(tick, log_tick) / 1e6,
+                      last_gpu_ns ? (gpu_ns - last_gpu_ns) / 1e6 : 0.0,
+@@ -290,7 +293,11 @@
+                      static_cast<unsigned long long>(
+                          delta(Vulkan::g_bb_module_compiles.load(), log_module_compiles)),
+                      delta(Vulkan::g_bb_module_compile_ns.load(), log_module_ns) / 1e6,
+-                     delta(Vulkan::g_bb_compile_total_ns.load(), log_compile_total_ns) / 1e6);
++                     delta(Vulkan::g_bb_compile_total_ns.load(), log_compile_total_ns) / 1e6,
++                     static_cast<unsigned long long>(
++                         delta(Vulkan::g_bb_prefetch_started.load(), log_prefetch_started)),
++                     static_cast<unsigned long long>(
++                         delta(Vulkan::g_bb_prefetch_adopted.load(), log_prefetch_adopted)));
+         static u32 unflushed = 0;
+         if (++unflushed >= 120) {
+             std::fflush(frame_log);
