@@ -6,8 +6,9 @@ import os
 from pathlib import Path
 import tempfile
 
-# 2: LZMA blocks are stored unpadded (padded streams crashed the game).
-OUTPUT_REVISION=2
+# 3: shrunken LZMA blocks are lengthened by re-encoding, never padded (revision 1
+# padded inside the stream and crashed; 2 stored them short and misread blocks).
+OUTPUT_REVISION=3
 
 
 def digest_file(path):

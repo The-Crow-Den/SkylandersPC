@@ -50,30 +50,45 @@ class AssetModTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'overlap'):
             asset_mod.edits(original, [move, dict(offset=6, expected_hex='4242', replacement_hex='4343')])
 
-    def test_better_compression_is_stored_unpadded_before_following_block(self):
-        plain = random.Random(481).randbytes(8192)
+    def test_better_compression_is_lengthened_to_keep_the_next_block(self):
+        plain = random.Random(5).randbytes(3200) + bytes(8192 - 3200)
         filters = [dict(id=lzma.FILTER_LZMA1, dict_size=32768, lc=3, lp=0, pb=2)]
         encoded = lzma.compress(plain, format=lzma.FORMAT_RAW, filters=filters)
-        allocation = (7 + len(encoded) + 2047) // 2048 * 2048
+        allocation = (7 + len(encoded) + 511) // 512 * 512
         following = b'NEXT ARCHIVE BLOCK'
         original = (struct.pack('<H', len(encoded)) + bytes.fromhex('5d00800000') +
                     encoded + bytes(allocation - 7 - len(encoded)) + following)
+        rng = random.Random(481)
+        changed = bytes(rng.randrange(4) for _ in range(len(plain)))
+        # Plain recompression would end more than one 512-byte unit early.
+        self.assertLess(7 + len(lzma.compress(changed, format=lzma.FORMAT_RAW, filters=filters)), allocation - 512)
         recipe = dict(asset='level/test.bld', source_sha256=asset_mod.digest(original),
                       chunks=[dict(offset=0, allocation=allocation, decoded_size=len(plain),
                                    decoded_sha256=asset_mod.digest(plain), encoding='raw-lzma',
-                                   alignment=2048,
+                                   alignment=512,
                                    encoded_size=len(encoded), properties_hex='5d00800000',
                                    edits=[dict(offset=0, expected_hex=plain.hex(),
-                                               replacement_hex=bytes(len(plain)).hex())])])
+                                               replacement_hex=changed.hex())])])
         output, _ = asset_mod.patch_asset(original, recipe)
         stored_size = struct.unpack_from('<H', output)[0]
-        self.assertLess(7 + stored_size, allocation - 2048)  # shrank by more than a block
-        self.assertEqual(output[7 + stored_size:allocation], bytes(allocation - 7 - stored_size))
+        self.assertEqual((7 + stored_size + 511) // 512 * 512, allocation)  # walks to the next block
         self.assertEqual(output[allocation:], following)
         decoder = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
-        self.assertEqual(decoder.decompress(output[7:7+stored_size]), bytes(len(plain)))
-        self.assertTrue(decoder.eof)  # the declared length ends at the stream's end marker
-        self.assertEqual(decoder.unused_data, b'')
+        self.assertEqual(decoder.decompress(output[7:7+stored_size], max_length=len(plain)), changed)
+
+    def test_block_that_cannot_be_lengthened_is_refused(self):
+        plain = random.Random(482).randbytes(8192)
+        filters = [dict(id=lzma.FILTER_LZMA1, dict_size=32768, lc=3, lp=0, pb=2)]
+        encoded = lzma.compress(plain, format=lzma.FORMAT_RAW, filters=filters)
+        allocation = (7 + len(encoded) + 2047) // 2048 * 2048
+        original = struct.pack('<H', len(encoded)) + bytes.fromhex('5d00800000') + encoded + bytes(allocation - 7 - len(encoded))
+        recipe = dict(asset='level/test.bld', source_sha256=asset_mod.digest(original),
+                      chunks=[dict(offset=0, allocation=allocation, decoded_size=len(plain),
+                                   decoded_sha256=asset_mod.digest(plain), encoding='raw-lzma',
+                                   alignment=2048, encoded_size=len(encoded), properties_hex='5d00800000',
+                                   edits=[dict(offset=0, expected_hex=plain.hex(), replacement_hex=bytes(8192).hex())])])
+        with self.assertRaisesRegex(ValueError, 'large enough'):
+            asset_mod.patch_asset(original, recipe)
 
     def test_alignment_must_match_original_archive_boundary(self):
         data, recipe, _, _ = fixture()
