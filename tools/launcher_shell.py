@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Library presentation layered over the existing native session controller."""
+from functools import lru_cache
 from pathlib import Path
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer
 from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen
@@ -176,6 +177,34 @@ class SkyCanvas(QWidget):
             p.setBrush(spark); p.drawEllipse(QRectF(x - r * 3, y - r * 3, r * 6, r * 6))
 
 
+LOGO_BOX = QSize(610, 280)      # the Swap Force logo fills this; others match its width
+LOGO_MAX_HEIGHT = 330
+
+
+@lru_cache(maxsize=16)
+def visible_fraction(path, threshold=64):
+    """Share of the image width holding opaque artwork, ignoring margins and soft glow."""
+    image = QImage(path)
+    if image.isNull():
+        return 1.0
+    small = image.scaledToWidth(min(400, image.width())).convertToFormat(QImage.Format.Format_ARGB32)
+    columns = [x for x in range(small.width())
+               if any(small.pixel(x, y) >> 24 > threshold for y in range(small.height()))]
+    return (columns[-1] - columns[0] + 1) / small.width() if columns else 1.0
+
+
+def logo_size(path, reference):
+    """Display size giving the logo the same visible width as the reference logo."""
+    image, model = QImage(path), QImage(reference)
+    if image.isNull():
+        return LOGO_BOX
+    if model.isNull():
+        return image.size().scaled(LOGO_BOX, Qt.AspectRatioMode.KeepAspectRatio)
+    target = model.size().scaled(LOGO_BOX, Qt.AspectRatioMode.KeepAspectRatio).width() * visible_fraction(reference)
+    width = target / visible_fraction(path)
+    return image.size().scaled(QSize(round(width), LOGO_MAX_HEIGHT), Qt.AspectRatioMode.KeepAspectRatio)
+
+
 def supplied_artwork(root, game):
     """Resolve supplied logos; launcher backgrounds are deliberately image-free."""
     folder = Path(root) / '.local/launcher-art/supplied'
@@ -322,9 +351,8 @@ def renovated(base):
         def refresh_game(self):
             themed = supplied_artwork(self.root, self.game)
             self.canvas.game = themed
-            reference = QPixmap(supplied_artwork(self.root, {'id': 'swap-force'}).get('logo', ''))
-            self.canvas.portal_logo_width = (None if reference.isNull() else
-                                             reference.size().scaled(610,280,Qt.AspectRatioMode.KeepAspectRatio).width())
+            reference = supplied_artwork(self.root, {'id': 'swap-force'}).get('logo', '')
+            self.canvas.portal_logo_width = logo_size(reference, reference).width() if Path(reference).is_file() else None
             self.canvas.update()
             logo = QPixmap(themed['logo'])
             self.brand.clear(); self.subtitle.clear()
@@ -333,7 +361,7 @@ def renovated(base):
             self.subtitle.hide()
             if not themed['composite']:
                 if not logo.isNull():
-                    self.brand.setPixmap(logo.scaled(610,280,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
+                    self.brand.setPixmap(logo.scaled(logo_size(themed['logo'], reference),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
                 else:
                     self.brand.setText(self.game['name'])
             ready = self.game['id'] == 'trap-team' and self.play.isEnabled()
