@@ -86,12 +86,13 @@ def overlay_pci_configuration(directory, pci_device):
 
 
 RENDERER_OPTION = 'SKY_RENDERER_'
-# The renderer still reads its options under this prefix; the host maps
-# SKY_RENDERER_* onto it (native/renderer_adapter.cpp). Accepted here as a
-# deprecated spelling for one transition.
+# The renderer's option prefix before it was renamed; accepted as a deprecated
+# spelling for one transition.
 LEGACY_RENDERER_OPTION = 'BB_'
-# The renderer's settings file inside the GPU user directory.
-RENDERER_SETTINGS = 'bbport.ini'
+# The renderer's settings file inside the GPU user directory, and its name
+# before the rename (the renderer moves it over on first start).
+RENDERER_SETTINGS = 'renderer.ini'
+LEGACY_RENDERER_SETTINGS = 'bbport.ini'
 
 
 def renderer_environment(environment, idle='adaptive'):
@@ -421,7 +422,10 @@ def main(argv=None):
         # Renderer settings are kept; only compiled shader/pipeline caches start empty.
         cold = session/'gpu-user'
         cold.mkdir()
-        settings = ROOT/'out/native-gpu-user'/RENDERER_SETTINGS
+        user = ROOT/'out/native-gpu-user'
+        settings = user/RENDERER_SETTINGS
+        if not settings.is_file():
+            settings = user/LEGACY_RENDERER_SETTINGS
         if settings.is_file():
             (cold/RENDERER_SETTINGS).write_bytes(settings.read_bytes())
         env['SKY_GPU_USER_DIR'] = str(cold)

@@ -2,9 +2,8 @@
 #pragma once
 #include <cstdint>
 
-// The host's view of the optional renderer component. renderer_adapter.cpp is
-// the one place that names the renderer library's current C API and option
-// variables; everything else uses these neutral names.
+// The host's view of the optional renderer component (skyrender).
+// renderer_adapter.cpp is the one place that calls the library's C API.
 namespace Renderer {
 struct WindowConfig {
     const char* title;
@@ -15,7 +14,7 @@ struct WindowConfig {
     std::int32_t width, height;
 };
 // The renderer's settings file inside the user directory.
-inline constexpr const char* settings_file = "bbport.ini";
+inline constexpr const char* settings_file = "renderer.ini";
 
 void register_kernel();
 bool init(const WindowConfig& config);
@@ -29,10 +28,7 @@ void add_event_filter(EventFilter filter);
 std::uint32_t draw_init_default_hardware_state(std::uint32_t* command_buffer, std::uint32_t size);
 
 // Renderer options are SKY_RENDERER_<name> environment variables. set_option
-// sets one; without overwrite an existing value (or its deprecated renderer
-// spelling) wins. export_options hands all of them to the renderer and must
-// run before the renderer reads its environment.
+// sets one; without overwrite an existing value wins.
 void set_option(const char* name, const char* value, bool overwrite);
 const char* option(const char* name);
-void export_options();
 }

@@ -378,7 +378,6 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
         Renderer::set_option("AUDIO_STATS", "1", true);
         std::printf("{\"event\":\"timing-diagnostics\",\"enabled\":true,\"changes_frame_limit\":false}\n");
     }
-    Renderer::export_options();
     Renderer::register_kernel();
 #else
     (void)serial; (void)sdk; (void)attributes;
