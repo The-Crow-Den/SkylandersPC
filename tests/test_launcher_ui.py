@@ -143,6 +143,21 @@ class LauncherUITests(unittest.TestCase):
         finally:
             window.close()
 
+    def test_backdrop_palette_follows_logo_colors(self):
+        from PyQt6.QtGui import QImage,QColor
+        from tools.launcher_shell import logo_palette
+        image=QImage(40,40,QImage.Format.Format_ARGB32);image.fill(QColor(0,0,0,0))
+        for y in range(40):
+            for x in range(40):
+                if y<28:image.setPixelColor(x,y,QColor('#e53815'))
+                elif y<36:image.setPixelColor(x,y,QColor('#2f8fd8'))
+        path=self.root/'logo.png';image.save(str(path))
+        primary,accent=logo_palette(path)
+        self.assertLess(abs(primary.hue()-QColor('#e53815').hue()),15)
+        self.assertLess(abs(accent.hue()-QColor('#2f8fd8').hue()),15)
+        fallback=logo_palette(self.root/'missing.png',('#123456','#654321'))
+        self.assertEqual([c.name() for c in fallback],['#123456','#654321'])
+
     def test_skylanders_manager_edits_and_places_figures(self):
         from test_figure_data import SEED, played
         from tools import figure_data

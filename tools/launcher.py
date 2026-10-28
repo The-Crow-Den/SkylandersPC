@@ -331,7 +331,7 @@ Launcher = renovated(Launcher)
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName('Skylanders Portal Library')
+    app.setApplicationName('Skylanders PC')
     # Its own identity, so desktops show the launcher icon rather than the game's.
     app.setDesktopFileName('org.skylanders.Launcher')
     icon=launcher_icon(ROOT)

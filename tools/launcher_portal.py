@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Skylanders Manager: the virtual portal collection with progress editing."""
+import json
 from pathlib import Path
 import struct
-from PyQt6.QtCore import Qt, QRectF, QSize
-from PyQt6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient, QFont, QIcon
+from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
+from PyQt6.QtGui import QColor, QGuiApplication, QImage, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient, QFont, QIcon
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QPushButton, QLineEdit,
     QListWidget, QListWidgetItem, QSpinBox, QProgressBar, QDialog, QFileDialog, QMessageBox, QFrame)
 try:
@@ -17,42 +18,56 @@ CELL = 96
 
 
 class Portraits:
-    """Identification portraits from the private atlas used by the in-game drawer."""
+    """Identification portraits: the original cached pictures, else the drawer atlas."""
     def __init__(self, root):
-        self.cells = {}; self.atlas = QImage()
+        self.cells = {}; self.files = {}; self.atlas = QImage(); self.cache = {}
         folder = Path(root) / '.local/portal-assets'
         try:
             lines = (folder / 'portrait-index.txt').read_text().split('\n')
             for line in lines[1:]:
                 parts = line.split()
                 if len(parts) == 3: self.cells[(int(parts[0]), int(parts[1]))] = int(parts[2])
+            sources = json.loads((folder / 'sources.json').read_text()).get('sources', [])
+            self.files = {s['cell']: folder / s['cache'] for s in sources
+                          if s.get('kind') == 'figure' and isinstance(s.get('cell'), int) and '/' not in str(s.get('cache', '/'))}
             data = (folder / 'portraits.rgba').read_bytes()
             width, height = struct.unpack('<II', data[:8])
             if len(data) == 8 + width * height * 4:
                 self.atlas = QImage(data[8:], width, height, width * 4, QImage.Format.Format_RGBA8888).copy()
-        except (OSError, ValueError, struct.error):
-            self.cells = {}
+        except (OSError, ValueError, KeyError, struct.error):
+            pass
 
     def get(self, identity, variant):
         cell = self.cells.get((identity, variant), self.cells.get((identity, 0)))
-        if cell is None or self.atlas.isNull(): return QPixmap()
-        columns = self.atlas.width() // CELL
-        return QPixmap.fromImage(self.atlas.copy((cell % columns) * CELL, (cell // columns) * CELL, CELL, CELL))
+        if cell is None: return QPixmap()
+        if cell not in self.cache:
+            picture = QPixmap(str(self.files[cell])) if cell in self.files else QPixmap()
+            if picture.isNull() and not self.atlas.isNull():
+                columns = self.atlas.width() // CELL
+                picture = QPixmap.fromImage(self.atlas.copy((cell % columns) * CELL + 4, (cell // columns) * CELL + 4, CELL - 8, CELL - 8))
+            self.cache[cell] = picture
+        return self.cache[cell]
 
 
-def disc(pixmap, size, ring='#98dfef', fallback=''):
-    """A circular portrait with a portal-style ring."""
-    image = QPixmap(size, size); image.fill(Qt.GlobalColor.transparent)
+def tile(pixmap, size, ring='#98dfef', fallback=''):
+    """A rounded portrait card showing the whole picture, rendered for the screen's pixel density."""
+    screen = QGuiApplication.primaryScreen(); ratio = screen.devicePixelRatio() if screen else 1.0
+    image = QPixmap(int(size * ratio), int(size * ratio)); image.setDevicePixelRatio(ratio); image.fill(Qt.GlobalColor.transparent)
     p = QPainter(image); p.setRenderHint(QPainter.RenderHint.Antialiasing); p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    inset = max(2, size // 22); circle = QRectF(inset, inset, size - 2 * inset, size - 2 * inset)
-    path = QPainterPath(); path.addEllipse(circle)
+    inset = max(1.5, size / 40); card = QRectF(inset, inset, size - 2 * inset, size - 2 * inset); radius = size * .2
+    path = QPainterPath(); path.addRoundedRect(card, radius, radius)
     p.fillPath(path, QColor('#1d2c38'))
     if not pixmap.isNull():
-        p.setClipPath(path); p.drawPixmap(circle.toRect(), pixmap); p.setClipping(False)
+        scaled = pixmap.scaled(QSize(int(card.width() * ratio), int(card.height() * ratio)), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                               Qt.TransformationMode.SmoothTransformation)
+        scaled.setDevicePixelRatio(ratio)
+        p.setClipPath(path)
+        p.drawPixmap(QPointF(card.center().x() - scaled.width() / ratio / 2, card.center().y() - scaled.height() / ratio / 2), scaled)
+        p.setClipping(False)
     elif fallback:
         p.setPen(QColor('#cbf5ff')); p.setFont(QFont('Cantarell', max(9, size // 4), QFont.Weight.Bold))
-        p.drawText(circle, Qt.AlignmentFlag.AlignCenter, fallback[:1].upper())
-    p.setPen(QPen(QColor(ring), max(1.5, size / 32))); p.setBrush(Qt.BrushStyle.NoBrush); p.drawEllipse(circle)
+        p.drawText(card, Qt.AlignmentFlag.AlignCenter, fallback[:1].upper())
+    p.setPen(QPen(QColor(ring), max(1.2, size / 50))); p.setBrush(Qt.BrushStyle.NoBrush); p.drawRoundedRect(card, radius, radius)
     p.end(); return image
 
 
@@ -68,7 +83,8 @@ class PortalStage(QWidget):
     def paintEvent(self, event):
         p = QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing)
         # Centre the figure and portal as one group in the available height.
-        size = int(min(210, self.width() - 60, self.height() - 120)); x = self.width() / 2
+        # Sources are ~128 px; keep near native size so they stay sharp.
+        size = int(min(168, self.width() - 60, self.height() - 120)); x = self.width() / 2
         base = min(self.height() - 46, (self.height() + size) / 2 + 10)
         glow = QRadialGradient(x, base - 30, 150)
         glow.setColorAt(0, QColor(63, 214, 255, 90 if self.active else 45)); glow.setColorAt(1, QColor(63, 214, 255, 0))
@@ -77,7 +93,7 @@ class PortalStage(QWidget):
         p.setBrush(QColor('#204760')); p.setPen(QPen(QColor('#90eaff' if self.active else '#43819b'), 4)); p.drawEllipse(QRectF(x - 110, base - 22, 220, 52))
         p.setPen(QPen(QColor('#4dbbd6'), 1)); p.drawEllipse(QRectF(x - 92, base - 14, 184, 36))
         if self.name and size > 40:
-            p.drawPixmap(int(x - size / 2), int(base - size + 4), disc(self.portrait, size, '#90eaff' if self.active else '#5d8ea5', self.name))
+            p.drawPixmap(int(x - size / 2), int(base - size - 6), tile(self.portrait, size, '#90eaff' if self.active else '#5d8ea5', self.name))
         p.end()
 
 
@@ -92,7 +108,7 @@ class CreateDialog(QDialog):
         self.search.textChanged.connect(self.filter); column.addWidget(self.search)
         self.list = QListWidget(); self.list.setIconSize(QSize(40, 40)); column.addWidget(self.list, 1)
         for name, identity, variant in collection.choices():
-            item = QListWidgetItem(QIcon(disc(portraits.get(identity, variant), 40, '#5d8ea5', name)), name)
+            item = QListWidgetItem(QIcon(tile(portraits.get(identity, variant), 40, '#5d8ea5', name)), name)
             item.setData(Qt.ItemDataRole.UserRole, (identity, variant)); self.list.addItem(item)
         self.list.itemDoubleClicked.connect(lambda item: self.accept())
         row = QHBoxLayout(); row.addStretch()
@@ -134,7 +150,7 @@ class PortalPage(QWidget):
         left = QVBoxLayout(side); left.setContentsMargins(16, 16, 16, 16); left.setSpacing(12)
         self.search = QLineEdit(); self.search.setPlaceholderText('Search your collection'); self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.filter); left.addWidget(self.search)
-        self.list = QListWidget(); self.list.setObjectName('portalList'); self.list.setIconSize(QSize(46, 46))
+        self.list = QListWidget(); self.list.setObjectName('portalList'); self.list.setIconSize(QSize(52, 52))
         self.list.currentRowChanged.connect(self.select); left.addWidget(self.list, 1)
         self.empty = QLabel('No virtual Skylanders yet.\nCreate one or import a figure dump.'); self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty.setStyleSheet('color: #92929e; padding: 30px 0;'); left.addWidget(self.empty)
@@ -225,7 +241,7 @@ class PortalPage(QWidget):
     def close_page(self):
         if self.dirty() and QMessageBox.question(self, 'Unsaved changes', 'Discard the changes to this Skylander?') != QMessageBox.StandardButton.Yes:
             return
-        self.owner.views.setCurrentWidget(self.owner.canvas)
+        self.owner.refresh_game(); self.owner.views.setCurrentWidget(self.owner.canvas)
 
     def locked(self):
         return self.owner.process is not None
@@ -262,7 +278,7 @@ class PortalPage(QWidget):
             detail = f'Level {figure.level}  ·  {figure.gold:,} gold'
             lines.append(detail + (f'  ·  “{figure.nickname}”' if figure.nickname else ''))
         else: lines.append('Not played yet')
-        item = QListWidgetItem(QIcon(disc(self.portraits.get(figure.identity, figure.variant), 46,
+        item = QListWidgetItem(QIcon(tile(self.portraits.get(figure.identity, figure.variant), 52,
                                           '#90eaff' if self.starting() == entry.path else '#4a6a7c', entry.name)), '\n'.join(lines))
         item.setToolTip(entry.path.name); return item
 
