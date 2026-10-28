@@ -130,7 +130,15 @@ def recipe(source,profile,mode):
                 if base not in blocks:raise ValueError('glyph exceeds verified font blocks')
                 _,_,modified=blocks[base];at=absolute-base;src=(y*width+x)*4
                 if at+4>len(modified):raise ValueError('glyph pixel exceeds block')
-                modified[at:at+4]=pixels[src:src+4]
+                # Font 001's shapes come from a separate alpha texture; this one holds
+                # colour only, opaque and white around the buttons, and text drawn
+                # from that white turned black when artwork wrote transparent black.
+                # Keep the original alpha byte; blend the artwork over the white
+                # background, or over black inside the original button (dark pixels).
+                alpha=pixels[src+3];background=min(modified[at:at+3])>=235
+                for channel in range(3):
+                    base=modified[at+channel] if background else 0
+                    modified[at+channel]=(pixels[src+channel]*alpha+base*(255-alpha)+127)//255
     return _write_blocks(profile,blocks)
 
 
