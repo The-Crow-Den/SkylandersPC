@@ -3,7 +3,8 @@
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QIcon,QPixmap
 from PyQt6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QLineEdit,
-    QComboBox,QListWidget,QListWidgetItem,QFileDialog,QMessageBox)
+    QComboBox,QListWidget,QListWidgetItem,QFileDialog,QMessageBox,QInputDialog,QApplication)
+from PyQt6.QtCore import Qt
 try:
     from . import launcher_trophies as trophies
 except ImportError:
@@ -21,10 +22,32 @@ class TrophyDialog(QDialog):
         self.list=QListWidget();self.list.setWordWrap(True);self.list.setIconSize(QSize(48,48));column.addWidget(self.list,1)
         self.notice=QLabel();self.notice.setWordWrap(True);self.notice.setStyleSheet('color: #a9a9b1;');column.addWidget(self.notice)
         actions=QHBoxLayout();column.addLayout(actions)
-        for text,callback in [('Link trophy catalogue',lambda:self.link('trophy_definitions')),('Link user trophy record',lambda:self.link('trophy_progress')),('Refresh',self.refresh),('Close',self.accept)]:
+        for text,callback in [('Get names from PSN',self.from_psn),('Link trophy catalogue',lambda:self.link('trophy_definitions')),('Link user trophy record',lambda:self.link('trophy_progress')),('Refresh',self.refresh),('Close',self.accept)]:
             button=QPushButton(text);button.clicked.connect(callback);actions.addWidget(button)
         self.search.textChanged.connect(self.populate);self.filter.currentIndexChanged.connect(self.populate)
         self.refresh()
+
+    def from_psn(self):
+        try:from . import psn_trophies,game_library
+        except ImportError:import psn_trophies,game_library
+        import os
+        from pathlib import Path
+        npsso,ok=QInputDialog.getText(self,'Get names from PSN',
+            'Sign in at playstation.com, then open\nhttps://ca.account.sony.com/api/v1/ssocookie\n'
+            'and paste the npsso value. It is used once and never saved.',QLineEdit.EchoMode.Password)
+        if not ok or not npsso.strip():return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            npwr=trophies.game_sources(self.owner.root,self.game)[3]
+            if not npwr:raise ValueError('This game has no trophy set.')
+            title_id=game_library.resolve(self.owner.root,game=self.game).title_id
+            store=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'skylanders-pc/trophies'/title_id
+            title,rows=psn_trophies.fetch(npwr,psn_trophies.access_token(npsso))
+            psn_trophies.write_catalogue(store,npwr,title,rows)
+        except (OSError,ValueError,KeyError) as error:
+            QApplication.restoreOverrideCursor();QMessageBox.warning(self,'PSN',str(error));return
+        QApplication.restoreOverrideCursor();self.refresh()
+        QMessageBox.information(self,'PSN',f'{len(rows)} trophy names imported. They appear in game from the next session.')
 
     def refresh(self):
         try:self.data=trophies.snapshot(self.owner.root,self.game)
