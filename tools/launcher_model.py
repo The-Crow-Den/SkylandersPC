@@ -15,7 +15,7 @@ except ImportError:
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
                 motion_blur=True, nvidia=True, mangohud=False,
-                unlock_nightmare=True, level_events=False, frame_policy='auto', figure='')
+                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='')
 FLAGS = ('motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
@@ -71,7 +71,7 @@ def command(root, python, value, mods=None, game=None):
         argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
     for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
-    for key in ('fullscreen', 'fps_counter', 'motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare'):
+    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare'):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))
     if mods is not None:
         try:

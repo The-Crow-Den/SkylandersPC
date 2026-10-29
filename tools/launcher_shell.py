@@ -467,6 +467,8 @@ def renovated(base):
 
         def read_output(self):
             super().read_output()
+            if '"event":"trophy-unlocked"' in getattr(self,'last_output',''):
+                self.refresh_game() # Live trophy percentage.
             if not hasattr(self,'loading_wheel') or self.stopping or getattr(self,'runtime_started',True): return
             if 'SKYLANDERS_RUNTIME_LAUNCHED' in self.output_buffer:
                 self.launch_status.setText('Starting game…')

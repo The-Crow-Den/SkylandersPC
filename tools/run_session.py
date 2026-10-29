@@ -134,6 +134,24 @@ def announce_window(log_path, process, marker=WINDOW_READY, interval=0.1):
                 time.sleep(interval)
 
 
+def relay_trophies(log_path, process, interval=0.25):
+    """Forward trophy unlock events from the runtime log to the launcher."""
+    pending = b''
+    with open(log_path, 'rb') as log:
+        while True:
+            chunk = log.read()
+            if chunk:
+                *lines, pending = (pending + chunk).split(b'\n')
+                for line in lines:
+                    if line.startswith(b'{"event":"trophy-unlocked"'):
+                        print(line.decode('utf-8', errors='replace'), flush=True)
+                pending = pending[-4096:]
+            elif process.poll() is not None:
+                return
+            else:
+                time.sleep(interval)
+
+
 def run_logged(command, directory, *, cwd, env=None, seconds=0):
     started = time.monotonic()
     reason = 'process-exit'
@@ -143,6 +161,7 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
         try:
             print('SKYLANDERS_RUNTIME_LAUNCHED', flush=True)
             threading.Thread(target=announce_window, args=(directory / 'runtime.log', process), daemon=True).start()
+            threading.Thread(target=relay_trophies, args=(directory / 'runtime.log', process), daemon=True).start()
             code = process.wait(timeout=seconds if seconds else None)
         except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
             reason = 'requested-time-limit' if isinstance(error, subprocess.TimeoutExpired) else 'user-interrupt'
@@ -216,6 +235,8 @@ def main(argv=None):
     parser.add_argument('--portal-volume', type=int, default=30, help='portal speaker volume, 0 to 100 (default 30)')
     parser.add_argument('--fullscreen', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('--fps-counter', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--trophy-popups', action=argparse.BooleanOptionalAction, default=True,
+                        help='show a popup in game when a trophy unlocks')
     parser.add_argument('--nvidia', action=argparse.BooleanOptionalAction,
                         default=Path('/usr/share/vulkan/icd.d/nvidia_icd.json').is_file(),
                         help='restrict Vulkan to the installed NVIDIA driver')
@@ -396,7 +417,8 @@ def main(argv=None):
                 'SKY_FRAME_POLICY': args.frame_policy,
                 'SKY_ALLOW_60': '0' if args.variant == 'original' else '1',
                 'SKY_FULLSCREEN': '1' if args.fullscreen else '0',
-                'SKY_FPS_COUNTER': '1' if args.fps_counter else '0'})
+                'SKY_FPS_COUNTER': '1' if args.fps_counter else '0',
+                'SKY_TROPHY_POPUPS': '1' if args.trophy_popups else '0'})
     if args.manual_phase_cap: env['SKY_EXTERNAL_FRAME_CAP'] = '1'
     else: env.pop('SKY_EXTERNAL_FRAME_CAP',None)
     env.setdefault('SKY_RENDERER_FPS_LIMIT','0')

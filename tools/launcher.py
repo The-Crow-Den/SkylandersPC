@@ -96,6 +96,7 @@ class Launcher(QMainWindow):
         self.combo(display,'Frame limit','frame_limit',[('30 FPS',30),('60 FPS · experimental timing',60),('Uncapped · diagnostic',0)])
         self.check(display,'Fullscreen','fullscreen')
         self.check(display,'Show frame rate','fps_counter')
+        self.check(display,'Show trophy popups','trophy_popups')
         self.check(display,'Motion blur','motion_blur')
         self.check(display,'Use NVIDIA GPU','nvidia')
         self.check(display,'MangoHud overlay · optional installation','mangohud')
@@ -262,6 +263,7 @@ class Launcher(QMainWindow):
         if self.process:
             text = bytes(self.process.readAllStandardOutput()).decode('utf-8', errors='replace')
             self.output_buffer = (self.output_buffer + text)[-32768:]
+            self.last_output = text
             self.log.moveCursor(self.log.textCursor().MoveOperation.End)
             self.log.insertPlainText(text)
 

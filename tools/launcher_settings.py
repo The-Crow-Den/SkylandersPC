@@ -13,7 +13,7 @@ except ImportError:
 
 GROUPS = [
  ('Display','Picture and window preferences.', [('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur')]),
- ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
+ ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('unlock_nightmare','Nightmare available by default')]),
 ]
@@ -74,7 +74,7 @@ class SettingsPage(QWidget):
             'resolution':'Internal rendering resolution.', 'quality':'Detail and definition of game shadows.',
             'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.',
             'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
-            'fps_counter':'Show frame rate during play.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
+            'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
             'portal_volume':'Volume of voices from the portal speaker.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'level_events':'Record events for troubleshooting.'}

@@ -23,6 +23,10 @@
 #include <unistd.h>
 #include <vector>
 
+// Renderer popup (libskyrender); absent in tests and headless runs.
+extern "C" void skyrender_show_toast(const char *, const char *, int)
+    __attribute__((weak));
+
 class LocalTrophies {
   using U = std::uint64_t;
   struct Item {
@@ -397,6 +401,16 @@ public:
       std::printf("{\"event\":\"trophy-unlocked\",\"user\":%d,\"id\":%d,"
                   "\"platinum\":%d}\n",
                   ctx.user, static_cast<int>(a[2]), platinum);
+      std::fflush(stdout); // The launcher follows runtime.log live.
+      const char *popups = std::getenv("SKY_TROPHY_POPUPS");
+      if (skyrender_show_toast && !(popups && popups[0] == '0')) {
+        for (const int id : {static_cast<int>(a[2]), platinum})
+          for (const auto &i : items)
+            if (i.id == id)
+              skyrender_show_toast(i.grade == 1 ? "Platinum trophy unlocked"
+                                                : "Trophy unlocked",
+                                   i.name.c_str(), i.grade);
+      }
       return 0;
     }
     if (operation == 12) {

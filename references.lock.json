@@ -20,7 +20,7 @@
     {
       "archive": "bloodborne_pc-master.zip",
       "sha256": "953c3da81c63915dfa70622289c505a7dd77498ba3cc5bf1bdd16943f80806c3",
-      "commit": "8185b88d80573fa300595d5c54450183b4109935",
+      "commit": "4205b87f2772381496c8d36917fd38d40bb0a60d",
       "role": "GPU/platform/audio/memory provider adopted locally; canonical changes in LICENSES/bbport-source.json",
       "fork": {"name": "skyrender", "location": ".local/skyrender", "commit": "2b14b4bc380f324533c9b29efd1306e7766f63a4"}
     },
