@@ -241,7 +241,7 @@ class LauncherUITests(unittest.TestCase):
         self.make_library_base('CUSA99999');self.window.rebuild_rail()
         self.window.select_game('title-cusa99999')
         self.assertIn('not supported yet',self.window.install_note.text())
-        self.assertEqual(self.window.primary.text(),'INSTALLED')
+        self.assertEqual(self.window.primary.text(),'NOT SUPPORTED')
         self.assertFalse(self.window.play.isEnabled())
         self.window.select_game('trap-team')
         self.assertEqual(self.window.game['installation'],'CUSA00626@01.01')
@@ -353,6 +353,43 @@ class LauncherUITests(unittest.TestCase):
         self.assertFalse(self.window.play.isEnabled()) # no prepared runtime
         dialog.close()
 
+    def test_game_states_gate_play_and_show_version_and_size(self):
+        from tools import launcher_game_state,game_library
+        self.make_library_base();self.window.rebuild_rail();self.window.select_game('title-cusa00626')
+        game=self.window.game
+        with patch.object(game_library,'supported',return_value=True),patch('tools.game_prepare.require_ready'):
+            self.window.refresh_game()
+            self.assertEqual(self.window.game_state['state'],'Ready');self.assertTrue(self.window.primary.isEnabled());self.assertTrue(self.window.play.isEnabled())
+            self.assertIn('Base 01.00',self.window.game_info.text());self.assertIn('MB',self.window.game_info.text())
+            game['operation']={'state':'Installing','message':'Unpacking files'};self.window.refresh_game()
+            self.assertEqual(self.window.primary.text(),'INSTALLING');self.assertFalse(self.window.play.isEnabled())
+            game['operation']={'state':'Preparing','message':'Checking files','fraction':.5};self.window.refresh_game()
+            self.assertEqual(self.window.primary.text(),'PREPARING');self.assertFalse(self.window.play.isEnabled())
+            game.pop('operation');self.window.refresh_game();self.assertTrue(self.window.play.isEnabled())
+        with patch.object(game_library,'supported',return_value=True),patch('tools.game_prepare.require_ready',side_effect=ValueError('missing step')):
+            self.window.refresh_game();self.assertEqual(self.window.primary.text(),'REPAIR');self.assertFalse(self.window.play.isEnabled())
+
+    def test_preparation_progress_does_not_wait_on_the_preparation_lock(self):
+        self.window.game['operation']={'state':'Preparing','message':'Preparing game files','fraction':.5}
+        with patch('tools.game_prepare.require_ready',side_effect=AssertionError('would wait on worker lock')):
+            self.window.refresh_game()
+        self.assertIn('50%',self.window.game_info.text());self.assertFalse(self.window.play.isEnabled())
+        self.window.game.pop('operation')
+
+    def test_remove_requires_confirmation_and_keeps_settings_and_figures(self):
+        from tools import game_library
+        entry=self.make_library_base();self.window.rebuild_rail();self.window.select_game('title-cusa00626')
+        self.window.game['settings']={'resolution':'2160p'}
+        from PyQt6.QtWidgets import QMessageBox
+        with patch('tools.launcher_shell.QMessageBox.question',return_value=QMessageBox.StandardButton.No):self.window.remove_game()
+        self.assertTrue(Path(entry['base_path']).exists())
+        saved=self.root/'save-data';saved.write_bytes(b'keep')
+        with patch('tools.launcher_shell.QMessageBox.question',return_value=QMessageBox.StandardButton.Yes):self.window.remove_game()
+        self.assertEqual(self.window.game['settings'],{'resolution':'2160p'})
+        self.assertEqual(saved.read_bytes(),b'keep');self.assertEqual(self.window.game_state['state'],'Not installed')
+        self.assertEqual(game_library.entries(self.root,[]),[])
+        self.assertTrue(any((self.root/'.local/removed-games').glob('*/0/eboot.bin')))
+
     def setup_script(self, body):
         path=self.root/'synthetic-preparer.py';path.write_text('import json,time\n'+body)
         return path
@@ -410,8 +447,8 @@ class LauncherUITests(unittest.TestCase):
         broken=self.make_library_base();good=self.make_library_base('CUSA99999')
         game_library.manifest_path(game_library.directory(self.root),broken).write_text('corrupt')
         self.window.rebuild_rail();self.window.select_game('title-cusa00626')
-        self.assertEqual(self.window.primary.text(),'NEEDS REPAIR')
-        self.assertIn('Needs repair',self.window.install_note.text())
+        self.assertEqual(self.window.primary.text(),'REPAIR')
+        self.assertIn('Needs repair',self.window.game_info.text())
         self.window.select_game('title-cusa99999')
         self.assertEqual(self.window.game['installed_paths'],[good['base_path']])
 

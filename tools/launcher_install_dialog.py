@@ -234,6 +234,8 @@ class InstallDialog(QDialog):
         jobs = self.checked_jobs()
         if not jobs:return
         self.show_step(3)
+        self.game['operation']={'state':'Installing','message':'Unpacking your game…'}
+        self.owner.refresh_game()
         self.source_packages = [Path(path).name for _,path in jobs]
         self.game.update({key:self.fields[key].text().strip() for key in ('game_pkg','update_pkg')})
         self.owner.persist();self.extractor = packages.BUILTIN_EXTRACTOR
@@ -252,11 +254,16 @@ class InstallDialog(QDialog):
             self.phase.setText('Finishing installation…')
             try:
                 entry = packages.publish(self.staging,game_library.directory(self.owner.root),self.source_packages)
+                hidden=game_library.removed(self.owner.root)
+                restored={game_library.selector(entry['title_id'],version) for version in (entry['base_version'],entry['app_version'])}
+                hidden=[key for key in hidden if key not in restored]
+                game_library.write_json(self.owner.root/'.local/removed-games.json',hidden)
                 launcher_library.sync_installations(self.owner.root,self.owner.library)
                 profile = game_library.profile_for(self.owner.root,entry)
                 key = profile['id'] if profile else 'title-'+entry['title_id'].lower()
                 self.owner.library['selected'] = key
                 game = next(g for g in self.owner.library['games'] if g['id']==key)
+                self.game.pop('operation',None);self.game=game
                 game_library.select(self.owner.root,game['installation']);self.owner.persist()
                 installed = game['installed_paths']
                 self.output.append('Extraction validated. Installed to:\n'+'\n'.join(installed))
@@ -286,12 +293,17 @@ class InstallDialog(QDialog):
             from .launcher_prepare import PreparationProcess
         except ImportError:
             from launcher_prepare import PreparationProcess
+        self.game['operation']={'state':'Preparing','message':'Checking your game files…'}
+        self.owner.refresh_game()
         self.show_step(3);self.heading.setText('Getting your game ready')
         self.phase.setText('Checking your game files…');self.cancel.setText('Cancel setup')
         self.open_folder.hide();self.progress.setRange(0,100);self.progress.setValue(0)
         worker = PreparationProcess(self);self.preparation = worker
-        worker.log.connect(self.output.insertPlainText)
+        worker.log.connect(self.append_log)
+        self.owner.log.append('Full setup log: '+str(self.staging/'setup.log'))
         def update(value):
+            self.game['operation']={'state':'Preparing','message':value['message'],'fraction':value['fraction']}
+            self.owner.refresh_game()
             if value['state'] not in ('optional','available'):
                 self.phase.setText(value['message']);self.progress.setValue(round(value['fraction']*100))
         worker.progress.connect(update)
@@ -306,10 +318,18 @@ class InstallDialog(QDialog):
         self.progress.setValue(1 if success else 0)
         self.owner.refresh_readiness();self.owner.refresh_game()
 
+    def append_log(self, text):
+        self.output.insertPlainText(text);self.owner.log.insertPlainText(text)
+        if hasattr(self,'staging'):
+            try:
+                self.staging.mkdir(parents=True,exist_ok=True)
+                with (self.staging/'setup.log').open('a') as stream:stream.write(text)
+            except OSError:pass
+
     def read_output(self):
         if self.process:
             output = bytes(self.process.readAllStandardOutput()).decode('utf-8',errors='replace')
-            self.output.insertPlainText(output);self.output.ensureCursorVisible()
+            self.append_log(output);self.output.ensureCursorVisible()
 
     def error(self,error):
         if error==QProcess.ProcessError.FailedToStart:
@@ -326,6 +346,8 @@ class InstallDialog(QDialog):
         self.completed_jobs += 1;self.next_job()
 
     def done_state(self, success=False):
+        self.game.pop('operation',None)
+        self.owner.refresh_game()
         self.heading.setText('Your game is installed' if success else 'Installation stopped')
         self.cancel.setText('Done' if success else 'Close');self.cancel.setEnabled(True);self.start.setEnabled(False)
         self.open_folder.setVisible(success)
@@ -333,8 +355,8 @@ class InstallDialog(QDialog):
         self.progress.setRange(0,1);self.progress.setValue(0)
 
     def fail(self,message):
-        self.phase.setText(message)
-        self.output.append('\n'+message+'\nImport folder: '+str(self.staging));self.done_state()
+        self.phase.setText(message if 'cancelled' in message.lower() else 'Installation could not finish. Check your files and available space, then try again. Your existing games were kept.')
+        self.append_log('\n'+message+'\nImport folder: '+str(self.staging));self.done_state()
 
     def reject(self):
         if getattr(self,'preparation',None) and self.preparation.process:

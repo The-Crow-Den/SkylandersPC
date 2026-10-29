@@ -199,6 +199,16 @@ class PreparationTests(unittest.TestCase):
         source.write_bytes(b'changed')
         with self.assertRaises(prepare.PreparationError):prepare.require_ready(self.root,self.entry,deep=False)
 
+    def test_comment_only_engine_edit_does_not_invalidate_ready_markers(self):
+        self.run_prepare();original=prepare.file_hash
+        def changed(path):
+            return 'comment-only-change' if Path(path)==Path(prepare.__file__) else original(path)
+        with patch.object(prepare,'file_hash',side_effect=changed):
+            prepare.require_ready(self.root,self.entry,deep=False)
+            prepare.require_ready(self.root,self.entry,deep=True)
+        with patch.object(prepare,'PREPARATION_VERSION',prepare.PREPARATION_VERSION+1):
+            with self.assertRaises(prepare.PreparationError):prepare.require_ready(self.root,self.entry,deep=False)
+
     def test_optional_failure_does_not_block_ready(self):
         with patch('tools.import_controller_glyphs.discover',side_effect=ValueError('No optional artwork')):
             events=[];prepare.prepare(self.root,self.entry,progress=events.append,optional=('controller-art',))

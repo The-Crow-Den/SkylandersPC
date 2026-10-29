@@ -265,7 +265,9 @@ def register(project, issues=None):
     candidates = []
     for folder in [project/'Game',*sorted((project/'.local/library-games').glob('*'))]:
         for sfo in sorted(folder.glob('*/sce_sys/param.sfo')):
-            try:candidates.append((sfo.parent.parent,metadata(sfo.parent.parent)))
+            try:
+                meta=metadata(sfo.parent.parent)
+                if selector(meta['TITLE_ID'],meta['APP_VER']) not in removed(project):candidates.append((sfo.parent.parent,meta))
             except (OSError,ValueError) as error:report(issues,sfo,error)
     legacy = read_entries(project/'.local/game-library',issues)
     for previous in libraries(project):
@@ -278,7 +280,9 @@ def register(project, issues=None):
     with locked(library):
         existing = {selector(e['title_id'],e['app_version']):e for e in read_entries(library,issues)}
         def add(entry):
-            key = selector(entry['title_id'],entry['app_version']);previous = existing.get(key)
+            key = selector(entry['title_id'],entry['app_version'])
+            if key in removed(project):return
+            previous = existing.get(key)
             if previous:
                 if (previous['base_path'],previous['update_path']) != (entry['base_path'],entry['update_path']):
                     # External Game/ references move with the project: re-register only
@@ -314,14 +318,23 @@ def register(project, issues=None):
                 except (OSError,ValueError) as error:report(issues,update or base,error,identity['TITLE_ID'])
 
 
+def removed(project):
+    path=Path(project)/'.local/removed-games.json'
+    try:
+        value=json.loads(path.read_text())
+        return value if isinstance(value,list) and all(isinstance(v,str) for v in value) else []
+    except (OSError,ValueError):return []
+
+
 def entries(project, issues=None):
     register(project,issues)
     result = [];seen = {}
     for library in libraries(project):
         for entry in read_entries(library,issues):
             try:
-                discover(entry)
                 key = selector(entry['title_id'],entry['app_version'])
+                if key in removed(project):continue
+                discover(entry)
                 if key in seen:
                     if (seen[key]['base_path'],seen[key]['update_path'])!=(entry['base_path'],entry['update_path']):
                         report(issues,manifest_path(library,entry),'Another installation has this title and version',entry['title_id'],entry['app_version'])

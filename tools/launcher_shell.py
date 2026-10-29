@@ -276,6 +276,14 @@ def renovated(base):
             main.addWidget(self.subtitle)
             self.canvas.anchor = self.brand
             main.addStretch(3)
+            self.game_info=QLabel();self.game_info.setStyleSheet('color: #c2c2ca;');self.game_info.setWordWrap(True)
+            game_panel=QWidget();game_panel.setObjectName('gameManagement')
+            game_panel.setStyleSheet('QWidget#gameManagement { background: rgba(20,20,26,0.8); border: 1px solid #343438; border-radius: 12px; }')
+            management=QHBoxLayout(game_panel);management.setContentsMargins(14,10,14,10);management.addWidget(self.game_info,1)
+            self.repair_button=self.button(management,'Repair',self.repair_game)
+            self.folder_button=self.button(management,'Open folder',self.open_game_folder)
+            self.remove_button=self.button(management,'Remove',self.remove_game)
+            main.insertWidget(1,game_panel)
             bottom = QHBoxLayout()
             self.trophies = self.button(bottom, 'Trophies  —%', self.trophy_tracker)
             self.trophies.setIcon(utility_icon('trophy'));self.trophies.setIconSize(QSize(24,24))
@@ -335,12 +343,19 @@ def renovated(base):
                 item = self.rail.takeAt(0)
                 if item.widget():
                     item.widget().hide(); item.widget().deleteLater()
+            self.game_buttons={}
             for game in self.library['games']:
                 button = self.button(self.rail, '',
                                      lambda checked=False, key=game['id']: self.select_game(key))
                 button.setObjectName('gameIcon'); button.setCheckable(True)
                 button.setChecked(game['id'] == self.library['selected']); button.setFixedSize(82,76)
-                button.setToolTip(game['name']); button.setAccessibleName(game['name'])
+                try:
+                    try:from .launcher_game_state import snapshot
+                    except ImportError:from launcher_game_state import snapshot
+                    state=snapshot(self.root,game,game.get('operation'))['state']
+                except (OSError,ValueError):state='Needs repair'
+                button.setToolTip(game['name']+' · '+state);button.setAccessibleName(game['name']+' · '+state)
+                self.game_buttons[game['id']]=button
                 logo = QPixmap(supplied_artwork(self.root, game)['logo'])
                 if not logo.isNull():
                     button.setIcon(QIcon(logo));button.setIconSize(QSize(70,48))
@@ -381,7 +396,8 @@ def renovated(base):
                 text = problem['path']+': '+problem['message']
                 if text not in self.reported_library_issues:
                     self.log.append('Library entry needs repair: '+text);self.reported_library_issues.add(text)
-            self.refresh_readiness()
+            if self.game.get('operation'):self.play.setEnabled(False)
+            else:self.refresh_readiness()
             themed = supplied_artwork(self.root, self.game)
             self.canvas.game = themed
             reference = supplied_artwork(self.root, {'id': 'swap-force'}).get('logo', '')
@@ -397,18 +413,27 @@ def renovated(base):
                     self.brand.setPixmap(logo.scaled(logo_size(themed['logo'], reference),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
                 else:
                     self.brand.setText(self.game['name'])
-            ready = self.play.isEnabled()
-            issue = self.game.get('installation_issue','')
-            self.primary.setText('PLAY' if ready else ('NEEDS REPAIR' if issue and not choices else 'INSTALLED' if choices else 'INSTALL'))
-            self.primary.setEnabled(ready or not choices)
-            if issue and not choices:
-                self.install_note.setText('Needs repair. '+issue)
-            elif choices and not ready:
-                entry = game_library.resolve_entry(self.root, game=self.game)
-                message = 'Game files installed. Setup is still needed before you can play.' if game_library.supported(self.root, entry) else 'Game files installed. This game is not supported yet.'
-                self.install_note.setText(message)
-            else:
-                self.install_note.clear()
+            try:
+                try:from .launcher_game_state import snapshot
+                except ImportError:from launcher_game_state import snapshot
+                data=snapshot(self.root,self.game,self.game.get('operation'))
+            except (OSError,ValueError) as error:
+                self.log.append(str(error));data=dict(state='Needs repair',message='Choose Repair to check your game files.',entry=None,size=None,version='')
+            self.game_state=data
+            if self.game['id'] in getattr(self,'game_buttons',{}):
+                button=self.game_buttons[self.game['id']]
+                button.setToolTip(self.game['name']+' · '+data['state']);button.setAccessibleName(button.toolTip())
+            ready=data['state']=='Ready';busy=data['state'] in ('Installing','Preparing') or self.process is not None or getattr(self,'library_transfer',False)
+            self.play.setEnabled(ready and not busy)
+            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'NOT SUPPORTED','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
+            self.primary.setEnabled(not busy and data['state'] in ('Ready','Needs repair','Not installed'))
+            size='' if data['size'] is None else f"{data['size']/1024**3:.1f} GB" if data['size']>=1024**3 else f"{data['size']/1024**2:.1f} MB"
+            progress=f"{round(data['fraction']*100)}%" if data.get('fraction') is not None else ''
+            self.game_info.setText(' · '.join(part for part in (data['state'],progress,data['version'],size) if part))
+            self.install_note.setText(data['message'])
+            self.repair_button.setEnabled(not busy and data['state'] in ('Ready','Needs repair'))
+            self.folder_button.setEnabled(not busy and data['entry'] is not None)
+            self.remove_button.setEnabled(not busy and data['entry'] is not None)
             try:
                 try:
                     from .launcher_trophies import snapshot
@@ -433,7 +458,7 @@ def renovated(base):
             if self.play.isEnabled():
                 self.launch()
                 return
-            if self.game.get('installation_issue'):
+            if getattr(self,'game_state',{}).get('state')=='Needs repair':
                 self.repair_game();return
             self.install()
 
@@ -515,6 +540,31 @@ def renovated(base):
                 from launcher_install_dialog import RepairDialog
             RepairDialog(self,optional).exec()
 
+        def open_game_folder(self):
+            try:
+                from PyQt6.QtCore import QUrl
+                from PyQt6.QtGui import QDesktopServices
+                entry=game_library.resolve_entry(self.root,game=self.game)
+                folder=Path(entry['update_path'] or entry['base_path'])
+                if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder))):raise OSError('The file manager could not open this folder.')
+            except (OSError,ValueError) as error:
+                self.log.append(str(error));QMessageBox.warning(self,'Cannot open game folder','The folder could not be opened. Choose Repair to check the installation.')
+
+        def remove_game(self):
+            if self.process or self.game.get('operation') or getattr(self,'library_transfer',False):return
+            answer=QMessageBox.question(self,'Remove '+self.game['name']+'?',
+                'Remove this game from your library? Your saves, figures and settings will be kept. Game files stay available for recovery, so this does not free disk space.',
+                QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+            if answer!=QMessageBox.StandardButton.Yes:return
+            try:
+                try:from .launcher_game_state import remove
+                except ImportError:from launcher_game_state import remove
+                folder=remove(self.root,self.game)
+                self.log.append('Removed game. Recovery information: '+str(folder))
+                self.persist();self.rebuild_rail()
+            except (OSError,ValueError) as error:
+                self.log.append(str(error));QMessageBox.warning(self,'Could not remove game','The game could not be removed. Your files were kept; see the session log for details.')
+
         def game_settings(self):
             self.settings_page.open(self.game)
 
@@ -534,7 +584,7 @@ def renovated(base):
                 self.portal_page.refresh()
 
         def closeEvent(self, event):
-            if getattr(self,'library_transfer',False):
+            if getattr(self,'library_transfer',False) or any(game.get('operation') for game in getattr(self,'library',{}).get('games',[])):
                 event.ignore();return
             if self.process is None: self.persist()
             super().closeEvent(event)

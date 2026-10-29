@@ -35,6 +35,10 @@ that folder in your file manager. Existing installations stay where they are.
 After installing a supported game, setup runs automatically. If it needs
 attention, choose **Repair game setup** from the game’s menu. Controller artwork
 and portrait downloads are optional extras; they never block setup.
+The library shows setup status, installed versions and size. Use **Repair** to
+finish setup, **Open folder** to find the files, or **Remove** to unregister the
+game. Removal keeps saves, figures and settings; managed game files are retained
+for recovery, so this does not immediately reclaim their disk space.
 Unrecognized titles can be installed and are labelled “not supported yet”.
 
 Builds will be published on the [Releases](https://github.com/The-Crow-Den/SkylandersPC/releases)

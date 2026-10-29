@@ -22,6 +22,7 @@ except ImportError:
     import game_library, game_build, link_native, patches, resolution
     from file_integrity import VerifiedDigests
 
+PREPARATION_VERSION = 1  # Bump only when output contracts or verification rules change.
 ROOT = Path(__file__).resolve().parents[1]
 PACK_FILES = ('image.pack','imports.types','boot.plan','metadata.json')
 
@@ -92,7 +93,7 @@ class Pipeline:
         spec = step.inputs() if callable(step.inputs) else step.inputs
         values = spec.get('values',{})
         hashes = {self.key(p):self.digests(Path(p)) if Path(p).is_file() else 'absent' for p in spec.get('files',[])}
-        payload = dict(values=values,files=hashes,engine=file_hash(Path(__file__)))
+        payload = dict(values=values,files=hashes,engine=str(PREPARATION_VERSION))
         fingerprint = hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
         return fingerprint,hashes
 
@@ -130,7 +131,7 @@ class Pipeline:
                     checked[self.key(path)] = file_hash(path)
                 if not checked:raise PreparationError('Preparation step produced no verified output')
                 if self.inputs(step)[0]!=key:raise PreparationError('Inputs changed during preparation; run Repair again')
-                self.record['steps'][step.name] = dict(fingerprint=key,engine=file_hash(Path(__file__)),input_hashes=hashes,outputs=checked,
+                self.record['steps'][step.name] = dict(fingerprint=key,engine=str(PREPARATION_VERSION),input_hashes=hashes,outputs=checked,
                     stamps={name:stamp(self.root/name) for name in {*hashes,*checked}})
                 self.record.pop('failure',None);self.save()
                 self.progress(event(step.name,'complete',(index+1)/total,'Finished.'))
@@ -386,7 +387,7 @@ def shallow_ready(root, entry, variant):
         changed = False;digests = VerifiedDigests(file_hash)
         for name in required:
             marker = record['steps'].get(name)
-            if not isinstance(marker,dict) or marker.get('engine')!=file_hash(Path(__file__)):raise PreparationError(name)
+            if not isinstance(marker,dict) or marker.get('engine')!=str(PREPARATION_VERSION):raise PreparationError(name)
             if not isinstance(marker.get('outputs'),dict) or not marker['outputs'] or not isinstance(marker.get('input_hashes'),dict) or not isinstance(marker.get('stamps'),dict):raise PreparationError(name)
             hashes = {**marker['input_hashes'],**marker['outputs']}
             if not set(hashes).issubset(marker['stamps']):raise PreparationError(name)
@@ -429,7 +430,7 @@ def require_ready(root, entry, variant='60-delta', *, deep=True):
         except (OSError,ValueError,KeyError,TypeError):missing('verify-executable')
     for name in required:
         marker = record['steps'].get(name)
-        if not isinstance(marker,dict) or marker.get('engine')!=file_hash(Path(__file__)):missing(name)
+        if not isinstance(marker,dict) or marker.get('engine')!=str(PREPARATION_VERSION):missing(name)
         if not isinstance(marker.get('outputs'),dict) or not marker['outputs'] or not isinstance(marker.get('input_hashes'),dict) or not isinstance(marker.get('stamps'),dict):missing(name)
         if not {*marker['outputs'],*marker['input_hashes']}.issubset(marker['stamps']):missing(name)
         if deep:
@@ -463,7 +464,7 @@ def relocate_inputs(root, entry, moves):
         changed = False
         for step in plan(pipeline,install,config):
             marker = pipeline.record['steps'].get(step.name)
-            if not marker or marker.get('engine')!=file_hash(Path(__file__)):continue
+            if not marker or marker.get('engine')!=str(PREPARATION_VERSION):continue
             rebased = {pipeline.key(Path(relocated(name))):value for name,value in marker['input_hashes'].items()}
             if rebased==marker['input_hashes']:continue
             key,hashes = pipeline.inputs(step)

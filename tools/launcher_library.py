@@ -62,7 +62,8 @@ def save(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.tmp')
-    temporary.write_text(json.dumps(value, indent=2) + '\n')
+    stored={**value,'games':[{k:v for k,v in game.items() if k!='operation'} for game in value['games']]}
+    temporary.write_text(json.dumps(stored, indent=2) + '\n')
     temporary.replace(path)
 
 
@@ -101,6 +102,7 @@ def sync_installations(root, value):
             (game_library.profile_for(root, e) or {}).get('id') == game['id'] or
             game.get('title_id') == e['title_id']]
         if not choices:
+            game.pop('installation',None);game.pop('installed_paths',None)
             continue
         try:
             from .game_install import version
