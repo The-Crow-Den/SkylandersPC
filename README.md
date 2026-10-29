@@ -1,150 +1,95 @@
-# SkylandersPS4 (working name)
+# SkylandersPS4
 
-A shared PS4 compatibility project for running user-supplied Skylanders games
-on PC. First target: Trap Team. Second target: Swap Force, used early to verify
-that the shared base generalizes. Initial platform: Linux x86-64, shadPS4 and
-Vulkan. The custom C++ native host executes the original Trap Team image with
-bundled libc/Fios and explicit platform services. Its optional private GPU
-component renders the title menu and the first level with Dino Rang, terrain,
-foliage, NPCs and the HUD. Full gameplay, chapter completion and in-game
-save/reload correctness remain unverified. A separate experimental 60 FPS/delta-time
-patch reaches Chapter One; correct simulation speed and automatic phase switching
-remain under investigation.
-Current launchers use explicit offline socket failures; diagnostic network-worker
-suspension is off by default. Later retry paths remain under validation.
-The repository also contains dump/profile tooling and a separate stock-shadPS4
-baseline launcher. See [current boot evidence](docs/CUSTOM_BOOT_PROGRESS_20261021.md),
-[service contracts and priorities](docs/SYSTEM_CALL_CONTRACTS.md), and the
-[709-import inventory](docs/SYSTEM_CALL_INVENTORY.md).
+Run your own PS4 copy of **Skylanders: Trap Team** natively on a Linux PC.
 
-Optional graphical launcher: `python3 tools/launcher.py` (PyQt6), or the
-[standalone AppImage](docs/STANDALONE_LAUNCHER.md) without Python packages. See
-[launcher controls and validation](docs/PC_LAUNCHER.md) and the
-[active PC experience goal](docs/PC_EXPERIENCE_GOAL.md).
+SkylandersPS4 is a compatibility framework, not an emulator: a C++ host loads the
+game's original x86-64 executable and runs it directly, supplying the PS4 system
+services it calls (files, threads, memory, audio, pads, saves, trophies, the
+Traptanium Portal) itself. Graphics go through a Vulkan renderer. Trap Team is
+the first target; Swap Force is next and is used early to keep the shared parts
+general.
 
-Latest work: [native runtime efficiency](docs/NATIVE_RUNTIME_EFFICIENCY.md)
-removes kernel crossings from supported CPUs' import bridge without lowering
-graphics quality. [PC and physical portal plans](docs/PC_ROADMAP_AND_PORTAL_TRANSPORTS.md)
-separate implemented features from future hardware support.
+> **You must supply your own game.** This repository contains no game code,
+> data, keys, firmware or artwork, and never will. You need your own extracted
+> CUSA00626 (US) or CUSA00697 (EU) package; the launcher can extract a fake-PKG
+> dump for you.
 
-Run the configured local build with `./tools/run-native.sh`. It enables the
-virtual portal: F2 imports a figure dump into a private working copy; F3 removes
-characters while retaining the trap. F6 opens settings on the left and the portal
-manager on the right, with separate character and initially empty villain traps.
-Physical SDL gamepads now feed the guest pad state; a DualSense
-Edge was detected in the real trial. See [portal, controller and display-backend
-details](docs/PORTAL_AND_CONTROLLERS.md). X11/XWayland is the working backend;
-native Wayland currently fails Vulkan swapchain creation on this machine.
+## Status
 
-Experimental internal resolution presets are available through
-`python3 tools/run_session.py --variant 60-delta --resolution 1440p --nvidia`.
-Choose `720p`, `900p`, `1080p`, `1440p`, `1600p` (2560×1600), or `2160p`;
-changes require a restart. F6 opens the PC menu for resolution, shadow-quality
-presets, fullscreen, an FPS counter, and a built-in 30/60 cap. MangoHud is an
-optional user overlay (`--mangohud`); normal launches require none of its tools.
-Use `--window-resolution 1080p` to fit a larger internal resolution into a smaller
-window. See [resolution options and validation](docs/RESOLUTION_OPTIONS.md).
+Playable on the developer's machine (Linux, KDE Plasma, NVIDIA + AMD laptop):
+title screen, Skylanders Academy, story levels, saving, the virtual portal and
+the expansion levels have been played. It is a work in progress: not every
+level, feature or GPU has been verified, and there is no binary release yet.
 
-The experimental `--performance-profile low-end` selects native 1080p, lower
-shadows, no motion blur and compact allocator settings. Start at 30 FPS for
-portal arrival, then Shift+F1 selects 60 during gameplay. This targets GTX
-16-series / RTX 20-series hardware; performance on those GPUs is not yet verified.
-See [the low-end performance pass](docs/LOW_END_PERFORMANCE.md).
+Highlights:
 
-The sibling Wii U project is preserved. The current playable native host uses
-bbport/shadPS4-derived renderer/platform code and the optional Cemu portal
-component; it does not launch the historical reference AppImage. Dependency
-origins, retained licenses and remaining publication checks are documented in
-[third-party notices](THIRD_PARTY_NOTICES.md) and
-[publication preparation](docs/PUBLICATION.md). Private game/code-generation
-outputs and user artwork are excluded from source exports.
+- **Virtual Traptanium Portal**: place Skylanders, traps and magic items from
+  figure dumps, create new figures, and capture villains, from an in-game PC menu
+  (F6, Insert or L3+R3) that works with a controller.
+- **PC settings**: internal resolution up to 2160p (the game renders natively at
+  it), shadow quality, fullscreen, a 30/60 FPS cap or an automatic policy that
+  keeps cutscenes at 30 and gameplay at 60, and controller button icons
+  (PlayStation, Xbox or Nintendo) in the game's own prompts.
+- **Optional gameplay tweaks** for the US 01.01 build: elemental gates and
+  Traptanium without a Trap Master, automatic adventure-pack access in the
+  Academy, and Nightmare mode unlocked.
+- **Launcher** (PyQt6, or a standalone AppImage) that installs games from PKG
+  files, manages figures and settings, and shows trophies.
 
-## Build the custom native host
+## Build
+
+Requirements: Linux x86-64, CMake, a C++20 compiler, SDL3, OpenSSL, Python 3.11+,
+and a Vulkan 1.3 GPU.
 
 ```sh
-cmake -S native -B .local/native-build -DCMAKE_BUILD_TYPE=Debug
-cmake --build .local/native-build -j2
+cmake -S native -B .local/native-build -DCMAKE_BUILD_TYPE=Release
+cmake --build .local/native-build
 ctest --test-dir .local/native-build --output-on-failure
-python3 tools/prepare_native.py /absolute/path/to/eboot.bin --out out/my-native-image
-.local/native-build/skylanders-native-host --load out/my-native-image/image.pack
-```
-
-The preparation output directory must be new and inside ignored `out/`. Pack
-bytes are game-derived and private. `--load` maps/links only and reports unresolved
-imports; it does not launch the game. Normal play goes through
-`tools/run_session.py`, which prepares the linked pack and starts the host with
-`--run` (alias `--trace-start`). No unknown import returns a fabricated success.
-See [the native host README](native/README.md) for the runtime layout.
-
-## Prepare the workspace
-
-Python 3.11+ and Git suffice for the current tools. From this repository:
-
-```sh
-python3 tools/workspace.py stage-runtime
-python3 tools/workspace.py doctor
-python3 tools/workspace.py probe-runtime
 python3 -m unittest discover -s tests -v
 ```
 
-The default archive path is `../shadps4-linux-sdl-0.20.0.zip`; pass `--archive`
-for another location. Staging checks both archive and AppImage hashes, copies
-only the pinned member to ignored `.local/runtime/` and makes it executable.
-Staging does not execute the binary, install system packages or download anything.
-Doctor reports environment facts; it does not certify GPU/runtime compatibility.
-`probe-runtime` executes the pinned AppImage's help command with local XDG/temp
-directories. Its logs and option checks go under `.local/probes/`. This has been
-tested against the supplied binary; no game is launched by the probe.
+The Vulkan renderer is a separate project, **skyrender** (GPL-2.0-or-later),
+built as `libskyrender.so`; see [the GPU component](docs/OPTIONAL_GPU_BACKEND.md)
+and [renderer build](docs/RENDERER_BUILD.md). It is not yet published alongside
+this repository.
 
-When the extracted dump arrives:
+## Play
 
-```sh
-python3 tools/workspace.py inventory /absolute/path/to/game
-python3 tools/workspace.py inspect-executable /absolute/path/to/eboot.bin
-python3 tools/workspace.py prepare-session /absolute/path/to/game \
-  --profile trap-team --figure /absolute/path/to/owned-figure.sky
-```
-
-`--figure` is optional. Inventory reads build metadata, hashes the executable and
-bundled modules, and inspects ELF64/plaintext SELF structure and import declarations.
-It preserves encoded NIDs/scopes and reports runtime resolution as unchecked.
-Malformed ranges are rejected; encrypted/compressed/blocked SELF payloads are
-reported as unsupported without decryption. It does not validate relocations,
-resolve runtime imports or certify dump completeness. See [inspection details](docs/EXECUTABLES.md).
-Keep base/update combinations explicit; this tool does not merge updates.
-
-Each session gets unique ignored directories and an inventory/manifest. Figure
-data is copied before use; never point an emulator at the original. Preparation
-does not launch anything. To attempt a prepared session when game data is present:
+Start the launcher with `python3 tools/launcher.py` (or the
+[standalone AppImage](docs/STANDALONE_LAUNCHER.md)), install your game from its
+PKG files, and press Play. From a terminal:
 
 ```sh
-python3 tools/workspace.py launch-session /absolute/path/to/out/sessions/trap-team-EXAMPLE --timeout 300
+python3 tools/run_session.py --variant 60-delta --frame-policy auto --resolution 1600p --nvidia
 ```
 
-The baseline launcher rechecks runtime, profile and game identities, disables automatic game
-patches, and sets local XDG paths while inferring game content from the executable. It records
-stdout/stderr, spawn errors, exit status, elapsed time and timeout/interruption. Attempts are
-single-use; prepare a fresh session to retry. Timeouts return 124. Working figures
-are **not automatically attached**: load the session's `figures/working.sky`
-manually in the runtime. Actual game save/config routing remains unverified;
-local path settings and CLI startup are tested, not game behavior. Private output
-may contain paths and build metadata. A zero exit is never a playability claim.
-On this NVIDIA/Wayland machine the verified stock title boot needed
-`SDL_VIDEO_DRIVER=x11` before the launch command. Default Wayland failed during
-swapchain creation. This is a local baseline setting, not a game patch.
+Each session runs from its own private copy under the ignored `out/`; original
+game files and figure dumps are never modified. See
+[launcher](docs/PC_LAUNCHER.md), [portal and controllers](docs/PORTAL_AND_CONTROLLERS.md)
+and [resolution options](docs/RESOLUTION_OPTIONS.md).
 
-Profiles deliberately contain no validated builds or patches. Preparation records
-the exact-build match result; existing templates remain unverified. Shared profile
-validation requires title ID, app version and executable hash to match before
-patch selection. Selecting a profile alone does not certify a dump. See
-[profile registration](docs/PROFILES.md). A separate patch validator/working-copy writer is implemented;
-see [patch format and limits](docs/PATCHES.md). It is deliberately not connected
-to automatic launch. No existing game patch has been verified yet.
+## How it fits together
 
-See [the plan](docs/PLAN.md), [architecture](docs/ARCHITECTURE.md),
-[Wii U lessons](docs/WIIU_LESSONS.md), and [reference review](docs/REFERENCES.md).
-The latest implementation evidence is in [the framework checkpoint](docs/FRAMEWORK_CHECKPOINT_20261021.md).
-Original project material is **GPL-3.0-or-later**; see [LICENSE](LICENSE) and
-[license scope](LICENSE_SCOPE.md). Third-party files retain their own terms.
-Use the checked source-export workflow in [publication preparation](docs/PUBLICATION.md)
-before uploading. This checkout is not a ready-made binary release.
+- `native/`: the host: loader, import bridge and PS4 service implementations
+  (`native/hle/`), game-specific hooks gated by the executable's hash. See
+  [native/README.md](native/README.md) and [architecture](docs/ARCHITECTURE.md).
+- `tools/`: launcher, session runner, PC menu, package extractor, and
+  hash-guarded asset/patch recipes.
+- `profiles/`: per-game build identities and patch recipes (expected bytes only).
+- `docs/`: design notes and measurements. Start with [the plan](docs/PLAN.md),
+  [system call contracts](docs/SYSTEM_CALL_CONTRACTS.md),
+  [frame pacing](docs/FRAME_PACING.md) and [asset recipes](docs/ASSET_MOD_RECIPES.md).
+  The original workspace and baseline-launcher tools are in
+  [workspace tools](docs/WORKSPACE_TOOLS.md).
+
+Every patch requires the exact executable hash and expected bytes and refuses a
+mismatch; unknown system calls are reported, never faked as successful.
+
+## License
+
+Original project material is **GPL-3.0-or-later** ([LICENSE](LICENSE),
+[license scope](LICENSE_SCOPE.md)). Third-party components keep their own terms
+([third-party notices](THIRD_PARTY_NOTICES.md), [LICENSES/](LICENSES)). Before
+publishing, run the checks in [publication preparation](docs/PUBLICATION.md).
+Skylanders is a trademark of Activision; this project is not affiliated with or
+endorsed by Activision.
