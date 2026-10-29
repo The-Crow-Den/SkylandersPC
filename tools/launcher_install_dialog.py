@@ -63,7 +63,7 @@ class InstallDialog(QDialog):
             from launcher_shell import SkyCanvas, supplied_artwork
             from launcher_theme import crystal_icon
         themed = supplied_artwork(owner.root,self.game)
-        artwork = SkyCanvas();artwork.setFixedWidth(280);artwork.game = themed
+        artwork = SkyCanvas(show_portal=False);artwork.setFixedWidth(280);artwork.game = themed
         art_layout = QVBoxLayout(artwork);art_layout.setContentsMargins(24,28,24,30)
         app_name = QLabel('SKYLANDERS PC');app_name.setObjectName('eyebrow');art_layout.addWidget(app_name)
         art_layout.addStretch(3)

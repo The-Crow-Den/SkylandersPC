@@ -82,8 +82,9 @@ def shade(color, value, saturation=1.0, alpha=255):
 
 
 class SkyCanvas(QWidget):
-    def __init__(self):
+    def __init__(self, *, show_portal=True):
         super().__init__()
+        self.show_portal = show_portal
         self.game = {}; self.palette_cache = {}; self.anchor = None
         # Every game's portal matches the Swap Force logo's width (set by the shell).
         self.portal_logo_width = None
@@ -122,7 +123,8 @@ class SkyCanvas(QWidget):
             seed = (seed * 1103515245 + 12345) & 0x7fffffff; size = .8 + (seed % 100) / 70
             star = shade(accent if i % 3 else primary, 1.0, .35, 30 + seed % 70)
             p.setBrush(star); p.drawEllipse(QRectF(x * w, y * h * .9, size, size))
-        self.paint_portal(p, primary, accent)
+        if self.show_portal:
+            self.paint_portal(p, primary, accent)
         vignette = QRadialGradient(w * .55, h * .5, max(w, h) * .75)
         vignette.setColorAt(.6, QColor(0, 0, 0, 0)); vignette.setColorAt(1, QColor(0, 0, 0, 120))
         p.fillRect(self.rect(), vignette)
