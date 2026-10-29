@@ -77,12 +77,12 @@ class Hero(QWidget):
         self.setMinimumHeight(330)
         try:
             try:
-                from .game_install import discover
+                from .game_library import resolve
             except ImportError:
-                from game_install import discover
-            artwork = discover(root/'Game').source('sce_sys/pic1.png')
+                from game_library import resolve
+            artwork = resolve(root).source('sce_sys/pic1.png')
         except (OSError,ValueError):
-            artwork = root/'Game/unavailable-artwork.png'
+            artwork = root/'.local/unavailable-artwork.png'
         self.art = QPixmap(str(artwork))
         row = QHBoxLayout(self); row.setContentsMargins(30, 32, 20, 26)
         left = QVBoxLayout(); left.setSpacing(13)

@@ -207,6 +207,56 @@ class LauncherUITests(unittest.TestCase):
         self.assertFalse(self.window.session_stop.isVisibleTo(self.window))
         self.assertEqual(self.window.status.text(),'Game stopped at your request.')
 
+    def make_library_base(self, title='CUSA00626'):
+        from tools import game_library
+        base=self.root/('synthetic-'+title);(base/'sce_sys').mkdir(parents=True)
+        (base/'sce_sys/param.sfo').write_bytes(sfo(dict(TITLE_ID=title,CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test')))
+        (base/'eboot.bin').write_bytes(b'synthetic')
+        return game_library.publish(game_library.directory(self.root),base)
+
+    def test_installation_selector_preserves_versions_and_per_game_preferences(self):
+        from tools import game_library
+        import hashlib
+        (self.root/'profiles').mkdir()
+        (self.root/'profiles/trap-team.json').write_text(json.dumps(dict(id='trap-team',title='Trap Team',
+            validated_builds=[dict(title_id='CUSA00626',app_version='01.00',executable_sha256=hashlib.sha256(b'synthetic').hexdigest())])))
+        self.make_library_base()
+        update=self.root/'synthetic-update';(update/'sce_sys').mkdir(parents=True)
+        (update/'sce_sys/param.sfo').write_bytes(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='test')))
+        game_library.publish(game_library.directory(self.root),update=update)
+        self.window.select_game('trap-team')
+        self.assertEqual(self.window.installations.count(),2)
+        self.window.game['settings']={'resolution':'2160p'}
+        index=self.window.installations.findData('CUSA00626@01.00')
+        self.window.installations.setCurrentIndex(index)
+        self.assertEqual(self.window.game['installation'],'CUSA00626@01.00')
+        self.assertEqual(game_library.resolve(self.root).app_version,'01.00')
+        self.assertEqual(self.window.game['settings'],{'resolution':'2160p'})
+        self.make_library_base('CUSA99999');self.window.rebuild_rail()
+        self.window.select_game('title-cusa99999')
+        self.assertIn('not supported yet',self.window.installations.currentText())
+        self.assertFalse(self.window.play.isEnabled())
+        self.window.select_game('trap-team')
+        self.assertEqual(self.window.game['installation'],'CUSA00626@01.00')
+        self.assertEqual(game_library.resolve(self.root).title_id,'CUSA00626')
+
+    def test_update_only_install_attaches_existing_base(self):
+        from tools import game_library
+        entry=self.make_library_base()
+        base=Path(entry['base_path']);inode=(base/'eboot.bin').stat().st_ino
+        tool=self.extractor('import sys,base64\nfrom pathlib import Path\n'
+            'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'
+            '(out/"sce_sys/param.sfo").write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))\n')
+        pkg=self.root/'update.pkg'
+        pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='test'))).decode())
+        dialog=InstallDialog(self.window);dialog.fields['game_pkg'].clear();dialog.fields['update_pkg'].setText(str(pkg))
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
+        self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
+        selected=game_library.resolve(self.root)
+        self.assertEqual(selected.app_version,'01.01');self.assertEqual(selected.base,base)
+        self.assertEqual((base/'eboot.bin').stat().st_ino,inode)
+        dialog.close()
+
     def test_extractor_success_and_matching_update(self):
         tool=self.extractor('import sys,json,base64\nfrom pathlib import Path\n'
             'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'

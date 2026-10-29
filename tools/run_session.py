@@ -24,14 +24,14 @@ try:
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
     from . import nightmare_mod
-    from . import game_install, game_build, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    from . import game_library, game_install, game_build, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 except ImportError:
     from overlay_session import html_overlay
     from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
     import nightmare_mod
-    import game_install, game_build, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    import game_library, game_install, game_build, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = {'original': 'native-linked-boot-weak',
@@ -164,6 +164,7 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--game', help='installed TITLE_ID[@APP_VER]; defaults to launcher selection or the only title')
     parser.add_argument('--variant', choices=PACKS, default='original')
     parser.add_argument('--figure', type=Path)
     parser.add_argument('--trophy-config',type=Path,help='private shadPS4 config or trophy-key file; never copied into logs')
@@ -254,7 +255,7 @@ def main(argv=None):
         args.frame_limit = 30
     shadows = args.shadows if args.shadows is not None else QUALITY[args.quality]
     try:
-        installation = game_install.discover(ROOT/'Game')
+        installation = game_library.resolve(ROOT, args.game)
         build = game_build.configuration(ROOT, installation, args.variant)
         selected_save, save_source = save_profile.select(ROOT, installation.title_id, args.save_root)
         selected_mods=gameplay_mods.selection(ROOT,installation.title_id,{name:getattr(args,name.replace('-','_')) for name in gameplay_mods.NAMES})

@@ -4,10 +4,12 @@ from functools import lru_cache
 from pathlib import Path
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer
 from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget)
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QComboBox)
 try:
+    from . import game_library
     from . import launcher_library as library
 except ImportError:
+    import game_library
     import launcher_library as library
 
 
@@ -239,6 +241,10 @@ def renovated(base):
             except (OSError, ValueError) as error:
                 self.library = library.defaults()
                 self.log.append(f'Library could not be loaded: {error}')
+            try:
+                library.sync_installations(self.root, self.library)
+            except (OSError, ValueError) as error:
+                self.log.append(f'Installations could not be loaded: {error}')
             self.legacy = self.takeCentralWidget()
             self.legacy.setParent(self);self.legacy.hide()
             self.views = QStackedWidget();self.setCentralWidget(self.views)
@@ -253,6 +259,9 @@ def renovated(base):
             top = QHBoxLayout()
             heading = QLabel('Library'); heading.setStyleSheet('font-size: 22px; font-weight: 600;')
             top.addWidget(heading); top.addStretch()
+            self.installations = QComboBox(); self.installations.setObjectName('installationSelector')
+            self.installations.setMinimumWidth(250); top.addWidget(self.installations)
+            self.installations.currentIndexChanged.connect(self.select_installation)
             for title, callback in [('Skylanders Manager', self.manager), ('Settings', self.game_settings)]:
                 pill = self.button(top, title, callback)
                 if title == 'Settings':
@@ -347,8 +356,39 @@ def renovated(base):
             if self.process:
                 QMessageBox.information(self, 'Session active', 'Stop the current session before switching games.'); return
             self.library['selected'] = key; self.persist(); self.rebuild_rail()
+            try:
+                game_library.select(self.root, self.game.get('installation'))
+            except (OSError, ValueError) as error:
+                self.log.append(f'Installation selection could not be saved: {error}')
+
+        def select_installation(self, index):
+            if self.process or index < 0: return
+            choice = self.installations.itemData(index)
+            if not choice: return
+            self.game['installation'] = choice
+            try:
+                game_library.select(self.root, choice)
+            except (OSError, ValueError) as error:
+                self.log.append(f'Installation selection could not be saved: {error}')
+            self.persist(); self.refresh_game()
 
         def refresh_game(self):
+            try:
+                library.sync_installations(self.root, self.library)
+                choices = game_library.for_game(self.root, self.game)
+                self.installations.blockSignals(True); self.installations.clear()
+                for entry in choices:
+                    key = game_library.selector(entry['title_id'], entry['app_version'])
+                    suffix = '' if game_library.supported(self.root, entry) else ' · not supported yet'
+                    self.installations.addItem(key + suffix, key)
+                self.installations.setCurrentIndex(self.installations.findData(self.game.get('installation')))
+                self.installations.setVisible(bool(choices))
+                self.installations.setEnabled(self.process is None)
+            except (OSError, ValueError) as error:
+                self.log.append(str(error))
+            finally:
+                self.installations.blockSignals(False)
+            self.refresh_readiness()
             themed = supplied_artwork(self.root, self.game)
             self.canvas.game = themed
             reference = supplied_artwork(self.root, {'id': 'swap-force'}).get('logo', '')
@@ -364,7 +404,7 @@ def renovated(base):
                     self.brand.setPixmap(logo.scaled(logo_size(themed['logo'], reference),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
                 else:
                     self.brand.setText(self.game['name'])
-            ready = self.game['id'] == 'trap-team' and self.play.isEnabled()
+            ready = self.play.isEnabled()
             self.primary.setText('PLAY' if ready else ('SETUP' if self.game['game_pkg'] else 'INSTALL'))
             try:
                 try:
@@ -387,15 +427,14 @@ def renovated(base):
 
         def primary_action(self):
             if self.process: return
-            if self.game['id'] == 'trap-team' and self.play.isEnabled():
+            if self.play.isEnabled():
                 self.launch()
                 return
             self.install()
 
         def launch(self):
             if self.process is not None: return
-            if self.game['id'] != 'trap-team':
-                QMessageBox.information(self, 'Runtime unavailable', 'The native session runner currently supports Trap Team.'); return
+
             universal = self.values()
             self.session_universal = universal
             try:
@@ -407,6 +446,7 @@ def renovated(base):
                 self.session_mods = selection(self.root,self.game)
                 super().launch()
                 if self.process is not None:
+                    self.installations.setEnabled(False)
                     self.runtime_started=False;self.session_stop.setEnabled(True);self.session_stop.setText('Stop')
                     self.session_stop.show();self.primary.setEnabled(False);self.primary.setText('LOADING')
                     self.launch_status.setText('Preparing game…');self.launch_status.show();self.loading_wheel.set_active(True)
@@ -464,11 +504,13 @@ def renovated(base):
 
         def finished(self, code, status):
             super().finished(code,status)
+            session_status = self.status.text()
             if hasattr(self, 'session_universal'):
                 self.apply_values(self.session_universal)
             if hasattr(self,'canvas'):
                 self.loading_wheel.set_active(False);self.launch_status.hide()
                 self.session_stop.setVisible(False); self.primary.setEnabled(True); self.refresh_game()
+                self.status.setText(session_status)
             if hasattr(self,'portal_page') and self.views.currentWidget() is self.portal_page:
                 self.portal_page.refresh()
 

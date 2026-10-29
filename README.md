@@ -28,6 +28,11 @@ files, keeps your saves, figures and settings, and starts the game. Each game
 runs from a private working copy, so the installed files and your figure dumps
 are never modified.
 
+The library keeps titles and versions side by side; choose the installed
+version in the launcher. To add an update, select its PKG and leave the base
+PKG field empty. Existing `Game/` dumps are registered in place. Unrecognized
+titles can be installed and are labelled “not supported yet”.
+
 Builds will be published on the [Releases](https://github.com/The-Crow-Den/SkylandersPC/releases)
 page, each with patch notes. There is no release yet.
 

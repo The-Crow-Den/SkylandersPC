@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from tools import launcher_library as library, launcher_packages as packages
+from tools import launcher_library as library, launcher_packages as packages, game_library as installs
 from test_game_install import sfo
 
 
@@ -43,36 +43,38 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);staging=root/'import'
             self.make(staging,'base','gd','01.00');self.make(staging,'update','gp','01.01')
-            paths=packages.publish(staging,root/'Game',True)
-            self.assertEqual(len(paths),2)
-            self.assertEqual(discover(root/'Game').app_version,'01.01')
+            entry=packages.publish(staging,installs.directory(root))
+            self.assertTrue(Path(entry['base_path']).is_dir());self.assertTrue(Path(entry['update_path']).is_dir())
+            self.assertEqual(discover(entry).app_version,'01.01')
 
     def test_wrong_update_is_not_published(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);staging=root/'import'
             base=self.make(staging,'base','gd','01.00');self.make(staging,'update','gp','01.01','wrong')
-            with self.assertRaisesRegex(ValueError,'Update'):packages.publish(staging,root/'Game',True)
-            self.assertTrue(base.exists());self.assertFalse((root/'Game').exists())
+            with self.assertRaisesRegex(ValueError,'Update'):packages.publish(staging,installs.directory(root))
+            self.assertTrue(base.exists());self.assertEqual(installs.read_entries(installs.directory(root)),[])
 
     def test_existing_install_and_symlink_refused(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);staging=root/'import';base=self.make(staging,'base','gd','01.00')
             (base/'linked').symlink_to(base/'eboot.bin')
-            with self.assertRaisesRegex(ValueError,'symlinks'):packages.publish(staging,root/'Game',True)
+            with self.assertRaisesRegex(ValueError,'symlinks'):packages.publish(staging,installs.directory(root))
             (base/'linked').unlink()
-            existing=root/'Game/existing/sce_sys';existing.mkdir(parents=True);(existing/'param.sfo').write_bytes(b'existing')
-            with self.assertRaisesRegex(ValueError,'already'):packages.publish(staging,root/'Game',True)
-            self.assertTrue(base.exists());self.assertEqual((existing/'param.sfo').read_bytes(),b'existing')
+            entry=packages.publish(staging,installs.directory(root))
+            staging=root/'second';base=self.make(staging,'base','gd','01.00')
+            with self.assertRaisesRegex(ValueError,'already'):packages.publish(staging,installs.directory(root))
+            self.assertTrue(base.exists());self.assertEqual(Path(entry['base_path']).joinpath('eboot.bin').read_bytes(),b'synthetic')
 
     def test_second_move_failure_rolls_back_base(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);staging=root/'import'
             base=self.make(staging,'base','gd','01.00');update=self.make(staging,'update','gp','01.01')
-            real_move=packages.shutil.move
+            real_move=installs.shutil.move
             def move(source,target):
                 if source==str(update):raise OSError('synthetic publication failure')
                 return real_move(source,target)
-            with patch.object(packages.shutil,'move',side_effect=move):
-                with self.assertRaises(OSError):packages.publish(staging,root/'Game',True)
+            with patch.object(installs.shutil,'move',side_effect=move):
+                with self.assertRaises(OSError):packages.publish(staging,installs.directory(root))
             self.assertTrue(base.exists());self.assertTrue(update.exists())
-            self.assertEqual(list((root/'Game').iterdir()),[])
+            self.assertEqual(installs.read_entries(installs.directory(root)),[])
+            self.assertFalse((installs.directory(root)/'CUSA00626/01.00/base').exists())

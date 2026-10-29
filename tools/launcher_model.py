@@ -6,11 +6,11 @@ from pathlib import Path
 try:
     from .pc_settings import validate_settings
     from .run_session import PACKS
-    from . import game_install, game_build
+    from . import game_install, game_build, game_library
 except ImportError:
     from pc_settings import validate_settings
     from run_session import PACKS
-    import game_install, game_build
+    import game_install, game_build, game_library
 
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
@@ -51,13 +51,16 @@ def save(path, value):
     temporary.replace(path)
 
 
-def command(root, python, value, mods=None):
+def command(root, python, value, mods=None, game=None):
     value = validate(value)
     # The exact-build mod gates 60 on engine loading, cutscene and UI state.
     argv = [str(python), str(Path(root) / 'tools/run_session.py'),
             '--variant', '60-delta', '--performance-profile', 'standard',
             '--memory-mode', 'standard', '--renderer-idle', 'adaptive',
             '--frame-policy', value['frame_policy']]
+    if game is not None:
+        entry = game_library.resolve_entry(root, game=game)
+        argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
     for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
     for key in ('fullscreen', 'fps_counter', 'motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare'):
@@ -76,10 +79,13 @@ def command(root, python, value, mods=None):
     return argv
 
 
-def missing_files(root):
+def missing_files(root, game=None):
     root = Path(root)
     try:
-        installation = game_install.discover(root/'Game')
+        entry = game_library.resolve_entry(root, game=game)
+        if not game_library.supported(root, entry):
+            raise ValueError('This title/version is not supported yet')
+        installation = game_install.discover(entry)
         pack = game_build.configuration(root,installation,'60-delta')['pack']
         executable = installation.source('eboot.bin')
     except (OSError,ValueError) as error:

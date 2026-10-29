@@ -14,13 +14,13 @@ def validate(value):
 
 def selection(root,game):
     try:
-        from . import gameplay_mods, game_install
+        from . import gameplay_mods, game_library
     except ImportError:
-        import gameplay_mods, game_install
+        import gameplay_mods, game_library
     selected=dict.fromkeys(NAMES,False)
     if game['id']=='trap-team':
         try:
-            title=game_install.discover(root/'Game').title_id
+            title=game_library.resolve(root, game=game).title_id
             current=gameplay_mods.selection(root,title)
             selected.update({name:current[name] for name in NAMES})
         except (OSError,ValueError):pass

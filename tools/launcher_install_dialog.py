@@ -7,8 +7,10 @@ from PyQt6.QtCore import QProcess
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox)
 try:
+    from . import game_library, launcher_library
     from . import launcher_packages as packages
 except ImportError:
+    import game_library, launcher_library
     import launcher_packages as packages
 
 
@@ -18,11 +20,11 @@ class InstallDialog(QDialog):
         self.owner = owner; self.game = owner.game; self.process = None; self.cancelled = False
         self.setWindowTitle('Install · '+self.game['name']); self.resize(720,540)
         column = QVBoxLayout(self)
-        note = QLabel('Extract a game PKG and an optional matching update. Original packages are kept.\n'
+        note = QLabel('Extract a game PKG, an update for an installed base, or both. Original packages are kept.\n'
                       'Extraction does not prepare the native runtime or verify gameplay.')
         note.setWordWrap(True); column.addWidget(note)
         form = QFormLayout(); column.addLayout(form); self.fields = {}
-        for key,title,initial in [('game_pkg','Game PKG',self.game['game_pkg']),
+        for key,title,initial in [('game_pkg','Game PKG (optional for updates)',self.game['game_pkg']),
                                   ('update_pkg','Update PKG (optional)',self.game['update_pkg'])]:
             row = QHBoxLayout(); field=QLineEdit(initial); self.fields[key]=field; row.addWidget(field)
             button=QPushButton('Browse…'); row.addWidget(button)
@@ -39,10 +41,13 @@ class InstallDialog(QDialog):
         jobs=[]
         for key,kind in [('game_pkg','base'),('update_pkg','update')]:
             path=self.fields[key].text().strip()
-            if kind=='base' or path:
+            if path:
                 if not Path(path).is_file() or Path(path).suffix.lower()!='.pkg':
                     QMessageBox.warning(self,'Invalid package','Choose an existing .pkg file for '+kind);return
                 jobs.append((kind,str(Path(path).resolve())))
+        if not jobs:
+            QMessageBox.warning(self,'No package selected','Choose a game PKG or an update PKG.');return
+        self.source_packages = [Path(path).name for _,path in jobs]
         self.game.update({key:self.fields[key].text().strip() for key in ('game_pkg','update_pkg')})
         self.owner.persist()
         self.extractor=packages.BUILTIN_EXTRACTOR;self.jobs=jobs
@@ -57,9 +62,18 @@ class InstallDialog(QDialog):
     def next_job(self):
         if not self.jobs:
             try:
-                destination=self.owner.root / ('Game' if self.game['id']=='trap-team' else '.local/library-games/'+self.game['id'])
-                installed=packages.publish(self.staging,destination,self.game['id']=='trap-team')
-                self.game['installed_paths']=installed;self.owner.persist()
+                game_library.register(self.owner.root)
+                entry=packages.publish(self.staging,game_library.directory(self.owner.root),self.source_packages)
+                launcher_library.sync_installations(self.owner.root,self.owner.library)
+                profile=game_library.profile_for(self.owner.root,entry)
+                key=profile['id'] if profile else 'title-'+entry['title_id'].lower()
+                self.owner.library['selected']=key
+                game=next(g for g in self.owner.library['games'] if g['id']==key)
+                game['installation']=game_library.selector(entry['title_id'],entry['app_version'])
+                installed=[p for p in (entry['base_path'],entry['update_path']) if p]
+                game['installed_paths']=installed
+                game_library.select(self.owner.root,game['installation']);self.owner.persist()
+                self.owner.rebuild_rail()
                 self.output.append('Extraction validated. Installed to:\n'+'\n'.join(installed)+'\nNative runtime preparation may still be required.')
                 self.owner.refresh_readiness();self.owner.refresh_game()
                 self.done_state()

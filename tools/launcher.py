@@ -216,7 +216,7 @@ class Launcher(QMainWindow):
         self.devices.setText('\n'.join(model.controllers()) or 'No joystick devices detected. Connect a controller to test it in game.')
 
     def refresh_readiness(self):
-        missing = model.missing_files(self.root)
+        missing = model.missing_files(self.root, getattr(self, 'game', None))
         self.status.setText('Setup incomplete · see Session log' if missing else 'Ready for adventure')
         if missing: self.log.append('Missing local files: ' + ', '.join(missing))
         self.play.setEnabled(not missing)
@@ -237,7 +237,7 @@ class Launcher(QMainWindow):
                 pc_value = {}
             pc_value.update({key: value[key] for key in model.PC_KEYS})
             save_settings(pc_path, pc_value)
-            argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None))
+            argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None), game=getattr(self, 'game', None))
         except (OSError, ValueError, TypeError) as error:
             QMessageBox.warning(self, 'Cannot start Trap Team', str(error))
             return

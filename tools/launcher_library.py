@@ -40,6 +40,12 @@ def load(path):
         except ImportError:
             from launcher_mods import validate as validate_mods
         validate_mods(game.get('mods',{}))
+        if 'installation' in game:
+            try:
+                from .game_library import split_selector
+            except ImportError:
+                from game_library import split_selector
+            split_selector(game['installation'])
         ids.add(game['id'])
     if value.get('selected') not in ids:
         value['selected'] = value['games'][0]['id']
@@ -58,3 +64,37 @@ def save(path, value):
     temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(value, indent=2) + '\n')
     temporary.replace(path)
+
+
+def sync_installations(root, value):
+    """Add installed titles to the rail without replacing saves, figures or overrides."""
+    try:
+        from . import game_library
+    except ImportError:
+        import game_library
+    installed = game_library.entries(root)
+    for entry in installed:
+        profile = game_library.profile_for(root, entry)
+        key = profile['id'] if profile else 'title-' + entry['title_id'].lower()
+        game = next((g for g in value['games'] if g['id'] == key), None)
+        if game is None:
+            game = dict(id=key, name=profile['title'] if profile else entry['title'],
+                        title_id=entry['title_id'], top='#263da2', bottom='#a9a9b1',
+                        background='', logo='', game_pkg='', update_pkg='', settings={})
+            value['games'].append(game)
+    for game in value['games']:
+        choices = [e for e in installed if
+            (game_library.profile_for(root, e) or {}).get('id') == game['id'] or
+            game.get('title_id') == e['title_id']]
+        if not choices:
+            continue
+        if not any(game.get('installation') == game_library.selector(e['title_id'], e['app_version']) for e in choices):
+            try:
+                from .game_install import version
+            except ImportError:
+                from game_install import version
+            chosen = max(choices, key=lambda e: version(e['app_version']))
+            game['installation'] = game_library.selector(chosen['title_id'], chosen['app_version'])
+        chosen = next(e for e in choices if game['installation'] == game_library.selector(e['title_id'], e['app_version']))
+        game['installed_paths'] = [p for p in (chosen['base_path'], chosen['update_path']) if p]
+    return value

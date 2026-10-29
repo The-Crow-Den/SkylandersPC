@@ -69,6 +69,13 @@ class Install:
 
 
 def discover(directory):
+    # A manifest (or its entry directory) describes exactly one title/version.
+    if isinstance(directory, dict) or (Path(directory) / 'manifest.json').is_file() or Path(directory).is_file():
+        try:
+            from . import game_library
+        except ImportError:
+            import game_library
+        return game_library.discover(directory)
     candidates = []
     for path in sorted(Path(directory).iterdir()):
         sfo = path / 'sce_sys/param.sfo'
@@ -76,12 +83,12 @@ def discover(directory):
             if sfo.is_symlink() or sfo.parent.is_symlink():
                 raise ValueError('Game metadata must not be a symlink')
             meta = read_sfo(sfo.read_bytes())
-            if meta.get('TITLE_ID') in ('CUSA00697', 'CUSA00626'):
+            if meta.get('CATEGORY') in ('gd', 'gp'):
                 version(meta.get('APP_VER'))
                 candidates.append((path, meta))
     bases = [(p, m) for p, m in candidates if m.get('CATEGORY') == 'gd']
     if len(bases) != 1:
-        raise ValueError('Expected exactly one Trap Team base dump in Game/')
+        raise ValueError('Expected exactly one base dump in installation')
     base, identity = bases[0]
     if any(m.get('CATEGORY')=='gp' and m['TITLE_ID']==identity['TITLE_ID'] and
            m.get('CONTENT_ID')!=identity.get('CONTENT_ID') for _,m in candidates):

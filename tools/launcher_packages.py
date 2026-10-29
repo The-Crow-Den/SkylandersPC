@@ -1,14 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validate extracted packages before publishing a complete local installation."""
 from pathlib import Path
-import shutil
 import struct
 try:
     from .workspace import read_sfo
-    from .game_install import version
 except ImportError:
     from workspace import read_sfo
-    from game_install import version
 
 BUILTIN_EXTRACTOR = Path(__file__).resolve().with_name('pkg_extract.py')
 
@@ -26,34 +23,13 @@ def extracted_root(directory):
         raise ValueError('Invalid extracted game metadata') from error
 
 
-def publish(staging, destination, trap_team=False):
-    """Move validated base/update together; rollback moves on a publication error."""
-    staging, destination = Path(staging), Path(destination)
-    base, meta = extracted_root(staging / 'base')
-    if meta.get('CATEGORY') != 'gd' or not (base / 'eboot.bin').is_file():
-        raise ValueError('Base package needs game metadata and eboot.bin')
-    version(meta.get('APP_VER'))
-    if trap_team and meta.get('TITLE_ID') not in ('CUSA00697','CUSA00626'):
-        raise ValueError('This package is not a supported Trap Team title')
-    roots = [('base', base)]
-    if (staging / 'update').exists():
-        update, patch = extracted_root(staging / 'update')
-        if (patch.get('CATEGORY') != 'gp' or patch.get('TITLE_ID') != meta.get('TITLE_ID')
-                or patch.get('CONTENT_ID') != meta.get('CONTENT_ID')
-                or version(patch.get('APP_VER')) <= version(meta.get('APP_VER'))):
-            raise ValueError('Update must match the base title/content ID and have a newer version')
-        roots.append(('update',update))
-    destination.mkdir(parents=True,exist_ok=True)
-    if trap_team and any(destination.glob('*/sce_sys/param.sfo')):
-        raise ValueError('Game/ already has an installation. Extracted files are retained in the import folder; existing files were kept.')
-    moved = []
+def publish(staging, destination, source_packages=()):
+    """Validate extractor outputs and publish them into the versioned library."""
     try:
-        for kind, source in roots:
-            target = destination / (staging.name + '-' + kind)
-            if target.exists(): raise ValueError('Installation destination already exists')
-            shutil.move(str(source),str(target)); moved.append((source,target))
-    except BaseException:
-        for source,target in reversed(moved):
-            source.parent.mkdir(parents=True,exist_ok=True); shutil.move(str(target),str(source))
-        raise
-    return [str(target) for _,target in moved]
+        from . import game_library
+    except ImportError:
+        import game_library
+    staging = Path(staging)
+    base = extracted_root(staging / 'base')[0] if (staging / 'base').exists() else None
+    update = extracted_root(staging / 'update')[0] if (staging / 'update').exists() else None
+    return game_library.publish(destination, base, update, source_packages)

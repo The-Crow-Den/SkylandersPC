@@ -47,12 +47,14 @@ def archive(path):
 
 def game_sources(root,game):
     root=Path(root);folders=[Path(p) for p in game.get('installed_paths',[])]
-    if game['id']=='trap-team':
-        try:
-            try:from .game_install import discover
-            except ImportError:from game_install import discover
-            folders.insert(0,discover(root/'Game').base)
-        except (OSError,ValueError):pass
+    installation = None
+    try:
+        try:from . import game_library
+        except ImportError:import game_library
+        installation = game_library.resolve(root, game=game)
+        folders = [p for p in (installation.update, installation.base) if p]
+    except (OSError,ValueError):
+        if game.get('installation'): folders = []
     trp=None;npwr=None
     for folder in folders:
         candidates=sorted((folder/'sce_sys/trophy').glob('*.trp'))
@@ -73,8 +75,8 @@ def game_sources(root,game):
                     if (home/relative).is_file():definitions=str(home/relative);break
             candidate=home/'home'/str(game.get('trophy_user','1000'))/'trophy'/(npwr+'.xml')
             if not progress and candidate.is_file():progress=str(candidate)
-    if npwr and game['id']=='trap-team':
-        native=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'skylanders-pc/trophies/CUSA00626'
+    if npwr and installation:
+        native=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/('skylanders-pc/trophies/'+installation.title_id)
         record=native/'users'/str(game.get('native_trophy_user','4096'))/(npwr+'.xml')
         if not game.get('trophy_progress') and record.is_file():progress=str(record)
         if not definitions:
