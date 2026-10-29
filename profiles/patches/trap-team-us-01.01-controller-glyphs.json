@@ -866,5 +866,37 @@
         ]
       }
     ]
+  },
+  "title": {
+    "asset": "level/title.bld",
+    "source_sha256": "d5327735db727796e65e3570b11d702c5522c0e2d6650c4fff193fb456e237fd",
+    "texture_name": "title confirm button (64x64 BC3, 1D thin micro tiled)",
+    "texture_offset": 14712004,
+    "texture_size": 4096,
+    "width": 64,
+    "chunks": [
+      {
+        "plain_offset": 14680064,
+        "offset": 5400576,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "decoded_sha256": "cdc10897b464d545f614a84c4d8544c3b10af53f508b39ef6dd5d35d9b561b05",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 4531,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14712832,
+        "offset": 5406720,
+        "allocation": 10240,
+        "decoded_size": 32768,
+        "decoded_sha256": "7da48e2d53102ccc7296b6ef69b8ae49b00113b2e24b0fe395da76bbebf08044",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 8363,
+        "properties_hex": "5d00800000"
+      }
+    ]
   }
 }

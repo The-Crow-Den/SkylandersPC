@@ -84,6 +84,23 @@ class ControllerGlyphTests(unittest.TestCase):
         self.assertNotEqual(pixel(left+w//2,top+h//2)[:3],bytes(glyph.KEY)) # round button drawn
         self.assertTrue(all(result[i]==200 for i in range(3,len(result),4)))  # alpha untouched
 
+    def test_title_button_is_reencoded_within_its_range(self):
+        # Synthetic archive: a 4096-byte BC3 texture straddling two 32 KiB blocks.
+        source=bytes(range(256))*(3*32768//256);start=32768-1000
+        profile=dict(asset='level/title.bld',texture_offset=start,texture_size=4096,width=64,
+                     source_sha256=asset_mod.digest(source),chunks=[])
+        for at in range(0,len(source),32768):
+            profile['chunks'].append(dict(plain_offset=at,offset=at,allocation=32768,
+                decoded_size=32768,decoded_sha256=asset_mod.digest(source[at:at+32768]),encoding='raw'))
+        result,_=asset_mod.patch_asset(source,glyph.title_recipe(source,profile,'xbox'))
+        self.assertTrue(all(a==b or start<=i<start+4096 for i,(a,b) in enumerate(zip(source,result))))
+        texture=result[start:start+4096]
+        corner=texture[glyph.block_texture.micro_tiled_offset(0,0,16):][:16]
+        centre=texture[glyph.block_texture.micro_tiled_offset(8,8,16):][:16]
+        self.assertLess(corner[0],64)                   # (nearly) transparent outside the art
+        self.assertEqual(centre[:2],b'\xff\xff')       # opaque in the middle
+        with self.assertRaises(ValueError):glyph.title_recipe(source,dict(profile,texture_size=8192),'xbox')
+
     def test_raw_lzma_uses_external_decoded_size_and_checks_block_bounds(self):
         plain=b'a'*32768
         encoded=lzma.compress(plain+b'padding',format=lzma.FORMAT_RAW,

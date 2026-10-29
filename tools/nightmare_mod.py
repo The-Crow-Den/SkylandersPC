@@ -14,6 +14,21 @@ import struct
 PROFILE=Path(__file__).resolve().parents[1]/'profiles/patches/trap-team-nightmare.json'
 
 
+def recipe(profile):
+    """The same edit as an asset_mod recipe, so it composes with other edits of
+    level/title.bld (such as the controller glyph pack) in one preparation."""
+    offset,allocation=profile['chunk_offset'],profile['allocation_size']
+    chunk=dict(offset=offset,allocation=allocation,decoded_size=profile['decoded_size'],
+               decoded_sha256=profile['decoded_sha256'],encoding='raw-lzma',
+               encoded_size=profile['compressed_payload_size'],properties_hex=profile['lzma_properties_hex'],
+               edits=[dict(offset=profile['patch_offset_in_chunk'],expected_hex=profile['expected_hex'],
+                           replacement_hex=profile['replacement_hex'])])
+    if offset%2048==0 and allocation%2048==0:chunk['alignment']=2048
+    return dict(schema_version=2,executable_sha256=profile['executable_sha256'],title_id=profile.get('title_id'),
+                app_version=profile.get('app_version'),
+                assets=[dict(asset=profile['asset'],source_sha256=profile['asset_sha256'],chunks=[chunk])])
+
+
 def patch_asset(data, profile):
     if hashlib.sha256(data).hexdigest()!=profile['asset_sha256']:
         raise ValueError('Nightmare mod refuses an unknown title asset')

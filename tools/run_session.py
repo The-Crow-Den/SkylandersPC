@@ -314,9 +314,16 @@ def main(argv=None):
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
     if args.unlock_nightmare:
+        # Composed with the other asset recipes, since the controller glyph pack
+        # also edits level/title.bld; a separate write would block that edit.
         try:
-            nightmare_metadata=nightmare_mod.prepare(original_game,game_root,session,build['nightmare'])
-        except (OSError,ValueError,lzma.LZMAError) as error:
+            nightmare_profile=json.loads(Path(build['nightmare']).read_text())
+            if nightmare_profile['executable_sha256']!=build['executable_sha256']:
+                raise ValueError('Nightmare mod refuses an unknown original executable')
+            recipes=list(recipes or [])+[nightmare_mod.recipe(nightmare_profile)]
+            nightmare_metadata={'asset':nightmare_profile['asset'],'status':nightmare_profile['status'],
+                                'prepared':'composed asset recipe'}
+        except (OSError,ValueError,KeyError) as error:
             parser.error(str(error))
     preparation_checkpoint('nightmare')
     movie_metadata=None
@@ -330,7 +337,7 @@ def main(argv=None):
     if glyph_mode!='playstation':
         try:
             recipes.append(controller_glyphs.build_profile(original_game,glyph_profile,glyph_mode,build['executable_sha256']))
-            glyph_metadata.update(coverage='shared font and animated mash prompts',assets=[item['asset'] for item in recipes[-1]['assets']])
+            glyph_metadata.update(coverage='shared font, animated mash prompts and title confirm button',assets=[item['asset'] for item in recipes[-1]['assets']])
         except (OSError,ValueError,lzma.LZMAError) as error:
             parser.error(str(error))
     preparation_checkpoint('glyph_recipe')

@@ -90,3 +90,26 @@ def patch_prompt(raw,mask,rectangle,color=(255,255,255)):
     for (x,y),pixels in changed.items():
         at=block_offset(x,y);out[at+8:at+16]=encode_color(pixels)
     return bytes(out)
+
+
+def micro_tiled_offset(x,y,blocks_per_row):
+    """BC block (x,y) of a 1D thin micro tiled texture: 8x8-block tiles, row major."""
+    micro=sum(((x>>i&1)<<(2*i))|((y>>i&1)<<(2*i+1)) for i in range(3))
+    return (((y//8)*(blocks_per_row//8)+x//8)*64+micro)*16
+
+
+def encode_alpha(values):
+    """BC3 alpha block: endpoints max/min with six interpolated levels."""
+    if len(values)!=16 or any(type(v) is not int or not 0<=v<=255 for v in values):
+        raise ValueError('BC alpha encoder requires sixteen values')
+    high,low=max(values),min(values)
+    if high==low:return bytes((high,low))+bytes(6)
+    palette=[high,low]+[((7-i)*high+i*low)//7 for i in range(1,7)]
+    indices=sum(min(range(8),key=lambda j:abs(v-palette[j]))<<(3*i) for i,v in enumerate(values))
+    return bytes((high,low))+indices.to_bytes(6,'little')
+
+
+def encode_bc3(pixels):
+    """Sixteen RGBA pixels to one BC3 block (alpha, then opaque-mode colour)."""
+    if len(pixels)!=16:raise ValueError('BC3 encoder requires sixteen pixels')
+    return encode_alpha([p[3] for p in pixels])+encode_color([tuple(p[:3]) for p in pixels])

@@ -268,11 +268,52 @@ def prompt_recipe(source,profile,mode):
     return _write_blocks(profile,blocks)
 
 
+def resample(art,width,height,target):
+    """Area-average an RGBA image to a square target size (premultiplied alpha)."""
+    scale=width/target;result=bytearray(target*target*4)
+    for ty in range(target):
+        for tx in range(target):
+            total=[0.0]*4
+            for sy in range(int(ty*scale),min(height,int((ty+1)*scale-1e-9)+1)):
+                wy=min(sy+1,(ty+1)*scale)-max(sy,ty*scale)
+                for sx in range(int(tx*scale),min(width,int((tx+1)*scale-1e-9)+1)):
+                    w=wy*(min(sx+1,(tx+1)*scale)-max(sx,tx*scale));i=(sy*width+sx)*4;a=art[i+3]*w
+                    total[0]+=art[i]*a;total[1]+=art[i+1]*a;total[2]+=art[i+2]*a;total[3]+=a
+            o=(ty*target+tx)*4;area=scale*scale
+            if total[3]:result[o:o+4]=bytes((round(total[0]/total[3]),round(total[1]/total[3]),round(total[2]/total[3]),min(255,round(total[3]/area))))
+    return bytes(result)
+
+
+def title_recipe(source,profile,mode):
+    """The title screen's 64x64 BC3 confirm button (stored flipped, 1D micro tiled)
+    re-encoded from the south-button artwork."""
+    if mode not in LABELS:raise ValueError('invalid title prompt pack')
+    blocks=_read_blocks(source,profile)
+    start=asset_mod.number(profile['texture_offset'],512*1024*1024,'title prompt offset')
+    if profile['texture_size']!=4096 or profile['width']!=64:raise ValueError('unsupported title prompt layout')
+    _,_,_,width,height=CELLS[0]
+    art=resample(raster(mode,0),width,height,64)
+    raw=bytearray(4096)
+    for by in range(16):
+        for bx in range(16):
+            # Stored vertically flipped, like the animated prompts (confirmed in game).
+            pixels=[tuple(art[((63-(by*4+i//4))*64+bx*4+i%4)*4:((63-(by*4+i//4))*64+bx*4+i%4)*4+4]) for i in range(16)]
+            at=block_texture.micro_tiled_offset(bx,by,16);raw[at:at+16]=block_texture.encode_bc3(pixels)
+    at=start
+    while at<start+4096:
+        base=at//32768*32768
+        if base not in blocks:raise ValueError('title prompt exceeds verified blocks')
+        _,_,modified=blocks[base];take=min(len(modified)-(at-base),start+4096-at)
+        modified[at-base:at-base+take]=raw[at-start:at-start+take];at+=take
+    return _write_blocks(profile,blocks)
+
+
 def build_profile(source_root,profile_path,mode,executable_sha256):
     profile=json.loads(Path(profile_path).read_text())
     if profile['executable_sha256']!=executable_sha256:raise ValueError('controller glyphs require the verified executable')
     assets=[]
-    for current,transform in [(profile,recipe)]+([(profile['prompts'],prompt_recipe)] if 'prompts' in profile else []):
+    for current,transform in ([(profile,recipe)]+([(profile['prompts'],prompt_recipe)] if 'prompts' in profile else [])+
+                              ([(profile['title'],title_recipe)] if 'title' in profile else [])):
         relative=Path(current['asset'])
         if relative.is_absolute() or '..' in relative.parts:raise ValueError('invalid glyph asset path')
         source=Path(source_root)/relative
@@ -284,4 +325,4 @@ def build_profile(source_root,profile_path,mode,executable_sha256):
 def prepare(source_root,game_root,session,profile_path,mode,executable_sha256):
     record=build_profile(source_root,profile_path,mode,executable_sha256)
     result=asset_mod.prepare(source_root,game_root,session,record,enabled=True)
-    return dict(mode=mode,coverage='shared font and animated mash prompts',**result)
+    return dict(mode=mode,coverage='shared font, animated mash prompts and title confirm button',**result)
