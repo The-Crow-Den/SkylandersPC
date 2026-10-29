@@ -28,8 +28,8 @@ files, keeps your saves, figures and settings, and starts the game. Each game
 runs from a private working copy, so the installed files and your figure dumps
 are never modified.
 
-Click **Install**, choose the game's PKG and, if you have one, its update PKG,
-then click **Install game**. The launcher unpacks both into the **Games** folder
+Click **Install** and follow the steps: choose your game file, add an update
+or skip it, then click **Install game**. The launcher unpacks both into the **Games** folder
 and uses the newest installed update automatically. **Open games folder** opens
 that folder in your file manager. Existing installations stay where they are.
 Unrecognized titles can be installed and are labelled “not supported yet”.

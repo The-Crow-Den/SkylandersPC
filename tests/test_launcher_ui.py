@@ -252,10 +252,33 @@ class LauncherUITests(unittest.TestCase):
         dialog=InstallDialog(self.window)
         self.assertEqual(dialog.fields['game_pkg'].text(),'')
         self.assertEqual(dialog.fields['update_pkg'].text(),'')
-        self.assertEqual(dialog.start.text(),'Install game')
+        self.assertEqual(dialog.start.text(),'Continue')
+        self.assertFalse(dialog.start.isEnabled())
+        self.assertTrue(dialog.details.isHidden())
         self.assertTrue(dialog.output.isHidden())
+        dialog.show_step(3)
         dialog.details.click();self.assertFalse(dialog.output.isHidden())
         dialog.details.click();self.assertTrue(dialog.output.isHidden())
+        dialog.close()
+
+    def test_install_wizard_guides_game_update_skip_and_review(self):
+        game=self.root/'My game.pkg';game.write_bytes(b'synthetic')
+        dialog=InstallDialog(self.window);dialog.show()
+        self.assertEqual(dialog.heading.text(),'Choose your game')
+        self.assertTrue(dialog.back.isHidden());self.assertTrue(dialog.skip.isHidden())
+        with patch('tools.launcher_install_dialog.QFileDialog.getOpenFileName',return_value=(str(game),'')):
+            dialog.browse_buttons[0].click()
+        self.assertEqual(dialog.file_labels['game_pkg'].text(),'My game.pkg')
+        self.assertNotIn(str(self.root),dialog.file_labels['game_pkg'].text())
+        with patch('tools.launcher_packages.package_info',return_value={'CATEGORY':'gd'}):dialog.start.click()
+        self.assertEqual(dialog.step,1);self.assertEqual(dialog.heading.text(),'Do you have an update?')
+        self.assertFalse(dialog.skip.isHidden());self.assertFalse(dialog.start.isEnabled())
+        dialog.skip.click()
+        self.assertEqual(dialog.step,2);self.assertEqual(dialog.start.text(),'Install game')
+        self.assertIn('Not adding an update',dialog.summary.text())
+        self.assertIsNone(dialog.process)
+        dialog.back.click();self.assertEqual(dialog.step,1)
+        dialog.back.click();self.assertEqual(dialog.step,0)
         dialog.close()
 
     def test_open_games_folder_uses_visible_directory(self):
@@ -278,6 +301,16 @@ class LauncherUITests(unittest.TestCase):
         self.assertIn('does not match',warning.call_args.args[2])
         self.assertIsNone(dialog.process)
         self.assertFalse((self.root/'.local/pkg-imports').exists())
+        dialog.close()
+
+    def test_existing_game_can_go_straight_to_adding_an_update(self):
+        self.make_library_base();self.window.rebuild_rail();self.window.select_game('title-cusa00626')
+        dialog=InstallDialog(self.window);dialog.show()
+        self.assertFalse(dialog.update_only.isHidden())
+        dialog.update_only.click()
+        self.assertEqual(dialog.step,1);self.assertTrue(dialog.only_update)
+        self.assertTrue(dialog.skip.isHidden());self.assertFalse(dialog.start.isEnabled())
+        dialog.back.click();self.assertEqual(dialog.step,0);self.assertFalse(dialog.only_update)
         dialog.close()
 
     def test_update_only_install_attaches_existing_base(self):
@@ -308,7 +341,10 @@ class LauncherUITests(unittest.TestCase):
             pkg=self.root/(key+'.pkg')
             pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY=cat,APP_VER=ver,CONTENT_ID='test'))).decode())
             dialog.fields[key].setText(str(pkg))
-        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
+        dialog.start.click();self.assertEqual(dialog.step,1)
+        dialog.start.click();self.assertEqual(dialog.step,2)
+        self.assertIsNone(dialog.process)
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.start.click()
         self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
         self.assertEqual(len(self.window.game['installed_paths']),2)
         self.assertTrue(all(Path(p).is_relative_to(self.root/'Games') for p in self.window.game['installed_paths']))

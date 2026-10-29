@@ -97,10 +97,10 @@ class PackageSelectionTests(unittest.TestCase):
             root=Path(folder);base=self.pkg(root,'game.pkg','gd');update=self.pkg(root,'update.pkg','gp',version='01.01')
             self.assertEqual(packages.package_info(base)['CATEGORY'],'gd')
             packages.check_packages(base,update)
-            with self.assertRaisesRegex(ValueError,'not a base game'):packages.check_packages(update,base)
+            with self.assertRaisesRegex(ValueError,'looks like an update'):packages.check_packages(update,base)
             wrong=self.pkg(root,'wrong.pkg','gp',title='CUSA99999',version='01.01')
             with self.assertRaisesRegex(ValueError,'does not match'):packages.check_packages(base,wrong)
-            with self.assertRaisesRegex(ValueError,'base game first'):packages.check_packages(None,update)
+            with self.assertRaisesRegex(ValueError,'game first'):packages.check_packages(None,update)
             installed=[dict(title_id='CUSA00626',content_id='content',base_version='01.00')]
             packages.check_packages(None,update,installed)
             broken=root/'broken.pkg';broken.write_bytes(b'not a package')

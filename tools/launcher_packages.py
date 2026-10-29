@@ -58,15 +58,15 @@ def check_packages(game_pkg=None, update_pkg=None, installed=()):
     base = package_info(game_pkg) if game_pkg else None
     update = package_info(update_pkg) if update_pkg else None
     if base and base.get('CATEGORY') != 'gd':
-        raise ValueError('The game file is not a base game package. If it is an update, choose it under Update PKG.')
+        raise ValueError('This looks like an update. Choose the game file first, then add the update in the next step.')
     if update and update.get('CATEGORY') != 'gp':
-        raise ValueError('The update file is not an update package. Choose the base game under Game PKG.')
+        raise ValueError('This looks like the game itself. Choose it in the first step, or choose an update file here.')
     if update and not base:
         matches = [e for e in installed if e['title_id'] == update.get('TITLE_ID') and e['content_id'] == update.get('CONTENT_ID')]
         if not matches:
-            raise ValueError('Install the base game first, or choose its Game PKG as well as this update.')
+            raise ValueError('Install the game first, or choose its game file as well as this update.')
         base = dict(TITLE_ID=matches[0]['title_id'], CONTENT_ID=matches[0]['content_id'], APP_VER=matches[0]['base_version'])
     if base:
         version(base.get('APP_VER'))
     if update and (update.get('TITLE_ID') != base.get('TITLE_ID') or update.get('CONTENT_ID') != base.get('CONTENT_ID') or version(update.get('APP_VER')) <= version(base.get('APP_VER'))):
-        raise ValueError('This update does not match the selected game, or is not newer than the base game. Choose the update for the same game and region.')
+        raise ValueError('This update does not match your game, or is older than your game file. Choose a newer update for the same game.')
