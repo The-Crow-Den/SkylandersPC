@@ -10,6 +10,8 @@ namespace SkyGpu {
 bool captures_input();
 bool enabled() noexcept;
 void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attributes);
+/// Where the game's executable is mapped (the renderer's runtime_guest_image).
+void set_guest_image(std::uint64_t base, std::uint64_t size);
 void bind_keyboard(KeyboardPad* pad);
 void bind_portal(void (*load)(const char*), void (*remove)(), void (*trap)(const char*), void (*remove_trap)());
 bool handle_fault(int signal, void* info, void* context);

@@ -23,6 +23,7 @@
 
 #include "hle/pure_libc.hpp"
 #include "guest_runtime.hpp"
+#include "gpu_backend.hpp"
 #include <cstdlib>
 
 namespace {
@@ -218,6 +219,7 @@ public:
                        MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
         if (memory_ == MAP_FAILED) fail(std::string("mmap failed: ") + std::strerror(errno));
         if (memory_ != requested) fail("kernel did not honor no-replace guest mapping");
+        SkyGpu::set_guest_image(pack.base, length_);
 #else
         fail("fixed guest loading requires Linux MAP_FIXED_NOREPLACE; inspect mode remains available");
 #endif

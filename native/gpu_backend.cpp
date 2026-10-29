@@ -26,6 +26,11 @@
 #include <unordered_map>
 #include <signal.h>
 
+namespace {
+// The game's executable as main.cpp mapped it (SkyGpu::set_guest_image, runtime_guest_image).
+std::atomic<std::uint64_t> guest_image_base = 0, guest_image_size = 0;
+}
+
 #ifdef SKY_RENDERER
 #include <csetjmp>
 #include <pthread.h>
@@ -292,6 +297,10 @@ uintptr_t runtime_lookup(const RuntimeExport* table, size_t count, const char* i
     return 0;
 }
 void runtime_guest_call_sites(uint64_t out[3]) { out[0] = out[1] = out[2] = 0; }
+void runtime_guest_image(uint64_t* base, uint64_t* size) {
+    *base = guest_image_base.load(std::memory_order_acquire);
+    *size = guest_image_size.load(std::memory_order_acquire);
+}
 void runtime_restart() { dprintf(STDERR_FILENO, "custom runtime restart is unsupported\n"); _exit(75); }
 int runtime_file_translate(const char*, char*, size_t) { return -1; }
 int runtime_file_host_path(const char*, char*, size_t) { return -1; }
@@ -342,6 +351,10 @@ const char* media_symbol(const char* identity) {
 #endif
 }
 namespace SkyGpu {
+void set_guest_image(std::uint64_t base, std::uint64_t size) {
+    guest_image_base.store(base, std::memory_order_release);
+    guest_image_size.store(size, std::memory_order_release);
+}
 bool captures_input() {
 #ifdef SKY_RENDERER
     return presenter_ready && Renderer::overlay_captures_input();
