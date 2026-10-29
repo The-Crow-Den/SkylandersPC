@@ -63,3 +63,21 @@ class OverlaySessionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class MenuZoomTests(unittest.TestCase):
+    def test_menu_grows_with_large_windows_and_keeps_full_size_on_a_deck(self):
+        from tools.pc_overlay import menu_zoom
+        self.assertEqual(menu_zoom(1280, 800), 1.0)
+        self.assertEqual(menu_zoom(1280, 720), 1.0)
+        self.assertAlmostEqual(menu_zoom(1920, 1080), 1.08)
+        self.assertAlmostEqual(menu_zoom(2560, 1600), 1.6)
+        self.assertAlmostEqual(menu_zoom(3840, 2160), 2.16)
+        # Small windows shrink so the 1100 x 720 page still fits.
+        width, height = 854, 480
+        zoom = menu_zoom(width, height)
+        self.assertLess(zoom, 1)
+        self.assertGreaterEqual(width / zoom, 1100 - 1e-6)
+        self.assertGreaterEqual(height / zoom, 720 - 1e-6)
+        self.assertEqual(menu_zoom(16384, 16384), 3.0)
+        self.assertEqual(menu_zoom(100, 100), 0.5)

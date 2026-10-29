@@ -105,7 +105,7 @@
  #trap-rail-demo .game-title { display:none; }
  #trap-rail-demo .left-tools { position:relative; inset:auto; display:block; }
  #trap-rail-demo .rail, #trap-rail-demo .left-tools:hover .rail, #trap-rail-demo .left-tools:focus-within .rail, #trap-rail-demo .left-tools.pinned .rail { width:100%; flex-direction:row; padding:6px; border-radius:18px; gap:8px; }
- #trap-rail-demo .rail { display:grid!important; grid-template-columns:repeat(4,minmax(0,1fr)); }
+ #trap-rail-demo .rail { display:grid!important; grid-template-columns:repeat(5,minmax(0,1fr)); }
  #trap-rail-demo .rail-divider { display:none; }
  #trap-rail-demo .rail-button { flex:1; height:54px; padding:4px 0; gap:4px; font-size:11px; flex-direction:column; justify-content:center; }
  #trap-rail-demo .nav-label { opacity:1; }

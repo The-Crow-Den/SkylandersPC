@@ -4,6 +4,7 @@ import struct
 import unittest
 import tempfile
 import json
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -95,3 +96,17 @@ class ResolutionTests(unittest.TestCase):
         profile['virtual_address'] = 5000
         with self.assertRaises(ValueError):
             patch_pack(data, '1440p', 'original', profile)
+
+    def test_menu_and_native_host_list_presets_in_the_same_order(self):
+        # The in-game menu sends an index; both sides must agree on it.
+        root = Path(__file__).resolve().parents[1]
+        native = (root / 'native/pc_settings.hpp').read_text()
+        entries = re.findall(r'\{"(\d+p)",(\d+),(\d+)\}', native)
+        self.assertEqual([(name, (int(w), int(h))) for name, w, h in entries], list(PRESETS.items()))
+        self.assertIn('default_resolution = %d;' % list(PRESETS).index('1080p'), native)
+        menu = (root / 'tools/pc_menu/index.html').read_text()
+        select = re.search(r'<select id="trap-demo-res">(.*?)</select>', menu)[1]
+        options = re.findall(r'<option>(\d+) × (\d+)', select)
+        self.assertEqual([(int(w), int(h)) for w, h in options], list(PRESETS.values()))
+        self.assertIn('800p', PRESETS)
+        self.assertEqual(PRESETS['800p'], (1280, 800))

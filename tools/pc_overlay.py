@@ -15,6 +15,19 @@ except ImportError:
 ROOT=Path(__file__).resolve().parents[1]
 
 
+def menu_zoom(width,height):
+    """Page zoom for a menu filling width x height logical pixels.
+
+    The menu is designed for a 1600 x 1000 page and grows with larger windows
+    (1.08 at 1080p, 1.6 at 2560 x 1600). It does not shrink below 1 while the
+    window still holds a 1100 x 720 page, so a 1280 x 800 Steam Deck keeps
+    full-size text; only smaller windows shrink it, and never below 0.5.
+    """
+    grow=min(height/1000,width/1600)
+    fit=min(1.0,height/720,width/1100)
+    return max(0.5,min(3.0,max(grow,fit)))
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory',type=Path,required=True)
@@ -158,7 +171,7 @@ def main(argv=None):
                 factor=min(1,3840/state['geometry'][2],2160/state['geometry'][3])
                 frame_size=(round(state['geometry'][2]*factor),round(state['geometry'][3]*factor))
                 x=y=0;width=round(frame_size[0]/scale);height=round(frame_size[1]/scale)
-            view.setGeometry(x,y,width,height);view.setZoomFactor(max(0.75,min(height/1080,3.0)))
+            view.setGeometry(x,y,width,height);view.setZoomFactor(menu_zoom(width,height))
             page.setLifecycleState(QWebEnginePage.LifecycleState.Active)
             if not was_visible:
                 buttons=Qt.MouseButton.NoButton;last_pixels=None;view.show()

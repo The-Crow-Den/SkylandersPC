@@ -86,8 +86,8 @@
     root.querySelector('.portal-panel').hidden=ui.view!=='portal';root.querySelector('.settings-panel').hidden=ui.view!=='settings';
     root.querySelectorAll('[data-view]').forEach(node=>{const active=node.dataset.view===ui.view&&(!node.dataset.page||node.dataset.page===ui.page);node.classList.toggle('is-current',active);node.setAttribute('aria-expanded',String(active));});
     root.querySelectorAll('[data-settings-page]').forEach(node=>node.hidden=node.dataset.settingsPage!==ui.page);
-    root.querySelector('[data-setting-title]').textContent={display:'Display',controls:'Controls',audio:'Audio'}[ui.page];
-    const old=root.querySelector('[data-setting-icon]');const next=document.createElement('i');next.dataset.settingIcon='';next.dataset.lucide={display:'monitor',controls:'gamepad-2',audio:'volume-2'}[ui.page];next.setAttribute('aria-hidden','true');old.replaceWith(next);
+    root.querySelector('[data-setting-title]').textContent={display:'Display',graphics:'Graphics',controls:'Controls',audio:'Audio'}[ui.page];
+    const old=root.querySelector('[data-setting-icon]');const next=document.createElement('i');next.dataset.settingIcon='';next.dataset.lucide={display:'monitor',graphics:'sliders-horizontal',controls:'gamepad-2',audio:'volume-2'}[ui.page];next.setAttribute('aria-hidden','true');old.replaceWith(next);
     slots();const isTrap=ui.slot===1;
     root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;root.querySelector('.section-title').hidden=isTrap;
     if(isTrap)traps();else figures();message.textContent=ui.snapshot?.status||'Waiting for the game…';icon();

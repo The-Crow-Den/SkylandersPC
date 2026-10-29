@@ -12,6 +12,12 @@
 
 extern "C" int sky_portal_volume() __attribute__((weak));
 namespace SkyPc {
+struct Resolution { const char* name; int width, height; };
+// Same order as PRESETS in tools/resolution.py: the menu sends an index.
+inline constexpr std::array<Resolution,8> resolutions{{
+    {"480p",854,480},{"720p",1280,720},{"800p",1280,800},{"900p",1600,900},
+    {"1080p",1920,1080},{"1440p",2560,1440},{"1600p",2560,1600},{"2160p",3840,2160}}};
+inline constexpr int default_resolution = 4; // 1080p
 inline std::atomic<bool> show_fps{[] {
     const auto* value=std::getenv("SKY_FPS_COUNTER");
     return !value || std::strcmp(value,"0")!=0;
@@ -140,10 +146,10 @@ extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_set_con
 // The UI sends only fixed-choice integers. The launcher validates the resulting
 // request again and applies it to a fresh, private session after orderly exit.
 extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_save_settings(int resolution, int quality, int fullscreen, int counter) {
-    constexpr const char* resolutions[]{"720p","900p","1080p","1440p","1600p","2160p"};
+    const auto& resolutions = SkyPc::resolutions;
     constexpr const char* qualities[]{"performance","balanced","high"};
     const auto* path = std::getenv("SKY_PC_SETTINGS_REQUEST");
-    if (!path || resolution < 0 || resolution >= 6 || quality < 0 || quality >= 3 ||
+    if (!path || resolution < 0 || resolution >= int(resolutions.size()) || quality < 0 || quality >= 3 ||
         (fullscreen != 0 && fullscreen != 1) || (counter != 0 && counter != 1)) return 0;
     std::lock_guard guard(SkyPc::frame_policy_mutex);
     const std::string temporary = std::string(path) + ".tmp";
@@ -151,7 +157,7 @@ extern "C" __attribute__((used,visibility("default"))) inline int sky_pc_save_se
     if (!file) return 0;
     const bool wrote = std::fprintf(file,
         "{\"resolution\":\"%s\",\"quality\":\"%s\",\"fullscreen\":%s,\"fps_counter\":%s,\"frame_limit\":%d,\"frame_policy\":\"%s\",\"portal_volume\":%d,\"controller_layout\":\"%s\",\"controller_glyphs\":\"%s\"}\n",
-        resolutions[resolution],qualities[quality],fullscreen?"true":"false",counter?"true":"false",SkyPc::manual_limit.load(),SkyPc::automatic.load()?"auto":"manual",sky_portal_volume?sky_portal_volume():30,SkyPc::controller_layout.load()?"keyboard-and-pad":"auto",
+        resolutions[resolution].name,qualities[quality],fullscreen?"true":"false",counter?"true":"false",SkyPc::manual_limit.load(),SkyPc::automatic.load()?"auto":"manual",sky_portal_volume?sky_portal_volume():30,SkyPc::controller_layout.load()?"keyboard-and-pad":"auto",
         std::array<const char*,4>{"auto","playstation","xbox","nintendo"}[SkyPc::controller_glyphs.load()]) > 0;
     const bool closed = std::fclose(file) == 0;
     if (!wrote || !closed || std::rename(temporary.c_str(),path)) { std::remove(temporary.c_str()); return 0; }

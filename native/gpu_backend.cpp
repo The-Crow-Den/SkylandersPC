@@ -487,11 +487,10 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
             std::int32_t window_width = 1280, window_height = 720;
             if (const auto* size = std::getenv("SKY_WINDOW_SIZE")) {
                 bool found = false;
-                for (const auto& preset : std::array<std::pair<std::int32_t,std::int32_t>,6>{
-                         {{1280,720},{1600,900},{1920,1080},{2560,1440},{2560,1600},{3840,2160}}}) {
-                    const auto name = std::to_string(preset.first) + "x" + std::to_string(preset.second);
+                for (const auto& preset : SkyPc::resolutions) {
+                    const auto name = std::to_string(preset.width) + "x" + std::to_string(preset.height);
                     if (name == size) {
-                        window_width = preset.first; window_height = preset.second; found = true; break;
+                        window_width = preset.width; window_height = preset.height; found = true; break;
                     }
                 }
                 if (!found) throw std::runtime_error("unsupported SKY_WINDOW_SIZE preset");

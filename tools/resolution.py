@@ -13,7 +13,10 @@ try:
 except ImportError:
     import prepare_native
 
-PRESETS = {'720p': (1280, 720), '900p': (1600, 900),
+# Ordered by size. The in-game menu and native host pass a preset as its index
+# here (native/pc_settings.hpp and tools/pc_menu list the same sizes in this
+# order); saved settings use the names. 800p is the Steam Deck panel (16:10).
+PRESETS = {'480p': (854, 480), '720p': (1280, 720), '800p': (1280, 800), '900p': (1600, 900),
            '1080p': (1920, 1080), '1440p': (2560, 1440), '1600p': (2560, 1600), '2160p': (3840, 2160)}
 PROFILE = Path(__file__).resolve().parents[1] / 'profiles/patches/trap-team-resolution.json'
 SHADOWS = {'low': (512, 2048), 'native': (1024, 4096), 'high': (2048, 8192)}

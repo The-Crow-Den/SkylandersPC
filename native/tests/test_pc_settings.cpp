@@ -42,13 +42,13 @@ int main() {
     check(sky_pc_frame_limit()==30 && SkyPc::manual_limit.load()==60);
     const std::string path="/tmp/sky-pc-settings-"+std::to_string(getpid())+".json";
     setenv("SKY_PC_SETTINGS_REQUEST",path.c_str(),1);
-    check(!sky_pc_save_settings(99,0,0,0));
+    check(!sky_pc_save_settings(99,0,0,0));check(!sky_pc_save_settings(8,0,0,0));
     check(access(path.c_str(),F_OK)!=0);
     check(!sky_pc_set_controller_layout(2));check(sky_pc_set_controller_layout(1));
     check(sky_pc_controller_layout()==1);
     check(!sky_pc_set_controller_glyphs(4));check(!sky_pc_set_controller_glyphs(-1));
     check(sky_pc_set_controller_glyphs(3) && sky_pc_controller_glyphs()==3);
-    check(sky_pc_save_settings(4,0,1,0));
+    check(sky_pc_save_settings(6,0,1,0));
     std::ifstream file(path);
     const std::string contents((std::istreambuf_iterator<char>(file)),{});
     check(contents.find("nintendo")!=contents.npos);
