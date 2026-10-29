@@ -153,7 +153,9 @@ class GameLibraryTests(unittest.TestCase):
         linked=self.root/'linked';linked.symlink_to(Path(entry['base_path']),target_is_directory=True)
         with self.assertRaisesRegex(ValueError,'symlink'): library.publish(self.library,linked)
         path.unlink();path.symlink_to(self.root/'elsewhere')
-        with self.assertRaisesRegex(ValueError,'symlink'): library.read_entries(self.library)
+        issues=[]
+        self.assertEqual(library.read_entries(self.library,issues),[])
+        self.assertIn('symlink',issues[0]['message'])
 
     def test_previous_hidden_library_is_referenced_from_visible_games_folder(self):
         hidden=self.root/'.local/game-library'
@@ -184,6 +186,62 @@ class GameLibraryTests(unittest.TestCase):
                 library.publish(self.library,base,update)
         self.assertTrue(base.exists());self.assertTrue(update.exists())
         self.assertEqual(library.read_entries(self.library),[])
+
+    def test_managed_paths_survive_project_move_and_external_references_reregister(self):
+        origin=self.root/'original';moved=self.root/'renamed'
+        base=self.dump('original/incoming')
+        entry=library.publish(library.directory(origin),base)
+        raw=json.loads(library.manifest_path(library.directory(origin),entry).read_text())
+        self.assertEqual(raw['base_path'],'CUSA00626/01.00/base')
+        self.dump('original/Game/external',title='CUSA99999')
+        library.register(origin)
+        origin.rename(moved)
+        selected=library.resolve(moved,'CUSA00626')
+        self.assertEqual(selected.base,moved/'Games/CUSA00626/01.00/base')
+        external=library.resolve(moved,'CUSA99999')
+        self.assertEqual(external.base,moved/'Game/external')
+        self.assertTrue(external.base.is_dir())
+
+    def test_bad_manifest_and_ambiguous_legacy_updates_do_not_hide_other_titles(self):
+        bad=library.publish(self.library,self.dump('bad'))
+        good=library.publish(self.library,self.dump('good',title='CUSA99999'))
+        library.manifest_path(self.library,bad).write_text('broken json')
+        self.dump('Game/legacy',title='CUSA11111')
+        self.dump('Game/patch1',title='CUSA11111',ver='01.01',category='gp')
+        self.dump('Game/patch2',title='CUSA11111',ver='01.01',category='gp')
+        issues=[];found=library.entries(self.root,issues)
+        self.assertTrue(any(e['title_id']=='CUSA99999' for e in found))
+        self.assertEqual(library.resolve(self.root,'CUSA99999').base,Path(good['base_path']))
+        self.assertTrue(any('Ambiguous' in issue['message'] for issue in issues))
+        value=launcher_library.defaults();launcher_library.sync_installations(self.root,value)
+        game=next(g for g in value['games'] if g.get('title_id')=='CUSA00626')
+        self.assertTrue(game['installation_issue'])
+        self.assertTrue(library.manifest_path(self.library,bad).read_text()=='broken json')
+
+    def test_folder_leave_and_move_preserve_library_entries(self):
+        from tools import library_location,launcher_model
+        entry=library.publish(self.library,self.dump('incoming'))
+        library_location.change(self.root,self.root/'second',move=False)
+        self.assertEqual(library.resolve(self.root).base,Path(entry['base_path']))
+        launcher_model.save(self.root/'.local/launcher-settings.json',launcher_model.DEFAULTS)
+        self.assertEqual(library.directory(self.root),self.root/'second')
+        library_location.change(self.root,self.root/'third',move=True)
+        self.assertEqual(library.resolve(self.root).base,self.root/'third/CUSA00626/01.00/base')
+
+    def test_folder_move_rolls_back_and_refuses_nested_destination(self):
+        from tools import library_location
+        base=self.dump('base');update=self.dump('update',category='gp',ver='01.01')
+        entry=library.publish(self.library,base,update)
+        with self.assertRaises(ValueError):library_location.change(self.root,Path(entry['base_path'])/'nested',move=True)
+        real=library_location.transfer
+        def transfer(source,target):
+            if source.name=='update':raise OSError('synthetic transfer failure')
+            return real(source,target)
+        with patch.object(library_location,'transfer',side_effect=transfer):
+            result=library_location.change(self.root,self.root/'new',move=True)
+        self.assertTrue(result['errors'])
+        self.assertTrue(Path(entry['base_path']).exists());self.assertTrue(Path(entry['update_path']).exists())
+        self.assertEqual(library.resolve(self.root).app_version,'01.01')
 
     def test_trophies_follow_selected_version_and_title(self):
         self.profile('CUSA00626','trap-team')

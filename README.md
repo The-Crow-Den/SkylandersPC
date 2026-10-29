@@ -32,6 +32,9 @@ Click **Install** and follow the steps: choose your game file, add an update
 or skip it, then click **Install game**. The launcher unpacks both into the **Games** folder
 and uses the newest installed update automatically. **Open games folder** opens
 that folder in your file manager. Existing installations stay where they are.
+After installing a supported game, setup runs automatically. If it needs
+attention, choose **Repair game setup** from the game’s menu. Controller artwork
+and portrait downloads are optional extras; they never block setup.
 Unrecognized titles can be installed and are labelled “not supported yet”.
 
 Builds will be published on the [Releases](https://github.com/The-Crow-Den/SkylandersPC/releases)

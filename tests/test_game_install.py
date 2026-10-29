@@ -60,6 +60,8 @@ class InstallTests(unittest.TestCase):
     def test_identity_and_hash_are_both_required_for_update_profiles(self):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t)/'Game';self.make(root,'base','gd','01.00');self.make(root,'update','gp','01.01');install=discover(root)
+            import shutil
+            shutil.copytree(Path(__file__).resolve().parents[1]/'profiles',Path(t)/'profiles')
             with patch('tools.game_build.hashlib.sha256') as sha:
                 sha.return_value.hexdigest.return_value=US_UPDATE_SHA256
                 result=configuration(Path(t),install,'60-delta')

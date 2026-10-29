@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 import uuid
-from PyQt6.QtCore import QProcess, Qt
+from PyQt6.QtCore import QProcess, QTimer, Qt
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame,
     QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QProgressBar, QStackedWidget, QWidget)
@@ -264,6 +264,10 @@ class InstallDialog(QDialog):
                 self.phase.setText(game['name']+' is installed. Your game files are in the Games folder.')
                 self.hint.setText('You can close this window. The launcher will show whether the game is ready to play.')
                 self.done_state(success=True);self.progress.setValue(1)
+                if game_library.supported(self.owner.root,entry):
+                    self.start_preparation(entry)
+                else:
+                    self.phase.setText(game['name']+' is installed. This game is not supported yet.')
             except (OSError,ValueError) as error:self.fail('Could not finish installation: '+str(error))
             return
         kind,path = self.jobs.pop(0);target = self.staging / kind
@@ -276,6 +280,31 @@ class InstallDialog(QDialog):
         process.readyReadStandardOutput.connect(self.read_output)
         process.finished.connect(self.finished);process.errorOccurred.connect(self.error)
         process.start(sys.executable,['-u',str(self.extractor),path,str(target)])
+
+    def start_preparation(self, entry, optional=()):
+        try:
+            from .launcher_prepare import PreparationProcess
+        except ImportError:
+            from launcher_prepare import PreparationProcess
+        self.show_step(3);self.heading.setText('Getting your game ready')
+        self.phase.setText('Checking your game files…');self.cancel.setText('Cancel setup')
+        self.open_folder.hide();self.progress.setRange(0,100);self.progress.setValue(0)
+        worker = PreparationProcess(self);self.preparation = worker
+        worker.log.connect(self.output.insertPlainText)
+        def update(value):
+            if value['state'] not in ('optional','available'):
+                self.phase.setText(value['message']);self.progress.setValue(round(value['fraction']*100))
+        worker.progress.connect(update)
+        worker.finished.connect(self.preparation_finished)
+        worker.start(self.owner.root,game_library.selector(entry['title_id'],entry['app_version']),optional)
+
+    def preparation_finished(self, success, message):
+        self.done_state(success=success)
+        self.open_folder.show()
+        self.heading.setText('Your game is ready' if success else 'Game installed · setup needs attention')
+        self.phase.setText(message if success else 'Your game files are installed. '+message)
+        self.progress.setValue(1 if success else 0)
+        self.owner.refresh_readiness();self.owner.refresh_game()
 
     def read_output(self):
         if self.process:
@@ -308,10 +337,25 @@ class InstallDialog(QDialog):
         self.output.append('\n'+message+'\nImport folder: '+str(self.staging));self.done_state()
 
     def reject(self):
+        if getattr(self,'preparation',None) and self.preparation.process:
+            self.preparation.cancel();self.cancel.setEnabled(False);return
         if self.process:
             self.cancelled=True;self.process.kill();self.cancel.setEnabled(False);return
         super().reject()
 
     def closeEvent(self,event):
-        if self.process:self.reject();event.ignore()
+        if self.process or (getattr(self,'preparation',None) and self.preparation.process):self.reject();event.ignore()
         else:event.accept()
+
+
+class RepairDialog(InstallDialog):
+    """Reuse the accepted installer presentation for setup and optional extras."""
+    def __init__(self, owner, optional=()):
+        super().__init__(owner)
+        self.setWindowTitle('Repair '+self.game['name'])
+        self.show_step(3);self.heading.setText('Checking your game')
+        self.staging = owner.root/'.local/game-preparation'
+        def begin():
+            try:self.start_preparation(game_library.resolve_entry(owner.root,game=self.game),optional)
+            except (OSError,ValueError) as error:self.preparation_finished(False,str(error))
+        QTimer.singleShot(0,begin)

@@ -9,14 +9,71 @@
       "title_id": "CUSA00697",
       "app_version": "01.00",
       "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
-      "scope": "Chapter One rendering, portal and automatic 30/60 sampled; not a full play-through"
+      "scope": "Chapter One rendering, portal and automatic 30/60 sampled; not a full play-through",
+      "preparation": {
+        "modules": [
+          "libc.prx",
+          "libSceFios2.prx"
+        ],
+        "variants": {
+          "original": {
+            "pack": "native-linked-boot-weak"
+          },
+          "60": {
+            "pack": "native-linked-one-vblank-experimental",
+            "patch": "patches/trap-team-CUSA00697-01.00-one-vblank.experimental.json"
+          },
+          "60-delta": {
+            "pack": "native-linked-60-delta-experimental",
+            "patch": "patches/trap-team-CUSA00697-01.00-60-delta.experimental.json"
+          }
+        },
+        "recipes": {
+          "resolution": "profiles/patches/trap-team-resolution.json",
+          "level-events": "profiles/patches/trap-team-level-events.json",
+          "nightmare": "profiles/patches/trap-team-nightmare.json"
+        },
+        "optional_recipes": {}
+      }
     },
     {
       "id": "us-01-01",
       "title_id": "CUSA00626",
       "app_version": "01.01",
       "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
-      "scope": "Base/update merge, title and Chapter One rendering, automatic 30/60 sampled; not a full play-through"
+      "scope": "Base/update merge, title and Chapter One rendering, automatic 30/60 sampled; not a full play-through",
+      "preparation": {
+        "modules": [
+          "libc.prx",
+          "libSceFios2.prx"
+        ],
+        "variants": {
+          "original": {
+            "pack": "native-us-01.01-original"
+          },
+          "60": {
+            "pack": "native-us-01.01-60",
+            "patch": "patches/trap-team-CUSA00626-01.01-one-vblank.experimental.json"
+          },
+          "60-delta": {
+            "pack": "native-us-01.01-60-delta",
+            "patch": "patches/trap-team-CUSA00626-01.01-60-delta.experimental.json"
+          }
+        },
+        "recipes": {
+          "resolution": "profiles/patches/trap-team-us-01.01-resolution.json",
+          "level-events": "profiles/patches/trap-team-us-01.01-level-events.json",
+          "nightmare": "profiles/patches/trap-team-us-01.01-nightmare.json"
+        },
+        "optional_recipes": {
+          "controller-glyphs": "profiles/patches/trap-team-us-01.01-controller-glyphs.json",
+          "movie-audio": "profiles/patches/trap-team-us-01.01-movie-audio.json",
+          "element-gates": "profiles/patches/trap-team-us-01.01-element-gates.experimental.json",
+          "traptanium": "profiles/patches/trap-team-us-01.01-traptanium.experimental.json",
+          "unlock-expansions": "profiles/patches/trap-team-us-01.01-unlock-expansions.experimental.json",
+          "replay-expansion-intros": "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json"
+        }
+      }
     }
   ],
   "patches": [],

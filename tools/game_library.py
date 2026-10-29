@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import uuid
+import warnings
 
 try:
     from . import game_install
@@ -19,7 +20,19 @@ except ImportError:
 
 
 def directory(project):
-    return Path(project) / 'Games'
+    try:
+        from .library_preferences import locations
+    except ImportError:
+        from library_preferences import locations
+    return locations(project)[0]
+
+
+def libraries(project):
+    try:
+        from .library_preferences import locations
+    except ImportError:
+        from library_preferences import locations
+    return locations(project)[1]
 
 
 def selector(title_id, app_version):
@@ -151,8 +164,11 @@ def validate_entry(entry):
         datetime.fromisoformat(entry['install_date'])
         if not re.fullmatch(r'[a-f0-9]{64}', entry['executable_sha256']):
             raise ValueError('Invalid manifest executable hash')
-        if not Path(entry['base_path']).is_absolute() or (entry['update_path'] is not None and not Path(entry['update_path']).is_absolute()):
-            raise ValueError('Manifest game paths must be absolute')
+        for key in ('base_path','update_path'):
+            if entry[key] is not None:
+                path = Path(entry[key])
+                if not str(path) or '..' in path.parts or (not path.is_absolute() and ('\\' in str(path) or ':' in str(path))):
+                    raise ValueError('Invalid manifest game path')
         if bool(entry['update_path']) != bool(entry['update_version']):
             raise ValueError('Manifest update path/version mismatch')
         if not isinstance(entry['source_packages'], list) or any(not isinstance(p, str) or '/' in p or '\\' in p for p in entry['source_packages']):
@@ -162,20 +178,60 @@ def validate_entry(entry):
     return entry
 
 
+def store_entry(library, entry):
+    """On disk, managed paths are relative to the library, never the checkout."""
+    library = Path(library).resolve()
+    stored = dict(entry)
+    for key in ('base_path','update_path'):
+        if stored[key]:
+            path = Path(stored[key])
+            try:stored[key] = path.relative_to(library).as_posix()
+            except ValueError:stored[key] = str(path)
+    validate_entry(stored)
+    path = manifest_path(library,stored)
+    content = json.dumps(stored,indent=2)+'\n'
+    if path.is_file() and not path.is_symlink() and path.read_text()==content:return
+    write_json(path,stored)
+
+
 def load_entry(path):
-    path = Path(path)
+    path = Path(path).absolute()
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError('Installation manifest refuses symlinks')
-    return validate_entry(json.loads(path.read_text()))
+    entry = validate_entry(json.loads(path.read_text()))
+    library = path.parents[2]
+    for key,kind,version_key in (('base_path','base','base_version'),('update_path','update','update_version')):
+        if not entry[key]:continue
+        location = Path(entry[key])
+        if not location.is_absolute():location = library/location
+        elif not location.exists():
+            # Upgrade old absolute managed manifests after a checkout relocation.
+            tail = Path(entry['title_id'])/entry[version_key]/kind
+            if tuple(location.parts[-3:])==tail.parts and (library/tail).is_dir():location = library/tail
+        if any(p.is_symlink() for p in (location,*location.parents)):
+            raise ValueError('Installation path refuses symlinks')
+        entry[key] = str(location)
+    return entry
 
 
-def read_entries(library):
+def report(issues, path, error, title_id=None, app_version=None):
+    issue = dict(path=str(path), message=str(error), state='Needs repair')
+    if title_id:issue['title_id'] = title_id
+    if app_version:issue['app_version'] = app_version
+    if issues is None:warnings.warn(f'{path}: {error}', RuntimeWarning, stacklevel=2)
+    elif issue not in issues:issues.append(issue)
+
+
+def read_entries(library, issues=None):
     result = []
     for path in sorted(Path(library).glob('CUSA*/*/manifest.json')):
-        entry = load_entry(path)
-        if manifest_path(library, entry) != path:
-            raise ValueError('Manifest location does not match its title/version')
-        result.append(entry)
+        try:
+            entry = load_entry(path)
+            if manifest_path(Path(library).absolute(), entry) != path.absolute():
+                raise ValueError('Manifest location does not match its title/version')
+            result.append(entry)
+        except (OSError,ValueError,KeyError,TypeError) as error:
+            report(issues,path,error,path.parent.parent.name,path.parent.name)
     return result
 
 
@@ -203,62 +259,82 @@ def discover(entry):
     return game_install.Install(base, update, entry['title_id'], entry['app_version'])
 
 
-def register(project):
-    """Idempotently reference old Game/ and earlier launcher imports, without moving them."""
-    project = Path(project)
-    folders = [project / 'Game']
-    folders += sorted((project / '.local/library-games').glob('*'))
+def register(project, issues=None):
+    """Reference old installs in place. A bad source never blocks unrelated titles."""
+    project = Path(project).absolute();library = directory(project)
     candidates = []
-    for folder in folders:
+    for folder in [project/'Game',*sorted((project/'.local/library-games').glob('*'))]:
         for sfo in sorted(folder.glob('*/sce_sys/param.sfo')):
-            path = sfo.parent.parent
-            candidates.append((path, metadata(path)))
-    legacy_entries = read_entries(project / '.local/game-library')
-    if not candidates and not legacy_entries:
+            try:candidates.append((sfo.parent.parent,metadata(sfo.parent.parent)))
+            except (OSError,ValueError) as error:report(issues,sfo,error)
+    legacy = read_entries(project/'.local/game-library',issues)
+    for previous in libraries(project):
+        if previous!=library:legacy.extend(read_entries(previous,issues))
+    if not candidates and not legacy:
+        for entry in read_entries(library,issues):
+            try:store_entry(library,entry)
+            except (OSError,ValueError) as error:report(issues,manifest_path(library,entry),error,entry['title_id'],entry['app_version'])
         return
-    library = directory(project)
     with locked(library):
-        existing = {selector(e['title_id'], e['app_version']): e for e in read_entries(library)}
-        for entry in legacy_entries:
-            key = selector(entry['title_id'], entry['app_version'])
-            previous = existing.get(key)
+        existing = {selector(e['title_id'],e['app_version']):e for e in read_entries(library,issues)}
+        def add(entry):
+            key = selector(entry['title_id'],entry['app_version']);previous = existing.get(key)
             if previous:
-                if (previous['base_path'], previous['update_path']) != (entry['base_path'], entry['update_path']):
-                    raise ValueError('Ambiguous existing installation ' + key)
-                continue
-            write_json(manifest_path(library, entry), entry)
-            existing[key] = entry
-        for base, identity in candidates:
-            if identity['CATEGORY'] != 'gd':
-                continue
-            updates = [(p, m) for p, m in candidates if m['CATEGORY'] == 'gp' and m['TITLE_ID'] == identity['TITLE_ID']]
-            if any(m['CONTENT_ID'] != identity['CONTENT_ID'] for _, m in updates):
-                raise ValueError('Game update content ID differs from its base')
-            versions = [m['APP_VER'] for _, m in updates]
-            if len(set(versions)) != len(versions):
-                raise ValueError('Ambiguous game update version')
-            for update in [None, *(p for p, _ in updates)]:
-                app_version = metadata(update)['APP_VER'] if update else identity['APP_VER']
-                key = selector(identity['TITLE_ID'], app_version)
-                previous = existing.get(key)
-                if previous:
-                    paths = (str(base.resolve()), str(update.resolve()) if update else None)
-                    if (previous['base_path'], previous['update_path']) != paths:
-                        raise ValueError('Ambiguous existing installation ' + key)
+                if (previous['base_path'],previous['update_path']) != (entry['base_path'],entry['update_path']):
+                    # External Game/ references move with the project: re-register only
+                    # when old sources are gone and the new executable/identity agree.
+                    old_missing = not Path(previous['base_path']).exists() or (previous['update_path'] and not Path(previous['update_path']).exists())
+                    if not old_missing or any(previous[k]!=entry[k] for k in ('content_id','executable_sha256','base_version','update_version')):
+                        raise ValueError('Ambiguous existing installation '+key)
+                    entry = {**entry,'install_date':previous['install_date'],'source_packages':previous['source_packages']}
+                else:return
+            target = manifest_path(library,entry)
+            if previous is None and target.exists():raise ValueError('Existing manifest needs repair; it was kept')
+            store_entry(library,entry);existing[key] = entry
+        for entry in legacy:
+            try:add(entry)
+            except (OSError,ValueError) as error:report(issues,manifest_path(library,entry),error,entry['title_id'],entry['app_version'])
+        for base,identity in candidates:
+            if identity['CATEGORY']!='gd':continue
+            updates = [(p,m) for p,m in candidates if m['CATEGORY']=='gp' and m['TITLE_ID']==identity['TITLE_ID']]
+            sources = [None]
+            for update,meta in updates:
+                if meta['CONTENT_ID']!=identity['CONTENT_ID']:
+                    report(issues,update,'Game update content ID differs from its base',meta['TITLE_ID'],meta['APP_VER']);continue
+                if sum(m['APP_VER']==meta['APP_VER'] for _,m in updates)!=1:
+                    report(issues,update,'Ambiguous game update version',meta['TITLE_ID'],meta['APP_VER']);continue
+                sources.append(update)
+            for update in sources:
+                try:
+                    app_version = metadata(update)['APP_VER'] if update else identity['APP_VER']
+                    previous = existing.get(selector(identity['TITLE_ID'],app_version))
+                    paths = (str(base.resolve()),str(update.resolve()) if update else None)
+                    if previous and (previous['base_path'],previous['update_path'])==paths:continue
+                    add(make_entry(base,update))
+                except (OSError,ValueError) as error:report(issues,update or base,error,identity['TITLE_ID'])
+
+
+def entries(project, issues=None):
+    register(project,issues)
+    result = [];seen = {}
+    for library in libraries(project):
+        for entry in read_entries(library,issues):
+            try:
+                discover(entry)
+                key = selector(entry['title_id'],entry['app_version'])
+                if key in seen:
+                    if (seen[key]['base_path'],seen[key]['update_path'])!=(entry['base_path'],entry['update_path']):
+                        report(issues,manifest_path(library,entry),'Another installation has this title and version',entry['title_id'],entry['app_version'])
                     continue
-                entry = make_entry(base, update)
-                write_json(manifest_path(library, entry), entry)
-                existing[key] = entry
+                seen[key] = entry;result.append(entry)
+            except (OSError,ValueError) as error:
+                report(issues,manifest_path(library,entry),error,entry['title_id'],entry['app_version'])
+    return result
 
 
-def entries(project):
-    register(project)
-    return read_entries(directory(project))
-
-
-def for_game(project, game):
+def for_game(project, game, issues=None):
     result = []
-    for entry in entries(project):
+    for entry in entries(project,issues):
         profile = profile_for(project, entry)
         if (profile and profile['id'] == game['id']) or game.get('title_id') == entry['title_id']:
             result.append(entry)
@@ -266,7 +342,8 @@ def for_game(project, game):
 
 
 def resolve_entry(project, choice=None, game=None):
-    available = for_game(project, game) if game is not None else entries(project)
+    issues = []
+    available = for_game(project, game,issues) if game is not None else entries(project,issues)
     if choice is None and game is not None:
         choice = game.get('installation')
     if choice is None and game is None:
@@ -286,6 +363,9 @@ def resolve_entry(project, choice=None, game=None):
         available = [e for e in available if e['title_id'] == title and (ver is None or e['app_version'] == ver)]
     titles = {e['title_id'] for e in available}
     if not available:
+        relevant = [i for i in issues if (not choice or i.get('title_id')==split_selector(choice)[0]) and
+            (game is None or game.get('title_id')==i.get('title_id') or (profile_for(project,{'title_id':i.get('title_id','')}) or {}).get('id')==game['id'])]
+        if relevant:raise ValueError('Needs repair: '+relevant[0]['message'])
         raise ValueError('No matching game installation in the library')
     if len(titles) != 1:
         raise ValueError('Multiple titles installed; select --game TITLE_ID[@APP_VER]')
@@ -371,7 +451,7 @@ def publish(library, base=None, update=None, source_packages=()):
                 path = manifest_path(library, entry)
                 if path.exists():
                     raise ValueError('Installation manifest already exists')
-                write_json(path, entry)
+                store_entry(library, entry)
                 written.append(path)
         except BaseException:
             for path in reversed(written):

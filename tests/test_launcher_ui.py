@@ -353,6 +353,68 @@ class LauncherUITests(unittest.TestCase):
         self.assertFalse(self.window.play.isEnabled()) # no prepared runtime
         dialog.close()
 
+    def setup_script(self, body):
+        path=self.root/'synthetic-preparer.py';path.write_text('import json,time\n'+body)
+        return path
+
+    def test_supported_install_automatically_runs_preparation_and_shows_progress(self):
+        import hashlib
+        (self.root/'profiles').mkdir()
+        (self.root/'profiles/trap-team.json').write_text(json.dumps(dict(id='trap-team',title='Trap Team',validated_builds=[dict(
+            title_id='CUSA00626',app_version='01.00',executable_sha256=hashlib.sha256(b'synthetic').hexdigest())])))
+        tool=self.extractor('import sys,base64\nfrom pathlib import Path\n'
+            'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'
+            '(out/"sce_sys/param.sfo").write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))\n'
+            '(out/"eboot.bin").write_bytes(b"synthetic")\n')
+        package=self.root/'game.pkg';package.write_text(base64.b64encode(sfo(dict(
+            TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test'))).decode())
+        script=self.setup_script('print(json.dumps(dict(name="verify-executable",state="running",fraction=0,message="Checking your game files")),flush=True)\n'
+            'time.sleep(.1)\nprint(json.dumps(dict(name="ready",state="complete",fraction=1,message="Setup complete.")),flush=True)\n')
+        dialog=InstallDialog(self.window);dialog.fields['game_pkg'].setText(str(package))
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool),patch('tools.launcher_prepare.PREPARER',script):
+            dialog.begin();self.wait(lambda:hasattr(dialog,'preparation'))
+            self.assertIn('ready',dialog.heading.text())
+            self.wait(lambda:dialog.preparation.process is None)
+        self.assertEqual(dialog.heading.text(),'Your game is ready')
+        self.assertTrue(Path(self.window.game['installed_paths'][0]).is_dir());dialog.close()
+
+    def test_repair_failure_keeps_install_and_full_log(self):
+        from tools.launcher_install_dialog import RepairDialog
+        entry=self.make_library_base();self.window.rebuild_rail();self.window.select_game('title-cusa00626')
+        script=self.setup_script('import sys\nprint("synthetic build details",file=sys.stderr,flush=True)\n'
+            'print(json.dumps(dict(name="pack.60-delta",state="failed",fraction=.5,message="A game module is missing. Restore it and choose Repair.")),flush=True)\nsys.exit(1)\n')
+        with patch('tools.launcher_prepare.PREPARER',script):
+            dialog=RepairDialog(self.window);dialog.show()
+            self.wait(lambda:hasattr(dialog,'preparation') and dialog.preparation.process is None)
+        self.assertIn('setup needs attention',dialog.heading.text())
+        self.assertIn('module is missing',dialog.phase.text())
+        self.assertIn('synthetic build details',dialog.output.toPlainText())
+        self.assertTrue(Path(entry['base_path']).is_dir());dialog.close()
+
+    def test_preparation_cancellation_and_incomplete_progress_never_report_ready(self):
+        from tools.launcher_prepare import PreparationProcess
+        script=self.setup_script('print(json.dumps(dict(name="runtime",state="running",fraction=.5,message="Checking runtime")),flush=True)\ntime.sleep(30)\n')
+        results=[];worker=PreparationProcess(self.window);worker.finished.connect(lambda ok,message:results.append((ok,message)))
+        with patch('tools.launcher_prepare.PREPARER',script):worker.start(self.root,'CUSA00626@01.00')
+        self.wait(lambda:worker.process is not None and worker.process.processId()!=0)
+        worker.cancel();self.wait(lambda:worker.process is None)
+        self.assertFalse(results[-1][0]);self.assertIn('cancelled',results[-1][1])
+        incomplete=self.setup_script('print(json.dumps(dict(name="runtime",state="complete",fraction=1,message="Only one step")),flush=True)\n')
+        other=PreparationProcess(self.window);other.finished.connect(lambda ok,message:results.append((ok,message)))
+        with patch('tools.launcher_prepare.PREPARER',incomplete):other.start(self.root,'CUSA00626@01.00')
+        self.wait(lambda:other.process is None)
+        self.assertFalse(results[-1][0]);self.assertIn('did not finish',results[-1][1])
+
+    def test_broken_entry_is_labelled_needs_repair_without_hiding_other_game(self):
+        from tools import game_library
+        broken=self.make_library_base();good=self.make_library_base('CUSA99999')
+        game_library.manifest_path(game_library.directory(self.root),broken).write_text('corrupt')
+        self.window.rebuild_rail();self.window.select_game('title-cusa00626')
+        self.assertEqual(self.window.primary.text(),'NEEDS REPAIR')
+        self.assertIn('Needs repair',self.window.install_note.text())
+        self.window.select_game('title-cusa99999')
+        self.assertEqual(self.window.game['installed_paths'],[good['base_path']])
+
     def test_extractor_failure_does_not_publish(self):
         tool=self.extractor('import sys\nprint("synthetic failure")\nsys.exit(7)\n')
         pkg=self.root/'base.pkg';pkg.write_bytes(b'synthetic')

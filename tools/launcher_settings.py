@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Dedicated settings view for the portal library, with explicit Save/Cancel."""
+from pathlib import Path
 from PyQt6.QtCore import Qt, QSize, QRectF
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,
     QStackedWidget,QScrollArea,QFormLayout,QComboBox,QCheckBox,QSlider,QLineEdit,
-    QTextEdit,QFileDialog,QMessageBox)
+    QTextEdit,QFileDialog,QMessageBox,QProgressDialog)
 try:
     from . import launcher_model as model
 except ImportError:
@@ -59,6 +60,14 @@ class SettingsPage(QWidget):
         header=QHBoxLayout();back=QPushButton('‹  Library');back.setObjectName('settingsBack');back.clicked.connect(self.cancel);header.addWidget(back);header.addStretch();self.scope=SettingCombo();self.scope.setMinimumWidth(240);self.scope.currentIndexChanged.connect(self.change_scope);header.addWidget(self.scope);layout.addLayout(header)
         self.title=title=QLabel('General settings');title.setStyleSheet('font-size: 30px; font-weight: 600;');layout.addWidget(title)
         self.notice=QLabel('Your defaults for every adventure.');self.notice.setStyleSheet('color: #92929e; font-size: 14px;');layout.addWidget(self.notice)
+        self.games_row=QWidget();self.games_row.setObjectName('settingRow')
+        folder_line=QHBoxLayout(self.games_row);folder_line.setContentsMargins(20,16,20,16)
+        folder_copy=QVBoxLayout();folder_title=QLabel('Games folder');folder_title.setStyleSheet('font-size: 14px; font-weight: 600;');folder_copy.addWidget(folder_title)
+        self.games_path=QLabel();self.games_path.setWordWrap(True);self.games_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.games_path.setStyleSheet('color: #93939e; font-size: 12px;');folder_copy.addWidget(self.games_path);folder_line.addLayout(folder_copy,1)
+        self.change_games=QPushButton('Change…');self.change_games.clicked.connect(self.change_games_folder);folder_line.addWidget(self.change_games)
+        self.open_games=QPushButton('Open');self.open_games.clicked.connect(self.open_games_folder);folder_line.addWidget(self.open_games)
+        layout.addWidget(self.games_row)
         navigation=QHBoxLayout();navigation.setSpacing(6);layout.addLayout(navigation)
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
@@ -144,6 +153,12 @@ class SettingsPage(QWidget):
 
     def open(self,game=None):
         self.game=game
+        try:
+            from .game_library import directory
+        except ImportError:
+            from game_library import directory
+        self.games_row.setVisible(game is None);self.games_path.setText(str(directory(self.owner.root)))
+        self.change_games.setEnabled(self.owner.process is None)
         self.scope.blockSignals(True);self.scope.clear();self.scope.addItem('General settings',None)
         for entry in self.owner.library['games']:self.scope.addItem(entry['name'],entry['id'])
         self.scope.setCurrentIndex(self.scope.findData(game['id']) if game else 0);self.scope.blockSignals(False)
@@ -180,6 +195,59 @@ class SettingsPage(QWidget):
 
     def frame_policy(self):
         self.fields['frame_limit'].setEnabled(self.owner.process is None and self.fields['frame_policy'].currentData()=='manual')
+
+    def open_games_folder(self):
+        try:
+            from .launcher_library import open_games_folder
+        except ImportError:
+            from launcher_library import open_games_folder
+        try:open_games_folder(self.owner.root)
+        except (OSError,ValueError) as error:QMessageBox.warning(self,'Cannot open Games folder',str(error))
+
+    def ask_move_games(self):
+        question=QMessageBox(self);question.setWindowTitle('Change Games folder')
+        question.setText('Would you like to move your installed games to this folder?')
+        question.setInformativeText('You can also leave them where they are and use the new folder for future installs. Your saves and original game files are kept.')
+        move=question.addButton('Move games',QMessageBox.ButtonRole.AcceptRole)
+        leave=question.addButton('Leave games where they are',QMessageBox.ButtonRole.ActionRole)
+        question.addButton(QMessageBox.StandardButton.Cancel);question.exec()
+        if question.clickedButton() is move:return True
+        if question.clickedButton() is leave:return False
+        return None
+
+    def change_games_folder(self):
+        if self.owner.process:return
+        try:
+            from .game_library import directory
+            from .launcher_library_location import LocationWorker
+        except ImportError:
+            from game_library import directory
+            from launcher_library_location import LocationWorker
+        destination=QFileDialog.getExistingDirectory(self,'Choose your Games folder',str(directory(self.owner.root)))
+        if not destination or str(directory(self.owner.root).resolve())==str(Path(destination).resolve()):return
+        move=self.ask_move_games()
+        if move is None:return
+        dialog=QProgressDialog('Updating your Games folder…','',0,100,self)
+        dialog.setCancelButton(None);dialog.setWindowTitle('Games folder');dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.setMinimumDuration(0);dialog.setValue(0);dialog.show()
+        worker=LocationWorker(self.owner.root,destination,move,self);self.location_worker=worker
+        self.owner.library_transfer=True
+        worker.finished.connect(lambda:setattr(self.owner,'library_transfer',False))
+        self.change_games.setEnabled(False);self.save_button.setEnabled(False)
+        def progress(value):
+            dialog.setLabelText(value['message']);dialog.setValue(min(99,round(value['fraction']*100)))
+        worker.progress.connect(progress)
+        def finish(result=None,error=None):
+            dialog.close();self.change_games.setEnabled(True);self.save_button.setEnabled(True)
+            self.games_path.setText(str(directory(self.owner.root)))
+            self.owner.rebuild_rail()
+            if error:
+                QMessageBox.warning(self,'Could not change Games folder',error);return
+            for message in result['errors']:self.owner.log.append('Games-folder move: '+message)
+            self.feedback.setText('Games folder updated. Other settings are saved separately.')
+            if result['errors']:QMessageBox.warning(self,'Some games were kept in place','Some games could not be moved. They remain listed in your library. See the session log for details.')
+        worker.completed.connect(lambda result:finish(result=result));worker.failed.connect(lambda error:finish(error=error))
+        worker.finished.connect(worker.deleteLater);worker.start()
 
     def browse(self):
         if self.owner.process:return

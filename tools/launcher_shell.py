@@ -376,6 +376,11 @@ def renovated(base):
                 choices = game_library.for_game(self.root, self.game)
             except (OSError, ValueError) as error:
                 self.log.append(str(error))
+            if not hasattr(self,'reported_library_issues'):self.reported_library_issues = set()
+            for problem in self.library.get('installation_issues',[]):
+                text = problem['path']+': '+problem['message']
+                if text not in self.reported_library_issues:
+                    self.log.append('Library entry needs repair: '+text);self.reported_library_issues.add(text)
             self.refresh_readiness()
             themed = supplied_artwork(self.root, self.game)
             self.canvas.game = themed
@@ -393,9 +398,12 @@ def renovated(base):
                 else:
                     self.brand.setText(self.game['name'])
             ready = self.play.isEnabled()
-            self.primary.setText('PLAY' if ready else ('INSTALLED' if choices else 'INSTALL'))
+            issue = self.game.get('installation_issue','')
+            self.primary.setText('PLAY' if ready else ('NEEDS REPAIR' if issue and not choices else 'INSTALLED' if choices else 'INSTALL'))
             self.primary.setEnabled(ready or not choices)
-            if choices and not ready:
+            if issue and not choices:
+                self.install_note.setText('Needs repair. '+issue)
+            elif choices and not ready:
                 entry = game_library.resolve_entry(self.root, game=self.game)
                 message = 'Game files installed. Setup is still needed before you can play.' if game_library.supported(self.root, entry) else 'Game files installed. This game is not supported yet.'
                 self.install_note.setText(message)
@@ -425,6 +433,8 @@ def renovated(base):
             if self.play.isEnabled():
                 self.launch()
                 return
+            if self.game.get('installation_issue'):
+                self.repair_game();return
             self.install()
 
         def launch(self):
@@ -488,7 +498,20 @@ def renovated(base):
             for title, callback in [('Install / update PKGs',self.install), ('Game settings',self.game_settings),
                                     ('Skylanders Manager',self.manager)]:
                 menu.addAction(title, callback)
+            menu.addAction('Repair game setup',self.repair_game)
+            extras = menu.addMenu('Optional extras')
+            for title,name in [('Controller artwork (optional)','controller-art'),('Download portal portraits (optional)','portraits'),('Download variant artwork (optional)','variant-art')]:
+                extras.addAction(title,lambda checked=False,name=name:self.repair_game(optional=(name,)))
             menu.exec(self.primary.mapToGlobal(self.primary.rect().topRight()))
+
+        def repair_game(self, checked=False, optional=()):
+            if self.process:
+                QMessageBox.information(self,'Session active','Stop the game before repairing its setup.');return
+            try:
+                from .launcher_install_dialog import RepairDialog
+            except ImportError:
+                from launcher_install_dialog import RepairDialog
+            RepairDialog(self,optional).exec()
 
         def game_settings(self):
             self.settings_page.open(self.game)
@@ -509,6 +532,8 @@ def renovated(base):
                 self.portal_page.refresh()
 
         def closeEvent(self, event):
+            if getattr(self,'library_transfer',False):
+                event.ignore();return
             if self.process is None: self.persist()
             super().closeEvent(event)
     return LibraryLauncher

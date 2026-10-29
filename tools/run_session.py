@@ -24,14 +24,14 @@ try:
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
     from . import nightmare_mod
-    from . import game_library, game_install, game_build, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 except ImportError:
     from overlay_session import html_overlay
     from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
     import nightmare_mod
-    import game_library, game_install, game_build, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = {'original': 'native-linked-boot-weak',
@@ -257,6 +257,8 @@ def main(argv=None):
     try:
         installation = game_library.resolve(ROOT, args.game)
         build = game_build.configuration(ROOT, installation, args.variant)
+        entry = game_library.resolve_entry(ROOT,args.game)
+        game_prepare.require_ready(ROOT,entry,args.variant)
         selected_save, save_source = save_profile.select(ROOT, installation.title_id, args.save_root)
         selected_mods=gameplay_mods.selection(ROOT,installation.title_id,{name:getattr(args,name.replace('-','_')) for name in gameplay_mods.NAMES})
         recipes=gameplay_mods.recipes(ROOT,installation.title_id,installation.app_version,selected_mods)
@@ -280,7 +282,7 @@ def main(argv=None):
     host = ROOT / '.local/native-gpu-build/skylanders-native-host'
     files = [pack / name for name in ('image.pack', 'imports.types', 'boot.plan')]
     if not host.is_file() or not all(path.is_file() for path in files):
-        parser.error('prepared local build is missing')
+        parser.error('Game setup needs pack.'+args.variant+' or runtime. Choose Repair in the launcher to finish setup.')
     if args.figure and not args.figure.is_file():
         parser.error('figure file is missing')
     session = ROOT / 'out/sessions' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
@@ -518,7 +520,7 @@ def main(argv=None):
         except (OSError,ValueError,TypeError) as error:
             print(f'PC restart request rejected: {error}',file=sys.stderr)
             return 2
-        restart = [sys.executable,str(Path(__file__).resolve()),'--pc-menu',args.pc_menu,'--variant',args.variant,
+        restart = [sys.executable,str(Path(__file__).resolve()),'--game',game_library.selector(installation.title_id,installation.app_version),'--pc-menu',args.pc_menu,'--variant',args.variant,
                    '--performance-profile',args.performance_profile,
                    '--motion-blur' if args.motion_blur else '--no-motion-blur',
                    '--memory-mode',args.memory_mode,

@@ -6,11 +6,11 @@ from pathlib import Path
 try:
     from .pc_settings import validate_settings
     from .run_session import PACKS
-    from . import game_install, game_build, game_library
+    from . import game_install, game_build, game_library, game_prepare
 except ImportError:
     from pc_settings import validate_settings
     from run_session import PACKS
-    import game_install, game_build, game_library
+    import game_install, game_build, game_library, game_prepare
 
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
@@ -37,6 +37,8 @@ def load(path):
     path = Path(path)
     if not path.exists(): return dict(DEFAULTS)
     value=json.loads(path.read_text())
+    if isinstance(value,dict):
+        value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
         value['frame_policy']='auto'
     return validate(value)
@@ -45,6 +47,12 @@ def load(path):
 def save(path, value):
     value = validate(value)
     path = Path(path)
+    try:
+        from .library_preferences import raw, KEYS
+    except ImportError:
+        from library_preferences import raw, KEYS
+    existing = raw(path)
+    value = {**value,**{key:existing[key] for key in KEYS if key in existing}}
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(value, indent=2) + '\n')
@@ -85,6 +93,7 @@ def missing_files(root, game=None):
         entry = game_library.resolve_entry(root, game=game)
         if not game_library.supported(root, entry):
             raise ValueError('This title/version is not supported yet')
+        game_prepare.require_ready(root,entry,deep=False)
         installation = game_install.discover(entry)
         pack = game_build.configuration(root,installation,'60-delta')['pack']
         executable = installation.source('eboot.bin')

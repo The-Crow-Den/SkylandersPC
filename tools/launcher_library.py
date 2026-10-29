@@ -72,7 +72,9 @@ def sync_installations(root, value):
         from . import game_library
     except ImportError:
         import game_library
-    installed = game_library.entries(root)
+    issues = []
+    installed = game_library.entries(root,issues)
+    value['installation_issues'] = issues
     for entry in installed:
         profile = game_library.profile_for(root, entry)
         key = profile['id'] if profile else 'title-' + entry['title_id'].lower()
@@ -82,7 +84,19 @@ def sync_installations(root, value):
                         title_id=entry['title_id'], top='#263da2', bottom='#a9a9b1',
                         background='', logo='', game_pkg='', update_pkg='', settings={})
             value['games'].append(game)
+    for issue in issues:
+        title = issue.get('title_id','')
+        import re
+        if not re.fullmatch(r'CUSA\d{5}',title):continue
+        profile = game_library.profile_for(root,{'title_id':title})
+        key = profile['id'] if profile else 'title-'+title.lower()
+        if not any(g['id']==key for g in value['games']):
+            value['games'].append(dict(id=key,name=profile['title'] if profile else title,title_id=title,
+                top='#263da2',bottom='#a9a9b1',background='',logo='',game_pkg='',update_pkg='',settings={}))
     for game in value['games']:
+        related = [i['message'] for i in issues if i.get('title_id') and
+            ((game_library.profile_for(root,{'title_id':i['title_id']}) or {}).get('id')==game['id'] or game.get('title_id')==i.get('title_id'))]
+        game['installation_issue'] = '\n'.join(related)
         choices = [e for e in installed if
             (game_library.profile_for(root, e) or {}).get('id') == game['id'] or
             game.get('title_id') == e['title_id']]
