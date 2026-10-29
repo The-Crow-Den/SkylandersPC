@@ -276,20 +276,14 @@ def renovated(base):
             main.addWidget(self.subtitle)
             self.canvas.anchor = self.brand
             main.addStretch(3)
-            self.game_info=QLabel();self.game_info.setStyleSheet('color: #c2c2ca;');self.game_info.setWordWrap(True)
-            game_panel=QWidget();game_panel.setObjectName('gameManagement')
-            game_panel.setStyleSheet('QWidget#gameManagement { background: rgba(20,20,26,0.8); border: 1px solid #343438; border-radius: 12px; }')
-            management=QHBoxLayout(game_panel);management.setContentsMargins(14,10,14,10);management.addWidget(self.game_info,1)
-            self.repair_button=self.button(management,'Repair',self.repair_game)
-            self.folder_button=self.button(management,'Open folder',self.open_game_folder)
-            self.remove_button=self.button(management,'Remove',self.remove_game)
-            main.insertWidget(1,game_panel)
+            self.game_info=QLabel();self.game_info.setStyleSheet('color: #92929e; font-size: 11px;');self.game_info.setWordWrap(True)
             bottom = QHBoxLayout()
             self.trophies = self.button(bottom, 'Trophies  —%', self.trophy_tracker)
             self.trophies.setIcon(utility_icon('trophy'));self.trophies.setIconSize(QSize(24,24))
             self.trophies.setStyleSheet('background: transparent; border: none; text-align: left; color: #a9a9b1; padding: 12px 0; font-size: 14px;')
             self.install_note = QLabel(); self.install_note.setWordWrap(True)
-            self.install_note.setStyleSheet('color: #a9a9b1;');bottom.addWidget(self.install_note,1)
+            self.install_note.setStyleSheet('color: #a9a9b1; font-size: 12px;')
+            information=QVBoxLayout();information.setSpacing(3);information.addWidget(self.game_info);information.addWidget(self.install_note);bottom.addLayout(information,1)
             bottom.addStretch()
             self.loading_wheel=LoadingWheel();bottom.addWidget(self.loading_wheel)
             self.launch_status=QLabel();self.launch_status.setStyleSheet('color: #a9a9b1;');self.launch_status.hide();bottom.addWidget(self.launch_status)
@@ -431,9 +425,6 @@ def renovated(base):
             progress=f"{round(data['fraction']*100)}%" if data.get('fraction') is not None else ''
             self.game_info.setText(' · '.join(part for part in (data['state'],progress,data['version'],size) if part))
             self.install_note.setText(data['message'])
-            self.repair_button.setEnabled(not busy and data['state'] in ('Ready','Needs repair'))
-            self.folder_button.setEnabled(not busy and data['entry'] is not None)
-            self.remove_button.setEnabled(not busy and data['entry'] is not None)
             try:
                 try:
                     from .launcher_trophies import snapshot
@@ -525,7 +516,11 @@ def renovated(base):
             for title, callback in [('Install / update PKGs',self.install), ('Game settings',self.game_settings),
                                     ('Skylanders Manager',self.manager)]:
                 menu.addAction(title, callback)
-            menu.addAction('Repair game setup',self.repair_game)
+            state=getattr(self,'game_state',{})
+            busy=self.process is not None or bool(self.game.get('operation')) or getattr(self,'library_transfer',False)
+            menu.addAction('Repair game setup',self.repair_game).setEnabled(not busy and state.get('state') in ('Ready','Needs repair'))
+            menu.addAction('Open game folder',self.open_game_folder).setEnabled(not busy and state.get('entry') is not None)
+            menu.addAction('Remove game…',self.remove_game).setEnabled(not busy and state.get('entry') is not None)
             extras = menu.addMenu('Optional extras')
             for title,name in [('Controller artwork (optional)','controller-art'),('Download portal portraits (optional)','portraits'),('Download variant artwork (optional)','variant-art')]:
                 extras.addAction(title,lambda checked=False,name=name:self.repair_game(optional=(name,)))
