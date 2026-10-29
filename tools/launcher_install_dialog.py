@@ -5,7 +5,7 @@ from pathlib import Path
 import uuid
 from PyQt6.QtCore import QProcess, Qt
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame,
     QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QProgressBar, QStackedWidget, QWidget)
 try:
     from . import game_library, launcher_library
@@ -64,17 +64,15 @@ class InstallDialog(QDialog):
             from launcher_theme import crystal_icon
         themed = supplied_artwork(owner.root,self.game)
         artwork = SkyCanvas(show_portal=False);artwork.setFixedWidth(280);artwork.game = themed
-        art_layout = QVBoxLayout(artwork);art_layout.setContentsMargins(24,28,24,30)
-        app_name = QLabel('SKYLANDERS PC');app_name.setObjectName('eyebrow');art_layout.addWidget(app_name)
-        art_layout.addStretch(3)
-        brand = QLabel();brand.setAlignment(Qt.AlignmentFlag.AlignCenter);brand.setFixedHeight(170)
+        art_layout = QGridLayout(artwork);art_layout.setContentsMargins(24,28,24,28)
+        app_name = QLabel('SKYLANDERS PC');app_name.setObjectName('eyebrow');art_layout.addWidget(app_name,0,0,Qt.AlignmentFlag.AlignTop|Qt.AlignmentFlag.AlignLeft)
+        brand = QLabel();brand.setObjectName('installGameLogo');brand.setAlignment(Qt.AlignmentFlag.AlignCenter);brand.setFixedHeight(170)
         logo = QPixmap(themed.get('logo',''))
         brand.setPixmap(logo.scaled(230,150,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
                         if not logo.isNull() else crystal_icon(size=110).pixmap(110,110))
-        art_layout.addWidget(brand);artwork.anchor = brand
-        art_layout.addStretch(4)
+        art_layout.addWidget(brand,0,0,Qt.AlignmentFlag.AlignCenter);artwork.anchor = brand
         game_name = QLabel(self.game['name']);game_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        game_name.setStyleSheet('font-size: 16px; font-weight: 600;');art_layout.addWidget(game_name)
+        game_name.setStyleSheet('font-size: 16px; font-weight: 600;');art_layout.addWidget(game_name,0,0,Qt.AlignmentFlag.AlignBottom|Qt.AlignmentFlag.AlignHCenter)
         outer.addWidget(artwork)
         panel = QWidget();panel.setObjectName('installPanel');outer.addWidget(panel,1)
         column = QVBoxLayout(panel);column.setContentsMargins(32,26,32,24);column.setSpacing(18)
