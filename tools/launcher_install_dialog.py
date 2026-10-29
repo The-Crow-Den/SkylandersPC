@@ -3,8 +3,9 @@
 import sys
 from pathlib import Path
 import uuid
-from PyQt6.QtCore import QProcess
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel,
+from PyQt6.QtCore import QProcess, Qt
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QProgressBar, QStackedWidget, QWidget)
 try:
     from . import game_library, launcher_library
@@ -14,27 +15,101 @@ except ImportError:
     import launcher_packages as packages
 
 
+STYLE = """
+QDialog#installWizard { background: #171719; }
+QWidget#installPanel { background: #171719; }
+QLabel#brandName { font-size: 16px; font-weight: 700; }
+QLabel#stepCount { color: #a9a9b1; font-size: 12px; }
+QLabel#wizardHeading { font-size: 29px; font-weight: 800; }
+QLabel#description { color: #c2c2ca; font-size: 14px; }
+QFrame#fileCard, QFrame#reviewCard { background: #222225; border: 1px solid #343438; border-radius: 12px; }
+QLabel#fileName { color: #a9a9b1; font-size: 13px; }
+QLabel#reviewSummary { font-size: 14px; }
+QFrame#installFooter { background: transparent; border: none; border-top: 1px solid #343438; }
+QPushButton#libraryPlay:disabled { background: #41515d; color: #8b9ca9; border: none; }
+QPushButton#quiet { background: transparent; border-color: transparent; color: #a9a9b1; }
+QPushButton#quiet:hover { background: #303034; color: #f5f5f7; }
+QPushButton#browse { font-size: 14px; padding: 11px 20px; }
+QProgressBar { background: #303034; border: none; border-radius: 5px; height: 8px; }
+QProgressBar::chunk { background: #f5f5f7; border-radius: 5px; }
+"""
+
+
+def file_icon():
+    """Small native-drawn folder symbol, without adding an image dependency."""
+    pixmap = QPixmap(56,56);pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap);painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setBrush(QColor('#303034'));painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawRoundedRect(0,0,56,56,16,16)
+    painter.setBrush(Qt.BrushStyle.NoBrush);painter.setPen(QPen(QColor('#f5f5f7'),1.8))
+    painter.drawRoundedRect(14,19,28,23,3,3)
+    painter.drawLine(18,15,26,15);painter.drawLine(26,15,30,19);painter.drawLine(18,15,14,19)
+    painter.drawLine(23,30,33,30);painter.drawLine(28,25,28,35);painter.end()
+    return pixmap
+
+
 class InstallDialog(QDialog):
     def __init__(self, owner):
         super().__init__(owner)
         self.owner = owner; self.game = owner.game
         self.process = None; self.cancelled = False
-        self.setWindowTitle('Install '+self.game['name']); self.resize(620,410)
-        column = QVBoxLayout(self);column.setSpacing(16)
-        self.step_label = QLabel();self.step_label.setStyleSheet('color: #a9a9b1;')
-        column.addWidget(self.step_label)
-        self.heading = QLabel();self.heading.setStyleSheet('font-size: 24px; font-weight: 700;')
-        column.addWidget(self.heading)
-        self.pages = QStackedWidget();column.addWidget(self.pages,1)
+        self.setObjectName('installWizard');self.setStyleSheet(owner.styleSheet()+STYLE)
+        self.setWindowTitle('Install '+self.game['name']);self.resize(1000,600);self.setMinimumWidth(940)
+        outer = QHBoxLayout(self);outer.setContentsMargins(0,0,0,0);outer.setSpacing(0)
+        try:
+            from .launcher_shell import SkyCanvas, supplied_artwork
+            from .launcher_theme import crystal_icon
+        except ImportError:
+            from launcher_shell import SkyCanvas, supplied_artwork
+            from launcher_theme import crystal_icon
+        themed = supplied_artwork(owner.root,self.game)
+        artwork = SkyCanvas();artwork.setFixedWidth(280);artwork.game = themed
+        art_layout = QVBoxLayout(artwork);art_layout.setContentsMargins(24,28,24,30)
+        app_name = QLabel('SKYLANDERS PC');app_name.setObjectName('eyebrow');art_layout.addWidget(app_name)
+        art_layout.addStretch(3)
+        brand = QLabel();brand.setAlignment(Qt.AlignmentFlag.AlignCenter);brand.setFixedHeight(170)
+        logo = QPixmap(themed.get('logo',''))
+        brand.setPixmap(logo.scaled(230,150,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+                        if not logo.isNull() else crystal_icon(size=110).pixmap(110,110))
+        art_layout.addWidget(brand);artwork.anchor = brand
+        art_layout.addStretch(4)
+        game_name = QLabel(self.game['name']);game_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        game_name.setStyleSheet('font-size: 16px; font-weight: 600;');art_layout.addWidget(game_name)
+        outer.addWidget(artwork)
+        panel = QWidget();panel.setObjectName('installPanel');outer.addWidget(panel,1)
+        column = QVBoxLayout(panel);column.setContentsMargins(32,26,32,24);column.setSpacing(18)
+        header = QHBoxLayout();header.setSpacing(14)
+        identity = QVBoxLayout();identity.setSpacing(3)
+        title = QLabel('Install game');title.setObjectName('brandName');identity.addWidget(title)
+        caption = QLabel('Add to your library');caption.setObjectName('muted');identity.addWidget(caption)
+        header.addLayout(identity);header.addStretch()
+        self.step_label = QLabel();self.step_label.setObjectName('stepCount');header.addWidget(self.step_label)
+        column.addLayout(header)
+        steps = QHBoxLayout();steps.setSpacing(10);self.step_badges = []
+        for index,name in enumerate(('Game','Update','Install')):
+            badge = QLabel();badge.setAlignment(Qt.AlignmentFlag.AlignCenter);badge.setFixedHeight(35)
+            self.step_badges.append((badge,name));steps.addWidget(badge,1)
+        column.addLayout(steps)
+        self.heading = QLabel();self.heading.setObjectName('wizardHeading');column.addWidget(self.heading)
+        self.pages = QStackedWidget();self.pages.setMinimumHeight(245);column.addWidget(self.pages,1)
         self.fields = {};self.browse_buttons = [];self.file_labels = {}
         for key,description,button_text in [
                 ('game_pkg','Choose the game file you want to install.\nLook for a file ending in .pkg.','Choose game file…'),
                 ('update_pkg','If you have an update for this game, you can add it now.\nYou can also skip this and add it later.','Choose update file…')]:
             page = QWidget();layout = QVBoxLayout(page);layout.setContentsMargins(0,0,0,0)
-            note = QLabel(description);note.setWordWrap(True);layout.addWidget(note)
+            note = QLabel(description);note.setObjectName('description');note.setWordWrap(True);layout.addWidget(note)
+            layout.setSpacing(16)
             field = QLineEdit(self);field.hide();self.fields[key] = field
-            button = QPushButton(button_text);self.browse_buttons.append(button);layout.addWidget(button)
-            label = QLabel('No file chosen');label.setWordWrap(True);self.file_labels[key] = label;layout.addWidget(label)
+            card = QFrame();card.setObjectName('fileCard');card.setMinimumHeight(155)
+            card_layout = QHBoxLayout(card);card_layout.setContentsMargins(24,22,24,22);card_layout.setSpacing(20)
+            icon = QLabel();icon.setPixmap(file_icon());icon.setFixedSize(56,56);card_layout.addWidget(icon)
+            file_content = QVBoxLayout();file_content.setSpacing(10);card_layout.addLayout(file_content,1)
+            file_content.addStretch()
+            button = QPushButton(button_text);button.setObjectName('browse')
+            self.browse_buttons.append(button);file_content.addWidget(button,0,Qt.AlignmentFlag.AlignLeft)
+            label = QLabel('No file chosen');label.setObjectName('fileName');label.setWordWrap(True)
+            self.file_labels[key] = label;file_content.addWidget(label);file_content.addStretch()
+            layout.addWidget(card)
             def browse(checked=False,key=key,field=field):
                 title = 'Choose your game file' if key == 'game_pkg' else 'Choose your update file'
                 path,_ = QFileDialog.getOpenFileName(self,title,'','Game files (*.pkg)')
@@ -42,17 +117,22 @@ class InstallDialog(QDialog):
             button.clicked.connect(browse)
             field.textChanged.connect(lambda text,key=key:self.file_changed(key,text))
             if key == 'game_pkg':
-                self.update_only = QPushButton('I only want to add an update')
+                self.update_only = QPushButton('I only want to add an update');self.update_only.setObjectName('quiet')
                 self.update_only.setVisible(bool(self.game.get('installed_paths')))
                 self.update_only.clicked.connect(self.add_update_only);layout.addWidget(self.update_only)
             layout.addStretch();self.pages.addWidget(page)
         review = QWidget();review_layout = QVBoxLayout(review);review_layout.setContentsMargins(0,0,0,0)
-        self.summary = QLabel();self.summary.setWordWrap(True);review_layout.addWidget(self.summary)
-        review_layout.addWidget(QLabel('We’ll unpack the files and put the game in your Games folder.'))
-        self.hint = QLabel('Your original files will stay where they are.');self.hint.setWordWrap(True)
+        review_layout.setSpacing(18)
+        review_card = QFrame();review_card.setObjectName('reviewCard')
+        card_layout = QHBoxLayout(review_card);card_layout.setContentsMargins(24,24,24,24);card_layout.setSpacing(20)
+        icon = QLabel();icon.setPixmap(file_icon());card_layout.addWidget(icon)
+        self.summary = QLabel();self.summary.setObjectName('reviewSummary');self.summary.setWordWrap(True);card_layout.addWidget(self.summary,1)
+        review_layout.addWidget(review_card)
+        location = QLabel('We’ll put everything in your Games folder.');location.setObjectName('description');location.setWordWrap(True);review_layout.addWidget(location)
+        self.hint = QLabel('Your original files will stay where they are.');self.hint.setWordWrap(True);self.hint.setObjectName('muted')
         review_layout.addWidget(self.hint);review_layout.addStretch();self.pages.addWidget(review)
         progress_page = QWidget();progress_layout = QVBoxLayout(progress_page);progress_layout.setContentsMargins(0,0,0,0)
-        self.phase = QLabel();self.phase.setWordWrap(True);progress_layout.addWidget(self.phase)
+        self.phase = QLabel();self.phase.setObjectName('description');self.phase.setWordWrap(True);progress_layout.addWidget(self.phase)
         self.progress = QProgressBar();self.progress.setRange(0,1);self.progress.setValue(0)
         self.progress.setTextVisible(False);progress_layout.addWidget(self.progress)
         progress_layout.addStretch();self.pages.addWidget(progress_page)
@@ -62,13 +142,14 @@ class InstallDialog(QDialog):
         column.addWidget(self.details)
         self.output = QTextEdit();self.output.setReadOnly(True);self.output.document().setMaximumBlockCount(1500)
         self.output.hide();column.addWidget(self.output);self.details.toggled.connect(self.toggle_details)
-        actions = QHBoxLayout();column.addLayout(actions)
-        self.open_folder = QPushButton('Open games folder');self.open_folder.clicked.connect(self.show_games_folder);actions.addWidget(self.open_folder)
-        self.back = QPushButton('Back');self.back.clicked.connect(self.go_back);actions.addWidget(self.back)
+        footer = QFrame();footer.setObjectName('installFooter')
+        actions = QHBoxLayout(footer);actions.setContentsMargins(0,18,0,0);actions.setSpacing(8);column.addWidget(footer)
+        self.open_folder = QPushButton('Open games folder');self.open_folder.setObjectName('libraryPlay');self.open_folder.clicked.connect(self.show_games_folder);actions.addWidget(self.open_folder)
+        self.back = QPushButton('Back');self.back.setObjectName('quiet');self.back.clicked.connect(self.go_back);actions.addWidget(self.back)
         actions.addStretch()
-        self.skip = QPushButton('Skip for now');self.skip.clicked.connect(self.skip_update);actions.addWidget(self.skip)
-        self.cancel = QPushButton('Cancel');self.cancel.clicked.connect(self.reject);actions.addWidget(self.cancel)
-        self.start = QPushButton('Continue');self.start.setDefault(True);self.start.clicked.connect(self.advance);actions.addWidget(self.start)
+        self.skip = QPushButton('Skip for now');self.skip.setObjectName('quiet');self.skip.clicked.connect(self.skip_update);actions.addWidget(self.skip)
+        self.cancel = QPushButton('Cancel');self.cancel.setObjectName('quiet');self.cancel.clicked.connect(self.reject);actions.addWidget(self.cancel)
+        self.start = QPushButton('Continue');self.start.setObjectName('libraryPlay');self.start.setMinimumSize(140,50);self.start.setDefault(True);self.start.clicked.connect(self.advance);actions.addWidget(self.start)
         self.only_update = False;self.show_step(0)
 
     def file_changed(self, key, text):
@@ -80,6 +161,14 @@ class InstallDialog(QDialog):
     def show_step(self, step):
         self.step = step;self.pages.setCurrentIndex(step)
         self.step_label.setText(f'Step {step+1} of 3' if step < 3 else '')
+        for index,(badge,name) in enumerate(self.step_badges):
+            complete = index < min(step,2)
+            active = index == step or step == 3 and index == 2
+            color = '#f5f5f7' if active or complete else '#777780'
+            background = 'transparent'
+            border = '#f5f5f7' if active else '#343438'
+            badge.setText(('✓' if complete else str(index+1))+'   '+name)
+            badge.setStyleSheet(f'color: {color}; background: {background}; border: none; border-bottom: 2px solid {border}; font-size: 12px; font-weight: 600;')
         self.heading.setText(('Choose your game','Do you have an update?','Ready to install?','Installing your game')[step])
         self.back.setVisible(step in (1,2));self.skip.setVisible(step==1 and not self.only_update)
         self.open_folder.setVisible(False);self.details.setVisible(step==3)
@@ -119,7 +208,7 @@ class InstallDialog(QDialog):
 
     def toggle_details(self, checked):
         self.output.setVisible(checked);self.details.setText('Hide details' if checked else 'Show details')
-        self.resize(self.width(),620 if checked else self.minimumSizeHint().height())
+        self.resize(self.width(),800 if checked else max(600,self.minimumSizeHint().height()))
 
     def show_games_folder(self):
         try:launcher_library.open_games_folder(self.owner.root)
@@ -213,6 +302,7 @@ class InstallDialog(QDialog):
         self.heading.setText('Your game is installed' if success else 'Installation stopped')
         self.cancel.setText('Done' if success else 'Close');self.cancel.setEnabled(True);self.start.setEnabled(False)
         self.open_folder.setVisible(success)
+        if success:self.step_badges[2][0].setText('✓   Install')
         self.progress.setRange(0,1);self.progress.setValue(0)
 
     def fail(self,message):
