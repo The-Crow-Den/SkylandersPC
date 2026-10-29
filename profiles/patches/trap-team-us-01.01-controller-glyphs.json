@@ -898,5 +898,191 @@
         "properties_hex": "5d00800000"
       }
     ]
+  },
+  "shapes": {
+    "asset": "permanent/bootstrap.bld",
+    "source_sha256": "71269ddb939eb3a33c0d3f06a71d9c39c74557a83874ffdcd5d8e2a1ccf28398",
+    "texture_name": "fonts/ps4/font_001.png (1024x778 RGBA8 Thin2DThin; R fill, G outline, B shadow)",
+    "texture_offset": 11367000,
+    "texture_height": 832,
+    "cell_row": 610,
+    "chunks": [
+      {
+        "plain_offset": 13697024,
+        "offset": 2621440,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "6d7d26617d0c8c44a30bf97cc54a23ba24e5d0988a8b3c3365dfcd8d7dc56857",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 806,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13729792,
+        "offset": 2623488,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "decoded_sha256": "c427ca987f80dfa7d2bbccd717b01caf48fe7fff78e6f58c035d8f08068e7daf",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 4708,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13893632,
+        "offset": 2641920,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "d15d82fa63e618484c95cac236d5282259353fc24876fbd4bc4be3d4a9a65a4d",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1127,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13926400,
+        "offset": 2643968,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "e2482542bf1c4da7739687f050fad9f63dbf4be37ac85ee04583c70da721930f",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1479,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13959168,
+        "offset": 2646016,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "328b68eeb57c4abbc94b9374455093f5b6ce9c4f09b955f7d03a78fe935fb24a",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1334,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13991936,
+        "offset": 2648064,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "decoded_sha256": "71f036f7a34b85daa0af2ce256a18decf6415b5c28b2d7cddcc36cc29e7782b4",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 2433,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14024704,
+        "offset": 2652160,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "decoded_sha256": "7f1b563b04e1dd5f57fc3229175a16728a9f3e65a47d64e76fd80496f5cd044c",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 2188,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14057472,
+        "offset": 2656256,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "543dd17ab2428cf9376487c2af4fceda959785f9e75b8d440fabbfef82a3b848",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1729,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14155776,
+        "offset": 2662400,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "4dc0f3ebf4358048baef4526d631e73697240dbf3b1dcc3b9fcd0fb6b5ba354a",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1875,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14188544,
+        "offset": 2664448,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "0957fefc1a6091ea4fac4d3c0fdcfbad113116b251912d1fd65ea9a3b507d8f3",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1498,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14221312,
+        "offset": 2666496,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "cbf664feeb34bd8f7ec95e45add2830a3e6698ef98dab1fadac73635b3235907",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 801,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14254080,
+        "offset": 2668544,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "62e1af32c6d73478b1be11ce00ad65ded40a0c34d1823a681b5456b0bbef0404",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1673,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14286848,
+        "offset": 2670592,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "cf9df35694c465eb1e596a6aa529d86af191cb0c86f06146b0d99fbefaeb7d03",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1147,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14319616,
+        "offset": 2672640,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "6f1d11c219f0dce479ee4ec28f3aa2bec64c5d3f9e28a010ace8654d9ffdb1d0",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 446,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14548992,
+        "offset": 2686976,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "96597bfb683f371ab4fb2f39af6a54da76c6a18e76f38205dec5f174a740090b",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 614,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14581760,
+        "offset": 2689024,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "45868fe5cd767d551db6bb5af9ff2627a0534a9dd7dadff456345e74aaa0e74f",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 374,
+        "properties_hex": "5d00800000"
+      }
+    ]
   }
 }

@@ -131,7 +131,10 @@ ROUND_FILL=(33,32,33)
 
 
 def disc(width,height):
-    radius=min(width,height)/2-2;cx,cy=width/2,height/2
+    """Where the round button's shape lies: the south button's 84x84 cell, centred
+    horizontally (its fill is a disc of radius ~38.5 at (40.5, 40.5)); the colour
+    disc is slightly larger so its edge is never sampled."""
+    cx,cy,radius=(width-84)//2+40.5,40.5,40
     return [[(x+.5-cx)**2+(y+.5-cy)**2<=radius*radius for x in range(width)] for y in range(height)]
 
 
@@ -284,6 +287,31 @@ def resample(art,width,height,target):
     return bytes(result)
 
 
+def shape_recipe(source,profile,mode):
+    """Font 001's shape texture (font_001.png: R fill, G outline, B shadow) holds
+    each button's outline at the colour cells' positions plus cell_row. Round View
+    and Menu cells take the south button's disc shape; the rest of those cells
+    (the touchpad rectangle, the Options pill and its OPTIONS caption) is cleared.
+    Alpha bytes are kept."""
+    if mode not in LABELS:raise ValueError('invalid glyph shape pack')
+    blocks=_read_blocks(source,profile)
+    base=asset_mod.number(profile['texture_offset'],512*1024*1024,'shape texture offset')
+    row=asset_mod.number(profile['cell_row'],1024,'shape cell row')
+    def place(x,y):
+        absolute=base+tiled_offset(x,y);start=absolute//32768*32768
+        if start not in blocks:raise ValueError('shape cell exceeds verified font blocks')
+        return blocks[start][2],absolute-start
+    _,left,top,width,height=CELLS[0]
+    south=[[bytes(m[at:at+3]) for m,at in (place(left+x,top+row+y) for x in range(width))] for y in range(height)]
+    for index in ROUND:
+        _,left,top,width,height=CELLS[index];dx=(width-84)//2
+        for y in range(height):
+            for x in range(width):
+                modified,at=place(left+x,top+row+y)
+                modified[at:at+3]=south[y][x-dx] if 0<=x-dx<84 and y<84 else b'\0\0\0'
+    return _write_blocks(profile,blocks)
+
+
 def title_recipe(source,profile,mode):
     """The title screen's 64x64 BC3 confirm button (stored flipped, 1D micro tiled)
     re-encoded from the south-button artwork."""
@@ -292,7 +320,21 @@ def title_recipe(source,profile,mode):
     start=asset_mod.number(profile['texture_offset'],512*1024*1024,'title prompt offset')
     if profile['texture_size']!=4096 or profile['width']!=64:raise ValueError('unsupported title prompt layout')
     _,_,_,width,height=CELLS[0]
-    art=resample(raster(mode,0),width,height,64)
+    # A soft drop shadow down and right, as the other buttons have; the art is
+    # scaled to leave room for it.
+    small=resample(raster(mode,0),width,height,58);art=bytearray(64*64*4)
+    for y in range(64):
+        for x in range(64):
+            sx,sy=x-1,y-1;shadow=0
+            for ox,oy,weight in ((3,4,.5),(2,3,.3),(4,5,.2)):
+                tx,ty=sx-ox,sy-oy
+                if 0<=tx<58 and 0<=ty<58:shadow+=small[(ty*58+tx)*4+3]*weight
+            shadow=min(255,round(shadow*.6))
+            a=small[(sy*58+sx)*4+3] if 0<=sx<58 and 0<=sy<58 else 0
+            if not a and not shadow:continue
+            out=a+shadow*(255-a)//255;o=(y*64+x)*4
+            rgb=[(small[(sy*58+sx)*4+c]*a)//out if a else 0 for c in range(3)]
+            art[o:o+4]=bytes((*rgb,out))
     raw=bytearray(4096)
     for by in range(16):
         for bx in range(16):
@@ -312,7 +354,8 @@ def build_profile(source_root,profile_path,mode,executable_sha256):
     profile=json.loads(Path(profile_path).read_text())
     if profile['executable_sha256']!=executable_sha256:raise ValueError('controller glyphs require the verified executable')
     assets=[]
-    for current,transform in ([(profile,recipe)]+([(profile['prompts'],prompt_recipe)] if 'prompts' in profile else [])+
+    for current,transform in ([(profile,recipe)]+([(profile['shapes'],shape_recipe)] if 'shapes' in profile else [])+
+                              ([(profile['prompts'],prompt_recipe)] if 'prompts' in profile else [])+
                               ([(profile['title'],title_recipe)] if 'title' in profile else [])):
         relative=Path(current['asset'])
         if relative.is_absolute() or '..' in relative.parts:raise ValueError('invalid glyph asset path')
