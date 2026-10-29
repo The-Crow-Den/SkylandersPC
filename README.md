@@ -1,8 +1,8 @@
-# SkylandersPS4
+# SkylandersPC
 
 Run your own PS4 copy of **Skylanders: Trap Team** natively on a Linux PC.
 
-SkylandersPS4 is a compatibility framework, not an emulator: a C++ host loads the
+SkylandersPC is a compatibility framework, not an emulator: a C++ host loads the
 game's original x86-64 executable and runs it directly, supplying the PS4 system
 services it calls (files, threads, memory, audio, pads, saves, trophies, the
 Traptanium Portal) itself. Graphics go through a Vulkan renderer. Trap Team is
