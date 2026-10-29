@@ -78,3 +78,30 @@ class PackageTests(unittest.TestCase):
             self.assertTrue(base.exists());self.assertTrue(update.exists())
             self.assertEqual(installs.read_entries(installs.directory(root)),[])
             self.assertFalse((installs.directory(root)/'CUSA00626/01.00/base').exists())
+
+
+class PackageSelectionTests(unittest.TestCase):
+    def pkg(self, root, name, category, title='CUSA00626', content='content', version='01.00'):
+        import struct
+        data=sfo(dict(TITLE_ID=title,APP_VER=version,CATEGORY=category,CONTENT_ID=content))
+        package=bytearray(0x3000);package[:4]=b'\x7fCNT'
+        struct.pack_into('>I',package,0x10,1);struct.pack_into('>I',package,0x18,0x1000)
+        struct.pack_into('>6IQ',package,0x1000,0x1000,0,0,0,0x1100,len(data),0)
+        struct.pack_into('>QQ',package,0x410,0x2000,0x1000)
+        struct.pack_into('>Q',package,0x430,len(package))
+        package[0x1100:0x1100+len(data)]=data
+        path=root/name;path.write_bytes(package);return path
+
+    def test_reads_real_header_metadata_and_checks_both_choices_without_extracting(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);base=self.pkg(root,'game.pkg','gd');update=self.pkg(root,'update.pkg','gp',version='01.01')
+            self.assertEqual(packages.package_info(base)['CATEGORY'],'gd')
+            packages.check_packages(base,update)
+            with self.assertRaisesRegex(ValueError,'not a base game'):packages.check_packages(update,base)
+            wrong=self.pkg(root,'wrong.pkg','gp',title='CUSA99999',version='01.01')
+            with self.assertRaisesRegex(ValueError,'does not match'):packages.check_packages(base,wrong)
+            with self.assertRaisesRegex(ValueError,'base game first'):packages.check_packages(None,update)
+            installed=[dict(title_id='CUSA00626',content_id='content',base_version='01.00')]
+            packages.check_packages(None,update,installed)
+            broken=root/'broken.pkg';broken.write_bytes(b'not a package')
+            with self.assertRaisesRegex(ValueError,'complete PS4 PKG'):packages.package_info(broken)

@@ -155,6 +155,22 @@ class GameLibraryTests(unittest.TestCase):
         path.unlink();path.symlink_to(self.root/'elsewhere')
         with self.assertRaisesRegex(ValueError,'symlink'): library.read_entries(self.library)
 
+    def test_previous_hidden_library_is_referenced_from_visible_games_folder(self):
+        hidden=self.root/'.local/game-library'
+        initial=library.publish(hidden,self.dump('base'))
+        old_manifest=library.manifest_path(hidden,initial).read_bytes()
+        inode=Path(initial['base_path']).joinpath('eboot.bin').stat().st_ino
+        library.register(self.root);library.register(self.root)
+        self.assertEqual(library.directory(self.root),self.root/'Games')
+        self.assertEqual(library.manifest_path(hidden,initial).read_bytes(),old_manifest)
+        entry=library.resolve_entry(self.root)
+        self.assertEqual(entry['base_path'],initial['base_path'])
+        self.assertEqual(Path(entry['base_path']).joinpath('eboot.bin').stat().st_ino,inode)
+        self.assertTrue(library.manifest_path(self.root/'Games',entry).exists())
+        patch=self.dump('update',category='gp',ver='01.01')
+        updated=library.publish(library.directory(self.root),update=patch)
+        self.assertTrue(Path(updated['update_path']).is_relative_to(self.root/'Games'))
+
     def test_publication_manifest_failure_rolls_back_only_new_data(self):
         base=self.dump('base');update=self.dump('update',ver='01.01',category='gp')
         original=library.write_json

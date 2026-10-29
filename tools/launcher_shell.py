@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer
 from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QComboBox)
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget)
 try:
     from . import game_library
     from . import launcher_library as library
@@ -259,9 +259,7 @@ def renovated(base):
             top = QHBoxLayout()
             heading = QLabel('Library'); heading.setStyleSheet('font-size: 22px; font-weight: 600;')
             top.addWidget(heading); top.addStretch()
-            self.installations = QComboBox(); self.installations.setObjectName('installationSelector')
-            self.installations.setMinimumWidth(250); top.addWidget(self.installations)
-            self.installations.currentIndexChanged.connect(self.select_installation)
+            self.button(top, 'Open games folder', self.open_games_folder)
             for title, callback in [('Skylanders Manager', self.manager), ('Settings', self.game_settings)]:
                 pill = self.button(top, title, callback)
                 if title == 'Settings':
@@ -280,6 +278,8 @@ def renovated(base):
             self.trophies = self.button(bottom, 'Trophies  —%', self.trophy_tracker)
             self.trophies.setIcon(utility_icon('trophy'));self.trophies.setIconSize(QSize(24,24))
             self.trophies.setStyleSheet('background: transparent; border: none; text-align: left; color: #a9a9b1; padding: 12px 0; font-size: 14px;')
+            self.install_note = QLabel(); self.install_note.setWordWrap(True)
+            self.install_note.setStyleSheet('color: #a9a9b1;');bottom.addWidget(self.install_note,1)
             bottom.addStretch()
             self.loading_wheel=LoadingWheel();bottom.addWidget(self.loading_wheel)
             self.launch_status=QLabel();self.launch_status.setStyleSheet('color: #a9a9b1;');self.launch_status.hide();bottom.addWidget(self.launch_status)
@@ -361,33 +361,19 @@ def renovated(base):
             except (OSError, ValueError) as error:
                 self.log.append(f'Installation selection could not be saved: {error}')
 
-        def select_installation(self, index):
-            if self.process or index < 0: return
-            choice = self.installations.itemData(index)
-            if not choice: return
-            self.game['installation'] = choice
+        def open_games_folder(self):
             try:
-                game_library.select(self.root, choice)
+                library.open_games_folder(self.root)
             except (OSError, ValueError) as error:
-                self.log.append(f'Installation selection could not be saved: {error}')
-            self.persist(); self.refresh_game()
+                QMessageBox.warning(self, 'Cannot open Games folder', str(error))
 
         def refresh_game(self):
+            choices = []
             try:
                 library.sync_installations(self.root, self.library)
                 choices = game_library.for_game(self.root, self.game)
-                self.installations.blockSignals(True); self.installations.clear()
-                for entry in choices:
-                    key = game_library.selector(entry['title_id'], entry['app_version'])
-                    suffix = '' if game_library.supported(self.root, entry) else ' · not supported yet'
-                    self.installations.addItem(key + suffix, key)
-                self.installations.setCurrentIndex(self.installations.findData(self.game.get('installation')))
-                self.installations.setVisible(bool(choices))
-                self.installations.setEnabled(self.process is None)
             except (OSError, ValueError) as error:
                 self.log.append(str(error))
-            finally:
-                self.installations.blockSignals(False)
             self.refresh_readiness()
             themed = supplied_artwork(self.root, self.game)
             self.canvas.game = themed
@@ -405,7 +391,14 @@ def renovated(base):
                 else:
                     self.brand.setText(self.game['name'])
             ready = self.play.isEnabled()
-            self.primary.setText('PLAY' if ready else ('SETUP' if self.game['game_pkg'] else 'INSTALL'))
+            self.primary.setText('PLAY' if ready else ('INSTALLED' if choices else 'INSTALL'))
+            self.primary.setEnabled(ready or not choices)
+            if choices and not ready:
+                entry = game_library.resolve_entry(self.root, game=self.game)
+                message = 'Game files installed. Setup is still needed before you can play.' if game_library.supported(self.root, entry) else 'Game files installed. This game is not supported yet.'
+                self.install_note.setText(message)
+            else:
+                self.install_note.clear()
             try:
                 try:
                     from .launcher_trophies import snapshot
@@ -446,7 +439,6 @@ def renovated(base):
                 self.session_mods = selection(self.root,self.game)
                 super().launch()
                 if self.process is not None:
-                    self.installations.setEnabled(False)
                     self.runtime_started=False;self.session_stop.setEnabled(True);self.session_stop.setText('Stop')
                     self.session_stop.show();self.primary.setEnabled(False);self.primary.setText('LOADING')
                     self.launch_status.setText('Preparing game…');self.launch_status.show();self.loading_wheel.set_active(True)

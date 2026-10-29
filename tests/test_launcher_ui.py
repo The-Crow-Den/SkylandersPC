@@ -42,6 +42,14 @@ class LauncherUITests(unittest.TestCase):
     def extractor(self,body):
         tool=self.root/'synthetic-extractor'
         tool.write_text('#!/usr/bin/env python3\n'+body);tool.chmod(0o755)
+        # These subprocess tests use base64 SFOs instead of binary PKGs.
+        from tools.workspace import read_sfo
+        def info(path):
+            try:return read_sfo(base64.b64decode(Path(path).read_text(),validate=True))
+            except (ValueError,UnicodeError):
+                return dict(TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test')
+        inspector=patch('tools.launcher_packages.package_info',side_effect=info)
+        inspector.start();self.addCleanup(inspector.stop)
         return tool
 
     def test_header_settings_opens_selected_game_scope(self):
@@ -214,7 +222,7 @@ class LauncherUITests(unittest.TestCase):
         (base/'eboot.bin').write_bytes(b'synthetic')
         return game_library.publish(game_library.directory(self.root),base)
 
-    def test_installation_selector_preserves_versions_and_per_game_preferences(self):
+    def test_latest_update_is_automatic_without_a_version_selector(self):
         from tools import game_library
         import hashlib
         (self.root/'profiles').mkdir()
@@ -225,20 +233,52 @@ class LauncherUITests(unittest.TestCase):
         (update/'sce_sys/param.sfo').write_bytes(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='test')))
         game_library.publish(game_library.directory(self.root),update=update)
         self.window.select_game('trap-team')
-        self.assertEqual(self.window.installations.count(),2)
+        self.assertFalse(hasattr(self.window,'installations'))
         self.window.game['settings']={'resolution':'2160p'}
-        index=self.window.installations.findData('CUSA00626@01.00')
-        self.window.installations.setCurrentIndex(index)
-        self.assertEqual(self.window.game['installation'],'CUSA00626@01.00')
-        self.assertEqual(game_library.resolve(self.root).app_version,'01.00')
+        self.assertEqual(self.window.game['installation'],'CUSA00626@01.01')
+        self.assertEqual(game_library.resolve(self.root).app_version,'01.01')
         self.assertEqual(self.window.game['settings'],{'resolution':'2160p'})
         self.make_library_base('CUSA99999');self.window.rebuild_rail()
         self.window.select_game('title-cusa99999')
-        self.assertIn('not supported yet',self.window.installations.currentText())
+        self.assertIn('not supported yet',self.window.install_note.text())
+        self.assertEqual(self.window.primary.text(),'INSTALLED')
         self.assertFalse(self.window.play.isEnabled())
         self.window.select_game('trap-team')
-        self.assertEqual(self.window.game['installation'],'CUSA00626@01.00')
+        self.assertEqual(self.window.game['installation'],'CUSA00626@01.01')
         self.assertEqual(game_library.resolve(self.root).title_id,'CUSA00626')
+
+    def test_install_window_is_simple_and_starts_with_fresh_choices(self):
+        self.window.game['game_pkg']='/old/game.pkg';self.window.game['update_pkg']='/old/update.pkg'
+        dialog=InstallDialog(self.window)
+        self.assertEqual(dialog.fields['game_pkg'].text(),'')
+        self.assertEqual(dialog.fields['update_pkg'].text(),'')
+        self.assertEqual(dialog.start.text(),'Install game')
+        self.assertTrue(dialog.output.isHidden())
+        dialog.details.click();self.assertFalse(dialog.output.isHidden())
+        dialog.details.click();self.assertTrue(dialog.output.isHidden())
+        dialog.close()
+
+    def test_open_games_folder_uses_visible_directory(self):
+        from tools import launcher_library
+        with patch('PyQt6.QtGui.QDesktopServices.openUrl',return_value=True) as opened:
+            launcher_library.open_games_folder(self.root)
+        self.assertEqual(opened.call_args.args[0].toLocalFile(),str(self.root/'Games'))
+        self.assertTrue((self.root/'Games').is_dir())
+
+    def test_wrong_update_is_explained_before_extraction(self):
+        from tools import launcher_packages
+        game=self.root/'game.pkg';game.write_bytes(b'synthetic')
+        update=self.root/'update.pkg';update.write_bytes(b'synthetic')
+        dialog=InstallDialog(self.window)
+        dialog.fields['game_pkg'].setText(str(game));dialog.fields['update_pkg'].setText(str(update))
+        values=[dict(TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='game'),
+                dict(TITLE_ID='CUSA99999',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='other')]
+        with patch.object(launcher_packages,'package_info',side_effect=values),patch('tools.launcher_install_dialog.QMessageBox.warning') as warning:
+            dialog.begin()
+        self.assertIn('does not match',warning.call_args.args[2])
+        self.assertIsNone(dialog.process)
+        self.assertFalse((self.root/'.local/pkg-imports').exists())
+        dialog.close()
 
     def test_update_only_install_attaches_existing_base(self):
         from tools import game_library
@@ -271,6 +311,9 @@ class LauncherUITests(unittest.TestCase):
         with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
         self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
         self.assertEqual(len(self.window.game['installed_paths']),2)
+        self.assertTrue(all(Path(p).is_relative_to(self.root/'Games') for p in self.window.game['installed_paths']))
+        self.assertIn('is installed',dialog.phase.text())
+        self.assertEqual(dialog.progress.value(),1)
         self.assertFalse(self.window.play.isEnabled()) # no prepared runtime
         dialog.close()
 

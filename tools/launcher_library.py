@@ -88,13 +88,27 @@ def sync_installations(root, value):
             game.get('title_id') == e['title_id']]
         if not choices:
             continue
-        if not any(game.get('installation') == game_library.selector(e['title_id'], e['app_version']) for e in choices):
-            try:
-                from .game_install import version
-            except ImportError:
-                from game_install import version
-            chosen = max(choices, key=lambda e: version(e['app_version']))
-            game['installation'] = game_library.selector(chosen['title_id'], chosen['app_version'])
-        chosen = next(e for e in choices if game['installation'] == game_library.selector(e['title_id'], e['app_version']))
+        try:
+            from .game_install import version
+        except ImportError:
+            from game_install import version
+        chosen = max(choices, key=lambda e: version(e['app_version']))
+        game['installation'] = game_library.selector(chosen['title_id'], chosen['app_version'])
         game['installed_paths'] = [p for p in (chosen['base_path'], chosen['update_path']) if p]
     return value
+
+
+def open_games_folder(root):
+    """Open the visible installation folder using the desktop's file manager."""
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtGui import QDesktopServices
+    try:
+        from . import game_library
+    except ImportError:
+        import game_library
+    folder = game_library.directory(root)
+    if any(p.is_symlink() for p in (folder, *folder.parents)):
+        raise ValueError('Games folder cannot be a symlink')
+    folder.mkdir(parents=True, exist_ok=True)
+    if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve()))):
+        raise OSError('The file manager could not open the Games folder.')

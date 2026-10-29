@@ -19,7 +19,7 @@ except ImportError:
 
 
 def directory(project):
-    return Path(project) / '.local/game-library'
+    return Path(project) / 'Games'
 
 
 def selector(title_id, app_version):
@@ -213,11 +213,21 @@ def register(project):
         for sfo in sorted(folder.glob('*/sce_sys/param.sfo')):
             path = sfo.parent.parent
             candidates.append((path, metadata(path)))
-    if not candidates:
+    legacy_entries = read_entries(project / '.local/game-library')
+    if not candidates and not legacy_entries:
         return
     library = directory(project)
     with locked(library):
         existing = {selector(e['title_id'], e['app_version']): e for e in read_entries(library)}
+        for entry in legacy_entries:
+            key = selector(entry['title_id'], entry['app_version'])
+            previous = existing.get(key)
+            if previous:
+                if (previous['base_path'], previous['update_path']) != (entry['base_path'], entry['update_path']):
+                    raise ValueError('Ambiguous existing installation ' + key)
+                continue
+            write_json(manifest_path(library, entry), entry)
+            existing[key] = entry
         for base, identity in candidates:
             if identity['CATEGORY'] != 'gd':
                 continue
