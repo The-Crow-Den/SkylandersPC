@@ -33,3 +33,5 @@ eboot.bin
 *.key
 *.pem
 *.pfx
+# Design notes and measurements stay local; the public repository has no docs folder.
+/docs/

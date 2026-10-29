@@ -15,5 +15,6 @@ Steam-provided controller glyphs and other artwork remain private user assets.
 No game, console firmware, console libraries, saves or figure dumps are supplied.
 
 The source-only export does not include a playable executable or a complete
-binary-release corresponding-source bundle. See docs/PUBLICATION.md for the
-remaining source/provenance checks before any binary distribution.
+binary-release corresponding-source bundle. See CONTRIBUTING.md for the
+source checks; a binary release also needs the provenance steps listed in
+release-policy.json.

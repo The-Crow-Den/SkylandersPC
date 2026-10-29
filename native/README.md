@@ -79,7 +79,3 @@ threads release on join. Guest-visible stacks and TLS are mapped below 2 GiB
 File I/O: `hle/kernel_file.cpp` guards its descriptor tables with a lock but
 performs blocking reads/writes outside it, so one stalled read does not block
 other threads' file calls.
-
-The bring-up history (first structural load, first entry attempt, startup
-stops) is kept in `docs/NATIVE_BRINGUP_20261021.md` and
-`docs/CUSTOM_BOOT_PROGRESS_20261021.md`.
