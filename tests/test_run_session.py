@@ -122,3 +122,29 @@ class RunSessionTests(unittest.TestCase):
             self.assertEqual(result['stop_reason'], 'process-exit')
             self.assertEqual(result['returncode'], -15)
             self.assertEqual(result['signal'], 15)
+
+
+class SessionCleanupTests(unittest.TestCase):
+    def test_finish_keeps_latest_log_and_removes_session(self):
+        from tools import run_session
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            last = root/'last'
+            for name, text in (('a', 'first'), ('b', 'second')):
+                session = root/'temp'/name
+                (session/'install').mkdir(parents=True)
+                (session/'runtime.log').write_text(text)
+                (session/'install/eboot.bin').write_bytes(b'x')
+                self.assertTrue(run_session.finish_session(session, [root/'saves'], last=last))
+                self.assertFalse(session.exists())
+            self.assertEqual(run_session.latest_log(last).read_text(), 'second')
+            self.assertEqual(list((root/'temp').iterdir()), [])
+
+    def test_finish_refuses_when_user_data_is_inside(self):
+        from tools import run_session
+        with tempfile.TemporaryDirectory() as temporary:
+            session = Path(temporary)/'session'
+            (session/'saves').mkdir(parents=True)
+            self.assertFalse(run_session.finish_session(session, [session/'saves'], last=Path(temporary)/'last'))
+            self.assertTrue((session/'saves').is_dir())
+            self.assertIsNone(run_session.latest_log(Path(temporary)/'last'))
