@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <stdexcept>
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
+#endif
 
 namespace {
 thread_local std::int32_t net_errno = 0;

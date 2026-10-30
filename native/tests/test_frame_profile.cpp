@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../frame_profile.hpp"
+#include "../platform/host_compat.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -24,7 +25,7 @@ int main() {
         check(!FrameProfile::enabled(), "profile enabled without configuration");
         FrameProfile::frame(); // Disabled: must be a no-op.
         const auto path = std::filesystem::temp_directory_path() / ("sky-frame-profile-" + std::to_string(getpid()) + ".csv");
-        setenv("SKY_FRAME_PROFILE", path.c_str(), 1);
+        SkyHost::set_environment("SKY_FRAME_PROFILE", path.string().c_str());
         FrameProfile::configure();
         check(FrameProfile::enabled(), "profile not enabled");
         FrameProfile::thread_started(true);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "local_trophies.hpp"
 #include <iostream>
+#include <random>
 #include <stdexcept>
 int main() {
   namespace fs = std::filesystem;
@@ -10,17 +11,17 @@ int main() {
       throw std::runtime_error("local trophy contract failed");
   };
   auto ptr = [](auto *value) { return reinterpret_cast<U>(value); };
-  char temporary[] = "/tmp/sky-trophies-XXXXXX";
-  const auto *directory = mkdtemp(temporary);
-  if (!directory)
+  std::error_code made;
+  const fs::path root = fs::temp_directory_path() /
+      ("sky-trophies-" + std::to_string(std::random_device{}()));
+  if (!fs::create_directory(root, made) || made)
     return 2;
-  const fs::path root(directory);
   try {
     fs::create_directories(root / "catalogues");
     fs::create_directories(root / "icons");
-    setenv("SKY_TROPHY_STORE", root.c_str(), 1);
-    setenv("SKY_TROPHY_CATALOGUES", (root / "catalogues").c_str(), 1);
-    setenv("SKY_TROPHY_ICONS", (root / "icons").c_str(), 1);
+    SkyHost::set_environment("SKY_TROPHY_STORE", root.string().c_str());
+    SkyHost::set_environment("SKY_TROPHY_CATALOGUES", (root / "catalogues").string().c_str());
+    SkyHost::set_environment("SKY_TROPHY_ICONS", (root / "icons").string().c_str());
     for (int user : {4096, 4097}) {
       std::ofstream file(root / "catalogues" / (std::to_string(user) + ".tsv"));
       file << "SKYTROPHIES1\tNPWR12345_00\tSynthetic "

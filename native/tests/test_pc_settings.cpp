@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../pc_settings.hpp"
 #include <stdexcept>
+#include "../platform/host_compat.hpp"
+#include <filesystem>
 #include <unistd.h>
 #include <fstream>
 #include <iterator>
@@ -21,18 +23,18 @@ int main() {
     check(sky_pc_set_fps_counter(1) && sky_pc_fps_counter()==1);
     sky_pc_report_frame_time(16.0f);check(sky_pc_frame_time()==16.0f);
     sky_pc_report_frame_time(-1.0f);sky_pc_report_frame_time(1000.0f);check(sky_pc_frame_time()==16.0f);
-    unsetenv("SKY_AUTO_FRAME_POLICY_AVAILABLE");
+    SkyHost::unset_environment("SKY_AUTO_FRAME_POLICY_AVAILABLE");
     check(!sky_pc_set_frame_policy(1));check(!sky_pc_set_frame_policy(2));
-    unsetenv("SKY_ALLOW_60");
+    SkyHost::unset_environment("SKY_ALLOW_60");
     sky_pc_set_frame_limit(30); sky_pc_set_frame_limit(60);
     check(sky_pc_frame_limit()==30);
-    setenv("SKY_ALLOW_60","1",1);
+    SkyHost::set_environment("SKY_ALLOW_60","1");
     sky_pc_set_frame_limit(60); check(sky_pc_frame_limit()==60);
     SkyPc::automatic.store(true);
     SkyPc::apply_frame_limit(30);check(SkyPc::automatic.load() && sky_pc_frame_limit()==30);
     sky_pc_set_frame_limit(60);check(!SkyPc::automatic.load() && sky_pc_frame_limit()==60);
     sky_pc_set_frame_limit(120); check(sky_pc_frame_limit()==60);
-    setenv("SKY_AUTO_FRAME_POLICY_AVAILABLE","1",1);
+    SkyHost::set_environment("SKY_AUTO_FRAME_POLICY_AVAILABLE","1");
     check(sky_pc_auto_available());check(sky_pc_set_frame_policy(1));
     check(sky_pc_frame_policy()==1 && sky_pc_frame_limit()==30);
     SkyPc::apply_automatic_limit(60);check(sky_pc_frame_limit()==60);
@@ -40,8 +42,8 @@ int main() {
     SkyPc::apply_automatic_limit(60);check(sky_pc_frame_limit()==30);
     sky_pc_set_frame_limit(60);check(sky_pc_set_frame_policy(1));
     check(sky_pc_frame_limit()==30 && SkyPc::manual_limit.load()==60);
-    const std::string path="/tmp/sky-pc-settings-"+std::to_string(getpid())+".json";
-    setenv("SKY_PC_SETTINGS_REQUEST",path.c_str(),1);
+    const std::string path=(std::filesystem::temp_directory_path()/("sky-pc-settings-"+std::to_string(getpid())+".json")).string();
+    SkyHost::set_environment("SKY_PC_SETTINGS_REQUEST",path.c_str());
     check(!sky_pc_save_settings(99,0,0,0));check(!sky_pc_save_settings(8,0,0,0));
     check(access(path.c_str(),F_OK)!=0);
     check(!sky_pc_set_controller_layout(2));check(sky_pc_set_controller_layout(1));
