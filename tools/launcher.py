@@ -345,7 +345,14 @@ def main():
         from PyQt6.QtGui import QIcon
         app.setWindowIcon(QIcon(str(icon)))
     window = Launcher(ROOT)
-    window.show()
+    try:
+        from .launcher_gamepad import game_mode
+    except ImportError:
+        from launcher_gamepad import game_mode
+    # Steam Game Mode shows one window at a time; fill the screen (1280x800 on Steam Deck).
+    if game_mode(): window.showFullScreen()
+    else: window.show()
+    window.primary.setFocus()
     return app.exec()
 
 

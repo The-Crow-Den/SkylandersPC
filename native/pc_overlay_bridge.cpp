@@ -57,6 +57,7 @@ void command(const std::string& data){
     if(verb=="portal"){int action=-1,index=-1;if(stream>>action>>index && action>=0&&action<=18&&index>=0&&index<2048)sky_portal_action(action,index);}
     else if(verb=="close")sky_portal_action(20,0);
     else if(verb=="minimize")sky_portal_action(22,0);
+    else if(verb=="quit")sky_portal_action(21,0); // ends the session; the launcher reappears
     else if(verb=="counter"){int n=-1;if(stream>>n)sky_pc_set_fps_counter(n);}
     else if(verb=="volume"){int n=-1;if(stream>>n&&n>=0&&n<=100)sky_portal_set_volume(n);}
     else if(verb=="fps"){int n=-1;if(stream>>n){if(n==0)sky_pc_set_frame_policy(1);else if(n==1)sky_pc_set_frame_limit(30);else if(n==2)sky_pc_set_frame_limit(60);}}

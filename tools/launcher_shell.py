@@ -318,6 +318,36 @@ def renovated(base):
             except ImportError:
                 from launcher_portal import PortalPage
             self.portal_page = PortalPage(self);self.views.addWidget(self.portal_page)
+            try:
+                from .launcher_gamepad import GamepadNavigator
+            except ImportError:
+                from launcher_gamepad import GamepadNavigator
+            self.gamepad = GamepadNavigator.attach(self)
+
+        # Controller hooks (tools/launcher_gamepad.py): B leaves a page, LB/RB switch tabs or
+        # games, Y opens the game menu, Start plays.
+        def gamepad_back(self):
+            page = self.views.currentWidget()
+            if page is self.settings_page: self.settings_page.cancel()
+            elif page is self.portal_page: self.portal_page.close_page()
+            else: return False
+            self.primary.setFocus(); return True
+
+        def gamepad_page(self, delta):
+            page = self.views.currentWidget()
+            if page is self.settings_page:
+                self.settings_page.select((self.settings_page.pages.currentIndex()+delta) % len(self.settings_page.nav))
+                self.settings_page.nav[self.settings_page.pages.currentIndex()].setFocus()
+            elif page is self.canvas and not self.process:
+                keys = [game['id'] for game in self.library['games']]
+                self.select_game(keys[(keys.index(self.library['selected'])+delta) % len(keys)])
+                self.primary.setFocus()
+
+        def gamepad_action(self, action):
+            if self.views.currentWidget() is not self.canvas: return False
+            if action == 'menu': self.game_menu(); return True
+            if action == 'start' and self.primary.isEnabled(): self.primary.click(); return True
+            return False
 
         @property
         def game(self):
@@ -576,6 +606,7 @@ def renovated(base):
                 self.loading_wheel.set_active(False);self.launch_status.hide()
                 self.session_stop.setVisible(False); self.primary.setEnabled(True); self.refresh_game()
                 self.status.setText(session_status)
+                self.raise_(); self.activateWindow(); self.primary.setFocus() # back from the game, ready for the pad
             if hasattr(self,'portal_page') and self.views.currentWidget() is self.portal_page:
                 self.portal_page.refresh()
 

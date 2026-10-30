@@ -72,7 +72,9 @@ class TrophyDialog(QDialog):
             item.setSizeHint(QSize(0,80));self.list.addItem(item)
 
     def link(self,key):
-        path,_=QFileDialog.getOpenFileName(self,'Choose trophy XML (not a normal game save)','','Trophy XML (*.xml *.XML)')
+        try:from .launcher_files import choose_file
+        except ImportError:from launcher_files import choose_file
+        path=choose_file(self,'Choose trophy XML (not a normal game save)',('.xml',))
         if not path:return
         old=self.game.get(key);self.game[key]=path
         try:trophies.snapshot(self.owner.root,self.game)
