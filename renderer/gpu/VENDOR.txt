@@ -1,0 +1,14 @@
+The GPU layer (gpu/) is the port's own code: command processor (cp/), GCN hardware definitions
+(gcn/), shader translator GCN -> SPIR-V (shader/), renderer (render/), buffer and texture caches
+(buffers/, textures/), memory tracking (memory/), platform libraries (platform/). It started
+from shadPS4 (https://github.com/shadps4-emu/shadPS4, commit
+b4e7ae776071ceb1dd35004577a8719481e1d258, GPL-2.0-or-later) and was rewritten part by part;
+gpu/shadps4 was removed on 2026-10-13. The shader translator was checked against the shadPS4
+translator it replaced on a corpus of the game's shaders (byte-identical SPIR-V,
+tests/test_shader_corpus.cpp).
+
+The upstream online module (gpu/bbnet) was removed in skyrender; see NOTICE.md.
+
+Third-party libraries in third_party/: sirit (SPIR-V emitter), gcn (AMD GCN headers), half,
+httplib, imgui, fonts. The upstream temporal upscalers (upscale/, the DLSS bridge, amd-fsr1 and
+fsr-vulkan) were removed in skyrender; see NOTICE.md.

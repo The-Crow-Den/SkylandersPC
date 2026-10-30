@@ -71,8 +71,20 @@ python3 -m unittest discover -s tests -v
 python3 tools/launcher.py
 ```
 
-The Vulkan renderer is a separate GPL-2.0-or-later project, skyrender, built as
-`libskyrender.so`. It is not published yet.
+The Vulkan renderer, skyrender, lives in `renderer/` (GPL-2.0-or-later; a
+modified fork of bloodborne_pc, which derives from shadPS4; see
+[renderer/NOTICE.md](renderer/NOTICE.md)). Build it into `libskyrender.so`, then
+point the host at it:
+
+```sh
+git submodule update --init
+cmake -S renderer/gpu -B .local/renderer-build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DSKY_RENDERER_LTO=OFF -DSKY_RENDERER_PGO=off
+cmake --build .local/renderer-build --target skyrender
+cmake -S native -B .local/native-gpu-build -DCMAKE_BUILD_TYPE=Release \
+  -DSKY_RENDERER_ROOT="$PWD/renderer" -DSKY_RENDERER_LIBRARY="$PWD/.local/renderer-build/libskyrender.so"
+cmake --build .local/native-gpu-build
+```
 
 ## Layout
 
@@ -83,6 +95,7 @@ The Vulkan renderer is a separate GPL-2.0-or-later project, skyrender, built as
   and asset/patch recipe tools.
 - `profiles/`: per-game build identities and patch recipes. Recipes hold
   expected bytes and refuse to apply to anything else.
+- `renderer/`: skyrender, the Vulkan GPU, video-out and audio component.
 - `tests/`: synthetic tests; none need a game.
 
 Unknown system calls are reported, never answered with a fake success.

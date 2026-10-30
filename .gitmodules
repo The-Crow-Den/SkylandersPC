@@ -1,0 +1,6 @@
+[submodule "renderer/gpu/third_party/imgui"]
+	path = renderer/gpu/third_party/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "renderer/third_party/LibAtrac9"]
+	path = renderer/third_party/LibAtrac9
+	url = https://github.com/Thealexbarney/LibAtrac9.git

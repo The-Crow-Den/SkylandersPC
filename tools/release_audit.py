@@ -19,11 +19,15 @@ import os
 
 ROOT=Path(__file__).resolve().parents[1]
 ROOT_FILES={'LICENSE','LICENSE_SCOPE.md','NOTICE.md','THIRD_PARTY_NOTICES.md','README.md','CONTRIBUTING.md',
-            'AGENTS.md','SOURCE_MANIFEST.json','references.lock.json','release-policy.json','.gitignore','.gitattributes'}
-SCOPES={'docs','native','tools','tests','profiles','patches','LICENSES','.github'}
+            'AGENTS.md','SOURCE_MANIFEST.json','references.lock.json','release-policy.json','.gitignore','.gitattributes','.gitmodules'}
+SCOPES={'renderer','docs','native','tools','tests','profiles','patches','LICENSES','.github'}
 SUFFIXES={'.md','.txt','.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.json','.patch','.yml','.yaml','.toml','.html','.css','.js'}
 CODE={'.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.html','.css','.js'}
 MAGIC=(b'\x7fELF',b'MZ',b'\x01ZGI',b'IGA\x1a',b'DDS ',b'\x89PNG',b'RIFF',b'PK\x03\x04',b'KB2',b'\x00PSF',b'\x4f\x15\x3d\x1d')
+# Vendored renderer dependencies keep their own license files and headers.
+VENDORED=('renderer/gpu/third_party/','renderer/third_party/')
+REVIEWED_BINARY={'renderer/gpu/third_party/fonts/DejaVuSans.ttf'} # Bitstream Vera/DejaVu font license.
+SUBMODULES={'renderer/gpu/third_party/imgui','renderer/third_party/LibAtrac9'}
 PRIVATE_KEY=re.compile(r'-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----\r?\n')
 INLINE_IMAGE=re.compile(r'data:image/[^;,\s]+;base64,[A-Za-z0-9+/=]{256,}')
 
@@ -41,6 +45,10 @@ def allowed(name,record):
     if path.is_absolute() or '..' in path.parts or '\\' in name or path.as_posix()!=name:return False
     if name in record['withheld']:return False
     if name in ROOT_FILES:return True
+    # The GPL-2.0-or-later renderer is an upstream-derived tree with its own
+    # notices; it keeps its file types, while the content checks still apply.
+    if path.parts[0]=='renderer' and len(path.parts)>1:
+        return not any(part.startswith('.') for part in path.parts) and path.suffix not in {'.sln','.vcproj','.vcxproj','.filters'}
     return bool(path.parts and path.parts[0] in SCOPES and
                 (path.suffix in SUFFIXES or path.name=='CMakeLists.txt') and
                 not any(part.startswith('.') and part!='.github' for part in path.parts))
@@ -56,6 +64,7 @@ def candidates(root,record):
         if not base.exists():continue
         for path in sorted(base.rglob('*')):
             name=path.relative_to(root).as_posix()
+            if any(name==m or name.startswith(m+'/') for m in SUBMODULES):continue
             if path.is_symlink():
                 # A link under a public scope must never silently disappear.
                 result.append(name)
@@ -77,12 +86,13 @@ def inspect(name,data,record):
     errors=[]
     if not allowed(name,record):return [name+': excluded/private/unreviewed publication path']
     if len(data)>4*1024*1024:return [name+': oversized source candidate']
+    if name in REVIEWED_BINARY:return []
     if data.startswith(MAGIC) or b'\x00' in data:return [name+': binary/game/artwork content is excluded']
     try:text=data.decode('utf-8')
     except UnicodeDecodeError:return [name+': source export accepts UTF-8 text only']
     if PRIVATE_KEY.search(text):errors.append(name+': private key material')
     if INLINE_IMAGE.search(text):errors.append(name+': embedded artwork requires review')
-    if PurePosixPath(name).suffix in CODE and 'SPDX-License-Identifier:' not in text[:1024]:
+    if PurePosixPath(name).suffix in CODE and not name.startswith(VENDORED) and 'SPDX-License-Identifier:' not in text[:1024]:
         errors.append(name+': missing source license identifier')
     if name.endswith('.json'):
         try:_inspect_json(json.loads(text),name,errors)
@@ -130,6 +140,7 @@ def git_selection(root,staged):
         if not row:continue
         info,name=row.split(b'\t',1);mode,oid,stage=info.decode().split()
         if stage!='0':raise ValueError('unmerged index entry')
+        if mode=='160000' and name.decode() in SUBMODULES:continue # Pinned upstream sources.
         entries[name.decode()]=(mode,oid)
     if staged:
         def load(name):

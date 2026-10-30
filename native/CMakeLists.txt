@@ -12,8 +12,8 @@ target_link_libraries(skylanders-native-host PRIVATE Threads::Threads)
 target_compile_features(skylanders-native-host PRIVATE cxx_std_20)
 target_compile_options(skylanders-native-host PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wconversion;-Wshadow>)
 
-set(SKY_RENDERER_ROOT "" CACHE PATH "Optional pinned private renderer/runtime source tree (GPL-2.0-or-later)")
-set(SKY_RENDERER_LIBRARY "" CACHE FILEPATH "Optional matching private renderer shared library")
+set(SKY_RENDERER_ROOT "" CACHE PATH "Optional renderer/runtime source tree, normally renderer/ (GPL-2.0-or-later)")
+set(SKY_RENDERER_LIBRARY "" CACHE FILEPATH "Optional matching renderer shared library (libskyrender.so)")
 # Deprecated aliases from before the renderer was renamed; existing build
 # directories keep working until they are reconfigured with the new names.
 foreach(alias_entry "SKY_BBPORT_ROOT;SKY_RENDERER_ROOT;PATH" "SKY_BBGPU_LIBRARY;SKY_RENDERER_LIBRARY;FILEPATH")

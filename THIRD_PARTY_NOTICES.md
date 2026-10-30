@@ -12,13 +12,13 @@ Upstream source headers and additional nested notices remain authoritative.
 | shadPS4 | GPL-2.0-or-later | Renderer/shader ancestry through bbport; upstream base recorded in `LICENSES/bbport-source.json` |
 | shadPS4 PKG/PFS extractor | GPL-2.0-or-later | Python port and entry-name table; pinned source and hashes in `LICENSES/pkg-source.json`; copyright 2024 shadPS4 Emulator Project |
 | Cemu portal and adapter | MPL-2.0 | Optional local portal implementation; exact public source pin unresolved |
+| skyrender (`renderer/`): fork of bloodborne_pc / shadPS4 | GPL-2.0-or-later | Vulkan GPU, video-out and audio library; see `renderer/NOTICE.md` |
 | LibAtrac9 | MIT | Audio codec compiled into native host |
 | Dear ImGui | MIT | In-game PC menu, with project modifications in provider patch |
 | DejaVu / Bitstream Vera / Arev | Full DejaVu notice | Embedded provider menu font; retain all supplied font notices |
 | sirit | BSD-3-Clause | SPIR-V emitter |
 | SPIRV-Headers / Vulkan-Headers | Retained Khronos notices, MIT / Apache-2.0 as applicable | Graphics build inputs |
 | AMD GCN / FidelityFX FSR1 headers | MIT notices retained | GPU definitions / shader headers |
-| FSR-Vulkan / FidelityFX SDK subset | MIT plus upstream notice | Provider upscaler code; no proprietary DLLs/model assets in source export |
 | half / cpp-httplib / robin-map / magic_enum / miniz / VMA | MIT notices retained | Renderer/build dependencies; use varies by target |
 | Zydis / Zycore | MIT | Instruction/patch tooling and renderer dependencies |
 | Xbyak | BSD-3-Clause | External dependency; target-specific use |
