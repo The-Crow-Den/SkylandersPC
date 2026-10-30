@@ -21,6 +21,11 @@ class SwapperFigureTests(unittest.TestCase):
         self.assertTrue(fc.creatable(1010, 0) and fc.creatable(2010, 0x2402))
         self.assertFalse(fc.creatable(1500, 0) or fc.creatable(2010, 0x4000))
 
+    def test_superchargers_vehicles_are_creatable_and_read_only(self):
+        self.assertEqual(fd.kind(3224), 'vehicle')
+        self.assertTrue(fc.creatable(3224, 0) and fc.creatable(3224, 0x4402))
+        self.assertFalse(fd.Figure(played(identity=3224), SEED).editable)
+
     def test_played_halves_stay_read_only(self):
         top = fd.Figure(played(identity=2010), SEED)
         self.assertEqual((top.kind, top.half), ('character', 'top'))

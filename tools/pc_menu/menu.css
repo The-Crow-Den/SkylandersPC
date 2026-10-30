@@ -40,6 +40,7 @@
 #trap-rail-demo .slot .empty { width:100%; max-width:88px; aspect-ratio:1; display:grid; place-items:center; color:#bdbdc5; background:#2c2c30; border-radius:11px; }
 #trap-rail-demo .slot .empty svg { width:30px; height:30px; }
 #trap-rail-demo .slot-name { font-size:11px; color:#c2c2cb; text-align:center; line-height:1.3; overflow-wrap:anywhere; }
+#trap-rail-demo.superchargers { --accent:#ef965d; }
 #trap-rail-demo .figure .swapper-half { display:block; width:max-content; margin:4px auto 0; padding:1px 7px; border-radius:999px; background:#2f4f66; color:#e6f6ff; font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; }
 #trap-rail-demo .small-row { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:44px; flex-wrap:wrap; }
 #trap-rail-demo .text-button { border:0; padding:11px 14px; min-height:44px; border-radius:11px; background:#303034; color:#ffffff; font-size:13px; }

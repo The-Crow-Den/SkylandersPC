@@ -33,7 +33,8 @@ def creatable(identity, variant):
     character = (identity <= 32 or 100 <= identity <= 115 or identity in (404, 416, 419, 430) or
                  450 <= identity <= 485 or 502 <= identity <= 543 or 3000 <= identity <= 3015 or
                  figure_data.swapper_half(identity) is not None)
-    return (character or figure_data.kind(identity) == 'item') and variant < 0x4000
+    # SuperChargers vehicles keep their deco variants (0x44xx), as on real figures.
+    return (character or figure_data.kind(identity) == 'item') and variant < 0x4000 or figure_data.kind(identity) == 'vehicle'
 
 
 def source_root(root):

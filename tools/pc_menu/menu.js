@@ -3,7 +3,7 @@
   'use strict';
   const root=document.getElementById('trap-rail-demo');
   const ui={view:'portal',slot:0,coop:false,page:'display',snapshot:null,dirty:false,sequence:-1};
-  const slotNames={0:'Player 1',3:'Player 2',1:'Trap',2:'Item'};
+  const slotNames={0:'Player 1',3:'Player 2',1:'Trap',2:'Item',9:'Vehicle'};
   const images=new Map();let bridge=null;let previous='';
   let selectPopup=null;
   function closeSelect(){if(selectPopup){const select=selectPopup.select;selectPopup.node.remove();selectPopup=null;select.focus({preventScroll:true});}}
@@ -31,6 +31,10 @@
   const collection=kind=>ui.snapshot?.collections?.[String(kind)]||[];
   const selected=kind=>collection(kind).find(item=>(item.state&2)!==0);
   const kind=()=>ui.slot===3?0:ui.slot;
+  // SuperChargers has a vehicle slot (collection 9) in place of Trap Team's trap slot.
+  const superchargers=()=>ui.snapshot?.title==='superchargers';
+  const slotOrder=()=>superchargers()?(ui.coop?[0,3,9,2]:[0,9,2]):(ui.coop?[0,3,1,2]:[0,1,2]);
+  const words=category=>category===2?['item','Choose an item','Search items…','Create an item','Create item']:category===9?['vehicle','Choose a vehicle','Search vehicles…','Create a vehicle','Create vehicle']:['figure','Choose a Skylander','Search Skylanders…','Create a Skylander','Create figure'];
   // Swapper halves share a player: state bit 4 marks the bottom half under the top.
   const isTop=item=>item?.detail==='Swapper top half';
   const halves=slot=>{const list=collection(slot);return {main:list.find(item=>(item.state&6)===2),bottom:list.find(item=>(item.state&4)!==0)};};
@@ -48,7 +52,7 @@
   function button(className,label){const result=document.createElement('button');result.type='button';result.className=className+' cursor-interaction';if(label)result.setAttribute('aria-label',label);return result;}
   function slots(){
     const strip=root.querySelector('.slot-strip');strip.replaceChildren();strip.classList.toggle('coop',ui.coop);
-    for(const slot of ui.coop?[0,3,1,2]:[0,1,2]){
+    for(const slot of slotOrder()){
       const item=slot===0||slot===3?halves(slot).main||halves(slot).bottom:selected(slot);const title=slotLabel(slot)||'Empty';const card=button('slot',slotNames[slot]+': '+title);card.setAttribute('aria-pressed',String(ui.slot===slot));
       let cell=item?.portrait??-1;if(slot===1&&item&&cell<0)cell=ui.snapshot?.elements?.[item.element]?.portrait??-1;
       if(cell>=0)card.append(portrait(cell));else{const empty=document.createElement('span');empty.className='empty';empty.innerHTML='<i data-lucide="orbit" aria-hidden="true"></i>';card.append(empty);}
@@ -57,7 +61,7 @@
     }
     root.querySelector('[data-coop]').textContent=ui.coop?'− Remove player 2':'+ Add player 2';
     const player=ui.slot===0||ui.slot===3;const {main,bottom}=player?halves(ui.slot):{};const swapper=player&&(isTop(main)||!!bottom);
-    root.querySelector('[data-remove]').textContent=ui.slot===1?'Eject trap':ui.slot===2?'Remove item':swapper?'Remove swapper':'Remove figure';
+    root.querySelector('[data-remove]').textContent=ui.slot===1?'Eject trap':ui.slot===2?'Remove item':ui.slot===9?'Remove vehicle':swapper?'Remove swapper':'Remove figure';
     root.querySelector('[data-remove-top]').hidden=!(swapper&&isTop(main));root.querySelector('[data-remove-bottom]').hidden=!(swapper&&bottom);
   }
   function traps(){
@@ -79,16 +83,16 @@
   }
   function figures(){
     const category=kind();const list=collection(ui.slot).filter(item=>item.name.toLowerCase().includes(search.value.trim().toLowerCase()));
-    root.querySelector('[data-collection-title]').textContent=category===2?'Choose an item':'Choose a Skylander';root.querySelector('[data-current-slot]').textContent=slotNames[ui.slot];search.placeholder=category===2?'Search items…':'Search Skylanders…';
+    const text=words(category);root.querySelector('[data-collection-title]').textContent=text[1];root.querySelector('[data-current-slot]').textContent=slotNames[ui.slot];search.placeholder=text[2];
     const grid=root.querySelector('.portrait-grid');grid.replaceChildren();
     for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=item.detail.startsWith('Swapper ')?halfName(item.name):item.name;card.append(label);
       if(item.detail.startsWith('Swapper ')){const half=document.createElement('span');half.className='swapper-half';half.textContent=isTop(item)?'Top':'Bottom';card.append(half);}
       if(item.state&2){const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);}
-      card.onclick=()=>send('portal',category===2?8:ui.slot===3?6:0,item.index);grid.append(card);}
-    if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a figure to start your collection.';grid.append(empty);}
+      card.onclick=()=>send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);grid.append(card);}
+    if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a '+text[0]+' to start your collection.';grid.append(empty);}
     const selector=root.querySelector('#trap-create-character');const saved=selector.value;selector.replaceChildren();
     for(const item of ui.snapshot?.creation||[]){if(item.kind!==category)continue;const option=document.createElement('option');option.value=String(item.index);option.textContent=item.name;selector.append(option);}if([...selector.options].some(option=>option.value===saved))selector.value=saved;
-    root.querySelector('.figure-creator h3').textContent=category===2?'Create an item':'Create a Skylander';root.querySelector('[data-add]').textContent=category===2?'Create item':'Create figure';
+    root.querySelector('.figure-creator h3').textContent=text[3];root.querySelector('label[for="trap-create-character"]').textContent=category===9?'Vehicle':category===2?'Item':'Character';root.querySelector('[data-add]').textContent=text[4];
   }
   function render(){
     const focused=document.activeElement?.getAttribute('aria-label');
@@ -114,7 +118,7 @@
     const badge=root.querySelector('[data-fps-readout]');const ms=Number(snapshot.frameTimeMs)||0;
     badge.hidden=!!snapshot.embedded||!snapshot.settings?.counter;
     badge.textContent=ms>0?`${Math.round(1000/ms)} FPS  ${ms.toFixed(1)} ms`:'— FPS';
-    if(snapshot.collections){const comparable=JSON.stringify([snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});updateHints();}
+    if(snapshot.collections){const comparable=JSON.stringify([snapshot.title,snapshot.collections,snapshot.elements,snapshot.creation,snapshot.status]);ui.snapshot=snapshot;root.classList.toggle('superchargers',superchargers());if(!slotOrder().includes(ui.slot))ui.slot=0;if(comparable!==previous){previous=comparable;ui.coop=ui.coop||!!selected(3);render();}initializeSettings(snapshot.settings||{});updateHints();}
     if(snapshot.inputSequence!==ui.sequence){ui.sequence=snapshot.inputSequence;for(const key of snapshot.keys||[])if(key>0)navigate(key);}
     if(opened)setTimeout(enterPanel,0);
   }
@@ -197,7 +201,7 @@
   root.querySelector('[data-coop]').onclick=()=>{ui.coop=!ui.coop;if(ui.coop)ui.slot=3;else{send('portal',7,0);if(ui.slot===3)ui.slot=0;}render();};
   root.querySelector('[data-remove-top]').onclick=()=>send('portal',ui.slot===3?16:15,0);
   root.querySelector('[data-remove-bottom]').onclick=()=>send('portal',ui.slot===3?14:13,0);
-  root.querySelector('[data-remove]').onclick=()=>send('portal',ui.slot===1?4:ui.slot===2?9:ui.slot===3?7:3,0);
+  root.querySelector('[data-remove]').onclick=()=>send('portal',ui.slot===9?18:ui.slot===1?4:ui.slot===2?9:ui.slot===3?7:3,0);
   root.querySelector('[data-add]').onclick=()=>{const panel=root.querySelector('.figure-creator');panel.hidden=!panel.hidden;};
   root.querySelector('[data-import]').onclick=()=>bridge?.importFigure(ui.slot===3?1:0);
   root.querySelector('[data-create-figure]').onclick=()=>{const choice=Number(root.querySelector('#trap-create-character').value);if(Number.isInteger(choice)&&choice>=0){send('portal',ui.slot===3?10:5,choice);root.querySelector('.figure-creator').hidden=true;}};

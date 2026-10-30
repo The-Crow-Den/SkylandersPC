@@ -281,6 +281,7 @@ class PortalPage(QWidget):
         figure = entry.figure
         lines = [entry.name + ('   ◉' if self.on_portal(entry) else '')]
         if figure.kind == 'item': lines.append('Magic item')
+        elif figure.kind == 'vehicle': lines.append('SuperChargers vehicle')
         elif figure.half: lines.append(f'Swapper {figure.half} half')
         elif figure.editable:
             detail = f'Level {figure.level}  ·  {figure.gold:,} gold'
@@ -312,7 +313,7 @@ class PortalPage(QWidget):
             on_portal = self.on_portal(entry)
             self.stage.show_figure(self.portraits.get(figure.identity, figure.variant), entry.name, on_portal)
             self.name.setText(entry.name)
-            kind = 'MAGIC ITEM' if figure.kind == 'item' else f'SWAPPER {figure.half.upper()} HALF' if figure.half else 'SKYLANDER'
+            kind = 'MAGIC ITEM' if figure.kind == 'item' else 'VEHICLE' if figure.kind == 'vehicle' else f'SWAPPER {figure.half.upper()} HALF' if figure.half else 'SKYLANDER'
             self.kind.setText(kind + ('  ·  CREATED' if entry.created else '  ·  IMPORTED'))
             self.place.setText('Remove from portal' if on_portal else 'Place on portal')
             self.place_hint.setText('Starts on the portal when you press Play.' if on_portal else
@@ -323,6 +324,7 @@ class PortalPage(QWidget):
             seconds = figure.seconds_played
             self.played.setText(f'{seconds // 3600} h {seconds // 60 % 60} min' if seconds else '—')
             if figure.kind == 'item': notice = 'Magic items have no level or gold to edit.'
+            elif figure.kind == 'vehicle': notice = 'Vehicles are used in the SuperChargers portal menu. Their progress is kept by the game.'
             elif figure.half: notice = 'Swapper halves are placed together: start with a top half, then add a bottom half. Their progress is kept by the game.'
             elif not figure.editable: notice = 'Not played yet. Place it on the portal in game once, then its level, gold and nickname can be edited here.'
             else: notice = ''

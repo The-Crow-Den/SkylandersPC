@@ -50,6 +50,8 @@ def kind(identity):
         return 'trap'
     if 200 <= identity <= 209 or 230 <= identity <= 233 or 300 <= identity <= 308:
         return 'item'
+    if 3220 <= identity <= 3299:
+        return 'vehicle'
     return 'character'
 
 
