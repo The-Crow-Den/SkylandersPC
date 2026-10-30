@@ -11,7 +11,7 @@ Upstream source headers and additional nested notices remain authoritative.
 | bbport / bloodborne_pc | GPL-2.0-or-later | GPU/platform and selected C runtime; source remains external |
 | shadPS4 | GPL-2.0-or-later | Renderer/shader ancestry through bbport; upstream base recorded in `LICENSES/bbport-source.json` |
 | shadPS4 PKG/PFS extractor | GPL-2.0-or-later | Python port and entry-name table; pinned source and hashes in `LICENSES/pkg-source.json`; copyright 2024 shadPS4 Emulator Project |
-| Cemu portal and adapter | MPL-2.0 | Optional local portal implementation; exact public source pin unresolved |
+| Cemu portal and adapter | MPL-2.0 | `native/third_party/cemu/`: Cemu a53cf0ece75964aa361056edab46f281dcc0bc44 subset; `Skylander.cpp`/`.h` modified |
 | skyrender (`renderer/`): fork of bloodborne_pc / shadPS4 | GPL-2.0-or-later | Vulkan GPU, video-out and audio library; see `renderer/NOTICE.md` |
 | LibAtrac9 | MIT | Audio codec compiled into native host |
 | Dear ImGui | MIT | In-game PC menu, with project modifications in provider patch |

@@ -2,36 +2,119 @@
   "schema_version": 1,
   "license": "MPL-2.0",
   "upstream": "https://github.com/cemu-project/Cemu",
-  "upstream_revision": null,
-  "status": "local sources only; public provenance unresolved",
+  "upstream_revision": "a53cf0ece75964aa361056edab46f281dcc0bc44",
+  "location": "native/third_party/cemu",
+  "status": "published in this repository; modified files are included as corresponding source",
   "files": [
     {
-      "path": "src/runtime/cemu_portal.cpp",
-      "sha256": "9b37a7accd044b4811cfd2ffcc6e67bb2b9a53669356379b5746629e23af6ca9"
+      "path": "Cemu-main/src/Cafe/HW/Espresso/PPCCallback.h",
+      "sha256": "97deaaa44a5f2ef2a1c87365e4b1b5f7719ffc942f6e2f75cf4fada21ec32537",
+      "origin": "Cemu, unmodified"
     },
     {
-      "path": "src/runtime/cemu_portal.hpp",
-      "sha256": "328ed690bf5808305f804e62e3fbbf28aa774cc5b54ed6f5d5a17347255bac35"
+      "path": "Cemu-main/src/Cafe/HW/Espresso/PPCState.h",
+      "sha256": "297304a0f803c6f2829fa7b0a8274b5d18a235d9f58dad44c400201a258df05e",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Cafe/HW/MMU/MMU.h",
+      "sha256": "0a6da9baedb9dd5290d11d06ab6158cab2583f8edeec35cc4a37d8aa9ac43eae",
+      "origin": "Cemu, unmodified"
     },
     {
       "path": "Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp",
-      "sha256": "a404e042dd57cec027fe0f5b868e988873f7989e9782cafc98e37cf57a6c7e6a"
+      "sha256": "a404e042dd57cec027fe0f5b868e988873f7989e9782cafc98e37cf57a6c7e6a",
+      "origin": "Cemu, modified"
     },
     {
       "path": "Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.h",
-      "sha256": "d4926d9ecdb0496e6edcccedea72163e16a60ae734207fff8c521b997daee8ee"
+      "sha256": "d4926d9ecdb0496e6edcccedea72163e16a60ae734207fff8c521b997daee8ee",
+      "origin": "Cemu, modified"
     },
     {
-      "path": "Cemu-main/src/Common/unix/FileStream_unix.cpp",
-      "sha256": "f3b5143987cbc835525b3660cf8381ea9f88ba7b8ccdb8c4afc992d9ffd40325"
+      "path": "Cemu-main/src/Cemu/Logging/CemuDebugLogging.h",
+      "sha256": "f9c46b34c3cc851bba2be39c94b6336906d04845ac63adf3a9c76e41b2f16d5a",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Cemu/Logging/CemuLogging.h",
+      "sha256": "8849406282f5c97bf22c34c4e7bbd47590c99b2c3c46fc908d1e964ff7629c2f",
+      "origin": "Cemu, unmodified"
     },
     {
       "path": "Cemu-main/src/Common/FileStream.h",
-      "sha256": "9f985efb587ed8fe9b43b7029f3dac9c71e07cce367ca8de85568902d8c7bb82"
+      "sha256": "9f985efb587ed8fe9b43b7029f3dac9c71e07cce367ca8de85568902d8c7bb82",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/MemPtr.h",
+      "sha256": "221f4c38f0598c2739ca6f95ad12e78a2c96e632a0da298418e7a8deddd694ab",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/StackAllocator.h",
+      "sha256": "61a4b0aec525e4dee2ea2403a28d09ce3b54e3798bf1d5749f0b8d94a31c087a",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/SysAllocator.h",
+      "sha256": "b8543cddf6199327aaa037ccaebe81086b6615c05b3dd2f12f67d8597075996c",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/betype.h",
+      "sha256": "f53618772218827dd2f131905a7d5866fd2760d83b7f162204a2c4320d5bf18f",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/enumFlags.h",
+      "sha256": "9fe410e27ad6d3bae267f180ba41899f21077115dd15ed3fa87c5d0b5b3e459e",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/platform.h",
+      "sha256": "c17b64b0f0211f19b3e17f746ebf01ab0e6bf97625538810ea0903cbafa93086",
+      "origin": "Cemu, unmodified"
     },
     {
       "path": "Cemu-main/src/Common/precompiled.h",
-      "sha256": "d4acb2c328647a64bd5e5d7c83440afaadaad596538b600da8f548ce66cce22d"
+      "sha256": "d4acb2c328647a64bd5e5d7c83440afaadaad596538b600da8f548ce66cce22d",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/unix/FileStream_unix.cpp",
+      "sha256": "f3b5143987cbc835525b3660cf8381ea9f88ba7b8ccdb8c4afc992d9ffd40325",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/unix/FileStream_unix.h",
+      "sha256": "ee6c50933a3a747f270db1145f80b2d62b62bac637da5c3957a0e145d7e89d5a",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/unix/platform.h",
+      "sha256": "405b0619a66ae5a91da9c8200281bc30948e46a7d60e1ed6daa45183a916c29c",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "Cemu-main/src/Common/version.h",
+      "sha256": "b8277fb57a2dc514f6bc16c911a22062cafd0da97425ba056b8ec3e1394ab8e7",
+      "origin": "Cemu, unmodified"
+    },
+    {
+      "path": "src/runtime/cemu_portal.cpp",
+      "sha256": "9b37a7accd044b4811cfd2ffcc6e67bb2b9a53669356379b5746629e23af6ca9",
+      "origin": "project adapter"
+    },
+    {
+      "path": "src/runtime/cemu_portal.hpp",
+      "sha256": "328ed690bf5808305f804e62e3fbbf28aa774cc5b54ed6f5d5a17347255bac35",
+      "origin": "project adapter"
+    },
+    {
+      "path": "tools/cemu_portal_core_test.cpp",
+      "sha256": "a0e939e217d68f7ef5302a1b7b58c178b9716a36e0247540849f7e70adeb6fa4",
+      "origin": "project adapter"
     }
   ]
 }

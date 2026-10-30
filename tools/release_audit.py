@@ -25,7 +25,7 @@ SUFFIXES={'.md','.txt','.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.j
 CODE={'.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.html','.css','.js'}
 MAGIC=(b'\x7fELF',b'MZ',b'\x01ZGI',b'IGA\x1a',b'DDS ',b'\x89PNG',b'RIFF',b'PK\x03\x04',b'KB2',b'\x00PSF',b'\x4f\x15\x3d\x1d')
 # Vendored renderer dependencies keep their own license files and headers.
-VENDORED=('renderer/gpu/third_party/','renderer/third_party/')
+VENDORED=('renderer/gpu/third_party/','renderer/third_party/','native/third_party/cemu/Cemu-main/')
 REVIEWED_BINARY={'renderer/gpu/third_party/fonts/DejaVuSans.ttf'} # Bitstream Vera/DejaVu font license.
 SUBMODULES={'renderer/gpu/third_party/imgui','renderer/third_party/LibAtrac9'}
 PRIVATE_KEY=re.compile(r'-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----\r?\n')

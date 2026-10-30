@@ -12,8 +12,9 @@ File-specific notices take precedence for these components:
   `tools/pkg_entry_names.json` retain the adopted
   GPL-2.0-or-later component terms. Their code may be combined under the GPL v3
   option; their upstream notices must remain intact.
-- `native/hle/portal_library_adapter.cpp` is MPL-2.0. The separately supplied Cemu
-  source remains MPL-2.0. Preserve its source notices and the MPL text when
+- `native/hle/portal_library_adapter.cpp` is MPL-2.0. The Cemu portal source in
+  `native/third_party/cemu/` (Cemu a53cf0e, with local changes to
+  `Skylander.cpp`/`Skylander.h`) remains MPL-2.0. Preserve its source notices and the MPL text when
   distributing those files or an executable containing them.
 - `LICENSES/` and `tools/licenses/` contain verbatim third-party license/notice
   documents under their respective terms, not a new project license grant.
