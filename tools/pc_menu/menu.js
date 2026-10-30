@@ -124,7 +124,7 @@
   }
   // Controller and keyboard navigation. Keys from the host: 1-4 up/down/left/right, 5 activate,
   // 6 close the overlay (Start/Select), 7 back (B), 8 left side: tab rail (LB), 9 right side: open panel (RB).
-  const tabs=()=>[...root.querySelectorAll('.rail [data-view]')];
+  const tabs=()=>[...root.querySelectorAll('.rail [data-view],.rail [data-quit]')];
   const currentTab=()=>tabs().find(node=>node.dataset.view===ui.view&&(!node.dataset.page||node.dataset.page===ui.page))||tabs()[0];
   const openPanel=()=>root.querySelector(ui.view==='portal'?'.portal-panel':'.settings-panel');
   const usable=node=>!node.disabled&&node.getClientRects().length&&!node.closest('[hidden]');
@@ -152,7 +152,7 @@
     if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});mark(node);node.scrollIntoView({block:'nearest',inline:'nearest'});
     if(!node.closest('.rail'))remembered.set(panelKey(),identity(node));
   }
-  function openTab(tab){if(!tab)return;tab.click();focus(tab);}
+  function openTab(tab){if(!tab)return;if(!tab.matches('[data-quit]'))tab.click();focus(tab);}
   function enterPanel(){
     const area=openPanel();if(!area||area.hidden){focus(currentTab());return;}
     const list=targets(area);const last=remembered.get(panelKey());const pressed=area.querySelector('[aria-pressed="true"]');
@@ -186,6 +186,7 @@
     if(!active||active===document.body||!root.contains(active)){enterPanel();return;}
     if(inRail){
       if(key===1||key===2){const list=tabs();const index=list.indexOf(active);openTab(list[Math.min(list.length-1,Math.max(0,index+(key===2?1:-1)))]);return;}
+      if(active.matches('[data-quit]')){if(key===5)active.click();return;}
       if(key===4||key===5)enterPanel();
       return;
     }
@@ -197,6 +198,9 @@
     if(key===3)focus(currentTab()); // past the panel's left edge: back to the tabs
   }
   root.querySelectorAll('[data-view]').forEach(node=>node.onclick=()=>{ui.view=node.dataset.view;if(node.dataset.page)ui.page=node.dataset.page;render();});
+  // Quit to launcher asks for a second press, so a stray A on the rail cannot end the session.
+  const quit=root.querySelector('[data-quit]');const quitLabel=quit.querySelector('.nav-label');
+  quit.onclick=()=>{if(quit.dataset.armed){send('quit');return;}quit.dataset.armed='1';quitLabel.textContent='Press again to quit';setTimeout(()=>{delete quit.dataset.armed;quitLabel.textContent='Quit to launcher';},4000);};
   root.querySelectorAll('[data-close]').forEach(node=>node.onclick=()=>{ui.view='none';render();});
   root.querySelector('[data-coop]').onclick=()=>{ui.coop=!ui.coop;if(ui.coop)ui.slot=3;else{send('portal',7,0);if(ui.slot===3)ui.slot=0;}render();};
   root.querySelector('[data-remove-top]').onclick=()=>send('portal',ui.slot===3?16:15,0);

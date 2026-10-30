@@ -411,7 +411,9 @@ class PortalPage(QWidget):
 
     def import_dump(self):
         if not self.guard(): return
-        path, _ = QFileDialog.getOpenFileName(self, 'Import a figure dump', '', 'Figure dumps (*.sky *.bin *.dump);;All files (*)')
+        try: from .launcher_files import choose_file
+        except ImportError: from launcher_files import choose_file
+        path = choose_file(self, 'Import a figure dump', ('.sky', '.bin', '.dump'))
         if not path: return
         try:
             entry = self.collection.import_dump(path)
@@ -430,7 +432,13 @@ class PortalPage(QWidget):
     def export(self):
         if not self.entry: return
         name = (self.entry.figure.nickname or self.entry.name).replace('/', '-')
-        path, _ = QFileDialog.getSaveFileName(self, 'Export figure', name + '.sky', 'Figure dumps (*.sky)')
+        try: from .launcher_files import choose_folder, controller_mode
+        except ImportError: from launcher_files import choose_folder, controller_mode
+        if controller_mode(self):  # No typing needed: pick a folder, keep the figure's name.
+            folder = choose_folder(self, 'Export figure to folder', str(Path.home() / 'Downloads'))
+            path = str(Path(folder) / (name + '.sky')) if folder else ''
+        else:
+            path, _ = QFileDialog.getSaveFileName(self, 'Export figure', name + '.sky', 'Figure dumps (*.sky)')
         if not path: return
         try:
             self.collection.export(self.entry, path)

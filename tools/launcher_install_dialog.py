@@ -110,8 +110,10 @@ class InstallDialog(QDialog):
             layout.addWidget(card)
             def browse(checked=False,key=key,field=field):
                 title = 'Choose your game file' if key == 'game_pkg' else 'Choose your update file'
-                path,_ = QFileDialog.getOpenFileName(self,title,'','Game files (*.pkg)')
-                if path:field.setText(path)
+                try:from .launcher_files import choose_file
+                except ImportError:from launcher_files import choose_file
+                path = choose_file(self,title,('.pkg',))
+                if path:field.setText(path);self.start.setFocus()
             button.clicked.connect(browse)
             field.textChanged.connect(lambda text,key=key:self.file_changed(key,text))
             if key == 'game_pkg':
@@ -206,7 +208,8 @@ class InstallDialog(QDialog):
 
     def toggle_details(self, checked):
         self.output.setVisible(checked);self.details.setText('Hide details' if checked else 'Show details')
-        self.resize(self.width(),800 if checked else max(600,self.minimumSizeHint().height()))
+        screen = self.screen().availableGeometry().height() if self.screen() else 800
+        self.resize(self.width(),min(800,screen) if checked else max(600,self.minimumSizeHint().height()))
 
     def show_games_folder(self):
         try:launcher_library.open_games_folder(self.owner.root)

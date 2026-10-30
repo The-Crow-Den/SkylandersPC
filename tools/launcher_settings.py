@@ -223,7 +223,9 @@ class SettingsPage(QWidget):
         except ImportError:
             from game_library import directory
             from launcher_library_location import LocationWorker
-        destination=QFileDialog.getExistingDirectory(self,'Choose your Games folder',str(directory(self.owner.root)))
+        try:from .launcher_files import choose_folder
+        except ImportError:from launcher_files import choose_folder
+        destination=choose_folder(self,'Choose your Games folder',str(directory(self.owner.root)))
         if not destination or str(directory(self.owner.root).resolve())==str(Path(destination).resolve()):return
         move=self.ask_move_games()
         if move is None:return
@@ -251,7 +253,9 @@ class SettingsPage(QWidget):
 
     def browse(self):
         if self.owner.process:return
-        path,_=QFileDialog.getOpenFileName(self,'Choose starting figure','','Figure dumps (*.sky *.bin *.dump)')
+        try:from .launcher_files import choose_file
+        except ImportError:from launcher_files import choose_file
+        path=choose_file(self,'Choose starting figure',('.sky','.bin','.dump'))
         if path:self.fields['figure'].setText(path)
 
     def cancel(self):
