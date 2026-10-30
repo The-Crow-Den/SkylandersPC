@@ -22,7 +22,9 @@ const std::vector<Choice>& choices() {
                 (id>=450 && id<=485) || (id>=502 && id<=543) ||
                 (id>=1000 && id<=1015) || (id>=2000 && id<=2015) || (id>=3000 && id<=3015);
             const bool item=(id>=200 && id<=209) || (id>=230 && id<=233) || (id>=300 && id<=308);
-            if((character || item) && variant<0x4000)result.push_back({id,variant,name});
+            // SuperChargers vehicles keep their variant decos (0x44xx) as real figures do.
+            const bool vehicle=id>=3220 && id<=3299;
+            if(((character || item) && variant<0x4000) || vehicle)result.push_back({id,variant,name});
         }
         std::sort(result.begin(),result.end(),[](const Choice& a,const Choice& b) {
             return std::string_view(a.name)<std::string_view(b.name);

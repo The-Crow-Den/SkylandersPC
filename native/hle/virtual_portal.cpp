@@ -35,7 +35,7 @@ std::unordered_set<void**> lists;
 std::unordered_set<libusb_transfer*> transfers;
 std::deque<libusb_transfer*> pending;
 std::vector<unsigned> figure_slots;
-unsigned trap_slot=16,item_slot=16;
+unsigned trap_slot=16,item_slot=16,vehicle_slot=16;
 std::array<unsigned,2> player_slots{16,16};
 // A Swap Force swapper is two tags on the portal at once: the top half sits in
 // the player's slot and the bottom half in its partner slot.
@@ -190,8 +190,8 @@ void remove_characters() {
 #ifdef SKY_CEMU_PORTAL
     std::lock_guard guard(mutex);
     figures_loaded=true;
-    for(auto slot:figure_slots)if(slot!=trap_slot && slot!=item_slot)trapteam::cemu_portal_remove_figure(slot);
-    std::erase_if(figure_slots,[](unsigned slot){return slot!=trap_slot && slot!=item_slot;});
+    for(auto slot:figure_slots)if(slot!=trap_slot && slot!=item_slot && slot!=vehicle_slot)trapteam::cemu_portal_remove_figure(slot);
+    std::erase_if(figure_slots,[](unsigned slot){return slot!=trap_slot && slot!=item_slot && slot!=vehicle_slot;});
     player_slots=bottom_slots={16,16};player_is_top={false,false};
 #endif
 }
@@ -259,6 +259,19 @@ void remove_swapper_half(unsigned player,bool bottom) {
     (void)player;(void)bottom;
 #endif
 }
+bool replace_vehicle(const char* path) {
+#ifdef SKY_CEMU_PORTAL
+    if(!path || !is_vehicle(figure_id(path)))return false;
+    std::lock_guard guard(mutex);return replace_managed(path,vehicle_slot);
+#else
+    (void)path;return false;
+#endif
+}
+void remove_vehicle() {
+#ifdef SKY_CEMU_PORTAL
+    std::lock_guard guard(mutex);eject(vehicle_slot);
+#endif
+}
 void remove_item() {
 #ifdef SKY_CEMU_PORTAL
     std::lock_guard guard(mutex);
@@ -284,7 +297,7 @@ void remove() {
     std::lock_guard guard(mutex);
     for(auto slot:figure_slots) trapteam::cemu_portal_remove_figure(slot);
     figure_slots.clear();
-    trap_slot=item_slot=16;player_slots=bottom_slots={16,16};player_is_top={false,false};
+    trap_slot=item_slot=vehicle_slot=16;player_slots=bottom_slots={16,16};player_is_top={false,false};
 #endif
 }
 std::uint64_t call(std::string_view identity,const std::uint64_t* a) {
@@ -405,8 +418,16 @@ std::uint64_t call(std::string_view identity,const std::uint64_t* a) {
             else t->status=LIBUSB_TRANSFER_STALL;
         }
         const auto callback=reinterpret_cast<U>(t->callback);
-        const auto delay=t->endpoint==2 && t->length==64 ? 4 : 1;
-        lock.unlock();std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+        lock.unlock();
+        if(t->endpoint==2 && t->length==64) {
+            // Pace speaker packets (32 samples = 4 ms at 8 kHz) against an absolute clock;
+            // relative sleeps plus interleaved reads ran at ~78% of real time and starved playback.
+            static auto due=std::chrono::steady_clock::now();
+            const auto now=std::chrono::steady_clock::now();
+            if(due<now-std::chrono::milliseconds(40))due=now;
+            due+=std::chrono::milliseconds(4);
+            std::this_thread::sleep_until(due);
+        } else std::this_thread::sleep_for(std::chrono::milliseconds(1));
         if(callback) {
             auto* context=GuestThreadContext::current();
             if(!context)throw std::runtime_error("USB callback outside guest thread");

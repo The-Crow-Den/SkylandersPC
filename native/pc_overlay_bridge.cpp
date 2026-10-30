@@ -37,10 +37,12 @@ std::string snapshot(unsigned long long sequence,const std::vector<int>& keys){
     std::array<int,4> geometry;{std::lock_guard lock(geometry_mutex);geometry=window_geometry;}
     std::ostringstream out;out<<"{\"version\":1,\"pid\":"<<getpid()<<",\"visible\":"<<(visible?"true":"false")<<",\"geometry\":["<<geometry[0]<<','<<geometry[1]<<','<<geometry[2]<<','<<geometry[3]<<"],\"inputSequence\":"<<sequence<<",\"keys\":[";
     for(unsigned i=0;i<keys.size();++i){if(i)out<<',';out<<keys[i];}out<<']';
+    out<<",\"title\":"<<quote(std::getenv("SKY_PORTAL_TITLE")?std::getenv("SKY_PORTAL_TITLE"):"trap-team");
     out<<",\"embedded\":"<<(embedded()?"true":"false")<<",\"events\":[";
     {std::lock_guard lock(input_mutex);for(unsigned i=0;i<desktop_input.size();++i){if(i)out<<',';out<<'['<<desktop_input[i].first<<','<<desktop_input[i].second<<']';}}out<<']';
     if(visible){out<<",\"frameTimeMs\":"<<sky_pc_frame_time()<<",\"collections\":{";
-        for(int kind=0;kind<4;++kind){if(kind)out<<',';out<<'"'<<kind<<"\":[";const int count=std::min(1024,sky_portal_count(kind));
+        // Kind 9 holds SuperChargers vehicles; the menu shows them for that title.
+        for(int kind:{0,1,2,3,9}){if(kind)out<<',';out<<'"'<<kind<<"\":[";const int count=std::min(1024,sky_portal_count(kind));
             for(int i=0;i<count;++i){if(i)out<<',';out<<"{\"index\":"<<i<<",\"name\":"<<quote(sky_portal_name(kind,i))<<",\"detail\":"<<quote(sky_portal_detail(kind,i))<<",\"state\":"<<sky_portal_state(kind,i)<<",\"portrait\":"<<sky_portal_portrait(kind,i);
                 if(kind==1)out<<",\"element\":"<<sky_portal_trap_element(i)<<",\"capture\":"<<sky_portal_trap_capture(i);out<<'}';}out<<']';}
         out<<"},\"elements\":[";
@@ -52,7 +54,7 @@ std::string snapshot(unsigned long long sequence,const std::vector<int>& keys){
 }
 void command(const std::string& data){
     std::istringstream stream(data);std::string verb;stream>>verb;
-    if(verb=="portal"){int action=-1,index=-1;if(stream>>action>>index && action>=0&&action<=16&&index>=0&&index<2048)sky_portal_action(action,index);}
+    if(verb=="portal"){int action=-1,index=-1;if(stream>>action>>index && action>=0&&action<=18&&index>=0&&index<2048)sky_portal_action(action,index);}
     else if(verb=="close")sky_portal_action(20,0);
     else if(verb=="minimize")sky_portal_action(22,0);
     else if(verb=="counter"){int n=-1;if(stream>>n)sky_pc_set_fps_counter(n);}

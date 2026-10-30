@@ -72,12 +72,16 @@ void portal_speaker(const unsigned char* bytes,std::size_t size) {
         SDL_AudioSpec spec{SDL_AUDIO_S16LE,1,8000};
         portal_audio_stream=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,nullptr,nullptr);
         if(!portal_audio_stream){std::fprintf(stderr,"Portal speaker: %s\n",SDL_GetError());return;}
-        SDL_ResumeAudioStreamDevice(portal_audio_stream);
         std::printf("Portal speaker: 8000 Hz mono PCM to PC output; default gain 30%%\n");
     }
     SDL_SetAudioStreamGain(portal_audio_stream,static_cast<float>(portal_volume.load())/100.0f);
-    if(SDL_GetAudioStreamQueued(portal_audio_stream)>3200)SDL_ClearAudioStream(portal_audio_stream);
+    // Jitter buffer: hold playback until 60 ms is queued, re-arm after an underrun, cap latency at 250 ms.
+    static bool playing=false;
+    const int queued=SDL_GetAudioStreamQueued(portal_audio_stream);
+    if(queued>4000)SDL_ClearAudioStream(portal_audio_stream);
+    if(playing && queued==0){SDL_PauseAudioStreamDevice(portal_audio_stream);playing=false;}
     SDL_PutAudioStreamData(portal_audio_stream,bytes,static_cast<int>(size));
+    if(!playing && SDL_GetAudioStreamQueued(portal_audio_stream)>=960){SDL_ResumeAudioStreamDevice(portal_audio_stream);playing=true;}
 }
 std::atomic<Uint32> portal_action_event{0};
 extern "C" int sky_portal_action(int action,int index) {
@@ -205,6 +209,8 @@ int keyboard_event(const void* raw_event, void* raw_window) {
         else if(event.user.code==5 || event.user.code==10)PortalLibrary::create_character(index,true,event.user.code==10?1:0);
         else if(event.user.code==12)PortalLibrary::select_empty_trap(index);
         else if(event.user.code==7 || event.user.code==9)PortalLibrary::remove(event.user.code==7?3:2);
+        else if(event.user.code==17)PortalLibrary::select(9,index);
+        else if(event.user.code==18)PortalLibrary::remove(9);
         else if(event.user.code>=13 && event.user.code<=16)PortalLibrary::remove(event.user.code-9); // swapper halves: 13/14 bottom, 15/16 top
         else if(event.user.code==20){if(Renderer::overlay_captures_input())Renderer::toggle_menu();}
         else if(event.user.code==21){SDL_Event quit{};quit.type=SDL_EVENT_QUIT;SDL_PushEvent(&quit);}

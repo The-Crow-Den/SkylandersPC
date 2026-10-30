@@ -23,6 +23,10 @@ bool replace_item(const char* path);
 void remove_player(unsigned player);
 void remove_swapper_half(unsigned player,bool bottom);
 void remove_item();
+// SuperChargers vehicles (tag IDs 3220-3299) sit in their own portal slot.
+constexpr bool is_vehicle(unsigned id) {return id>=3220 && id<=3299;}
+bool replace_vehicle(const char* path);
+void remove_vehicle();
 void remove_characters();
 bool create_blank(const char* path, unsigned id, unsigned variant);
 unsigned creation_count();

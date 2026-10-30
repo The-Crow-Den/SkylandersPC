@@ -20,10 +20,12 @@ namespace {
 namespace fs=std::filesystem;
 std::mutex library_mutex;
 struct Character {fs::path file;std::string name;unsigned id,variant;};
-std::vector<Character> characters,items;
+std::vector<Character> characters,items,vehicles;
 bool is_item(unsigned id) {return (id>=200 && id<=209) || (id>=230 && id<=233) || (id>=300 && id<=308);}
 fs::path root;
-int selected_character=-1,selected_second=-1,selected_item=-1,selected_trap=-1;
+int selected_character=-1,selected_second=-1,selected_item=-1,selected_trap=-1,selected_vehicle=-1;
+// Collection kind of SuperChargers vehicles; 4-7 are swapper-half removals.
+constexpr int vehicle_kind=9;
 // Bottom swapper halves paired under each player's top half (kinds 0 and 3).
 std::array<int,2> selected_bottom{-1,-1};
 VirtualPortal::SwapperHalf half_of(int index) {
@@ -53,12 +55,13 @@ void add_character(const fs::path& path) {
     if(!read_figure(path,bytes))return;
     const auto id=word(bytes,0x10),variant=word(bytes,0x1c);
     if(id>=210 && id<=220)return;
-    (is_item(id)?items:characters).push_back({path,VirtualPortal::figure_name(id,variant),id,variant});
+    (VirtualPortal::is_vehicle(id)?vehicles:is_item(id)?items:characters).push_back({path,VirtualPortal::figure_name(id,variant),id,variant});
 }
 // Mirrors the virtual portal's start-up placement of SKY_PORTAL_FIGURE and
 // SKY_PORTAL_FIGURE_BOTTOM: a bottom half is only placed under a top half.
 void mark_starting(int kind,int index) {
     if(kind==2){selected_item=index;return;}
+    if(kind==vehicle_kind){selected_vehicle=index;return;}
     if(half_of(index)!=VirtualPortal::SwapperHalf::bottom)selected_character=index;
     else if(half_of(selected_character)==VirtualPortal::SwapperHalf::top)selected_bottom[0]=index;
 }
@@ -104,7 +107,7 @@ void initialize(const char* initial,const char* initial_bottom) {
         if(fs::weakly_canonical(root,ec)!=root || ec){root.clear();feedback="Portal library path is unavailable.";return;}
         fs::create_directories(root/"characters",ec);fs::create_directories(root/"traps",ec);
         if(ec || !ready()){root.clear();feedback="Cannot open the portal library.";return;}
-        traps.clear();characters.clear();items.clear();
+        traps.clear();characters.clear();items.clear();vehicles.clear();
         for(const auto& villain:PortalCatalog::villains)traps.push_back({root/"traps"/(std::string(villain.key)+".sky"),villain.id,villain.variant,element_for(villain.id)});
         for(const auto& entry:fs::directory_iterator(root/"traps")) {
             if(!entry.path().filename().string().starts_with("element-")||traps.size()>=1024)continue;
@@ -112,7 +115,7 @@ void initialize(const char* initial,const char* initial_bottom) {
             if(element>=0)traps.push_back({entry.path(),id,word(bytes,0x1c),element});
         }
         refresh_traps(true);
-        for(const auto& entry:fs::directory_iterator(root/"characters"))if(characters.size()+items.size()<512)add_character(entry.path());
+        for(const auto& entry:fs::directory_iterator(root/"characters"))if(characters.size()+items.size()+vehicles.size()<512)add_character(entry.path());
     }
     if(initial && *initial)import_character(initial,false);
     if(initial_bottom && *initial_bottom)import_character(initial_bottom,false);
@@ -125,8 +128,8 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         std::array<unsigned char,1024> bytes{};
         if(!path || !ready() || !read_figure(path,bytes)){feedback="Choose a regular 1024-byte Skylander dump.";return false;}
         const auto id=word(bytes,0x10);
-        kind=is_item(id)?2:0;
-        auto& collection=kind==2?items:characters;
+        kind=VirtualPortal::is_vehicle(id)?vehicle_kind:is_item(id)?2:0;
+        auto& collection=kind==vehicle_kind?vehicles:kind==2?items:characters;
         if(id>=210&&id<=220){feedback="This is a trap. Use the villain collection for dedicated traps.";return false;}
         // A tag already in the collection (e.g. a created figure chosen as the
         // starting Skylander) is used in place, never imported a second time.
@@ -144,7 +147,7 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         ec.clear();fs::copy_file(path,destination,fs::copy_options::skip_existing,ec);
         if(ec){feedback="Could not import this Skylander.";return false;}
         for(unsigned i=0;i<collection.size();++i)if(collection[i].file==destination)index=static_cast<int>(i);
-        if(index<0){if(characters.size()+items.size()>=512)return false;add_character(destination);index=static_cast<int>(collection.size())-1;}
+        if(index<0){if(characters.size()+items.size()+vehicles.size()>=512)return false;add_character(destination);index=static_cast<int>(collection.size())-1;}
         if(!select_after){mark_starting(kind,index);return true;}
         }
     }
@@ -156,12 +159,12 @@ bool create_character(int choice,bool select_after,unsigned player) {
     {
         std::lock_guard lock(library_mutex);
         unsigned id=0,variant=0;
-        if(!ready() || characters.size()+items.size()>=512 || choice<0 ||
+        if(!ready() || characters.size()+items.size()+vehicles.size()>=512 || choice<0 ||
            !VirtualPortal::creation_identity(static_cast<unsigned>(choice),id,variant)) {
             feedback="Choose a supported Skylander to create.";return false;
         }
-        kind=is_item(id)?2:0;
-        auto& collection=kind==2?items:characters;
+        kind=VirtualPortal::is_vehicle(id)?vehicle_kind:is_item(id)?2:0;
+        auto& collection=kind==vehicle_kind?vehicles:kind==2?items:characters;
         auto pattern=(root/"characters/.new-XXXXXX").string();
         std::vector<char> writable(pattern.begin(),pattern.end());writable.push_back(0);
         const auto* directory=mkdtemp(writable.data());
@@ -184,6 +187,12 @@ bool select(int kind,int index) {
     const auto started=std::chrono::steady_clock::now();
     std::lock_guard lock(library_mutex);
     if(!ready()||index<0)return false;
+    if(kind==vehicle_kind) {
+        if(static_cast<unsigned>(index)>=vehicles.size())return false;
+        if(selected_vehicle==index)return true;
+        if(!VirtualPortal::replace_vehicle(vehicles[static_cast<unsigned>(index)].file.c_str())){feedback="Could not place this vehicle.";return false;}
+        selected_vehicle=index;feedback=vehicles[static_cast<unsigned>(index)].name+" placed in the vehicle slot.";return true;
+    }
     if(kind==2) {
         if(static_cast<unsigned>(index)>=items.size())return false;
         if(selected_item==index)return true;
@@ -257,11 +266,12 @@ void remove(int kind) {
         if(half_of(selected)==VirtualPortal::SwapperHalf::top){VirtualPortal::remove_swapper_half(kind-6,false);selected=-1;feedback="Top half removed. The bottom half stays on the portal.";}
     }
     if(kind==2){VirtualPortal::remove_item();selected_item=-1;feedback="Item removed. Characters and trap preserved.";}
+    if(kind==vehicle_kind){VirtualPortal::remove_vehicle();selected_vehicle=-1;feedback="Vehicle removed. Skylanders stay on the portal.";}
     if(kind==1){VirtualPortal::remove_trap();selected_trap=-1;feedback="Trap removed. Its progress is kept.";}
 }
 std::string status(){std::lock_guard lock(library_mutex);return feedback;}
 }
-extern "C" int sky_portal_count(int kind){std::lock_guard lock(library_mutex);refresh_traps();return kind==1?static_cast<int>(traps.size()):(kind==0 || kind==3)?static_cast<int>(characters.size()):kind==2?static_cast<int>(items.size()):0;}
+extern "C" int sky_portal_count(int kind){std::lock_guard lock(library_mutex);refresh_traps();return kind==1?static_cast<int>(traps.size()):(kind==0 || kind==3)?static_cast<int>(characters.size()):kind==2?static_cast<int>(items.size()):kind==vehicle_kind?static_cast<int>(vehicles.size()):0;}
 extern "C" const char* sky_portal_name(int kind,int index){
     thread_local std::string text;std::lock_guard lock(library_mutex);text.clear();
     if(index>=0&&kind==1&&static_cast<unsigned>(index)<traps.size()){
@@ -271,6 +281,7 @@ extern "C" const char* sky_portal_name(int kind,int index){
     }
     if(index>=0&&(kind==0 || kind==3)&&static_cast<unsigned>(index)<characters.size())text=characters[static_cast<unsigned>(index)].name;
     if(index>=0&&kind==2&&static_cast<unsigned>(index)<items.size())text=items[static_cast<unsigned>(index)].name;
+    if(index>=0&&kind==vehicle_kind&&static_cast<unsigned>(index)<vehicles.size())text=vehicles[static_cast<unsigned>(index)].name;
     return text.c_str();
 }
 extern "C" const char* sky_portal_detail(int kind,int index){
@@ -280,7 +291,7 @@ extern "C" const char* sky_portal_detail(int kind,int index){
         if(half==VirtualPortal::SwapperHalf::top)return "Swapper top half";
         if(half==VirtualPortal::SwapperHalf::bottom)return "Swapper bottom half";
     }
-    return kind==2?"Magic / adventure item":"Skylander";
+    return kind==2?"Magic / adventure item":kind==vehicle_kind?"Vehicle":"Skylander";
 }
 extern "C" int sky_portal_state(int kind,int index){
     std::lock_guard lock(library_mutex);
@@ -291,13 +302,14 @@ extern "C" int sky_portal_state(int kind,int index){
         return 1|(main==index?2:0)|(selected_bottom[player]==index?6:0);
     }
     if(kind==2&&static_cast<unsigned>(index)<items.size())return 1|(selected_item==index?2:0);
+    if(kind==vehicle_kind&&static_cast<unsigned>(index)<vehicles.size())return 1|(selected_vehicle==index?2:0);
     if(kind==1&&static_cast<unsigned>(index)<traps.size()&&!root.empty())return (traps[static_cast<unsigned>(index)].exists?1:0)|(selected_trap==index?2:0);
     return 0;
 }
 extern "C" int sky_portal_portrait(int kind,int index){
     std::lock_guard lock(library_mutex);
     if(kind==1&&index>=0&&static_cast<unsigned>(index)<traps.size()){const auto capture=traps[static_cast<unsigned>(index)].capture;return capture>0?TrapMetadata::portrait_by_id[static_cast<unsigned>(capture)]:-1;}
-    const auto* collection=(kind==0 || kind==3)?&characters:kind==2?&items:nullptr;
+    const auto* collection=(kind==0 || kind==3)?&characters:kind==2?&items:kind==vehicle_kind?&vehicles:nullptr;
     if(collection && index>=0 && static_cast<unsigned>(index)<collection->size()) {
         const auto& figure=(*collection)[static_cast<unsigned>(index)];
         return portrait_index().find(figure.id,figure.variant);
@@ -311,7 +323,7 @@ extern "C" const char* sky_portal_creation_name(int index){return index<0?"":Vir
 
 extern "C" int sky_portal_creation_kind(int index) {
     unsigned id=0,variant=0;
-    return index>=0 && VirtualPortal::creation_identity(static_cast<unsigned>(index),id,variant)?(is_item(id)?2:0):-1;
+    return index>=0 && VirtualPortal::creation_identity(static_cast<unsigned>(index),id,variant)?(VirtualPortal::is_vehicle(id)?vehicle_kind:is_item(id)?2:0):-1;
 }
 
 extern "C" int sky_portal_creation_portrait(int index) {

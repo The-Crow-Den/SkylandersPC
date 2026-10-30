@@ -97,18 +97,19 @@ int main() {
         check(saved[3]==0x5a && saved[4]==0xa5);
         // Use the linked Cemu factory, preserving the inserted trap and every
         // existing file. Verify the generated tag independently of its name.
-        int water=-1,top=-1,bottom=-1,other_bottom=-1;
+        int water=-1,top=-1,bottom=-1,other_bottom=-1,vehicle=-1;
         const auto creation_count=sky_portal_creation_count();
         check(creation_count>32);
         for(int i=0;i<creation_count;++i) {
             unsigned id=0,variant=0;
             check(VirtualPortal::creation_identity(static_cast<unsigned>(i),id,variant));
-            check(variant<0x4000 && !(id>=210 && id<=220) && !(id>1015 && id<2000));
+            check((variant<0x4000 || VirtualPortal::is_vehicle(id)) && !(id>=210 && id<=220) && !(id>1015 && id<2000));
             const std::string name=sky_portal_creation_name(i);
             if(name=="Gill Grunt")water=i;
             if(name=="Magna Charge (Top)")top=i;
             if(name=="Wash Buckler (Bottom)")bottom=i;
             if(name=="Free Ranger (Bottom)")other_bottom=i;
+            if(name=="Hot Streak")vehicle=i;
         }
         check(water>=0 && !PortalLibrary::create_character(-1) && !PortalLibrary::create_character(creation_count));
         const auto before_count=sky_portal_count(0);
@@ -193,6 +194,14 @@ int main() {
         check(PortalLibrary::select(0,top_index) && present_ids()==std::vector<unsigned>({211,1015,2010}));
         PortalLibrary::remove(0);check(present_ids()==std::vector<unsigned>({211}));
         check(sky_portal_state(0,top_index)==1 && sky_portal_state(0,bottom_index)==1);
+        // SuperChargers vehicles have their own collection (kind 9) and slot.
+        check(vehicle>=0 && sky_portal_creation_kind(vehicle)==9 && sky_portal_count(9)==0);
+        check(PortalLibrary::select(0,top_index) && PortalLibrary::create_character(vehicle));
+        check(sky_portal_count(9)==1 && (sky_portal_state(9,0)&2) && std::string(sky_portal_detail(9,0))=="Vehicle");
+        check(sky_portal_count(0)==other_index+1 && present_ids()==std::vector<unsigned>({211,2010,3224}));
+        check(!VirtualPortal::replace_vehicle(generated.c_str()));
+        PortalLibrary::remove(9);check(!(sky_portal_state(9,0)&2) && present_ids()==std::vector<unsigned>({211,2010}));
+        PortalLibrary::remove(0);check(present_ids()==std::vector<unsigned>({211}));
         // Element buttons reuse an empty tag, never clobber a previous capture.
         const auto trap_count=sky_portal_count(1);check(PortalLibrary::select_empty_trap(0));
         check(sky_portal_count(1)==trap_count+1);const auto empty_index=sky_portal_count(1)-1;
