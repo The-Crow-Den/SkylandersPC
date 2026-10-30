@@ -31,6 +31,12 @@
   const collection=kind=>ui.snapshot?.collections?.[String(kind)]||[];
   const selected=kind=>collection(kind).find(item=>(item.state&2)!==0);
   const kind=()=>ui.slot===3?0:ui.slot;
+  // Swapper halves share a player: state bit 4 marks the bottom half under the top.
+  const isTop=item=>item?.detail==='Swapper top half';
+  const halves=slot=>{const list=collection(slot);return {main:list.find(item=>(item.state&6)===2),bottom:list.find(item=>(item.state&4)!==0)};};
+  const halfName=name=>name.replace(/ \((Top|Bottom)\)$/,'');
+  const slotLabel=slot=>{if(slot!==0&&slot!==3)return selected(slot)?.name;const {main,bottom}=halves(slot);
+    if(bottom)return (isTop(main)?halfName(main.name):'?')+' + '+halfName(bottom.name);return isTop(main)?halfName(main.name)+' + ?':main?.name;};
   const send=(verb,...args)=>bridge?.command([verb,...args].join(' '));
   function portrait(cell){
     const image=document.createElement('img');image.alt='';
@@ -43,14 +49,16 @@
   function slots(){
     const strip=root.querySelector('.slot-strip');strip.replaceChildren();strip.classList.toggle('coop',ui.coop);
     for(const slot of ui.coop?[0,3,1,2]:[0,1,2]){
-      const item=selected(slot);const card=button('slot',slotNames[slot]+': '+(item?.name||'Empty'));card.setAttribute('aria-pressed',String(ui.slot===slot));
+      const item=slot===0||slot===3?halves(slot).main||halves(slot).bottom:selected(slot);const title=slotLabel(slot)||'Empty';const card=button('slot',slotNames[slot]+': '+title);card.setAttribute('aria-pressed',String(ui.slot===slot));
       let cell=item?.portrait??-1;if(slot===1&&item&&cell<0)cell=ui.snapshot?.elements?.[item.element]?.portrait??-1;
       if(cell>=0)card.append(portrait(cell));else{const empty=document.createElement('span');empty.className='empty';empty.innerHTML='<i data-lucide="orbit" aria-hidden="true"></i>';card.append(empty);}
-      const label=document.createElement('span');label.textContent=slotNames[slot];const name=document.createElement('span');name.className='slot-name';name.textContent=item?.name||'Empty';card.append(label,name);
+      const label=document.createElement('span');label.textContent=slotNames[slot];const name=document.createElement('span');name.className='slot-name';name.textContent=title;card.append(label,name);
       card.onclick=()=>{ui.slot=slot;search.value='';root.querySelector('.figure-creator').hidden=true;render();};strip.append(card);
     }
     root.querySelector('[data-coop]').textContent=ui.coop?'− Remove player 2':'+ Add player 2';
-    root.querySelector('[data-remove]').textContent=ui.slot===1?'Eject trap':ui.slot===2?'Remove item':'Remove figure';
+    const player=ui.slot===0||ui.slot===3;const {main,bottom}=player?halves(ui.slot):{};const swapper=player&&(isTop(main)||!!bottom);
+    root.querySelector('[data-remove]').textContent=ui.slot===1?'Eject trap':ui.slot===2?'Remove item':swapper?'Remove swapper':'Remove figure';
+    root.querySelector('[data-remove-top]').hidden=!(swapper&&isTop(main));root.querySelector('[data-remove-bottom]').hidden=!(swapper&&bottom);
   }
   function traps(){
     const elementGrid=root.querySelector('.element-grid');elementGrid.replaceChildren();
@@ -73,7 +81,8 @@
     const category=kind();const list=collection(ui.slot).filter(item=>item.name.toLowerCase().includes(search.value.trim().toLowerCase()));
     root.querySelector('[data-collection-title]').textContent=category===2?'Choose an item':'Choose a Skylander';root.querySelector('[data-current-slot]').textContent=slotNames[ui.slot];search.placeholder=category===2?'Search items…':'Search Skylanders…';
     const grid=root.querySelector('.portrait-grid');grid.replaceChildren();
-    for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=item.name;card.append(label);
+    for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=item.detail.startsWith('Swapper ')?halfName(item.name):item.name;card.append(label);
+      if(item.detail.startsWith('Swapper ')){const half=document.createElement('span');half.className='swapper-half';half.textContent=isTop(item)?'Top':'Bottom';card.append(half);}
       if(item.state&2){const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);}
       card.onclick=()=>send('portal',category===2?8:ui.slot===3?6:0,item.index);grid.append(card);}
     if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a figure to start your collection.';grid.append(empty);}
@@ -186,6 +195,8 @@
   root.querySelectorAll('[data-view]').forEach(node=>node.onclick=()=>{ui.view=node.dataset.view;if(node.dataset.page)ui.page=node.dataset.page;render();});
   root.querySelectorAll('[data-close]').forEach(node=>node.onclick=()=>{ui.view='none';render();});
   root.querySelector('[data-coop]').onclick=()=>{ui.coop=!ui.coop;if(ui.coop)ui.slot=3;else{send('portal',7,0);if(ui.slot===3)ui.slot=0;}render();};
+  root.querySelector('[data-remove-top]').onclick=()=>send('portal',ui.slot===3?16:15,0);
+  root.querySelector('[data-remove-bottom]').onclick=()=>send('portal',ui.slot===3?14:13,0);
   root.querySelector('[data-remove]').onclick=()=>send('portal',ui.slot===1?4:ui.slot===2?9:ui.slot===3?7:3,0);
   root.querySelector('[data-add]').onclick=()=>{const panel=root.querySelector('.figure-creator');panel.hidden=!panel.hidden;};
   root.querySelector('[data-import]').onclick=()=>bridge?.importFigure(ui.slot===3?1:0);
