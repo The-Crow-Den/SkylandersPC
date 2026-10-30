@@ -161,9 +161,10 @@
   function nearest(nodes,active,key){
     const rect=active.getBoundingClientRect();const x=rect.x+rect.width/2,y=rect.y+rect.height/2;let best=null,score=Infinity;
     // Sideways offset is the gap between the two spans (0 when they overlap), so a small
-    // control just below a wide one is preferred over a centred one further away.
+    // control just below a wide one is preferred over a centred one further away. Anything in
+    // line (gap 0) beats every diagonal, so left/right stays in its row however far the next item is.
     const gap=(a0,a1,b0,b1)=>Math.max(0,Math.max(a0,b0)-Math.min(a1,b1));
-    for(const node of nodes){if(node===active)continue;const r=node.getBoundingClientRect();const dx=r.x+r.width/2-x,dy=r.y+r.height/2-y;const forward=key===1?-dy:key===2?dy:key===3?-dx:dx;if(forward<4)continue;const cross=key<3?gap(rect.left,rect.right,r.left,r.right):gap(rect.top,rect.bottom,r.top,r.bottom);const candidate=forward+cross*2.5;if(candidate<score){best=node;score=candidate;}}
+    for(const node of nodes){if(node===active)continue;const r=node.getBoundingClientRect();const dx=r.x+r.width/2-x,dy=r.y+r.height/2-y;const forward=key===1?-dy:key===2?dy:key===3?-dx:dx;if(forward<4)continue;const cross=key<3?gap(rect.left,rect.right,r.left,r.right):gap(rect.top,rect.bottom,r.top,r.bottom);const candidate=(cross>0?1e6:0)+forward+cross*2.5;if(candidate<score){best=node;score=candidate;}}
     return best;
   }
   function adjust(node,step){
