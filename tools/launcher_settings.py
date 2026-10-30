@@ -265,6 +265,8 @@ class SettingsPage(QWidget):
             elif isinstance(field,QCheckBox):values[key]=field.isChecked()
             elif isinstance(field,QSlider):values[key]=field.value()
             else:values[key]=field.text()
+        # The swapper bottom half is chosen on the Portal page, not here.
+        values.setdefault('figure_bottom',self.baseline.get('figure_bottom',''))
         try:
             values=model.validate(values)
             if self.game is not None:
