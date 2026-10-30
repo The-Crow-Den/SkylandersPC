@@ -1,12 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
 project(SkylandersNativeHost LANGUAGES CXX ASM)
 
-if(NOT UNIX)
-  message(FATAL_ERROR "The initial native loader requires POSIX mmap/mprotect")
+find_package(Threads REQUIRED)
+# Host platform layer (platform/): POSIX on Linux, Win32 on Windows (MinGW).
+if(WIN32)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp)
+else()
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp)
+endif()
+if(WIN32)
+  # Windows port in progress (docs/windows-port.md): the guest entry bridge,
+  # TLS, fault handling and the file sandbox are POSIX-only so far, so only the
+  # host pieces that already have a Windows platform layer build and test here.
+  include(windows_tests.cmake)
+  return()
 endif()
 
-find_package(Threads REQUIRED)
-add_executable(skylanders-native-host main.cpp guest_runtime.cpp frame_profile.cpp thread_context.cpp gpu_backend.cpp game_hooks.cpp trap_team_hooks.cpp guest_start.S bridge_features.cpp hle/pure_libc.cpp hle/kernel_data.cpp hle/kernel_sync.cpp hle/kernel_memory.cpp hle/kernel_clock.cpp hle/user_service.cpp hle/kernel_semaphore.cpp hle/kernel_thread.cpp hle/kernel_file.cpp hle/kernel_event.cpp hle/offline_network.cpp hle/system_service.cpp hle/local_np.cpp hle/app_content.cpp hle/local_playgo.cpp hle/keyboard_pad.cpp hle/empty_usb_bus.cpp)
+add_executable(skylanders-native-host ${SKY_HOST_PLATFORM_SOURCES} main.cpp guest_runtime.cpp frame_profile.cpp thread_context.cpp gpu_backend.cpp game_hooks.cpp trap_team_hooks.cpp guest_start.S bridge_features.cpp hle/pure_libc.cpp hle/kernel_data.cpp hle/kernel_sync.cpp hle/kernel_memory.cpp hle/kernel_clock.cpp hle/user_service.cpp hle/kernel_semaphore.cpp hle/kernel_thread.cpp hle/kernel_file.cpp hle/kernel_event.cpp hle/offline_network.cpp hle/system_service.cpp hle/local_np.cpp hle/app_content.cpp hle/local_playgo.cpp hle/keyboard_pad.cpp hle/empty_usb_bus.cpp)
 target_sources(skylanders-native-host PRIVATE portal_library.cpp)
 target_link_libraries(skylanders-native-host PRIVATE Threads::Threads)
 target_compile_features(skylanders-native-host PRIVATE cxx_std_20)
@@ -110,7 +120,7 @@ if(BUILD_TESTING)
   target_compile_features(kernel-sync-test PRIVATE cxx_std_20)
   target_link_libraries(kernel-sync-test PRIVATE Threads::Threads)
   add_test(NAME native-kernel-sync COMMAND kernel-sync-test)
-  add_executable(kernel-memory-test hle/test_kernel_memory.cpp hle/kernel_memory.cpp)
+  add_executable(kernel-memory-test hle/test_kernel_memory.cpp hle/kernel_memory.cpp ${SKY_HOST_PLATFORM_SOURCES})
   target_compile_features(kernel-memory-test PRIVATE cxx_std_20)
   add_test(NAME native-kernel-memory COMMAND kernel-memory-test)
   add_executable(kernel-thread-test hle/test_kernel_thread.cpp hle/kernel_thread.cpp frame_profile.cpp thread_context.cpp guest_start.S bridge_features.cpp)
