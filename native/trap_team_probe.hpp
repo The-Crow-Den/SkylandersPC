@@ -16,15 +16,29 @@
 #include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace TrapTeamProbe {
 inline bool read(std::uintptr_t address, void* output, std::size_t size) {
+#ifdef _WIN32
+    SIZE_T copied=0;
+    return ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(address),output,size,&copied) && copied==size;
+#else
     struct Memory {
         int fd=open("/proc/self/mem",O_RDONLY|O_CLOEXEC);
         ~Memory() {if(fd>=0)close(fd);}
     };
     static Memory memory;
     return memory.fd>=0 && pread(memory.fd,output,size,static_cast<off_t>(address))==static_cast<ssize_t>(size);
+#endif
 }
 template<class T, std::size_t N>
 T field(const std::array<unsigned char,N>& data, std::size_t offset) {

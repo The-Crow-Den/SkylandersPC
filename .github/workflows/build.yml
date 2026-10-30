@@ -95,8 +95,8 @@ jobs:
           update: true
           pacboy: >-
             toolchain:p cmake:p ninja:p python:p pkgconf:p git:p sdl3:p fmt:p boost:p robin-map:p
-            zydis:p miniz:p spirv-headers:p vulkan-headers:p vulkan-loader:p glslang:p xxhash:p
-            ffmpeg:p glm:p magic-enum:p vulkan-memory-allocator:p
+            zydis:p spirv-headers:p vulkan-headers:p vulkan-loader:p glslang:p xxhash:p
+            ffmpeg:p glm:p vulkan-memory-allocator:p
       - uses: actions/checkout@v7
         with:
           submodules: recursive
