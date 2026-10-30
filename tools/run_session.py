@@ -39,6 +39,48 @@ PACKS = {'original': 'native-linked-boot-weak',
          '60-delta': 'native-linked-60-delta-experimental'}
 
 
+SESSION_TEMP = ROOT / 'out/session-temp'
+LAST_SESSION = ROOT / 'out/last-session'
+KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log')
+
+
+def latest_log(last=None):
+    """The previous session's runtime log, kept for crash reports, or None."""
+    path = Path(last or LAST_SESSION) / 'runtime.log'
+    return path if path.is_file() else None
+
+
+def finish_session(session, protected=(), last=None):
+    """Keep the session's logs as the latest, then delete the session folder.
+
+    The folder is kept if any user data (saves, figures, trophies, settings,
+    shader cache) resolves inside it; nothing persistent may live there."""
+    session = Path(session)
+    if not session.is_dir():
+        return False
+    root = session.resolve()
+    for path in protected:
+        if path and (Path(path).resolve() == root or Path(path).resolve().is_relative_to(root)):
+            print(f'Session folder kept: it contains {path}', file=sys.stderr)
+            return False
+    last = Path(last or LAST_SESSION)
+    staging = last.with_name(last.name + '.new')
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True)
+    for name in KEPT_LOGS:
+        if (session / name).is_file() and not (session / name).is_symlink():
+            shutil.copyfile(session / name, staging / name)
+    (staging / 'source').write_text(session.name + '\n')
+    old = last.with_name(last.name + '.old')
+    shutil.rmtree(old, ignore_errors=True)
+    if last.exists():
+        last.rename(old)
+    staging.rename(last)
+    shutil.rmtree(old, ignore_errors=True)
+    shutil.rmtree(session)
+    return True
+
+
 @contextmanager
 def exclusive_session(path):
     """Do not let two launched games write the same save/portal library."""
@@ -182,6 +224,15 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
 
 
 def main(argv=None):
+    sessions=[]
+    try:
+        return run(argv,sessions)
+    finally:
+        for session,protected in sessions:
+            finish_session(session,protected)
+
+
+def run(argv,sessions):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--game', help='installed TITLE_ID[@APP_VER]; defaults to launcher selection or the only title')
     parser.add_argument('--variant', choices=PACKS, default='original')
@@ -309,8 +360,11 @@ def main(argv=None):
         parser.error('figure file is missing')
     if args.figure_bottom and not args.figure_bottom.is_file():
         parser.error('bottom half figure file is missing')
-    session = ROOT / 'out/sessions' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
+    # Same filesystem as the game library: the working copy is hard-linked.
+    session = SESSION_TEMP / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     session.mkdir(parents=True)
+    protected=[preferences,ROOT/'out/ps4-saves',ROOT/'out/native-gpu-user',args.figure,args.figure_bottom,args.trophy_config]
+    sessions.append((session,protected))
     preparation_started=time.monotonic()
     preparation_phases={}
     phase_started=preparation_started
@@ -395,6 +449,8 @@ def main(argv=None):
 
     if selected_save is not None:
         env['SKY_SAVE_DATA_ROOT'] = str(selected_save)
+        protected.append(selected_save)
+    if trophy_metadata.get('available'):protected.append(trophy_metadata['store'])
     env = renderer_environment(env, args.renderer_idle)
     if args.level_events:
         try:
@@ -571,6 +627,8 @@ def main(argv=None):
         restart.append('--unlock-nightmare' if args.unlock_nightmare else '--no-unlock-nightmare')
         for name,enabled in selected_mods.items():restart.append(('--' if enabled else '--no-')+name)
         print('Restarting with saved PC settings.',flush=True)
+        # execv skips main's cleanup.
+        while sessions:finish_session(*sessions.pop())
         os.execv(sys.executable,restart)
     return 0 if result['stop_reason'] != 'process-exit' else (result['returncode'] if result['returncode'] >= 0 else 128 - result['returncode'])
 
