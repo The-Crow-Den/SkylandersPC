@@ -2,6 +2,7 @@
 out/
 game/
 games/
+!renderer/gpu/games/
 Game/
 Games/
 dumps/

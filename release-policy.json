@@ -13,11 +13,11 @@
     "LICENSES/dependencies.json",
     "LICENSES/bbport-source.json",
     "LICENSES/portal-source.json",
+    "LICENSES/bundled-components.json",
     "CONTRIBUTING.md"
   ],
   "binary_release_ready": false,
   "binary_release_blockers": [
-    "Inventory every actually bundled binary, nested dependency, optional model and driver term.",
     "Provide the exact modified corresponding source and build inputs for any executable release."
   ]
 }

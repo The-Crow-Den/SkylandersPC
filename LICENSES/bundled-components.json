@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "artifact": "Skylanders-Launcher-x86_64.AppImage",
+  "build_script": "tools/appimage/build-launcher-appimage.sh",
+  "scope": "Every executable, shared library and plugin the launcher AppImage carries, including code statically linked into them. The image bundles no native host, renderer, GPU driver, model, firmware or game data; the launcher runs those from the repository checkout, and Vulkan, glibc, X11/Wayland, fontconfig and GL/EGL come from the host system. tools/appimage/check-bundled-inventory.py fails the build when a bundled binary matches no entry below.",
+  "components": [
+    {
+      "name": "AppImage type2-runtime",
+      "version": "20251108",
+      "license": "MIT",
+      "source": "https://github.com/AppImage/type2-runtime/releases/tag/20251108",
+      "sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d",
+      "paths": ["(ELF header of the .AppImage file)"],
+      "statically_linked": [
+        {"name": "squashfuse", "version": "0.5.2", "license": "BSD-2-Clause", "source": "https://github.com/vasi/squashfuse"},
+        {"name": "libfuse", "version": "3.x", "license": "LGPL-2.1-only", "source": "https://github.com/libfuse/libfuse"},
+        {"name": "zstd", "version": "1.5.7", "license": "BSD-3-Clause OR GPL-2.0-only", "source": "https://github.com/facebook/zstd"},
+        {"name": "zlib", "license": "Zlib", "source": "https://zlib.net"},
+        {"name": "musl libc", "license": "MIT", "source": "https://musl.libc.org"}
+      ],
+      "note": "Prepended unchanged by appimagetool; corresponding source is the tagged type2-runtime release and the library releases it pins."
+    },
+    {
+      "name": "SkylandersPC AppImage entry point",
+      "license": "GPL-3.0-or-later",
+      "source": "tools/appimage/AppRun.sh",
+      "paths": ["AppRun", "org.skylanders.Launcher.desktop", "org.skylanders.Launcher.png", ".DirIcon", "usr/share/skylanders/root"]
+    },
+    {
+      "name": "CPython (python-build-standalone)",
+      "version": "3.14.10, build 20261026, cpython-3.14.10-linux-x86_64-gnu",
+      "license": "PSF-2.0",
+      "source": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261026",
+      "notice": "usr/share/licenses/CPython-LICENSE.txt",
+      "paths": ["usr/python/bin/python*", "usr/python/lib/python3.14/lib-dynload/*.so", "usr/python/lib/python3.14/**/*.py", "usr/python/lib/python3.14/ctypes/macholib/fetch_macholib"],
+      "statically_linked": [
+        {"name": "OpenSSL", "version": "3.5.9", "license": "Apache-2.0", "source": "https://www.openssl.org/source/"},
+        {"name": "SQLite", "version": "3.53.1", "license": "blessing", "source": "https://sqlite.org/download.html"},
+        {"name": "zlib", "version": "1.3.2", "license": "Zlib", "source": "https://zlib.net"},
+        {"name": "zstd", "version": "1.5.7", "license": "BSD-3-Clause OR GPL-2.0-only", "source": "https://github.com/facebook/zstd"},
+        {"name": "xz (liblzma)", "license": "0BSD", "source": "https://tukaani.org/xz/"},
+        {"name": "bzip2", "license": "bzip2-1.0.6", "source": "https://sourceware.org/bzip2/"},
+        {"name": "libffi", "license": "MIT", "source": "https://github.com/libffi/libffi"},
+        {"name": "expat", "version": "2.9.0", "license": "MIT", "source": "https://github.com/libexpat/libexpat"},
+        {"name": "mpdecimal", "license": "BSD-2-Clause", "source": "https://www.bytereef.org/mpdecimal/"},
+        {"name": "ncurses", "version": "6.5.20240427", "license": "X11", "source": "https://invisible-island.net/ncurses/"},
+        {"name": "libedit", "license": "BSD-3-Clause", "source": "https://thrysoee.dk/editline/"},
+        {"name": "libuuid (util-linux)", "license": "BSD-3-Clause", "source": "https://github.com/util-linux/util-linux"},
+        {"name": "Berkeley DB (via _dbm)", "license": "Sleepycat", "source": "https://github.com/astral-sh/python-build-standalone"},
+        {"name": "HACL* (hashlib)", "license": "MIT", "source": "https://github.com/hacl-star/hacl-star"},
+        {"name": "libb2 (BLAKE2)", "license": "CC0-1.0", "source": "https://github.com/BLAKE2/libb2"}
+      ],
+      "note": "Tk/Tcl, pip, ensurepip, headers, tests and libpython are removed by the build script. The release's PYTHON.json lists per-extension licences and exact library versions."
+    },
+    {
+      "name": "PyQt6",
+      "version": "6.11.0",
+      "license": "GPL-3.0-only",
+      "source": "https://pypi.org/project/PyQt6/6.11.0/",
+      "notice": "usr/python/lib/python3.14/site-packages/pyqt6-6.11.0.dist-info/licenses/LICENSE",
+      "paths": ["usr/python/lib/python3.14/site-packages/PyQt6/Qt*.abi3.so", "usr/python/lib/python3.14/site-packages/PyQt6/**/*.py*", "usr/python/lib/python3.14/site-packages/pyqt6-6.11.0.dist-info/**"]
+    },
+    {
+      "name": "PyQt6-sip",
+      "version": "13.13.0",
+      "license": "BSD-2-Clause",
+      "source": "https://pypi.org/project/PyQt6-sip/13.13.0/",
+      "notice": "usr/python/lib/python3.14/site-packages/pyqt6_sip-13.13.0.dist-info/licenses/LICENSE",
+      "paths": ["usr/python/lib/python3.14/site-packages/PyQt6/sip.cpython-314-x86_64-linux-gnu.so"]
+    },
+    {
+      "name": "Qt 6 (PyQt6-Qt6 wheel)",
+      "version": "6.11.2",
+      "license": "LGPL-3.0-only",
+      "source": "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/ (qtbase, qtsvg, qtwayland, qtimageformats); wheel https://pypi.org/project/PyQt6-Qt6/6.11.2/",
+      "notice": "usr/python/lib/python3.14/site-packages/pyqt6_qt6-6.11.2.dist-info/LICENSE",
+      "paths": ["usr/python/lib/python3.14/site-packages/PyQt6/Qt6/lib/libQt6*.so.6", "usr/python/lib/python3.14/site-packages/PyQt6/Qt6/plugins/**/*.so"],
+      "statically_linked": [
+        {"name": "FreeType", "license": "FTL", "source": "https://freetype.org"},
+        {"name": "HarfBuzz", "license": "MIT", "source": "https://github.com/harfbuzz/harfbuzz"},
+        {"name": "libpng", "license": "libpng-2.0", "source": "http://www.libpng.org"},
+        {"name": "libjpeg-turbo", "license": "IJG AND BSD-3-Clause", "source": "https://libjpeg-turbo.org"},
+        {"name": "PCRE2", "license": "BSD-3-Clause", "source": "https://github.com/PCRE2Project/pcre2"},
+        {"name": "double-conversion", "license": "BSD-3-Clause", "source": "https://github.com/google/double-conversion"},
+        {"name": "md4c", "license": "MIT", "source": "https://github.com/mity/md4c"},
+        {"name": "libwebp", "license": "BSD-3-Clause", "source": "https://chromium.googlesource.com/webm/libwebp"},
+        {"name": "libtiff", "license": "libtiff", "source": "https://libtiff.gitlab.io/libtiff/"},
+        {"name": "xcb-util family", "license": "MIT", "source": "https://xcb.freedesktop.org"}
+      ],
+      "note": "Exact third-party versions are listed in Qt 6.11.2's qt_attribution.json per module. The image ships Qt unmodified as replaceable shared libraries (LGPL-3.0 section 4)."
+    },
+    {
+      "name": "ICU",
+      "version": "73",
+      "license": "Unicode-3.0",
+      "source": "https://github.com/unicode-org/icu/releases/tag/release-73-2 (shipped inside the PyQt6-Qt6 wheel)",
+      "paths": ["usr/python/lib/python3.14/site-packages/PyQt6/Qt6/lib/libicu*.so.73"]
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.2",
+      "license": "Apache-2.0 OR BSD-3-Clause",
+      "source": "https://pypi.org/project/cryptography/50.0.2/",
+      "notice": "usr/python/lib/python3.14/site-packages/cryptography-50.0.2.dist-info/licenses/LICENSE",
+      "paths": ["usr/python/lib/python3.14/site-packages/cryptography/hazmat/bindings/_rust.abi3.so"],
+      "statically_linked": [
+        {"name": "OpenSSL", "license": "Apache-2.0", "source": "https://www.openssl.org/source/"},
+        {"name": "Rust crates (see Cargo.lock in the cryptography 50.0.2 sdist)", "license": "MIT OR Apache-2.0 (predominantly)", "source": "https://github.com/pyca/cryptography/blob/50.0.2/Cargo.lock"},
+        {"name": "Rust standard library", "license": "MIT OR Apache-2.0", "source": "https://github.com/rust-lang/rust"}
+      ]
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "license": "MIT-0",
+      "source": "https://pypi.org/project/cffi/2.1.1/",
+      "notice": "usr/python/lib/python3.14/site-packages/cffi-2.1.1.dist-info/licenses/LICENSE",
+      "paths": ["usr/python/lib/python3.14/site-packages/_cffi_backend.cpython-314-x86_64-linux-gnu.so"],
+      "statically_linked": [
+        {"name": "libffi", "license": "MIT", "source": "https://github.com/libffi/libffi"}
+      ]
+    },
+    {
+      "name": "pycparser",
+      "version": "3.12",
+      "license": "BSD-3-Clause",
+      "source": "https://pypi.org/project/pycparser/3.12/",
+      "notice": "usr/python/lib/python3.14/site-packages/pycparser-3.12.dist-info/licenses/LICENSE",
+      "paths": []
+    }
+  ]
+}

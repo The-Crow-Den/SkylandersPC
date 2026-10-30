@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Build the standalone launcher AppImage: a relocatable CPython plus the pinned
-# packages in requirements.txt, entered through AppRun.sh. Build needs uv, curl
-# and sha256sum; running the result needs none of them. Every download is
+# packages in requirements.txt, entered through AppRun.sh. Build needs uv, curl,
+# sha256sum and python3; running the result needs none of them. Every download is
 # pinned and hash-checked. Output and caches stay in ignored out/.
 #
 #   tools/appimage/build-launcher-appimage.sh [output.AppImage]
@@ -21,7 +21,7 @@ cache="$work/cache"
 appdir="$work/AppDir"
 output="${1:-$root/out/dist/Skylanders-Launcher-x86_64.AppImage}"
 
-for tool in uv curl sha256sum; do
+for tool in uv curl sha256sum python3; do
     command -v "$tool" >/dev/null || { echo "Building needs $tool on PATH." >&2; exit 1; }
 done
 
@@ -135,6 +135,9 @@ open(sys.argv[1], 'wb').write(png)
 EOF
 fi
 ln -sf org.skylanders.Launcher.png "$appdir/.DirIcon"
+
+# Every bundled binary must be inventoried with its licence and source.
+python3 "$here/check-bundled-inventory.py" "$appdir"
 
 ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$cache/appimagetool" --no-appstream \
     --runtime-file "$cache/runtime" "$appdir" "$output.part"

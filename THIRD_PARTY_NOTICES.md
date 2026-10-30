@@ -26,7 +26,7 @@ Upstream source headers and additional nested notices remain authoritative.
 | fmt / xxHash / X11 / Boost | MIT / BSD-2-Clause / supplied X11 notices / BSL-1.0 | System/build dependencies |
 | PyQt6 | GPL v3 or separate commercial license | Python launcher uses PyQt6, not PySide; this project uses the GPL route |
 | PyQt6-sip | BSD-2-Clause | Python binding support |
-| Qt | Module-specific GPL/LGPL/commercial and third-party terms | System GUI libraries; bundled Qt needs a separate module inventory |
+| Qt | Module-specific GPL/LGPL/commercial and third-party terms | System GUI libraries; the AppImage's bundled Qt modules, plugins and ICU are listed in `LICENSES/bundled-components.json` |
 | CPython (python-build-standalone) | PSF-2.0 and bundled-library notices | Interpreter in the optional standalone launcher AppImage only |
 | cryptography / cffi / pycparser | Apache-2.0 or BSD-3-Clause / MIT-0 / BSD-3-Clause | Python packages in the standalone launcher AppImage |
 | AppImage type-2 runtime / appimagetool | MIT | Build tool and runtime of the standalone launcher AppImage |

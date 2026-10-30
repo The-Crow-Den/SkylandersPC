@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Build the renderer and native host, run every synthetic test, and on a tag or by
+# hand package the launcher AppImage. Nothing here needs game files, keys or a GPU.
+name: Build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  # Header-only renderer dependencies Arch does not package, pinned as in LICENSES/dependencies.json.
+  VMA_COMMIT: 1d8f600fd424278486eade7ed3e877c99f0846b1
+  XBYAK_COMMIT: cd6bad3cad2e07a3e277c23d2b1f065320024717
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    # SDL3, Zydis and robin-map are packaged on Arch but not on Ubuntu's runner image.
+    container: archlinux:base-devel
+    steps:
+      - name: Build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git cmake ninja python python-cryptography python-pillow \
+            sdl3 fmt boost robin-map zydis miniz spirv-headers vulkan-headers vulkan-icd-loader \
+            glslang xxhash ffmpeg libx11 libusb openssl glm
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Header-only dependencies
+        run: |
+          fetch() {  # repository commit destination
+              git init -q "$3"
+              git -C "$3" fetch -q --depth 1 "https://github.com/$1.git" "$2"
+              git -C "$3" checkout -q FETCH_HEAD
+          }
+          fetch GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator "$VMA_COMMIT" "$RUNNER_TEMP/vma"
+          fetch herumi/xbyak "$XBYAK_COMMIT" "$RUNNER_TEMP/xbyak"
+      - name: Build renderer (libskyrender.so)
+        run: |
+          cmake -S renderer/gpu -B .local/renderer-build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DSKY_RENDERER_LTO=OFF -DSKY_RENDERER_PGO=off -DVMA_INCLUDE_DIR="$RUNNER_TEMP/vma/include" \
+            -DCMAKE_CXX_FLAGS="-isystem $RUNNER_TEMP/xbyak"
+          cmake --build .local/renderer-build --target skyrender
+      - name: Build native host
+        run: |
+          cmake -S native -B .local/native-gpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSKY_RENDERER_ROOT="$PWD/renderer" -DSKY_RENDERER_LIBRARY="$PWD/.local/renderer-build/libskyrender.so"
+          cmake --build .local/native-gpu-build
+      - name: Native tests
+        run: ctest --test-dir .local/native-gpu-build --output-on-failure
+      - name: Synthetic tooling tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python3 -m unittest discover -s tests -v
+      - name: Source and notice audit
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 tools/release_audit.py
+          python3 tools/release_audit.py --tracked
+
+  appimage:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+      - name: Build launcher AppImage
+        run: tools/appimage/build-launcher-appimage.sh "$PWD/out/dist/Skylanders-Launcher-x86_64.AppImage"
+      - name: Smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          out/dist/Skylanders-Launcher-x86_64.AppImage --appimage-extract-and-run --python -c \
+            'import cryptography.hazmat.primitives.ciphers; from PyQt6.QtWidgets import QApplication; QApplication([])'
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Skylanders-Launcher-x86_64.AppImage
+          path: out/dist/Skylanders-Launcher-x86_64.AppImage
+          if-no-files-found: error
