@@ -459,6 +459,7 @@ def renovated(base):
 
             universal = self.values()
             self.session_universal = universal
+            self.session_dir = None
             try:
                 self.apply_values({**universal, **self.game['settings']})
                 try:
@@ -484,6 +485,9 @@ def renovated(base):
 
         def read_output(self):
             super().read_output()
+            try:from .crash_report import session_directory
+            except ImportError:from crash_report import session_directory
+            self.session_dir = session_directory(getattr(self,'output_buffer','')) or getattr(self,'session_dir',None)
             if '"event":"trophy-unlocked"' in getattr(self,'last_output',''):
                 self.refresh_game() # Live trophy percentage.
             if not hasattr(self,'loading_wheel') or self.stopping or getattr(self,'runtime_started',True): return
@@ -568,6 +572,9 @@ def renovated(base):
             self.portal_page.open()
 
         def finished(self, code, status):
+            if self.process is None: return
+            from PyQt6.QtCore import QProcess
+            crashed = not self.stopping and (code != 0 or status != QProcess.ExitStatus.NormalExit)
             super().finished(code,status)
             session_status = self.status.text()
             if hasattr(self, 'session_universal'):
@@ -578,6 +585,29 @@ def renovated(base):
                 self.status.setText(session_status)
             if hasattr(self,'portal_page') and self.views.currentWidget() is self.portal_page:
                 self.portal_page.refresh()
+            if crashed: self.crash_dialog(code)
+
+        def crash_dialog(self, code):
+            try:from . import crash_report
+            except ImportError:import crash_report
+            folder = getattr(self,'session_dir',None)
+            report = crash_report.build_report(folder, code)
+            box = QMessageBox(QMessageBox.Icon.Warning, 'Game stopped unexpectedly',
+                'The game closed unexpectedly. Copy the report into a bug report; it contains no saves, figures or game files.', parent=self)
+            copy = box.addButton('Copy report', QMessageBox.ButtonRole.ActionRole)
+            logs = box.addButton('Open log folder', QMessageBox.ButtonRole.ActionRole) if folder else None
+            box.addButton(QMessageBox.StandardButton.Close)
+            box.setDetailedText(report)
+            while True:
+                box.exec()
+                if box.clickedButton() is copy:
+                    from PyQt6.QtWidgets import QApplication
+                    QApplication.clipboard().setText(report); copy.setText('Copied')
+                elif logs is not None and box.clickedButton() is logs:
+                    from PyQt6.QtCore import QUrl
+                    from PyQt6.QtGui import QDesktopServices
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+                else: break
 
         def closeEvent(self, event):
             if getattr(self,'library_transfer',False) or any(game.get('operation') for game in getattr(self,'library',{}).get('games',[])):
