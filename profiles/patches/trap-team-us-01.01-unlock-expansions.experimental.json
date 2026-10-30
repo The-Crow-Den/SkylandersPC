@@ -3,13 +3,13 @@
   "recipe_features": [
     "iga-block-alignment"
   ],
-  "revision": 5,
+  "revision": 6,
   "title_id": "CUSA00626",
   "app_version": "01.01",
   "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
   "name": "Expansion eligibility",
-  "status": "Live verified: expansion access, Academy platform, statues and original portal effect; later hub variants statically verified",
-  "behavior": "Reports expansion eligibility as true and activates Academy platform, stairs, statues and the original portal effect in all three hub variants; save setters and introduction data remain unchanged",
+  "status": "Progression-aware revision: original island introduction/deployment and saved-state checks restored in all three hubs; archive composition statically verified, live progression acceptance pending",
+  "behavior": "Unlocks all adventure packs without toys, while retaining the original Academy island introduction after Chapter 2 and its saved deployment state; platform, stairs, statues and portal effects follow the original story flow",
   "assets": [
     {
       "asset": "permanent/global.bld",
@@ -64,73 +64,6 @@
           "encoded_size": 5131,
           "properties_hex": "5d00800000",
           "alignment": 2048
-        },
-        {
-          "offset": 1370112,
-          "allocation": 6144,
-          "decoded_size": 32768,
-          "decoded_sha256": "6581fa5c331a75c64636d2039016e2f7cc6d8af8a3c6b41cbcbaf9f767bf1e70",
-          "encoding": "raw-lzma",
-          "edits": [
-            {
-              "offset": 12316,
-              "expected_hex": "38ed2c0000000000",
-              "replacement_hex": "184c520000000000"
-            },
-            {
-              "offset": 12324,
-              "expected_hex": "d05c270000000000",
-              "replacement_hex": "784c520000000000"
-            },
-            {
-              "offset": 12332,
-              "expected_hex": "90dd270000000000",
-              "replacement_hex": "004d520000000000"
-            },
-            {
-              "offset": 12340,
-              "expected_hex": "50a14e0000000000",
-              "replacement_hex": "884d520000000000"
-            },
-            {
-              "offset": 12348,
-              "expected_hex": "c8a14e0000000000",
-              "replacement_hex": "b857270000000000"
-            },
-            {
-              "offset": 12356,
-              "expected_hex": "0060270000000000",
-              "replacement_hex": "b857270000000000"
-            },
-            {
-              "offset": 12364,
-              "expected_hex": "40a24e0000000000",
-              "replacement_hex": "b857270000000000"
-            },
-            {
-              "offset": 13652,
-              "expected_hex": "184c520000000000",
-              "replacement_hex": "b857270000000000"
-            },
-            {
-              "offset": 13660,
-              "expected_hex": "784c520000000000",
-              "replacement_hex": "b857270000000000"
-            },
-            {
-              "offset": 13668,
-              "expected_hex": "004d520000000000",
-              "replacement_hex": "b857270000000000"
-            },
-            {
-              "offset": 13676,
-              "expected_hex": "884d520000000000",
-              "replacement_hex": "b857270000000000"
-            }
-          ],
-          "encoded_size": 4857,
-          "properties_hex": "5d00800000",
-          "alignment": 2048
         }
       ]
     },
@@ -159,73 +92,6 @@
           "encoded_size": 4780,
           "properties_hex": "5d00800000",
           "alignment": 2048
-        },
-        {
-          "offset": 1474560,
-          "allocation": 6144,
-          "decoded_size": 32768,
-          "decoded_sha256": "b919e2dcf7b57292bde8c54a1973278f1c434998505f64ce585d90eb04b46460",
-          "encoding": "raw-lzma",
-          "edits": [
-            {
-              "offset": 23344,
-              "expected_hex": "f0912e0000000000",
-              "replacement_hex": "e825590000000000"
-            },
-            {
-              "offset": 23352,
-              "expected_hex": "08a8290000000000",
-              "replacement_hex": "4826590000000000"
-            },
-            {
-              "offset": 23360,
-              "expected_hex": "68272a0000000000",
-              "replacement_hex": "d026590000000000"
-            },
-            {
-              "offset": 23368,
-              "expected_hex": "3882520000000000",
-              "replacement_hex": "5827590000000000"
-            },
-            {
-              "offset": 23376,
-              "expected_hex": "b082520000000000",
-              "replacement_hex": "f0a2290000000000"
-            },
-            {
-              "offset": 23384,
-              "expected_hex": "38ab290000000000",
-              "replacement_hex": "f0a2290000000000"
-            },
-            {
-              "offset": 23392,
-              "expected_hex": "2883520000000000",
-              "replacement_hex": "f0a2290000000000"
-            },
-            {
-              "offset": 24680,
-              "expected_hex": "e825590000000000",
-              "replacement_hex": "f0a2290000000000"
-            },
-            {
-              "offset": 24688,
-              "expected_hex": "4826590000000000",
-              "replacement_hex": "f0a2290000000000"
-            },
-            {
-              "offset": 24696,
-              "expected_hex": "d026590000000000",
-              "replacement_hex": "f0a2290000000000"
-            },
-            {
-              "offset": 24704,
-              "expected_hex": "5827590000000000",
-              "replacement_hex": "f0a2290000000000"
-            }
-          ],
-          "encoded_size": 4472,
-          "properties_hex": "5d00800000",
-          "alignment": 2048
         }
       ]
     },
@@ -252,73 +118,6 @@
             }
           ],
           "encoded_size": 4871,
-          "properties_hex": "5d00800000",
-          "alignment": 2048
-        },
-        {
-          "offset": 1576960,
-          "allocation": 6144,
-          "decoded_size": 32768,
-          "decoded_sha256": "e6e16281b84c5c9b0b9f441f2a063a771e0a63e70874d73c5fe08f15620a5c10",
-          "encoding": "raw-lzma",
-          "edits": [
-            {
-              "offset": 4960,
-              "expected_hex": "a056350000000000",
-              "replacement_hex": "9825560000000000"
-            },
-            {
-              "offset": 4968,
-              "expected_hex": "68992e0000000000",
-              "replacement_hex": "f825560000000000"
-            },
-            {
-              "offset": 4976,
-              "expected_hex": "d0182f0000000000",
-              "replacement_hex": "8026560000000000"
-            },
-            {
-              "offset": 4984,
-              "expected_hex": "c0b64f0000000000",
-              "replacement_hex": "0827560000000000"
-            },
-            {
-              "offset": 4992,
-              "expected_hex": "38b74f0000000000",
-              "replacement_hex": "50942e0000000000"
-            },
-            {
-              "offset": 5000,
-              "expected_hex": "989c2e0000000000",
-              "replacement_hex": "50942e0000000000"
-            },
-            {
-              "offset": 5008,
-              "expected_hex": "b0b74f0000000000",
-              "replacement_hex": "50942e0000000000"
-            },
-            {
-              "offset": 6296,
-              "expected_hex": "9825560000000000",
-              "replacement_hex": "50942e0000000000"
-            },
-            {
-              "offset": 6304,
-              "expected_hex": "f825560000000000",
-              "replacement_hex": "50942e0000000000"
-            },
-            {
-              "offset": 6312,
-              "expected_hex": "8026560000000000",
-              "replacement_hex": "50942e0000000000"
-            },
-            {
-              "offset": 6320,
-              "expected_hex": "0827560000000000",
-              "replacement_hex": "50942e0000000000"
-            }
-          ],
-          "encoded_size": 4969,
           "properties_hex": "5d00800000",
           "alignment": 2048
         }

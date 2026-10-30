@@ -111,7 +111,7 @@ class SettingsPage(QWidget):
                     ('any-portal','Any portal','Physical portal compatibility is not implemented. The virtual portal is available.'),
                     ('element-gates','No Trap Master required for gates','Open elemental gates with a matching-element Skylander. Experimental · US 01.01.'),
                     ('traptanium','No Trap Master required for Traptanium','Break Traptanium with any Skylander. Experimental · US 01.01.'),
-                    ('unlock-expansions','Unlock adventure packs','Access all four adventure packs without placing their toys on the portal. Experimental · US 01.01.'),
+                    ('unlock-expansions','Unlock adventure packs','Access all four adventure packs without toys after the island’s original introduction following Chapter 2. Experimental · US 01.01.'),
                     ('replay-expansion-intros','Replay adventure pack introductions','Play the selected pack’s introduction after confirming travel at its Academy statue. Experimental · US 01.01.')]:
                     card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
                     copy=QVBoxLayout();heading=QLabel(label);heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
