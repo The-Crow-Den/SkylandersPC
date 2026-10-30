@@ -37,6 +37,10 @@ std::deque<libusb_transfer*> pending;
 std::vector<unsigned> figure_slots;
 unsigned trap_slot=16,item_slot=16;
 std::array<unsigned,2> player_slots{16,16};
+// A Swap Force swapper is two tags on the portal at once: the top half sits in
+// the player's slot and the bottom half in its partner slot.
+std::array<unsigned,2> bottom_slots{16,16};
+std::array<bool,2> player_is_top{false,false};
 std::atomic<void(*)(const unsigned char*,std::size_t)> portal_audio{nullptr};
 struct Configuration {
     libusb_config_descriptor config{};
@@ -64,12 +68,19 @@ std::string_view name(std::string_view identity) {
     for (const auto& item : contracts) if (identity==item.identity) return item.name;
     return {};
 }
+unsigned figure_id(const char* path) {
+    std::ifstream input(path,std::ios::binary);
+    std::array<unsigned char,2> id{};input.seekg(0x10);
+    if(!input.read(reinterpret_cast<char*>(id.data()),id.size()))return 65536;
+    return id[0]|(static_cast<unsigned>(id[1])<<8);
+}
+void eject(unsigned& slot) {
+    if(slot<16){trapteam::cemu_portal_remove_figure(slot);std::erase(figure_slots,slot);slot=16;}
+}
 bool load_locked(const char* path,bool trap=false) {
     if(trap){
-        std::ifstream input(path,std::ios::binary);
-        std::array<unsigned char,2> id{};input.seekg(0x10);
-        if(!input.read(reinterpret_cast<char*>(id.data()),id.size()))return false;
-        const unsigned value=id[0]|(static_cast<unsigned>(id[1])<<8);
+        const unsigned value=figure_id(path);
+        if(value>65535)return false;
         if(value<210 || value>220){std::fprintf(stderr,"Portal: selected dump is not a Trap Team trap; character unchanged\n");return false;}
     }
     trapteam::PortalFigure figure; std::string failure;
@@ -181,7 +192,7 @@ void remove_characters() {
     figures_loaded=true;
     for(auto slot:figure_slots)if(slot!=trap_slot && slot!=item_slot)trapteam::cemu_portal_remove_figure(slot);
     std::erase_if(figure_slots,[](unsigned slot){return slot!=trap_slot && slot!=item_slot;});
-    player_slots={16,16};
+    player_slots=bottom_slots={16,16};player_is_top={false,false};
 #endif
 }
 bool replace_character(const char* path) {return replace_player(path,0);}
@@ -205,8 +216,19 @@ bool replace_managed(const char* path,unsigned& slot) {
 }
 bool replace_player(const char* path,unsigned player) {
 #ifdef SKY_CEMU_PORTAL
-    if(player>=player_slots.size())return false;
-    std::lock_guard guard(mutex);return replace_managed(path,player_slots[player]);
+    if(player>=player_slots.size() || !path)return false;
+    std::lock_guard guard(mutex);
+    const auto half=swapper_half(figure_id(path));
+    if(half==SwapperHalf::bottom) {
+        // A bottom half only pairs with a top half; a whole Skylander leaves.
+        if(!replace_managed(path,bottom_slots[player]))return false;
+        if(!player_is_top[player])eject(player_slots[player]);
+        return true;
+    }
+    if(!replace_managed(path,player_slots[player]))return false;
+    player_is_top[player]=half==SwapperHalf::top;
+    if(!player_is_top[player])eject(bottom_slots[player]);
+    return true;
 #else
     (void)path;(void)player;return false;
 #endif
@@ -222,10 +244,19 @@ void remove_player(unsigned player) {
 #ifdef SKY_CEMU_PORTAL
     if(player>=player_slots.size())return;
     std::lock_guard guard(mutex);
-    auto& slot=player_slots[player];
-    if(slot<16){trapteam::cemu_portal_remove_figure(slot);std::erase(figure_slots,slot);slot=16;}
+    eject(player_slots[player]);eject(bottom_slots[player]);player_is_top[player]=false;
 #else
     (void)player;
+#endif
+}
+void remove_swapper_half(unsigned player,bool bottom) {
+#ifdef SKY_CEMU_PORTAL
+    if(player>=player_slots.size())return;
+    std::lock_guard guard(mutex);
+    if(bottom)eject(bottom_slots[player]);
+    else if(player_is_top[player]){eject(player_slots[player]);player_is_top[player]=false;}
+#else
+    (void)player;(void)bottom;
 #endif
 }
 void remove_item() {
@@ -253,7 +284,7 @@ void remove() {
     std::lock_guard guard(mutex);
     for(auto slot:figure_slots) trapteam::cemu_portal_remove_figure(slot);
     figure_slots.clear();
-    trap_slot=item_slot=16;player_slots={16,16};
+    trap_slot=item_slot=16;player_slots=bottom_slots={16,16};player_is_top={false,false};
 #endif
 }
 std::uint64_t call(std::string_view identity,const std::uint64_t* a) {
@@ -265,10 +296,16 @@ std::uint64_t call(std::string_view identity,const std::uint64_t* a) {
         initialized=true;
         if (!figures_loaded) {
             figures_loaded=true;
-            for(const auto* key:{"SKY_PORTAL_FIGURE","SKY_PORTAL_TRAP"})
+            for(const auto* key:{"SKY_PORTAL_FIGURE","SKY_PORTAL_FIGURE_BOTTOM","SKY_PORTAL_TRAP"})
                 if (const auto* path=std::getenv(key);path && *path) {
-                    const bool trap=std::strcmp(key,"SKY_PORTAL_TRAP")==0;
-                    if(load_locked(path,trap) && !trap)player_slots[0]=figure_slots.back();
+                    const bool trap=std::strcmp(key,"SKY_PORTAL_TRAP")==0,bottom=std::strcmp(key,"SKY_PORTAL_FIGURE_BOTTOM")==0;
+                    const auto half=swapper_half(figure_id(path));
+                    // The starting bottom half is only placed under a starting top half.
+                    if(bottom && (half!=SwapperHalf::bottom || !player_is_top[0]))continue;
+                    if(!bottom && !trap && half==SwapperHalf::bottom)continue;
+                    if(!load_locked(path,trap) || trap)continue;
+                    (bottom?bottom_slots:player_slots)[0]=figure_slots.back();
+                    if(!bottom)player_is_top[0]=half==SwapperHalf::top;
                 }
         }
         std::printf("Virtual portal: Cemu protocol enabled\n"); return 0;

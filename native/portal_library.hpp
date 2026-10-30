@@ -2,7 +2,7 @@
 #pragma once
 #include <string>
 namespace PortalLibrary {
-void initialize(const char* initial);
+void initialize(const char* initial,const char* initial_bottom=nullptr);
 bool import_character(const char* path, bool select,unsigned player=0);
 bool create_character(int index,bool select_after=true,unsigned player=0);
 bool select(int kind,int index);

@@ -97,14 +97,18 @@ int main() {
         check(saved[3]==0x5a && saved[4]==0xa5);
         // Use the linked Cemu factory, preserving the inserted trap and every
         // existing file. Verify the generated tag independently of its name.
-        int water=-1;
+        int water=-1,top=-1,bottom=-1,other_bottom=-1;
         const auto creation_count=sky_portal_creation_count();
         check(creation_count>32);
         for(int i=0;i<creation_count;++i) {
             unsigned id=0,variant=0;
             check(VirtualPortal::creation_identity(static_cast<unsigned>(i),id,variant));
-            check(variant<0x4000 && !(id>=210 && id<=220) && !(id>=1000 && id<=2015));
-            if(std::string(sky_portal_creation_name(i))=="Gill Grunt")water=i;
+            check(variant<0x4000 && !(id>=210 && id<=220) && !(id>1015 && id<2000));
+            const std::string name=sky_portal_creation_name(i);
+            if(name=="Gill Grunt")water=i;
+            if(name=="Magna Charge (Top)")top=i;
+            if(name=="Wash Buckler (Bottom)")bottom=i;
+            if(name=="Free Ranger (Bottom)")other_bottom=i;
         }
         check(water>=0 && !PortalLibrary::create_character(-1) && !PortalLibrary::create_character(creation_count));
         const auto before_count=sky_portal_count(0);
@@ -165,6 +169,30 @@ int main() {
         check(present_ids()==std::vector<unsigned>({14,202,211}));
         PortalLibrary::remove(3);check(present_ids()==std::vector<unsigned>({202,211}));
         PortalLibrary::remove(2);check(present_ids()==std::vector<unsigned>({211}));
+        // Swappers: a top and a bottom half from different Skylanders share a
+        // player and are both reported; either half can be changed on its own.
+        check(top>=0 && bottom>=0 && other_bottom>=0 && sky_portal_creation_kind(top)==0);
+        check(PortalLibrary::create_character(top));const auto top_index=sky_portal_count(0)-1;
+        check(std::string(sky_portal_detail(0,top_index))=="Swapper top half");
+        check(PortalLibrary::create_character(bottom));const auto bottom_index=sky_portal_count(0)-1;
+        check(std::string(sky_portal_detail(0,bottom_index))=="Swapper bottom half");
+        check((sky_portal_state(0,top_index)&6)==2 && (sky_portal_state(0,bottom_index)&6)==6);
+        check(present_ids()==std::vector<unsigned>({211,1015,2010}));
+        check(PortalLibrary::create_character(other_bottom));const auto other_index=sky_portal_count(0)-1;
+        check(!(sky_portal_state(0,bottom_index)&2) && (sky_portal_state(0,top_index)&2));
+        check(present_ids()==std::vector<unsigned>({211,1001,2010}));
+        check(!PortalLibrary::select(3,other_index) && !PortalLibrary::select(3,top_index));
+        PortalLibrary::remove(6);check(present_ids()==std::vector<unsigned>({211,1001}));
+        check(PortalLibrary::select(0,top_index) && present_ids()==std::vector<unsigned>({211,1001,2010}));
+        PortalLibrary::remove(4);check(present_ids()==std::vector<unsigned>({211,2010}));
+        check(PortalLibrary::select(0,bottom_index) && present_ids()==std::vector<unsigned>({211,1015,2010}));
+        // A whole Skylander replaces both halves; a bottom half replaces a whole Skylander.
+        check(PortalLibrary::select(0,before_count) && present_ids()==std::vector<unsigned>({14,211}));
+        check(!(sky_portal_state(0,top_index)&2) && !(sky_portal_state(0,bottom_index)&2));
+        check(PortalLibrary::select(0,bottom_index) && present_ids()==std::vector<unsigned>({211,1015}));
+        check(PortalLibrary::select(0,top_index) && present_ids()==std::vector<unsigned>({211,1015,2010}));
+        PortalLibrary::remove(0);check(present_ids()==std::vector<unsigned>({211}));
+        check(sky_portal_state(0,top_index)==1 && sky_portal_state(0,bottom_index)==1);
         // Element buttons reuse an empty tag, never clobber a previous capture.
         const auto trap_count=sky_portal_count(1);check(PortalLibrary::select_empty_trap(0));
         check(sky_portal_count(1)==trap_count+1);const auto empty_index=sky_portal_count(1)-1;
@@ -200,6 +228,6 @@ int main() {
         check(call("L0EHgZZNVas",{ptr(audio)})==0);check(call("EkqGLxWC-S0")==0);
         check(audio->status==LIBUSB_TRANSFER_COMPLETED&&audio->actual_length==64&&speaker_bytes==64);
         check(call("-sgi7EeLSO8",{ptr(audio)})==0);
-        std::cout<<"Portal ownership, independent trap progress, and PCM routing passed\n";
+        std::cout<<"Portal ownership, swapper pairing, independent trap progress, and PCM routing passed\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

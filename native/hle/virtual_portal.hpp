@@ -5,6 +5,11 @@
 #include <string_view>
 #include <string>
 namespace VirtualPortal {
+// Swap Force halves: bottoms are tag IDs 1000-1015, tops 2000-2015.
+enum class SwapperHalf { none, top, bottom };
+constexpr SwapperHalf swapper_half(unsigned id) {
+    return id>=1000 && id<=1015 ? SwapperHalf::bottom : id>=2000 && id<=2015 ? SwapperHalf::top : SwapperHalf::none;
+}
 bool enabled();
 void bind_audio(void(*sink)(const unsigned char*,std::size_t));
 bool supports(std::string_view identity);
@@ -16,6 +21,7 @@ bool replace_character(const char* path);
 bool replace_player(const char* path,unsigned player);
 bool replace_item(const char* path);
 void remove_player(unsigned player);
+void remove_swapper_half(unsigned player,bool bottom);
 void remove_item();
 void remove_characters();
 bool create_blank(const char* path, unsigned id, unsigned variant);

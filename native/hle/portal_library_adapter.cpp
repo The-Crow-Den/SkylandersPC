@@ -14,13 +14,13 @@ const std::vector<Choice>& choices() {
         std::vector<Choice> result;
         for(const auto& [identity,name]:nsyshid::g_skyportal.GetListSkylanders()) {
             const auto [id,variant]=identity;
-            // Single-tag characters plus magic/adventure items through Trap Team.
-            // Traps have a separate collection; swappable halves and vehicles
-            // require additional placement support.
+            // Characters, Swap Force swapper halves (bottoms 1000-1015, tops
+            // 2000-2015) and magic/adventure items through Trap Team. Traps have
+            // a separate collection; vehicles require additional placement support.
             const bool character=id<=32 || (id>=100 && id<=115) ||
                 id==404 || id==416 || id==419 || id==430 ||
                 (id>=450 && id<=485) || (id>=502 && id<=543) ||
-                (id>=3000 && id<=3015);
+                (id>=1000 && id<=1015) || (id>=2000 && id<=2015) || (id>=3000 && id<=3015);
             const bool item=(id>=200 && id<=209) || (id>=230 && id<=233) || (id>=300 && id<=308);
             if((character || item) && variant<0x4000)result.push_back({id,variant,name});
         }

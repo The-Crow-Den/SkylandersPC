@@ -205,6 +205,7 @@ int keyboard_event(const void* raw_event, void* raw_window) {
         else if(event.user.code==5 || event.user.code==10)PortalLibrary::create_character(index,true,event.user.code==10?1:0);
         else if(event.user.code==12)PortalLibrary::select_empty_trap(index);
         else if(event.user.code==7 || event.user.code==9)PortalLibrary::remove(event.user.code==7?3:2);
+        else if(event.user.code>=13 && event.user.code<=16)PortalLibrary::remove(event.user.code-9); // swapper halves: 13/14 bottom, 15/16 top
         else if(event.user.code==20){if(Renderer::overlay_captures_input())Renderer::toggle_menu();}
         else if(event.user.code==21){SDL_Event quit{};quit.type=SDL_EVENT_QUIT;SDL_PushEvent(&quit);}
         else if(event.user.code==22)minimize_game_window(static_cast<SDL_Window*>(raw_window));
@@ -402,7 +403,7 @@ void note_cpu_write(std::uint64_t address, std::uint64_t size) {
 void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attributes) {
 #ifdef SKY_RENDERER
     game_serial = serial; sdk_version = sdk; psf_attributes = attributes;
-    PortalLibrary::initialize(std::getenv("SKY_PORTAL_FIGURE"));
+    PortalLibrary::initialize(std::getenv("SKY_PORTAL_FIGURE"),std::getenv("SKY_PORTAL_FIGURE_BOTTOM"));
     VirtualPortal::bind_audio(&portal_speaker);
     if(const auto* volume=std::getenv("SKY_PORTAL_VOLUME"))portal_volume=std::clamp(std::atoi(volume),0,100);
     // SKY_GPU_USER_DIR selects another settings/pipeline-cache directory,

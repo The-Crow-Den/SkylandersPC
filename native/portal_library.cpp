@@ -24,6 +24,11 @@ std::vector<Character> characters,items;
 bool is_item(unsigned id) {return (id>=200 && id<=209) || (id>=230 && id<=233) || (id>=300 && id<=308);}
 fs::path root;
 int selected_character=-1,selected_second=-1,selected_item=-1,selected_trap=-1;
+// Bottom swapper halves paired under each player's top half (kinds 0 and 3).
+std::array<int,2> selected_bottom{-1,-1};
+VirtualPortal::SwapperHalf half_of(int index) {
+    return index>=0 && static_cast<unsigned>(index)<characters.size()?VirtualPortal::swapper_half(characters[static_cast<unsigned>(index)].id):VirtualPortal::SwapperHalf::none;
+}
 struct Trap {fs::path file;unsigned id,variant;int element,capture=-1;bool exists=false;std::array<unsigned char,1024> snapshot{};bool cached=false;};
 std::vector<Trap> traps;
 struct Element {const char* name;unsigned id,variant;};
@@ -49,6 +54,13 @@ void add_character(const fs::path& path) {
     const auto id=word(bytes,0x10),variant=word(bytes,0x1c);
     if(id>=210 && id<=220)return;
     (is_item(id)?items:characters).push_back({path,VirtualPortal::figure_name(id,variant),id,variant});
+}
+// Mirrors the virtual portal's start-up placement of SKY_PORTAL_FIGURE and
+// SKY_PORTAL_FIGURE_BOTTOM: a bottom half is only placed under a top half.
+void mark_starting(int kind,int index) {
+    if(kind==2){selected_item=index;return;}
+    if(half_of(index)!=VirtualPortal::SwapperHalf::bottom)selected_character=index;
+    else if(half_of(selected_character)==VirtualPortal::SwapperHalf::top)selected_bottom[0]=index;
 }
 fs::path trap_path(int index) {return traps[static_cast<unsigned>(index)].file;}
 // The Cemu safety adapter preserves writes in a content-addressed private
@@ -84,7 +96,7 @@ bool ready() {
 }
 }
 namespace PortalLibrary {
-void initialize(const char* initial) {
+void initialize(const char* initial,const char* initial_bottom) {
     {
         std::lock_guard lock(library_mutex);
         root=fs::current_path()/"out/portal-library";
@@ -103,6 +115,7 @@ void initialize(const char* initial) {
         for(const auto& entry:fs::directory_iterator(root/"characters"))if(characters.size()+items.size()<512)add_character(entry.path());
     }
     if(initial && *initial)import_character(initial,false);
+    if(initial_bottom && *initial_bottom)import_character(initial_bottom,false);
 }
 bool import_character(const char* path,bool select_after,unsigned player) {
     if(player>=2)return false;
@@ -120,7 +133,7 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         std::error_code source_error;const auto source=fs::weakly_canonical(path,source_error);
         if(!source_error&&source.parent_path()==root/"characters")
             for(unsigned i=0;i<collection.size();++i)if(collection[i].file==source)index=static_cast<int>(i);
-        if(index>=0){if(!select_after){(kind==2?selected_item:selected_character)=index;return true;}}
+        if(index>=0){if(!select_after){mark_starting(kind,index);return true;}}
         else {
         std::uint64_t hash=14695981039346656037ull;
         for(auto b:bytes){hash^=b;hash*=1099511628211ull;}
@@ -132,7 +145,7 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         if(ec){feedback="Could not import this Skylander.";return false;}
         for(unsigned i=0;i<collection.size();++i)if(collection[i].file==destination)index=static_cast<int>(i);
         if(index<0){if(characters.size()+items.size()>=512)return false;add_character(destination);index=static_cast<int>(collection.size())-1;}
-        if(!select_after){(kind==2?selected_item:selected_character)=index;return true;}
+        if(!select_after){mark_starting(kind,index);return true;}
         }
     }
     return select(kind==0 && player==1?3:kind,index);
@@ -179,12 +192,26 @@ bool select(int kind,int index) {
     }
     if(kind==0 || kind==3) {
         if(static_cast<unsigned>(index)>=characters.size())return false;
-        auto& selected=kind==3?selected_second:selected_character;
-        const auto other=kind==3?selected_character:selected_second;
-        if(other==index){feedback="This figure is already placed for the other player. Create another copy to use two of the same Skylander.";return false;}
-        if(selected==index){feedback=characters[static_cast<unsigned>(index)].name+" is on the portal.";return true;}
-        if(!VirtualPortal::replace_player(characters[static_cast<unsigned>(index)].file.c_str(),kind==3?1:0)){feedback="Could not place this Skylander.";return false;}
-        selected=index;feedback=characters[static_cast<unsigned>(index)].name+" placed on the portal.";return true;
+        const unsigned player=kind==3?1:0;
+        auto& selected=player?selected_second:selected_character;
+        auto& bottom=selected_bottom[player];
+        const auto other=player?selected_character:selected_second;
+        if(other==index || selected_bottom[1-player]==index){feedback="This figure is already placed for the other player. Create another copy to use two of the same Skylander.";return false;}
+        const auto half=half_of(index);
+        if(selected==index || bottom==index){feedback=characters[static_cast<unsigned>(index)].name+" is on the portal.";return true;}
+        if(!VirtualPortal::replace_player(characters[static_cast<unsigned>(index)].file.c_str(),player)){feedback="Could not place this Skylander.";return false;}
+        const auto& name=characters[static_cast<unsigned>(index)].name;
+        if(half==VirtualPortal::SwapperHalf::bottom) {
+            bottom=index;
+            if(half_of(selected)!=VirtualPortal::SwapperHalf::top)selected=-1;
+            feedback=selected<0?name+" placed. Add a top half to complete the swapper.":characters[static_cast<unsigned>(selected)].name+" + "+name+" swapped together.";
+            return true;
+        }
+        selected=index;
+        if(half==VirtualPortal::SwapperHalf::none)bottom=-1;
+        feedback=half==VirtualPortal::SwapperHalf::top && bottom>=0?name+" + "+characters[static_cast<unsigned>(bottom)].name+" swapped together.":
+            half==VirtualPortal::SwapperHalf::top?name+" placed. Add a bottom half to complete the swapper.":name+" placed on the portal.";
+        return true;
     }
     if(kind!=1 || static_cast<unsigned>(index)>=traps.size())return false;
     auto& trap=traps[static_cast<unsigned>(index)];
@@ -222,7 +249,13 @@ bool select_empty_trap(int element) {
 }
 void remove(int kind) {
     std::lock_guard lock(library_mutex);
-    if(kind==0 || kind==3){VirtualPortal::remove_player(kind==3?1:0);(kind==3?selected_second:selected_character)=-1;feedback="Skylander removed. Other portal slots preserved.";}
+    if(kind==0 || kind==3){VirtualPortal::remove_player(kind==3?1:0);(kind==3?selected_second:selected_character)=-1;selected_bottom[kind==3?1:0]=-1;feedback="Skylander removed. Other portal slots preserved.";}
+    // Kinds 4/5 lift only a player's bottom swapper half, 6/7 only its top half.
+    if(kind==4 || kind==5){VirtualPortal::remove_swapper_half(kind-4,true);selected_bottom[static_cast<unsigned>(kind-4)]=-1;feedback="Bottom half removed. The top half stays on the portal.";}
+    if(kind==6 || kind==7) {
+        auto& selected=kind==7?selected_second:selected_character;
+        if(half_of(selected)==VirtualPortal::SwapperHalf::top){VirtualPortal::remove_swapper_half(kind-6,false);selected=-1;feedback="Top half removed. The bottom half stays on the portal.";}
+    }
     if(kind==2){VirtualPortal::remove_item();selected_item=-1;feedback="Item removed. Characters and trap preserved.";}
     if(kind==1){VirtualPortal::remove_trap();selected_trap=-1;feedback="Trap removed. Its progress is kept.";}
 }
@@ -242,13 +275,21 @@ extern "C" const char* sky_portal_name(int kind,int index){
 }
 extern "C" const char* sky_portal_detail(int kind,int index){
     std::lock_guard lock(library_mutex);if(kind==1&&index>=0&&static_cast<unsigned>(index)<traps.size())return elements[static_cast<unsigned>(traps[static_cast<unsigned>(index)].element)].name;
+    if((kind==0 || kind==3)&&index>=0) {
+        const auto half=half_of(index);
+        if(half==VirtualPortal::SwapperHalf::top)return "Swapper top half";
+        if(half==VirtualPortal::SwapperHalf::bottom)return "Swapper bottom half";
+    }
     return kind==2?"Magic / adventure item":"Skylander";
 }
 extern "C" int sky_portal_state(int kind,int index){
     std::lock_guard lock(library_mutex);
     if(index<0)return 0;
-    if(kind==0&&static_cast<unsigned>(index)<characters.size())return 1|(selected_character==index?2:0);
-    if(kind==3&&static_cast<unsigned>(index)<characters.size())return 1|(selected_second==index?2:0);
+    // Bit 2: placed for this player; bit 4: placed as its bottom swapper half.
+    if((kind==0 || kind==3)&&static_cast<unsigned>(index)<characters.size()) {
+        const auto player=kind==3?1u:0u;const auto main=player?selected_second:selected_character;
+        return 1|(main==index?2:0)|(selected_bottom[player]==index?6:0);
+    }
     if(kind==2&&static_cast<unsigned>(index)<items.size())return 1|(selected_item==index?2:0);
     if(kind==1&&static_cast<unsigned>(index)<traps.size()&&!root.empty())return (traps[static_cast<unsigned>(index)].exists?1:0)|(selected_trap==index?2:0);
     return 0;

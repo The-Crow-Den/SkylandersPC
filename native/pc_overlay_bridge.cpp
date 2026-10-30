@@ -52,7 +52,7 @@ std::string snapshot(unsigned long long sequence,const std::vector<int>& keys){
 }
 void command(const std::string& data){
     std::istringstream stream(data);std::string verb;stream>>verb;
-    if(verb=="portal"){int action=-1,index=-1;if(stream>>action>>index && action>=0&&action<=12&&index>=0&&index<2048)sky_portal_action(action,index);}
+    if(verb=="portal"){int action=-1,index=-1;if(stream>>action>>index && action>=0&&action<=16&&index>=0&&index<2048)sky_portal_action(action,index);}
     else if(verb=="close")sky_portal_action(20,0);
     else if(verb=="minimize")sky_portal_action(22,0);
     else if(verb=="counter"){int n=-1;if(stream>>n)sky_pc_set_fps_counter(n);}
