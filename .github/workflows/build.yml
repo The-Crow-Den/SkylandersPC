@@ -59,6 +59,60 @@ jobs:
           python3 tools/release_audit.py
           python3 tools/release_audit.py --tracked
 
+  # Windows port (docs/windows-port.md): MinGW under MSYS2 CLANG64, the toolchain the renderer's
+  # platform/win32 layer targets. The native host builds its portable pieces and their tests so far.
+  windows-native:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          pacboy: >-
+            toolchain:p cmake:p ninja:p python:p openssl:p
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build native host (portable subset)
+        run: |
+          cmake -S native -B .local/native-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build .local/native-build
+      - name: Native tests
+        run: ctest --test-dir .local/native-build --output-on-failure
+
+  windows-renderer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          pacboy: >-
+            toolchain:p cmake:p ninja:p python:p pkgconf:p git:p sdl3:p fmt:p boost:p robin-map:p
+            zydis:p miniz:p spirv-headers:p vulkan-headers:p vulkan-loader:p glslang:p xxhash:p
+            ffmpeg:p glm:p magic-enum:p vulkan-memory-allocator:p
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Header-only dependencies
+        run: |
+          git init -q "$RUNNER_TEMP/xbyak"
+          git -C "$RUNNER_TEMP/xbyak" fetch -q --depth 1 https://github.com/herumi/xbyak.git "$XBYAK_COMMIT"
+          git -C "$RUNNER_TEMP/xbyak" checkout -q FETCH_HEAD
+      - name: Build renderer (static skyrender)
+        run: |
+          xbyak="$(cygpath -m "$RUNNER_TEMP/xbyak")"
+          cmake -S renderer/gpu -B .local/renderer-build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DSKY_RENDERER_LTO=OFF -DSKY_RENDERER_PGO=off -DCMAKE_CXX_FLAGS="-isystem $xbyak"
+          cmake --build .local/renderer-build --target skyrender
+
   appimage:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
