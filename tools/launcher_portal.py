@@ -270,16 +270,24 @@ class PortalPage(QWidget):
         value = self.owner.library.get('portal')
         return Path(value) if value else None
 
+    def starting_bottom(self):
+        value = self.owner.library.get('portal_bottom')
+        return Path(value) if value else None
+
+    def on_portal(self, entry):
+        return entry.path in (self.starting(), self.starting_bottom())
+
     def item(self, entry):
         figure = entry.figure
-        lines = [entry.name + ('   ◉' if self.starting() == entry.path else '')]
+        lines = [entry.name + ('   ◉' if self.on_portal(entry) else '')]
         if figure.kind == 'item': lines.append('Magic item')
+        elif figure.half: lines.append(f'Swapper {figure.half} half')
         elif figure.editable:
             detail = f'Level {figure.level}  ·  {figure.gold:,} gold'
             lines.append(detail + (f'  ·  “{figure.nickname}”' if figure.nickname else ''))
         else: lines.append('Not played yet')
         item = QListWidgetItem(QIcon(tile(self.portraits.get(figure.identity, figure.variant), 52,
-                                          '#90eaff' if self.starting() == entry.path else '#4a6a7c', entry.name)), '\n'.join(lines))
+                                          '#90eaff' if self.on_portal(entry) else '#4a6a7c', entry.name)), '\n'.join(lines))
         item.setToolTip(entry.path.name); return item
 
     def filter(self, text):
@@ -301,10 +309,11 @@ class PortalPage(QWidget):
         figure = entry.figure if entry else None
         editable = bool(figure and figure.editable) and not self.locked()
         if entry:
-            on_portal = self.starting() == entry.path
+            on_portal = self.on_portal(entry)
             self.stage.show_figure(self.portraits.get(figure.identity, figure.variant), entry.name, on_portal)
             self.name.setText(entry.name)
-            self.kind.setText(('MAGIC ITEM' if figure.kind == 'item' else 'SKYLANDER') + ('  ·  CREATED' if entry.created else '  ·  IMPORTED'))
+            kind = 'MAGIC ITEM' if figure.kind == 'item' else f'SWAPPER {figure.half.upper()} HALF' if figure.half else 'SKYLANDER'
+            self.kind.setText(kind + ('  ·  CREATED' if entry.created else '  ·  IMPORTED'))
             self.place.setText('Remove from portal' if on_portal else 'Place on portal')
             self.place_hint.setText('Starts on the portal when you press Play.' if on_portal else
                                     'Choose the figure placed when the game starts. You can swap figures in game with F6.')
@@ -314,6 +323,7 @@ class PortalPage(QWidget):
             seconds = figure.seconds_played
             self.played.setText(f'{seconds // 3600} h {seconds // 60 % 60} min' if seconds else '—')
             if figure.kind == 'item': notice = 'Magic items have no level or gold to edit.'
+            elif figure.half: notice = 'Swapper halves are placed together: start with a top half, then add a bottom half. Their progress is kept by the game.'
             elif not figure.editable: notice = 'Not played yet. Place it on the portal in game once, then its level, gold and nickname can be edited here.'
             else: notice = ''
         else:
@@ -383,7 +393,8 @@ class PortalPage(QWidget):
             saved = self.collection.save(self.entry, figure.to_bytes())
         except (OSError, figure_data.FigureError) as error:
             self.failure('Could not save this Skylander', error); return
-        if self.starting() == self.entry.path and saved.path != self.entry.path: self.set_starting(saved.path)
+        if self.starting() == self.entry.path and saved.path != self.entry.path: self.set_starting(saved.path, self.starting_bottom())
+        if self.starting_bottom() == self.entry.path and saved.path != self.entry.path: self.set_starting(self.starting(), saved.path)
         self.entry = None; self.refresh(saved.path); self.feedback.setText('Saved. The previous state was backed up to out/figure-backups.')
 
     def create(self):
@@ -432,6 +443,7 @@ class PortalPage(QWidget):
                 'The figure and its progress are moved to out/portal-library/removed and can be restored from there.') != QMessageBox.StandardButton.Yes:
             return
         if self.starting() == self.entry.path: self.set_starting(None)
+        elif self.starting_bottom() == self.entry.path: self.set_starting(self.starting())
         try:
             self.collection.remove(self.entry)
         except OSError as error:
@@ -440,12 +452,23 @@ class PortalPage(QWidget):
 
     def toggle_portal(self):
         if not self.entry or not self.guard(): return
-        self.set_starting(None if self.starting() == self.entry.path else self.entry.path)
+        path, half = self.entry.path, self.entry.figure.half
+        top = self.starting(); top_entry = next((e for e in self.entries if e.path == top), None)
+        if path == self.starting_bottom(): self.set_starting(top, None)
+        elif path == top: self.set_starting(None)
+        elif half == 'bottom':
+            # A bottom half only starts under a top half, like the real portal pairing.
+            if not (top_entry and top_entry.figure.half == 'top'):
+                QMessageBox.information(self, 'Place a top half first', 'Choose a swapper top half as the starting figure, then add this bottom half under it.'); return
+            self.set_starting(top, path)
+        else: self.set_starting(path, self.starting_bottom() if half == 'top' else None)
         self.refresh(self.entry.path)
 
-    def set_starting(self, path):
-        owner = self.owner; value = str(path) if path else None
+    def set_starting(self, path, bottom=None):
+        owner = self.owner; value = str(path) if path else None; under = str(bottom) if bottom and path else None
         owner.library['portal'] = value; owner.fields['figure'].setText(value or '')
+        owner.library['portal_bottom'] = under; owner.fields['figure_bottom'].setText(under or '')
         for game in owner.library['games']:
             if 'figure' in game['settings']: game['settings']['figure'] = value or ''
+            if 'figure' in game['settings'] or 'figure_bottom' in game['settings']: game['settings']['figure_bottom'] = under or ''
         owner.persist()

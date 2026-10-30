@@ -306,6 +306,7 @@ def renovated(base):
             ''')
             if self.library['portal'] and Path(self.library['portal']).is_file():
                 self.fields['figure'].setText(self.library['portal'])
+                self.fields['figure_bottom'].setText(self.library.get('portal_bottom') or '')
             self.rebuild_rail()
             try:
                 from .launcher_settings import SettingsPage

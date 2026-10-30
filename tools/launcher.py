@@ -104,6 +104,8 @@ class Launcher(QMainWindow):
 
         portal=self.page('Portal & controls','Bring your collection to life.','Choose a starting Skylander. Manage figures and individual villain traps in the game’s right-hand portal drawer.')
         self.fields['figure']=QLineEdit();self.fields['figure'].setPlaceholderText('Choose a Skylander figure dump…')
+        # A swapper's starting bottom half is chosen on the Portal page, not typed here.
+        self.fields['figure_bottom']=QLineEdit();self.fields['figure_bottom'].setVisible(False)
         row=QHBoxLayout();row.addWidget(self.fields['figure'],1)
         browse=QPushButton('Browse…');browse.clicked.connect(self.browse);row.addWidget(browse)
         portal.addRow('Starting Skylander',row)
@@ -229,6 +231,8 @@ class Launcher(QMainWindow):
             value = self.values()
             if value['figure'] and not Path(value['figure']).is_file():
                 raise ValueError('The selected figure file is missing.')
+            if value['figure_bottom'] and not Path(value['figure_bottom']).is_file():
+                value['figure_bottom'] = ''
             model.save(self.preferences, value)
             pc_path = self.root / 'out/pc-settings.json'
             pc_path.parent.mkdir(parents=True, exist_ok=True)

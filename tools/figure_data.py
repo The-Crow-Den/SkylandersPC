@@ -53,6 +53,15 @@ def kind(identity):
     return 'character'
 
 
+def swapper_half(identity):
+    """Swap Force halves: bottoms are 1000-1015, tops 2000-2015."""
+    if 1000 <= identity <= 1015:
+        return 'bottom'
+    if 2000 <= identity <= 2015:
+        return 'top'
+    return None
+
+
 def level_for(xp):
     return max(i + 1 for i, need in enumerate(LEVEL_XP) if xp >= need)
 
@@ -98,7 +107,9 @@ class Figure:
     identity = property(lambda self: int.from_bytes(self.raw[0x10:0x12], 'little'))
     variant = property(lambda self: int.from_bytes(self.raw[0x1c:0x1e], 'little'))
     kind = property(lambda self: kind(self.identity))
-    editable = property(lambda self: self.kind == 'character' and self.header is not None)
+    half = property(lambda self: swapper_half(self.identity))
+    # Swapper halves split their progress across two tags; leave them to the game.
+    editable = property(lambda self: self.kind == 'character' and self.half is None and self.header is not None)
 
     def _raw_block(self, block):
         return self.raw[block * 16:block * 16 + 16]

@@ -186,6 +186,7 @@ def main(argv=None):
     parser.add_argument('--game', help='installed TITLE_ID[@APP_VER]; defaults to launcher selection or the only title')
     parser.add_argument('--variant', choices=PACKS, default='original')
     parser.add_argument('--figure', type=Path)
+    parser.add_argument('--figure-bottom', type=Path, help='swapper bottom half placed under a starting top half')
     parser.add_argument('--trophy-config',type=Path,help='private shadPS4 config or trophy-key file; never copied into logs')
     parser.add_argument('--pc-menu',choices=('web','native'),default='web',
                         help='HTML PC menu inside the game window (default), with a native fallback when WebEngine is unavailable')
@@ -306,6 +307,8 @@ def main(argv=None):
         parser.error('Game setup needs pack.'+args.variant+' or runtime. Choose Repair in the launcher to finish setup.')
     if args.figure and not args.figure.is_file():
         parser.error('figure file is missing')
+    if args.figure_bottom and not args.figure_bottom.is_file():
+        parser.error('bottom half figure file is missing')
     session = ROOT / 'out/sessions' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     session.mkdir(parents=True)
     preparation_started=time.monotonic()
@@ -445,6 +448,8 @@ def main(argv=None):
     env.setdefault('SKY_VIRTUAL_PORTAL', '1')
     if args.figure:
         env['SKY_PORTAL_FIGURE'] = str(args.figure.resolve())
+        if args.figure_bottom:
+            env['SKY_PORTAL_FIGURE_BOTTOM'] = str(args.figure_bottom.resolve())
     if args.timing:
         env['SKY_TIMING_TRACE'] = '1'
     if args.profile:
@@ -556,7 +561,7 @@ def main(argv=None):
                    '--fullscreen' if chosen['fullscreen'] else '--no-fullscreen',
                    '--fps-counter' if chosen['fps_counter'] else '--no-fps-counter',
                    '--mangohud' if args.mangohud else '--no-mangohud']
-        for flag,value in (('--trophy-config',args.trophy_config),('--figure',args.figure),('--hud-pci-device',args.hud_pci_device),
+        for flag,value in (('--trophy-config',args.trophy_config),('--figure',args.figure),('--figure-bottom',args.figure_bottom),('--hud-pci-device',args.hud_pci_device),
                            ('--present-limit',args.present_limit),('--save-root',selected_save)):
             if value is not None: restart += [flag,str(value)]
         restart.append('--save-backups' if args.save_backups else '--no-save-backups')

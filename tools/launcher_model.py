@@ -15,7 +15,7 @@ except ImportError:
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
                 motion_blur=True, nvidia=True, mangohud=False,
-                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='')
+                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='')
 FLAGS = ('motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
@@ -28,7 +28,7 @@ def validate(value):
         raise ValueError('Invalid launcher switch')
     if value['frame_policy'] not in ('auto','manual'):
         raise ValueError('Invalid frame policy')
-    if not isinstance(value['figure'], str) or '\0' in value['figure']:
+    if any(not isinstance(value[key], str) or '\0' in value[key] for key in ('figure', 'figure_bottom')):
         raise ValueError('Invalid figure path')
     return dict(value)
 
@@ -39,6 +39,8 @@ def load(path):
     value=json.loads(path.read_text())
     if isinstance(value,dict):
         value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
+    if isinstance(value,dict) and 'figure_bottom' not in value:
+        value['figure_bottom']=''
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
         value['frame_policy']='auto'
     return validate(value)
@@ -84,6 +86,8 @@ def command(root, python, value, mods=None, game=None):
         argv.append('--level-events')
     if value['figure']:
         argv += ['--figure', value['figure']]
+        if value['figure_bottom']:
+            argv += ['--figure-bottom', value['figure_bottom']]
     return argv
 
 

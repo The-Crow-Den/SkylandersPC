@@ -16,7 +16,7 @@ GAMES = [('swap-force', 'Swap Force', '#246bd8', '#ffaf83'),
 def defaults():
     return {'selected': 'swap-force', 'games': [dict(id=i, name=n, top=t, bottom=b,
             background='', logo='', game_pkg='', update_pkg='', settings={})
-            for i, n, t, b in GAMES], 'figures': [], 'portal': None}
+            for i, n, t, b in GAMES], 'figures': [], 'portal': None, 'portal_bottom': None}
 
 
 def load(path):
@@ -55,6 +55,10 @@ def load(path):
     portal = value.get('portal')
     if not isinstance(portal, str) or not portal or not Path(portal).is_file():
         value['portal'] = None
+    # A swapper's bottom half starts under the starting top half.
+    bottom = value.get('portal_bottom')
+    if not value['portal'] or not isinstance(bottom, str) or not bottom or not Path(bottom).is_file():
+        value['portal_bottom'] = None
     return value
 
 
