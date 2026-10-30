@@ -12,6 +12,16 @@ HOST = {'gpu': 'Test GPU 1.0', 'distro': 'Test Linux', 'kernel': '6.0-test', 'ma
 
 
 class CrashReportTest(unittest.TestCase):
+    def test_deleted_session_uses_kept_logs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            last = Path(directory)/'last-session';last.mkdir()
+            (last/'source').write_text('20261030T000000Z-abc\n')
+            gone = Path(directory)/'sessions/20261030T000000Z-abc'
+            self.assertEqual(crash_report.kept_session(gone, last), last)
+            self.assertIsNone(crash_report.kept_session(Path(directory)/'sessions/other', last))
+            gone.mkdir(parents=True)
+            self.assertEqual(crash_report.kept_session(gone, last), gone)
+
     def session(self, root, log_lines, exit_info):
         session = Path(root) / 'session'
         session.mkdir()

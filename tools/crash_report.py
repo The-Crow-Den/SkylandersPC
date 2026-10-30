@@ -33,6 +33,19 @@ def session_directory(output):
     return None
 
 
+def kept_session(session, last=None):
+    """The session folder, or its kept logs once run_session.py deleted it."""
+    if not session:return None
+    session = Path(session)
+    if session.is_dir():return session
+    last = Path(last) if last else Path(__file__).resolve().parents[1]/'out/last-session'
+    try:
+        if (last/'source').read_text().strip() == session.name:return last
+    except OSError:
+        pass
+    return None
+
+
 def redact(text, home=None, user=None):
     """Replace home-directory paths and the user name with placeholders."""
     home = home if home is not None else str(Path.home())

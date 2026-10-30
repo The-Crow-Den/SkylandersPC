@@ -621,7 +621,7 @@ def renovated(base):
         def crash_dialog(self, code):
             try:from . import crash_report
             except ImportError:import crash_report
-            folder = getattr(self,'session_dir',None)
+            folder = crash_report.kept_session(getattr(self,'session_dir',None))
             report = crash_report.build_report(folder, code)
             box = QMessageBox(QMessageBox.Icon.Warning, 'Game stopped unexpectedly',
                 'The game closed unexpectedly. Copy the report into a bug report; it contains no saves, figures or game files.', parent=self)
