@@ -1,4 +1,4 @@
-# SkylandersPC
+# SkylandersPC (W.I.P)
 
 Play the PS4 Skylanders games natively on PC, from your own copies.
 
