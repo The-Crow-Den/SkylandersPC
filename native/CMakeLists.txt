@@ -2,6 +2,28 @@ cmake_minimum_required(VERSION 3.20)
 project(SkylandersNativeHost LANGUAGES CXX ASM)
 
 find_package(Threads REQUIRED)
+if(WIN32)
+  add_compile_options(-mno-ms-bitfields)
+endif()
+
+# Optional until the loader's Windows FS rewrite path is integrated. Enabling
+# this uses the same Zydis package as the renderer, without fetching source.
+option(SKY_TLS_PREFLIGHT "Build strict guest FS preflight tests" OFF)
+if(SKY_TLS_PREFLIGHT)
+  find_package(Zydis REQUIRED)
+  find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+  include(CTest)
+  add_library(sky-guest-tls STATIC guest_tls.cpp)
+  target_compile_features(sky-guest-tls PUBLIC cxx_std_20)
+  target_link_libraries(sky-guest-tls PRIVATE Zydis::Zydis OpenSSL::Crypto)
+  if(BUILD_TESTING)
+    add_executable(guest-tls-test tests/test_guest_tls.cpp)
+    target_include_directories(guest-tls-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(guest-tls-test PRIVATE sky-guest-tls)
+    add_test(NAME synthetic-guest-tls-preflight COMMAND guest-tls-test)
+  endif()
+endif()
+
 # Host platform layer (platform/): POSIX on Linux, Win32 on Windows (MinGW).
 if(WIN32)
   set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp platform/host_tls_win32.cpp)
@@ -12,7 +34,6 @@ if(WIN32)
   # Windows port in progress (docs/windows-port.md): guest FS rewriting, fault
   # handling and the file sandbox remain to be ported, so only the
   # host pieces that already have a Windows platform layer build and test here.
-  add_compile_options(-mno-ms-bitfields)
   include(CTest)
   find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 

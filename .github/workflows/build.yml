@@ -45,7 +45,7 @@ jobs:
       - name: Build native host
         run: |
           cmake -S native -B .local/native-gpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DSKY_RENDERER_ROOT="$PWD/renderer" -DSKY_RENDERER_LIBRARY="$PWD/.local/renderer-build/libskyrender.so"
+            -DSKY_TLS_PREFLIGHT=ON -DSKY_RENDERER_ROOT="$PWD/renderer" -DSKY_RENDERER_LIBRARY="$PWD/.local/renderer-build/libskyrender.so"
           cmake --build .local/native-gpu-build
       - name: Native tests
         run: ctest --test-dir .local/native-gpu-build --output-on-failure
@@ -72,13 +72,13 @@ jobs:
           msystem: CLANG64
           update: true
           pacboy: >-
-            toolchain:p cmake:p ninja:p python:p openssl:p
+            toolchain:p cmake:p ninja:p python:p openssl:p zydis:p
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Build native host (portable subset)
         run: |
-          cmake -S native -B .local/native-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -S native -B .local/native-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSKY_TLS_PREFLIGHT=ON
           cmake --build .local/native-build
       - name: Native tests
         run: ctest --test-dir .local/native-build --output-on-failure
