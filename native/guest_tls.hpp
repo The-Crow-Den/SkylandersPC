@@ -28,6 +28,8 @@ struct Profile {
     std::uint64_t site_count;
     std::string sites_sha256;
 };
+// Refuse unknown input before decoding control-flow or patch instructions.
+void verify_executable(std::span<const std::uint8_t> executable, const std::string& expected_sha256);
 // Read-only preflight for a future rewriter. Decodes every byte of each supplied
 // executable range. Unsupported FS forms or undecodable bytes throw, never skip.
 // Ranges must describe original executable bytes, before any other patching.

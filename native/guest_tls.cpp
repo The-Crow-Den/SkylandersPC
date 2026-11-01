@@ -34,6 +34,10 @@ bool valid_hash(const std::string& value) {
     return value.size() == 64 && value.find_first_not_of("0123456789abcdef") == std::string::npos;
 }
 }
+void verify_executable(std::span<const std::uint8_t> executable, const std::string& expected_sha256) {
+    if (!valid_hash(expected_sha256) || sha256(executable) != expected_sha256)
+        throw std::runtime_error("guest executable SHA-256 mismatch before code analysis");
+}
 Manifest inspect(std::span<const std::uint8_t> executable, std::span<const CodeRange> ranges) {
     if (ranges.empty()) throw std::runtime_error("guest TLS requires executable code ranges");
     std::vector<CodeRange> sorted(ranges.begin(), ranges.end());

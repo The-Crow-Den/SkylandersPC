@@ -16,9 +16,9 @@ import re
 import struct
 
 try:
-    from . import executable
+    from . import executable, audit_imports, link_native, module_graph
 except ImportError:
-    import executable
+    import executable, audit_imports, link_native, module_graph
 
 
 def _leb(data, pos, signed=False):
@@ -90,14 +90,18 @@ def _cie_encoding(record):
     return encoding
 
 
-def discover(data, expected_sha256):
-    """Return bounded metadata evidence, refusing hash or structural mismatches."""
+def _verified_image(data, expected_sha256):
     if not isinstance(expected_sha256, str) or not re.fullmatch('[0-9a-f]{64}', expected_sha256):
         raise ValueError('expected executable SHA-256 is required')
     digest = hashlib.sha256(data).hexdigest()
     if digest != expected_sha256:
         raise ValueError('executable hash mismatch before unwind inspection')
-    image = executable.Image(data)
+    return executable.Image(data), digest
+
+
+def discover(data, expected_sha256):
+    """Return bounded metadata evidence, refusing hash or structural mismatches."""
+    image, digest = _verified_image(data, expected_sha256)
     headers = [p for p in image.programs if p['type'] == 0x6474e550]
     if len(headers) != 1:
         raise ValueError('requires exactly one PT_GNU_EH_FRAME header')
@@ -172,6 +176,57 @@ def discover(data, expected_sha256):
             uncovered.append({'address': cursor, 'size': end - cursor})
     return {'executable_sha256': digest, 'source': 'unwind function metadata',
             'rewrite_authorized': False, 'function_ranges': ranges, 'uncovered_ranges': uncovered}
+
+
+def nonreturning_import_thunks(data, expected_sha256):
+    """Identify exact compiler stack-failure imports for diagnostic CFG evidence.
+
+    __stack_chk_fail has a nonreturning compiler ABI contract (for example,
+    glibc debug/stack_chk_fail.c). Match its exact scoped NID, function type and
+    JUMP_SLOT relocation, then verify an unconditional RIP-relative import JMP.
+    No other calls are guessed to be nonreturning. Output is not patch authority.
+    """
+    image, _ = _verified_image(data, expected_sha256)
+    one, blob, _ = link_native.dynamic_tables(image)
+    imports = {s['index']: s for s in module_graph.analyze_bytes(data, 'main')['imports']}
+    identity = audit_imports.nid('__stack_chk_fail') + '#libkernel#libkernel'
+    slots = set()
+    for offset_tag, size_tag in ((0x6100002F, 0x61000031), (0x61000029, 0x6100002D)):
+        offset, size = one(offset_tag), one(size_tag)
+        if offset is None and size is None:
+            continue
+        if offset is None or size is None or size % 24 or one(0x61000033, 24) != 24:
+            raise ValueError('invalid nonreturning-import relocation table')
+        table = executable.take(blob, offset, size)
+        for position in range(0, size, 24):
+            target, info, addend = executable.unpack('<QQq', table, position)
+            symbol = imports.get(info >> 32)
+            if (info & 0xffffffff) != 7 or addend or not symbol or symbol['name'] != identity:
+                continue
+            if symbol['type'] not in (0, 2) or symbol['binding'] not in (1, 2):
+                raise ValueError('nonreturning import is not a function declaration')
+            if target in slots or not any(p['type'] == 1 and p['vaddr'] <= target and
+                    target + 8 <= p['vaddr'] + p['memsz'] for p in image.programs):
+                raise ValueError('duplicate/unmapped nonreturning import slot')
+            slots.add(target)
+    result = []
+    for p in image.programs:
+        if p['type'] != 1 or not p['flags'] & 1 or not p['filesz']:
+            continue
+        code = image.read(p['offset'], p['filesz'])
+        position = 0
+        while True:
+            position = code.find(b'\xff\x25', position)
+            if position < 0:
+                break
+            if position + 6 <= len(code):
+                pc = p['vaddr'] + position
+                slot = pc + 6 + executable.unpack('<i', code, position + 2)[0]
+                if slot in slots:
+                    result.append({'address': pc, 'slot_address': slot, 'import': identity,
+                                   'expected_bytes_hex': code[position:position + 6].hex()})
+            position += 1
+    return sorted(result, key=lambda item: item['address'])
 
 
 def main():

@@ -109,6 +109,33 @@ class BoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'outside executable'):
             discover(data)
 
+    def test_nonreturning_thunks_require_exact_import_slot_and_original_jmp(self):
+        from test_prepare_native import native_fixture
+        data = native_fixture()
+        old = b'syntheticNID#A#B'
+        new = t.audit_imports.nid('__stack_chk_fail').encode() + b'#A#B'
+        pos = data.index(old)
+        data[pos:pos + len(old)] = bytes(len(old))
+        data[pos:pos + len(new)] = new
+        for old in (b'libSynthetic', b'syntheticModule'):
+            pos = data.index(old)
+            data[pos:pos + len(old)] = b'libkernel' + bytes(len(old) - len(b'libkernel'))
+        slot = 0x401008
+        thunk = b'\xff\x25' + struct.pack('<i', slot - (BASE + 0x180 + 6))
+        data[0x180:0x186] = thunk
+        report = t.nonreturning_import_thunks(data, hashlib.sha256(data).hexdigest())
+        self.assertEqual(len(report), 1)
+        self.assertEqual(report[0]['address'], BASE + 0x180)
+        self.assertEqual(report[0]['expected_bytes_hex'], thunk.hex())
+        self.assertEqual(report[0]['slot_address'], slot)
+        # A data-only lookalike is not a thunk; the executable JMP must also
+        # resolve to the exact declared import slot.
+        data[0x680:0x686] = thunk
+        data[0x182] ^= 1
+        self.assertEqual(t.nonreturning_import_thunks(data, hashlib.sha256(data).hexdigest()), [])
+        with self.assertRaisesRegex(ValueError, 'hash mismatch'):
+            t.nonreturning_import_thunks(data, '0' * 64)
+
     def test_bounded_leb_values_and_truncation(self):
         self.assertEqual(t._leb(b'\x78', 0, signed=True), (-8, 1))
         self.assertEqual(t._leb(b'\xff\x7f', 0), (16383, 2))
