@@ -245,6 +245,22 @@ void cfg_bound_tests() {
             std::set<std::uint64_t>(entries.begin(),entries.end()),{},0x10000+read,gpr);
     };
     const std::multimap<std::uint64_t,std::uint64_t> edges{{0x1000e,0x10005},{0x1000d,0x10007}};
+    require(!query(std::vector<std::uint8_t>{0x48,0x83,0xe0,7,0xc3},4,{},root));
+    require(!query(std::vector<std::uint8_t>{0x83,0xe0,5,0xc3},3,{},root));
+    require(!query(std::vector<std::uint8_t>{0x83,0xe0,0,0xc3},3,{},root));
+    require(!query(std::vector<std::uint8_t>{0x48,0x83,0xe0,0xff,0xc3},4,{},root));
+    require(!query(std::vector<std::uint8_t>{0x66,0x83,0xe0,7,0xc3},4,{},root));
+    require(!query(std::vector<std::uint8_t>{0x48,0x25,0,0,1,0,0xc3},6,{},root));
+    const std::vector<std::uint8_t> alias{0x89,0xf9,0x89,0xc8,0x83,0xe0,7,0x83,0xf8,1,
+        0x77,11,0x48,0x83,0xe1,7,0xeb,4,0xff,0xff,0xff,0xff,0xc3,0xc3};
+    const std::multimap<std::uint64_t,std::uint64_t> alias_edges{{0x10017,0x1000a},{0x10016,0x10010}};
+    require(query(alias,22,alias_edges,root,1)==2);
+    auto mismatch=alias;mismatch[15]=15;
+    require(!query(mismatch,22,alias_edges,root,1)); // Guard masked off a bit the query still reads.
+    auto overwritten=alias;overwritten.insert(overwritten.begin()+4,{0xff,0xc1}); // INC ECX after the copy.
+    require(!query(overwritten,24,{{0x10019,0x1000c},{0x10018,0x10012}},root,1));
+    const std::array<std::uint64_t,2> alias_entry{0x10000,0x10007};
+    require(!query(alias,22,alias_edges,alias_entry,1));
     require(query(original,13,edges,root)==2);
     const std::array<std::uint64_t,2> at_guard{0x10000,0x10005};
     require(!query(original,13,edges,at_guard));
@@ -254,6 +270,15 @@ void cfg_bound_tests() {
     require(!query(both_edges,13,{{0x10007,0x10005},{0x1000d,0x10007}},root));
     auto taken=original;taken[6]=6;taken[8]=5;
     require(!query(taken,13,{{0x1000d,0x10005},{0x1000e,0x10007}},root));
+    auto below=taken;below[5]=0x76; // JBE taken means EAX <= 1.
+    require(query(below,13,{{0x1000d,0x10005},{0x1000e,0x10007}},root)==2);
+    below[5]=0x72; // JB taken means EAX < 1.
+    require(query(below,13,{{0x1000d,0x10005},{0x1000e,0x10007}},root)==1);
+    auto unbounded=original;unbounded[5]=0x76;
+    require(!query(unbounded,13,edges,root)); // JBE fallthrough supplies a lower bound only.
+    auto joined=both_edges;joined[5]=0x76;
+    require(!query(joined,13,{{0x10007,0x10005},{0x1000d,0x10007}},root));
+    require(!query(below,13,{{0x1000d,0x10005},{0x1000e,0x10007}},at_guard));
     auto changed=original;changed.insert(changed.begin()+7,{0xff,0xc0});changed[6]+=2; // INC EAX.
     require(!query(changed,15,{{0x10010,0x10005},{0x1000f,0x10009}},root));
     // A branch entering the JA directly must not borrow the preceding CMP.
@@ -310,6 +335,31 @@ void cfg_switch_tests() {
     require(a.switch_tables.size()==1 && a.switch_tables[0].invariant_index.has_value() &&
         a.switch_tables[0].invariant_base.has_value() && a.switch_tables[0].table_size==8);
     require(GuestTls::inspect(code,a.instructions).sites.size()==1);
+    auto masked=code;
+    for(unsigned i=2;i<7;++i) masked[i]=0x90; // Remove CMP+JA.
+    masked.insert(masked.begin()+2,{0x48,0x83,0xe0,1});
+    const auto mask_graph=analyze(masked,root);
+    require(mask_graph.switch_tables.empty()); // A mask alone is not a guarded domain.
+    // A comparison of a masked copy also bounds the same masked source used
+    // later by a dispatch. The two registers must denote the same value.
+    std::vector<std::uint8_t> correlated{0x89,0xf9,0x89,0xc8,0x83,0xe0,7,0x83,0xf8,1,
+        0x77,26,0x48,0x83,0xe1,7,0xeb,4,0xff,0xff,0xff,0xff,
+        0x48,0x8d,0x05,10,0,0,0,0x48,0x63,0x0c,0x88,0x48,0x01,0xc1,0xff,0xe1,0xc3,
+        8,0,0,0,18,0,0,0,0x64,0x48,0x8b,4,0x25,0,0,0,0,0xc3,0xc3};
+    const auto copied=analyze(correlated,root);
+    require(copied.switch_tables.size()==1 && copied.switch_tables[0].table_size==8 &&
+        copied.switch_tables[0].invariant_index.has_value());
+    require(GuestTls::inspect(correlated,copied.instructions).sites.size()==1);
+    correlated[15]=15;
+    require(analyze(correlated,root).switch_tables.empty());
+    for(const bool inclusive:{false,true}) {
+        auto below=code;below[4]=inclusive?1:2;below[5]=inclusive?0x76:0x72;
+        below[6]=10;below[8]=24; // Taken -> LEA, fallthrough -> default RET.
+        const auto branch=analyze(below,root);
+        require(branch.switch_tables.size()==1 && branch.switch_tables[0].table_size==8 &&
+            branch.switch_tables[0].invariant_index.has_value());
+        require(GuestTls::inspect(below,branch.instructions).sites.size()==1);
+    }
     const std::array<std::uint64_t,2> bypass{0x10000,0x10011};
     require(analyze(code,bypass).switch_tables.empty());
     require(analyze(cfg_switch_fixture(true),root).switch_tables.empty());
