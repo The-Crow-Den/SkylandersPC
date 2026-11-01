@@ -229,6 +229,48 @@ void switch_tests() {
     require(analyze(exclusive,root).switch_tables.size()==1);
 }
 
+void repeated_guard_tests() {
+    const std::array<std::uint64_t,1> root{0x10000};
+    auto code=switch_fixture();
+    // Two adjacent JA instructions see the same flags. The second can have a
+    // distinct destination: it is never taken after the first falls through.
+    code.insert(code.begin()+7,{0x77,16});
+    code[6]+=2;
+    code[8]=static_cast<std::uint8_t>(code.size()-1-9); // Distinct final RET.
+    require(analyze(code,root).switch_tables.size()==1);
+    require(GuestTls::inspect(code,analyze(code,root).instructions).sites.size()==1);
+    auto different=code;different[7]=0x73; // JAE is not redundant after JA.
+    require(analyze(different,root).switch_tables.empty());
+    // An entry directly at the duplicate guard bypasses the proven compare.
+    const std::array<std::uint64_t,2> bypass{0x10000,0x10007};
+    require(analyze(code,bypass).switch_tables.empty());
+    // A flag change between guards cannot be ignored.
+    auto changed=code;changed.insert(changed.begin()+7,0xf8); // CLC.
+    changed[6]+=1;
+    require(analyze(changed,root).switch_tables.empty());
+    // A local LEA before a call is not part of the index guard. The separate
+    // CFG proof must establish the callee-saved base across that call.
+    std::vector<std::uint8_t> across_call{0x4c,0x8d,0x3d,0,0,0,0,0xe8,0,0,0,0,
+        0x89,0xf8,0x83,0xf8,1,0x77,11,0x49,0x63,0x04,0x87,0x4c,0x01,0xf8,0xff,0xe0,0xc3,0xc3};
+    // JA targets the default RET at 28, not the helper RET at 29.
+    across_call[18]=9;
+    across_call[8]=17; // Call helper at 29 from PC12.
+    const auto table=across_call.size();across_call.resize(table+8);
+    const auto first=across_call.size();across_call.push_back(0xc3);
+    const auto second=across_call.size();across_call.push_back(0xc3);
+    for(unsigned i=0;i<4;++i) {
+        across_call[3+i]=static_cast<std::uint8_t>((table-7)>>(8*i));
+        across_call[table+i]=static_cast<std::uint8_t>((first-table)>>(8*i));
+        across_call[table+4+i]=static_cast<std::uint8_t>((second-table)>>(8*i));
+    }
+    const auto graph=analyze(across_call,root);
+    require(graph.switch_tables.size()==1 && graph.switch_tables[0].invariant_base.has_value());
+    // Starting after the LEA destroys the invariant, even if the contiguous
+    // backward instruction list still happens to contain that LEA.
+    const std::array<std::uint64_t,2> after_lea{0x10000,0x10007};
+    require(analyze(across_call,after_lea).switch_tables.empty());
+}
+
 void census_tests() {
     // Operand-size/address-size/REX prefixes can precede FS. Starting only at
     // 0x64 would lose the actual entry and can change operand/address width.
@@ -272,6 +314,7 @@ void census_tests() {
 
 int main() try {
     census_tests();
+    repeated_guard_tests();
     const std::array<std::uint64_t,1> root{0x10000};
     // Jump over undecodable inline data, then execute a guest FS load and RET.
     const std::vector<std::uint8_t> code{0xeb,4,0xff,0xff,0xff,0xff,

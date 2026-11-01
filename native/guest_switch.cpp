@@ -190,8 +190,14 @@ recognize_switch(std::span<const std::uint8_t> executable, std::span<const Guest
         return {};
     }
     std::optional<std::uint64_t> invariant_base;
-    if (lea_at == n && needed_base == base && known_base)
+    // A callee-saved RIP base may be initialized long before the compare,
+    // across calls/loop edges that are outside the local guard proof. Prefer
+    // the independently checked CFG invariant in that case, rather than
+    // treating those intervening instructions as part of index validation.
+    if ((lea_at == n || lea_at < cmp_at) && needed_base == base && known_base) {
         invariant_base = known_base(load.range.address, number(base));
+        if (invariant_base) lea_at = n;
+    }
     if ((lea_at == n && !invariant_base) || guard_at == n)
         return {};
     const auto &guard = code[guard_at];
@@ -201,6 +207,20 @@ recognize_switch(std::span<const std::uint8_t> executable, std::span<const Guest
         (cmp.operands[0].size != 32 && cmp.operands[0].size != 64) ||
         cmp.operands[1].type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
         return {};
+    // Consecutive identical guards observe the same flags. Once the first
+    // guard falls through, each repeated guard necessarily falls through too.
+    // Only adjacent copies are admitted; no flag-writing instruction or other
+    // condition may be crossed. Late entries into this span invalidate the
+    // proof in discover(), just as entries bypassing the first guard do.
+    auto guard_end = guard_at;
+    while (guard_end + 1 < load_at) {
+        const auto &next = code[guard_end + 1];
+        if (next.instruction.mnemonic != guard.instruction.mnemonic ||
+            next.instruction.operand_count_visible != 1 ||
+            next.operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE || !next.operands[0].imm.is_relative)
+            break;
+        ++guard_end;
+    }
     const auto comparison_index = enclosing(cmp.operands[0].reg.value);
     if (number(comparison_index) >= 16 || number(index) >= 16)
         return {};
@@ -244,7 +264,7 @@ recognize_switch(std::span<const std::uint8_t> executable, std::span<const Guest
     // after the guard kills facts; vector operations must leave GPRs and memory
     // unchanged. No unrelated value is guessed to carry the bound.
     for (std::size_t at = entry_at; at < load_at; ++at) {
-        if (at == cmp_at || at == guard_at)
+        if (at == cmp_at || (at >= guard_at && at <= guard_end))
             continue;
         const auto &i = code[at];
         if (safe_vector(i))
