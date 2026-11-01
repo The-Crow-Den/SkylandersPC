@@ -7,6 +7,15 @@
 #include <mutex>
 #include <pthread.h>
 #include <time.h>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 #include <vector>
 
 namespace {
@@ -19,7 +28,14 @@ std::array<std::atomic<U>, kBuckets> all_ns{}, main_ns{};
 std::atomic<U> calls{0};
 thread_local bool is_main = false;
 
-struct Clock { clockid_t id; bool main; };
+#ifdef _WIN32
+// winpthreads' thread CPU clocks stop at thread exit; Windows reads a thread
+// handle instead (GetThreadTimes, in 100 ns units of scheduler ticks).
+using ThreadClock = HANDLE;
+#else
+using ThreadClock = clockid_t;
+#endif
+struct Clock { ThreadClock id; bool main; };
 std::mutex threads_lock; // Guards the live table, retired totals and the writer.
 std::vector<std::pair<pthread_t, Clock>> live;
 U retired_worker_ns = 0, retired_main_ns = 0;
@@ -29,6 +45,22 @@ U read_clock(clockid_t id) {
     if (clock_gettime(id, &value)) return 0;
     return static_cast<U>(value.tv_sec) * 1000000000ull + static_cast<U>(value.tv_nsec);
 }
+#ifdef _WIN32
+U read_clock(HANDLE thread) {
+    FILETIME created{}, exited{}, kernel{}, user{};
+    if (!GetThreadTimes(thread, &created, &exited, &kernel, &user)) return 0;
+    const auto ticks = [](FILETIME t) { return (static_cast<U>(t.dwHighDateTime) << 32) | t.dwLowDateTime; };
+    return (ticks(kernel) + ticks(user)) * 100;
+}
+bool current_thread_clock(ThreadClock* id) {
+    *id = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, GetCurrentThreadId());
+    return *id != nullptr;
+}
+void release_clock(ThreadClock id) { CloseHandle(id); }
+#else
+bool current_thread_clock(ThreadClock* id) { return pthread_getcpuclockid(pthread_self(), id) == 0; }
+void release_clock(ThreadClock) {}
+#endif
 struct Previous {
     U stamp_ns = 0, main_cpu = 0, worker_cpu = 0, calls = 0;
     std::array<U, kBuckets> all{}, main{};
@@ -53,8 +85,8 @@ void configure() {
 void thread_started(bool main_thread) {
     if (!active) return;
     is_main = main_thread;
-    clockid_t id{};
-    if (pthread_getcpuclockid(pthread_self(), &id)) return;
+    ThreadClock id{};
+    if (!current_thread_clock(&id)) return;
     std::lock_guard lock(threads_lock);
     live.emplace_back(pthread_self(), Clock{id, main_thread});
 }
@@ -64,6 +96,7 @@ void thread_finished() {
     for (auto it = live.begin(); it != live.end(); ++it) {
         if (!pthread_equal(it->first, pthread_self())) continue;
         (it->second.main ? retired_main_ns : retired_worker_ns) += read_clock(it->second.id);
+        release_clock(it->second.id);
         live.erase(it);
         return;
     }

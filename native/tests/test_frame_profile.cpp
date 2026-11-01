@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../frame_profile.hpp"
+#include <chrono>
 #include "../platform/host_compat.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -33,7 +34,9 @@ int main() {
         std::thread worker([] {
             FrameProfile::thread_started(false);
             FrameProfile::record(FrameProfile::Bucket::Sync, 3000000);
-            volatile unsigned long spin = 0; for (unsigned long i = 0; i < 20000000; ++i) spin = spin + i;
+            // Busy for 50 ms of wall time: Windows counts thread CPU time in ~15.6 ms ticks.
+            const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
+            volatile unsigned long spin = 0; while (std::chrono::steady_clock::now() < until) spin = spin + 1;
             FrameProfile::thread_finished();
         });
         worker.join();
