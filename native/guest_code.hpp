@@ -27,6 +27,9 @@ struct SwitchTable {
     std::uint64_t table_size;
     std::vector<std::uint64_t> targets;
     std::optional<BaseRead> invariant_base;
+    // An all-predecessor unsigned index bound; guard_address is zero when
+    // there is no single contiguous guard proof. Revalidate after expansion.
+    std::optional<BaseRead> invariant_index;
 };
 struct Analysis {
     std::vector<GuestTls::CodeRange> instructions;

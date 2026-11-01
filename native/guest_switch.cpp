@@ -21,6 +21,55 @@ bool reg(const Decoded &i, unsigned operand, ZydisRegister expected, unsigned wi
 ZydisRegister enclosing(ZydisRegister r) {
     return ZydisRegisterGetLargestEnclosing(ZYDIS_MACHINE_MODE_LONG_64, r);
 }
+std::optional<SwitchTable> read_table(std::span<const std::uint8_t> executable,
+                                      std::span<const GuestTls::CodeRange> ranges, SwitchTable result,
+                                      bool strict = true) {
+    const auto table = result.table_address;
+    const auto count = result.table_size / 4;
+    const auto locate = [&](std::uint64_t address) -> const GuestTls::CodeRange * {
+        auto at = std::upper_bound(ranges.begin(), ranges.end(), address,
+                                   [](auto pc, const auto &r) { return pc < r.address; });
+        if (at == ranges.begin())
+            return nullptr;
+        --at;
+        return address - at->address < at->size ? &*at : nullptr;
+    };
+    const auto *range = locate(table);
+    if (!range)
+        return {}; // Other memory regions are not yet modeled by this recognizer.
+    const auto bytes = result.table_size;
+    if (bytes > range->size - (table - range->address)) {
+        if (!strict)
+            return {};
+        throw std::runtime_error("bounded switch table exceeds mapped source");
+    }
+    const auto source = range->file_offset + table - range->address;
+    for (std::uint64_t i = 0; i < count; ++i) {
+        std::uint32_t bits = 0;
+        for (unsigned byte = 0; byte < 4; ++byte)
+            bits |= std::uint32_t{executable[static_cast<std::size_t>(source + i * 4 + byte)]} << (8 * byte);
+        const auto delta = (bits & 0x80000000u) ? static_cast<std::int64_t>(bits) - 0x100000000LL
+                                                : static_cast<std::int64_t>(bits);
+        if ((delta < 0 && table < static_cast<std::uint64_t>(-delta)) ||
+            (delta >= 0 &&
+             table > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(delta))) {
+            if (!strict)
+                return {};
+            throw std::runtime_error("bounded switch target overflows address space at dispatch " +
+                                     std::to_string(result.dispatch_address) + " entry " + std::to_string(i) +
+                                     " of " + std::to_string(count));
+        }
+        const auto target = delta < 0 ? table - static_cast<std::uint64_t>(-delta)
+                                      : table + static_cast<std::uint64_t>(delta);
+        if (!locate(target) || (target >= table && target - table < bytes)) {
+            if (!strict)
+                return {};
+            throw std::runtime_error("bounded switch target outside executable code or inside table");
+        }
+        result.targets.push_back(target);
+    }
+    return result;
+}
 } // namespace
 std::optional<SwitchTable>
 recognize_switch(std::span<const std::uint8_t> executable, std::span<const GuestTls::CodeRange> ranges,
@@ -301,41 +350,78 @@ recognize_switch(std::span<const std::uint8_t> executable, std::span<const Guest
     if (out_of_bounds >= guard.range.address + guard.range.size &&
         out_of_bounds < jump.range.address + jump.range.size)
         return {};
-    const auto locate = [&](std::uint64_t address) -> const GuestTls::CodeRange * {
-        auto at = std::upper_bound(ranges.begin(), ranges.end(), address,
-                                   [](auto pc, const auto &r) { return pc < r.address; });
-        if (at == ranges.begin())
-            return nullptr;
-        --at;
-        return address - at->address < at->size ? &*at : nullptr;
-    };
-    const auto *range = locate(table);
-    if (!range)
-        return {}; // Other memory regions are not yet modeled by this recognizer.
-    const auto bytes = count * 4;
-    if (bytes > range->size - (table - range->address))
-        throw std::runtime_error("bounded switch table exceeds mapped source");
-    const auto source = range->file_offset + table - range->address;
     SwitchTable result{
-        code[entry_at].range.address, guard.range.address, jump.range.address, table, bytes, {}, {}};
+        code[entry_at].range.address, guard.range.address, jump.range.address, table, count * 4, {}, {}, {}};
     if (invariant_base)
         result.invariant_base = BaseRead{load.range.address, number(base)};
-    for (std::uint64_t i = 0; i < count; ++i) {
-        std::uint32_t bits = 0;
-        for (unsigned byte = 0; byte < 4; ++byte)
-            bits |= std::uint32_t{executable[static_cast<std::size_t>(source + i * 4 + byte)]} << (8 * byte);
-        const auto delta = (bits & 0x80000000u) ? static_cast<std::int64_t>(bits) - 0x100000000LL
-                                                : static_cast<std::int64_t>(bits);
-        if ((delta < 0 && table < static_cast<std::uint64_t>(-delta)) ||
-            (delta >= 0 &&
-             table > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(delta)))
-            throw std::runtime_error("bounded switch target overflows address space");
-        const auto target = delta < 0 ? table - static_cast<std::uint64_t>(-delta)
-                                      : table + static_cast<std::uint64_t>(delta);
-        if (!locate(target) || (target >= table && target - table < bytes))
-            throw std::runtime_error("bounded switch target outside executable code or inside table");
-        result.targets.push_back(target);
+    return read_table(executable, ranges, std::move(result));
+}
+std::optional<SwitchTable> recognize_cfg_switch(
+    std::span<const std::uint8_t> executable, std::span<const GuestTls::CodeRange> ranges,
+    std::span<const GuestTls::CodeRange> tail,
+    const std::function<std::optional<std::uint64_t>(std::uint64_t, unsigned)> &known_base,
+    const std::function<std::optional<std::uint64_t>(std::uint64_t, unsigned)> &known_bound) {
+    if (tail.size() < 3 || !known_base || !known_bound)
+        return {};
+    ZydisDecoder decoder{};
+    if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64)))
+        return {};
+    std::array<Decoded, 3> code;
+    for (unsigned i = 0; i < 3; ++i) {
+        const auto &r = tail[tail.size() - 3 + i];
+        if (r.file_offset > executable.size() || r.size > executable.size() - r.file_offset)
+            return {};
+        auto &c = code[i];
+        c.range = r;
+        if (!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder, executable.data() + r.file_offset,
+                                                 static_cast<std::size_t>(r.size), &c.instruction,
+                                                 c.operands.data())) ||
+            c.instruction.length != r.size ||
+            (i && code[i - 1].range.address + code[i - 1].range.size != r.address))
+            return {};
     }
-    return result;
+    const auto &load = code[0];
+    const auto &add = code[1];
+    const auto &jump = code[2];
+    if (jump.instruction.mnemonic != ZYDIS_MNEMONIC_JMP || jump.instruction.operand_count_visible != 1 ||
+        jump.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || jump.operands[0].size != 64)
+        return {};
+    const auto destination = jump.operands[0].reg.value;
+    if (destination < ZYDIS_REGISTER_RAX || destination > ZYDIS_REGISTER_R15 ||
+        destination == ZYDIS_REGISTER_RSP || add.instruction.mnemonic != ZYDIS_MNEMONIC_ADD ||
+        add.instruction.operand_count_visible != 2 || !reg(add, 0, destination) ||
+        add.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER || add.operands[1].size != 64 ||
+        load.instruction.mnemonic != ZYDIS_MNEMONIC_MOVSXD || load.instruction.operand_count_visible != 2 ||
+        !reg(load, 0, destination))
+        return {};
+    const auto base = add.operands[1].reg.value;
+    const auto &memory = load.operands[1];
+    if (base < ZYDIS_REGISTER_RAX || base > ZYDIS_REGISTER_R15 || base == ZYDIS_REGISTER_RSP ||
+        base == destination || memory.type != ZYDIS_OPERAND_TYPE_MEMORY || memory.size != 32 ||
+        memory.mem.base != base || memory.mem.index < ZYDIS_REGISTER_RAX ||
+        memory.mem.index > ZYDIS_REGISTER_R15 || memory.mem.index == ZYDIS_REGISTER_RSP ||
+        memory.mem.index == base || memory.mem.scale != 4 ||
+        (memory.mem.disp.has_displacement && memory.mem.disp.value != 0) ||
+        load.instruction.address_width != 64 ||
+        (memory.mem.segment != ZYDIS_REGISTER_DS && memory.mem.segment != ZYDIS_REGISTER_SS))
+        return {};
+    const auto base_gpr = static_cast<unsigned>(base - ZYDIS_REGISTER_RAX);
+    const auto index_gpr = static_cast<unsigned>(memory.mem.index - ZYDIS_REGISTER_RAX);
+    const auto table = known_base(load.range.address, base_gpr);
+    const auto count = known_bound(load.range.address, index_gpr);
+    if (!table || !count || !*count || *count > 65536)
+        return {};
+    SwitchTable result{load.range.address,
+                       0,
+                       jump.range.address,
+                       *table,
+                       *count * 4,
+                       {},
+                       BaseRead{load.range.address, base_gpr},
+                       BaseRead{load.range.address, index_gpr}};
+    // CFG bounds can overestimate the domain when other conditions are not
+    // modeled. If that domain is not a fully valid table, retain the original
+    // unresolved transfer; no data classification or targets are published.
+    return read_table(executable, ranges, std::move(result), false);
 }
 } // namespace GuestCode::Detail

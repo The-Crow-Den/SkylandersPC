@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "guest_code.hpp"
 #include "guest_constants.hpp"
+#include "guest_bounds.hpp"
+#include "guest_switch.hpp"
 #include <openssl/evp.h>
 #include <array>
 #include <iomanip>
@@ -229,6 +231,96 @@ void switch_tests() {
     require(analyze(exclusive,root).switch_tables.size()==1);
 }
 
+void cfg_bound_tests() {
+    const std::array<std::uint64_t,1> root{0x10000};
+    const std::vector<std::uint8_t> original{0x89,0xf8,0x83,0xf8,1,0x77,7,0xeb,4,
+        0xff,0xff,0xff,0xff,0xc3,0xc3};
+    const auto query=[&](const auto& code,unsigned read,
+        const std::multimap<std::uint64_t,std::uint64_t>& edges,
+        std::span<const std::uint64_t> entries,unsigned gpr=0) {
+        const auto a=analyze(code,entries);
+        std::map<std::uint64_t,GuestTls::CodeRange> instructions;
+        for(const auto& r:a.instructions) instructions.emplace(r.address,r);
+        return GuestCode::Detail::known_index_bound(code,instructions,edges,
+            std::set<std::uint64_t>(entries.begin(),entries.end()),{},0x10000+read,gpr);
+    };
+    const std::multimap<std::uint64_t,std::uint64_t> edges{{0x1000e,0x10005},{0x1000d,0x10007}};
+    require(query(original,13,edges,root)==2);
+    const std::array<std::uint64_t,2> at_guard{0x10000,0x10005};
+    require(!query(original,13,edges,at_guard));
+    const std::array<std::uint64_t,2> at_read{0x10000,0x1000d};
+    require(!query(original,13,edges,at_read));
+    auto both_edges=original;both_edges[6]=0; // Taken and fallthrough both reach PC7.
+    require(!query(both_edges,13,{{0x10007,0x10005},{0x1000d,0x10007}},root));
+    auto taken=original;taken[6]=6;taken[8]=5;
+    require(!query(taken,13,{{0x1000d,0x10005},{0x1000e,0x10007}},root));
+    auto changed=original;changed.insert(changed.begin()+7,{0xff,0xc0});changed[6]+=2; // INC EAX.
+    require(!query(changed,15,{{0x10010,0x10005},{0x1000f,0x10009}},root));
+    // A branch entering the JA directly must not borrow the preceding CMP.
+    auto bypass=original;bypass.insert(bypass.begin(),{0x75,5});
+    require(!query(bypass,15,{{0x10007,0x10000},{0x10010,0x10007},{0x1000f,0x10009}},root));
+    // A 32-bit guard cannot bound a 64-bit index with unknown high bits.
+    auto high=original;high[0]=0x48;high.insert(high.begin()+1,0x89);high[2]=0xf8;
+    require(!query(high,14,{{0x1000f,0x10006},{0x1000e,0x10008}},root));
+    // An unchanged index can circulate through a loop after its guard.
+    auto loop=original;loop[6]=9;loop[13]=0x75;loop[14]=0xf8;loop.insert(loop.end(),{0xc3,0xc3});
+    require(query(loop,13,{{0x10010,0x10005},{0x1000d,0x10007},{0x10007,0x1000d}},root)==2);
+    // Independent bounded incoming paths merge conservatively with max, not min.
+    auto merged=original;
+    merged[8]=19; // JMP common RET at 28.
+    merged.insert(merged.end(),original.begin(),original.end());
+    merged[15+4]=3; // The second root's guard admits four values.
+    const std::array<std::uint64_t,2> two_roots{0x10000,0x1000f};
+    require(query(merged,28,{{0x1000e,0x10005},{0x1001c,0x10007},
+        {0x1001d,0x10014},{0x1001c,0x10016}},two_roots)==4);
+    auto call=original;call.insert(call.begin()+7,{0xe8,7,0,0,0});call[6]+=5;
+    require(!query(call,18,{{0x10013,0x10005},{0x10012,0x1000c}},root));
+    const std::vector<std::uint8_t> saved{0x41,0x89,0xfc,0x41,0x83,0xfc,1,0x77,12,
+        0xe8,7,0,0,0,0xeb,4,0xff,0xff,0xff,0xff,0xc3,0xc3};
+    require(query(saved,20,{{0x10015,0x10007},{0x10014,0x1000e}},root,12)==2);
+    auto partial=original;partial.insert(partial.begin()+7,{0xb0,0xff});partial[6]+=2; // MOV AL,255.
+    require(!query(partial,15,{{0x10010,0x10005},{0x1000f,0x10009}},root));
+}
+
+std::vector<std::uint8_t> cfg_switch_fixture(bool invalidating_case=false) {
+    std::vector<std::uint8_t> code{0x89,0xf8,0x83,0xf8,1,0x77,26,0xeb,8};
+    code.insert(code.end(),8,0xff);
+    code.insert(code.end(),{0x48,0x8d,0x0d,0,0,0,0,0x48,0x63,0x04,0x81,0x48,0x01,0xc8,0xff,0xe0,0xc3});
+    const auto table=code.size();code.resize(table+8);
+    const auto first=code.size();
+    if(!invalidating_case) code.insert(code.end(),{0x64,0x48,0x8b,4,0x25,0,0,0,0,0xc3});
+    else {
+        code.insert(code.end(),{0x48,0x89,0xf8,0xe9,0,0,0,0}); // Unknown full-width RDI -> RAX; loop to LEA.
+        const auto delta=std::uint32_t(17-first-8);
+        for(unsigned i=0;i<4;++i) code[first+4+i]=static_cast<std::uint8_t>(delta>>(8*i));
+    }
+    const auto second=code.size();code.push_back(0xc3);
+    for(unsigned i=0;i<4;++i) {
+        code[20+i]=static_cast<std::uint8_t>((table-24)>>(8*i));
+        code[table+i]=static_cast<std::uint8_t>((first-table)>>(8*i));
+        code[table+4+i]=static_cast<std::uint8_t>((second-table)>>(8*i));
+    }
+    return code;
+}
+
+void cfg_switch_tests() {
+    const std::array<std::uint64_t,1> root{0x10000};
+    const auto code=cfg_switch_fixture();
+    const auto a=analyze(code,root);
+    require(a.switch_tables.size()==1 && a.switch_tables[0].invariant_index.has_value() &&
+        a.switch_tables[0].invariant_base.has_value() && a.switch_tables[0].table_size==8);
+    require(GuestTls::inspect(code,a.instructions).sites.size()==1);
+    const std::array<std::uint64_t,2> bypass{0x10000,0x10011};
+    require(analyze(code,bypass).switch_tables.empty());
+    require(analyze(cfg_switch_fixture(true),root).switch_tables.empty());
+    // A coarse bound is insufficient when its whole domain is not a table.
+    // Preserve the unresolved dispatch instead of classifying adjacent bytes.
+    auto coarse=code;coarse[4]=150;
+    const auto unresolved=analyze(coarse,root);
+    require(unresolved.switch_tables.empty() && unresolved.unresolved.size()==1 &&
+            unresolved.unresolved[0].kind==GuestCode::ExitKind::IndirectJump);
+}
+
 void repeated_guard_tests() {
     const std::array<std::uint64_t,1> root{0x10000};
     auto code=switch_fixture();
@@ -240,14 +332,29 @@ void repeated_guard_tests() {
     require(analyze(code,root).switch_tables.size()==1);
     require(GuestTls::inspect(code,analyze(code,root).instructions).sites.size()==1);
     auto different=code;different[7]=0x73; // JAE is not redundant after JA.
-    require(analyze(different,root).switch_tables.empty());
+    // The local redundant-guard proof cannot handle JAE. The CFG bound can
+    // independently use the earlier JA: an extra branch does not widen EAX.
+    const auto narrowed=analyze(different,root);
+    require(narrowed.switch_tables.size()==1 && narrowed.switch_tables[0].invariant_index.has_value() &&
+            narrowed.switch_tables[0].table_size==8);
     // An entry directly at the duplicate guard bypasses the proven compare.
     const std::array<std::uint64_t,2> bypass{0x10000,0x10007};
     require(analyze(code,bypass).switch_tables.empty());
-    // A flag change between guards cannot be ignored.
+    // A flag change cannot be ignored as a redundant guard, but does not
+    // destroy an index bound already established on the earlier fallthrough.
     auto changed=code;changed.insert(changed.begin()+7,0xf8); // CLC.
     changed[6]+=1;
-    require(analyze(changed,root).switch_tables.empty());
+    const auto flags=analyze(changed,root);
+    require(flags.switch_tables.size()==1 && flags.switch_tables[0].invariant_index.has_value());
+    const auto local_refuses=[&](const auto& input,const auto& graph) {
+        std::vector<GuestTls::CodeRange> tail;
+        for(const auto& r:graph.instructions)
+            if(r.address<=graph.switch_tables[0].dispatch_address) tail.push_back(r);
+        const std::array<GuestTls::CodeRange,1> ranges{{{0,0x10000,input.size()}}};
+        require(!GuestCode::Detail::recognize_switch(input,ranges,tail,{}));
+    };
+    local_refuses(different,narrowed);
+    local_refuses(changed,flags);
     // A local LEA before a call is not part of the index guard. The separate
     // CFG proof must establish the callee-saved base across that call.
     std::vector<std::uint8_t> across_call{0x4c,0x8d,0x3d,0,0,0,0,0xe8,0,0,0,0,
@@ -313,6 +420,8 @@ void census_tests() {
 }
 
 int main() try {
+    cfg_bound_tests();
+    cfg_switch_tests();
     census_tests();
     repeated_guard_tests();
     const std::array<std::uint64_t,1> root{0x10000};

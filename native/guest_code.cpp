@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "guest_code.hpp"
 #include "guest_constants.hpp"
+#include "guest_bounds.hpp"
 #include "guest_switch.hpp"
 #include <Zydis/Zydis.h>
 #include <algorithm>
@@ -131,6 +132,10 @@ Analysis discover(std::span<const std::uint8_t> executable,
         return Detail::known_rip_base(executable, decoded, branch_predecessors, state_entries,
                                       terminating_calls, pc, gpr);
     };
+    const auto known_bound = [&](std::uint64_t pc,unsigned gpr) {
+        return Detail::known_index_bound(executable,decoded,branch_predecessors,state_entries,
+                                         terminating_calls,pc,gpr);
+    };
     for (;;) {
         while (!pending.empty()) {
             auto pc = pending.back();
@@ -251,6 +256,8 @@ Analysis discover(std::span<const std::uint8_t> executable,
             std::reverse(tail.begin(), tail.end());
             auto evidence = Detail::recognize_switch(executable, ranges, tail, known_base);
             if (!evidence)
+                evidence = Detail::recognize_cfg_switch(executable,ranges,tail,known_base,known_bound);
+            if (!evidence)
                 continue;
             const auto begin = evidence->table_address;
             const auto end_data = begin + evidence->table_size;
@@ -303,6 +310,10 @@ Analysis discover(std::span<const std::uint8_t> executable,
                                    known_base(sw.invariant_base->address, sw.invariant_base->gpr);
                                if (!constant || *constant != sw.table_address)
                                    bypass = true;
+                           }
+                           if (sw.invariant_index) {
+                               const auto count=known_bound(sw.invariant_index->address,sw.invariant_index->gpr);
+                               if (!count || *count != sw.table_size/4) bypass=true;
                            }
                            for (const auto &[source, target] : incoming) {
                                if (target <= sw.entry_address || target > sw.dispatch_address)
