@@ -14,13 +14,23 @@ struct NoReturnTarget {
     std::uint64_t address;
     std::vector<std::uint8_t> expected_bytes;
 };
+struct SwitchTable {
+    std::uint64_t entry_address;
+    std::uint64_t guard_address;
+    std::uint64_t dispatch_address;
+    std::uint64_t table_address;
+    std::uint64_t table_size;
+    std::vector<std::uint64_t> targets;
+};
 struct Analysis {
     std::vector<GuestTls::CodeRange> instructions;
     std::vector<Exit> unresolved;
+    // Guarded relative tables for known roots/edges, not a completeness claim.
+    std::vector<SwitchTable> switch_tables;
 };
 // Diagnostic evidence only: roots do not prove that every possible entry was
 // supplied. Follow direct control flow without decoding unreachable inline
-// pools. Record indirect/external exits; never assume their targets or skip
+// pools. Refine supported bounded relative switches. Record other indirect/external exits; never assume their targets or skip
 // undecodable reachable bytes. Reject instruction overlaps and interior entries.
 // A caller may provide metadata-verified nonreturning import thunks, guarded by
 // original thunk bytes as well as the executable hash. No guessed noreturns.

@@ -6,13 +6,21 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <source_location>
 
-void require(bool ok) { if (!ok) throw std::runtime_error("guest code assertion failed"); }
-template<class F> void rejects(F action, const char* expected) {
-    bool rejected = false;
-    try { action(); } catch (const std::runtime_error& e) { rejected = std::string(e.what()).find(expected) != std::string::npos; }
-    require(rejected);
+void require(bool ok, std::source_location site=std::source_location::current()) {
+    if (!ok) throw std::runtime_error("guest code assertion failed at line " + std::to_string(site.line()));
 }
+template<class F> void rejects(F action, const char* expected, std::source_location site=std::source_location::current()) {
+    std::string actual = "no rejection";
+    try { action(); } catch (const std::runtime_error& e) {
+        actual = e.what();
+        if (actual.find(expected) != std::string::npos) return;
+    }
+    throw std::runtime_error("expected rejection '" + std::string(expected) + "' at line " +
+        std::to_string(site.line()) + ": " + actual);
+}
+
 std::string hash(std::span<const std::uint8_t> bytes) {
     std::array<unsigned char,EVP_MAX_MD_SIZE> digest{};
     unsigned length = 0;
@@ -26,6 +34,60 @@ GuestCode::Analysis analyze(std::span<const std::uint8_t> code,
     const std::array<GuestTls::CodeRange,1> ranges{{{0,0x10000,code.size()}}};
     return GuestCode::discover(code,ranges,roots,hash(code),limit);
 }
+std::vector<std::uint8_t> switch_fixture(bool base_first = false) {
+    std::vector<std::uint8_t> code;
+    if (!base_first) code={0x89,0xf8,0x83,0xf8,1,0x77,16,0x48,0x8d,0x15,10,0,0,0};
+    else code={0x48,0x8d,0x15,17,0,0,0,0x89,0xf8,0x83,0xf8,1,0x77,9};
+    const std::vector<std::uint8_t> rest{0x48,0x63,0x04,0x82,0x48,0x01,0xd0,0xff,0xe0,0xc3,
+        8,0,0,0,18,0,0,0,0x64,0x48,0x8b,4,0x25,0,0,0,0,0xc3,0xc3};
+    code.insert(code.end(),rest.begin(),rest.end());
+    return code;
+}
+void switch_tests() {
+    const std::array<std::uint64_t,1> root{0x10000};
+    for (bool base_first : {false,true}) {
+        const auto code=switch_fixture(base_first);
+        const auto analysis=analyze(code,root);
+        require(analysis.unresolved.empty() && analysis.switch_tables.size()==1);
+        const auto& table=analysis.switch_tables[0];
+        require(table.dispatch_address==0x10015 && table.table_address==0x10018 && table.table_size==8 &&
+            table.targets==std::vector<std::uint64_t>{0x10020,0x1002a});
+        require(GuestTls::inspect(code,analysis.instructions).sites.size()==1);
+        for(const auto& ins:analysis.instructions) require(ins.address<0x10018 || ins.address>=0x10020);
+    }
+    // The guard may check an argument's low 32 bits before copying them to
+    // the actual address index. That copy must use the same source register.
+    auto copied_index=switch_fixture();
+    const std::array<std::uint8_t,7> copy_prefix{0x83,0xff,1,0x77,18,0x89,0xf8};
+    std::copy(copy_prefix.begin(),copy_prefix.end(),copied_index.begin());
+    require(analyze(copied_index,root).switch_tables.size()==1);
+    auto unrelated_copy=copied_index; unrelated_copy[6]=0xc8; // MOV EAX,ECX, not EDI.
+    require(analyze(unrelated_copy,root).switch_tables.empty());
+    auto unknown_upper=switch_fixture(); unknown_upper[0]=0x90; unknown_upper[1]=0x90;
+    require(analyze(unknown_upper,root).switch_tables.empty());
+    auto undefined_writer=switch_fixture();
+    undefined_writer.erase(undefined_writer.begin(),undefined_writer.begin()+2);
+    undefined_writer.insert(undefined_writer.begin(),{0x0f,0xbc,0xc7}); // BSF EAX,EDI: zero input is undefined.
+    require(analyze(undefined_writer,root).switch_tables.empty());
+    auto wrong_guard=switch_fixture(); wrong_guard[5]=0x76; // JBE does not guard the upper bound.
+    require(analyze(wrong_guard,root).switch_tables.empty());
+    auto guard_bypass=switch_fixture(); guard_bypass[6]=0; // Out-of-bound branch enters LEA.
+    require(analyze(guard_bypass,root).switch_tables.empty());
+    // A later root must not silently bypass the initialization/guard proof.
+    require(analyze(switch_fixture(),std::array<std::uint64_t,2>{0x10000,0x10007}).switch_tables.empty());
+    auto outside=switch_fixture(); outside[24]=0xff; outside[25]=0xff; outside[26]=0xff; outside[27]=0x7f;
+    rejects([&] { analyze(outside,root); },"switch target outside");
+    auto in_table=switch_fixture(); in_table[24]=0;
+    rejects([&] { analyze(in_table,root); },"inside table");
+    auto truncated=switch_fixture(); truncated[10]=27; // Table points too close to the mapping end.
+    rejects([&] { analyze(truncated,root); },"table exceeds");
+    auto interior=switch_fixture(); interior[28]=9; // Case two enters case one's MOV.
+    rejects([&] { analyze(interior,root); },"overlaps");
+    // JAE with limit two bounds the same two entries (instead of JA limit one).
+    auto exclusive=switch_fixture(); exclusive[4]=2; exclusive[5]=0x73;
+    require(analyze(exclusive,root).switch_tables.size()==1);
+}
+
 int main() try {
     const std::array<std::uint64_t,1> root{0x10000};
     // Jump over undecodable inline data, then execute a guest FS load and RET.
@@ -83,6 +145,7 @@ int main() try {
     // Fallthrough at the mapping end remains an unresolved edge.
     const std::vector<std::uint8_t> tail{0x90};
     require(analyze(tail,root).unresolved[0].target==0x10001);
+    switch_tests();
     std::cout << "guest control-flow evidence and strict refusal tests passed\n";
     return 0;
 } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
