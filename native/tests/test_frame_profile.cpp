@@ -58,7 +58,8 @@ int main() {
         check(column(row, "service_calls") == 2, "service call count");
         check(column(row, "worker_cpu_ms") > 0.0, "retired worker CPU time missing");
         check(column(quiet, "all_gpu_ms") == 0.0 && column(quiet, "service_calls") == 0, "second frame not a delta");
-        std::filesystem::remove(path);
+        std::error_code ignored; // Windows: the profile keeps its file open until exit.
+        std::filesystem::remove(path, ignored);
         std::puts("frame profile: per-frame deltas and thread accounting passed");
         return 0;
     } catch (const std::exception& error) {
