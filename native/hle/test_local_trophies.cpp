@@ -85,7 +85,7 @@ int main() {
     LocalTrophies corrupt;
     check(call(corrupt, "XbkjbobZlCY", {ptr(&other_context), 4096}) ==
           0x80551622);
-    unsetenv("SKY_TROPHY_CATALOGUES");
+    SkyHost::unset_environment("SKY_TROPHY_CATALOGUES");
     LocalTrophies absent;
     check(call(absent, "XbkjbobZlCY", {ptr(&other_context), 4096}) ==
           0x80551622);
