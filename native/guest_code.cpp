@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "guest_code.hpp"
+#include "guest_constants.hpp"
 #include "guest_switch.hpp"
 #include <Zydis/Zydis.h>
 #include <algorithm>
@@ -72,6 +73,12 @@ Analysis discover(std::span<const std::uint8_t> executable,
     std::vector<std::pair<std::uint64_t, std::uint64_t>> incoming;
     std::map<std::uint64_t, std::uint64_t> table_data;
     std::set<std::uint64_t> resolved_dispatches;
+    std::set<std::uint64_t> state_entries(roots.begin(), roots.end()), terminating_calls;
+    std::multimap<std::uint64_t, std::uint64_t> branch_predecessors;
+    const auto known_base = [&](std::uint64_t pc, unsigned gpr) {
+        return Detail::known_rip_base(executable, decoded, branch_predecessors, state_entries,
+                                      terminating_calls, pc, gpr);
+    };
     for (;;) {
         while (!pending.empty()) {
             auto pc = pending.back();
@@ -141,8 +148,14 @@ Analysis discover(std::span<const std::uint8_t> executable,
                                 ZydisCalcAbsoluteAddress(&instruction, &target_operand, pc, &target)))
                             fail(pc, "cannot resolve relative control flow");
                         incoming.emplace_back(pc, target);
-                        if (call && terminating.contains(target))
+                        if (call && locate(target))
+                            state_entries.insert(target);
+                        if (branch && locate(target))
+                            branch_predecessors.emplace(target, pc);
+                        if (call && terminating.contains(target)) {
                             returns = false;
+                            terminating_calls.insert(pc);
+                        }
                         if (locate(target))
                             pending.push_back(target);
                         else
@@ -175,7 +188,7 @@ Analysis discover(std::span<const std::uint8_t> executable,
             if (at == decoded.end())
                 fail(exit.address, "indirect dispatch is not decoded");
             std::vector<GuestTls::CodeRange> tail;
-            for (unsigned i = 0; i < 8; ++i) {
+            for (unsigned i = 0; i < 32; ++i) {
                 if (!tail.empty() && at->second.address + at->second.size != tail.back().address)
                     break;
                 tail.push_back(at->second);
@@ -184,7 +197,7 @@ Analysis discover(std::span<const std::uint8_t> executable,
                 --at;
             }
             std::reverse(tail.begin(), tail.end());
-            auto evidence = Detail::recognize_switch(executable, ranges, tail);
+            auto evidence = Detail::recognize_switch(executable, ranges, tail, known_base);
             if (!evidence)
                 continue;
             const auto begin = evidence->table_address;
@@ -209,6 +222,7 @@ Analysis discover(std::span<const std::uint8_t> executable,
             table_data.emplace(merge_begin, merge_end);
             for (auto target : evidence->targets) {
                 incoming.emplace_back(exit.address, target);
+                branch_predecessors.emplace(target, exit.address);
                 pending.push_back(target);
             }
             result.switch_tables.push_back(std::move(*evidence));
@@ -232,6 +246,12 @@ Analysis discover(std::span<const std::uint8_t> executable,
                            bool bypass = std::any_of(roots.begin(), roots.end(), [&](auto root) {
                                return root > sw.entry_address && root <= sw.dispatch_address;
                            });
+                           if (sw.invariant_base) {
+                               const auto constant =
+                                   known_base(sw.invariant_base->address, sw.invariant_base->gpr);
+                               if (!constant || *constant != sw.table_address)
+                                   bypass = true;
+                           }
                            for (const auto &[source, target] : incoming) {
                                if (target <= sw.entry_address || target > sw.dispatch_address)
                                    continue;

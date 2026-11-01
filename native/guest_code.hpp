@@ -2,6 +2,7 @@
 #pragma once
 #include "guest_tls.hpp"
 #include <cstddef>
+#include <optional>
 
 namespace GuestCode {
 enum class ExitKind { IndirectJump, IndirectCall, ExternalBranch, ExternalCall, Trap };
@@ -14,6 +15,10 @@ struct NoReturnTarget {
     std::uint64_t address;
     std::vector<std::uint8_t> expected_bytes;
 };
+struct BaseRead {
+    std::uint64_t address;
+    unsigned gpr;
+};
 struct SwitchTable {
     std::uint64_t entry_address;
     std::uint64_t guard_address;
@@ -21,6 +26,7 @@ struct SwitchTable {
     std::uint64_t table_address;
     std::uint64_t table_size;
     std::vector<std::uint64_t> targets;
+    std::optional<BaseRead> invariant_base;
 };
 struct Analysis {
     std::vector<GuestTls::CodeRange> instructions;

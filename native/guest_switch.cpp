@@ -22,10 +22,11 @@ ZydisRegister enclosing(ZydisRegister r) {
     return ZydisRegisterGetLargestEnclosing(ZYDIS_MACHINE_MODE_LONG_64, r);
 }
 } // namespace
-std::optional<SwitchTable> recognize_switch(std::span<const std::uint8_t> executable,
-                                            std::span<const GuestTls::CodeRange> ranges,
-                                            std::span<const GuestTls::CodeRange> tail) {
-    if (tail.size() < 6 || tail.size() > 8)
+std::optional<SwitchTable>
+recognize_switch(std::span<const std::uint8_t> executable, std::span<const GuestTls::CodeRange> ranges,
+                 std::span<const GuestTls::CodeRange> tail,
+                 const std::function<std::optional<std::uint64_t>(std::uint64_t, unsigned)> &known_base) {
+    if (tail.size() < 6 || tail.size() > 32)
         return {};
     ZydisDecoder decoder{};
     if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64)))
@@ -45,17 +46,100 @@ std::optional<SwitchTable> recognize_switch(std::span<const std::uint8_t> execut
             return {};
         code.push_back(decoded);
     }
+    const auto number = [](ZydisRegister r) -> unsigned {
+        r = enclosing(r);
+        return r >= ZYDIS_REGISTER_RAX && r <= ZYDIS_REGISTER_R15
+                   ? static_cast<unsigned>(r - ZYDIS_REGISTER_RAX)
+                   : 16;
+    };
+    const auto context_move = [&](const Decoded &i) {
+        const auto mnemonic = i.instruction.mnemonic;
+        if (mnemonic != ZYDIS_MNEMONIC_MOV && mnemonic != ZYDIS_MNEMONIC_MOVZX &&
+            mnemonic != ZYDIS_MNEMONIC_MOVSX && mnemonic != ZYDIS_MNEMONIC_MOVSXD &&
+            mnemonic != ZYDIS_MNEMONIC_LEA)
+            return false;
+        if (i.instruction.operand_count_visible != 2 || i.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER ||
+            number(i.operands[0].reg.value) >= 16 || (i.operands[0].size != 32 && i.operands[0].size != 64))
+            return false;
+        const auto kind = i.operands[1].type;
+        return kind == ZYDIS_OPERAND_TYPE_REGISTER || kind == ZYDIS_OPERAND_TYPE_MEMORY ||
+               (mnemonic == ZYDIS_MNEMONIC_MOV && kind == ZYDIS_OPERAND_TYPE_IMMEDIATE);
+    };
+    const auto defined_alu32 = [&](const Decoded &i) {
+        const auto mnemonic = i.instruction.mnemonic;
+        const bool unary = mnemonic == ZYDIS_MNEMONIC_INC || mnemonic == ZYDIS_MNEMONIC_DEC;
+        const bool binary = mnemonic == ZYDIS_MNEMONIC_ADD || mnemonic == ZYDIS_MNEMONIC_SUB ||
+                            mnemonic == ZYDIS_MNEMONIC_AND || mnemonic == ZYDIS_MNEMONIC_OR ||
+                            mnemonic == ZYDIS_MNEMONIC_XOR;
+        return (unary || binary) && i.instruction.operand_count_visible == (unary ? 1 : 2) &&
+               i.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && i.operands[0].size == 32 &&
+               number(i.operands[0].reg.value) < 16 && (i.operands[0].actions & ZYDIS_OPERAND_ACTION_WRITE) &&
+               !(i.operands[0].actions & ZYDIS_OPERAND_ACTION_CONDWRITE);
+    };
+    const auto safe_vector = [&](const Decoded &i) {
+        const auto encoding = i.instruction.encoding;
+        if (encoding != ZYDIS_INSTRUCTION_ENCODING_VEX && encoding != ZYDIS_INSTRUCTION_ENCODING_EVEX &&
+            encoding != ZYDIS_INSTRUCTION_ENCODING_XOP)
+            return false;
+        const auto category = i.instruction.meta.category;
+        if (category == ZYDIS_CATEGORY_CALL || category == ZYDIS_CATEGORY_COND_BR ||
+            category == ZYDIS_CATEGORY_UNCOND_BR || category == ZYDIS_CATEGORY_RET ||
+            category == ZYDIS_CATEGORY_INTERRUPT || category == ZYDIS_CATEGORY_SYSCALL ||
+            category == ZYDIS_CATEGORY_SYSRET)
+            return false;
+        for (unsigned operand = 0; operand < i.instruction.operand_count; ++operand) {
+            const auto &o = i.operands[operand];
+            if (!(o.actions & ZYDIS_OPERAND_ACTION_MASK_WRITE))
+                continue;
+            if (o.type == ZYDIS_OPERAND_TYPE_MEMORY ||
+                (o.type == ZYDIS_OPERAND_TYPE_REGISTER && number(o.reg.value) < 16))
+                return false;
+        }
+        return true;
+    };
+    const auto writes_gpr = [&](const Decoded &i, ZydisRegister r) {
+        for (unsigned operand = 0; operand < i.instruction.operand_count; ++operand) {
+            const auto &o = i.operands[operand];
+            if (o.type == ZYDIS_OPERAND_TYPE_REGISTER && enclosing(o.reg.value) == r &&
+                (o.actions & ZYDIS_OPERAND_ACTION_MASK_WRITE))
+                return true;
+        }
+        return false;
+    };
     const auto n = code.size();
     const auto &jump = code[n - 1];
-    const auto &add = code[n - 2];
-    const auto &load = code[n - 3];
     if (jump.instruction.mnemonic != ZYDIS_MNEMONIC_JMP || jump.instruction.operand_count_visible != 1 ||
         jump.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || jump.operands[0].size != 64)
         return {};
-    const auto destination = jump.operands[0].reg.value;
-    if (destination == ZYDIS_REGISTER_RSP || add.instruction.mnemonic != ZYDIS_MNEMONIC_ADD ||
-        !reg(add, 0, destination) || add.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER ||
-        add.operands[1].size != 64)
+    auto destination = jump.operands[0].reg.value;
+    if (destination == ZYDIS_REGISTER_RSP || number(destination) >= 16)
+        return {};
+    auto add_at = n;
+    for (std::size_t at = n - 1; at > 0;) {
+        --at;
+        const auto &i = code[at];
+        if (i.instruction.mnemonic == ZYDIS_MNEMONIC_ADD && reg(i, 0, destination)) {
+            add_at = at;
+            break;
+        }
+        if (safe_vector(i))
+            continue;
+        if (!context_move(i))
+            return {};
+        if (writes_gpr(i, destination)) {
+            if (i.instruction.mnemonic != ZYDIS_MNEMONIC_MOV || !reg(i, 0, destination) ||
+                i.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER || i.operands[1].size != 64 ||
+                number(i.operands[1].reg.value) >= 16 || i.operands[1].reg.value == ZYDIS_REGISTER_RSP)
+                return {};
+            destination = i.operands[1].reg.value;
+        }
+    }
+    if (add_at == n || !add_at)
+        return {};
+    const auto load_at = add_at - 1;
+    const auto &add = code[add_at];
+    const auto &load = code[load_at];
+    if (add.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER || add.operands[1].size != 64)
         return {};
     const auto base = add.operands[1].reg.value;
     if (base == destination || base == ZYDIS_REGISTER_RSP ||
@@ -70,59 +154,55 @@ std::optional<SwitchTable> recognize_switch(std::span<const std::uint8_t> execut
         (memory.mem.segment != ZYDIS_REGISTER_DS && memory.mem.segment != ZYDIS_REGISTER_SS))
         return {};
     const auto index = memory.mem.index;
-    // The bound may apply directly to the table index or to a source copied
-    // into it by MOV r32,r32 after the guard (which clears unknown upper bits).
-    std::size_t lea_at, guard_at, cmp_at, copy_at = n;
-    if (code[n - 4].instruction.mnemonic == ZYDIS_MNEMONIC_LEA) {
-        lea_at = n - 4;
-        if (code[n - 5].instruction.mnemonic == ZYDIS_MNEMONIC_MOV) {
-            if (n < 7)
-                return {};
-            copy_at = n - 5;
-            guard_at = n - 6;
-            cmp_at = n - 7;
-        } else {
-            guard_at = n - 5;
-            cmp_at = n - 6;
+    std::size_t lea_at = n, guard_at = n, cmp_at = n;
+    for (std::size_t at = load_at; at > 0;) {
+        --at;
+        const auto &candidate = code[at];
+        if (guard_at == n && at > 0 &&
+            (candidate.instruction.mnemonic == ZYDIS_MNEMONIC_JNBE ||
+             candidate.instruction.mnemonic == ZYDIS_MNEMONIC_JNB) &&
+            code[at - 1].instruction.mnemonic == ZYDIS_MNEMONIC_CMP) {
+            guard_at = at;
+            cmp_at = at - 1;
         }
-    } else {
-        if (code[n - 4].instruction.mnemonic == ZYDIS_MNEMONIC_MOV) {
-            copy_at = n - 4;
-            guard_at = n - 5;
-            cmp_at = n - 6;
-        } else {
-            guard_at = n - 4;
-            cmp_at = n - 5;
+    }
+    auto needed_base = base;
+    for (std::size_t at = load_at; at > 0;) {
+        --at;
+        const auto &candidate = code[at];
+        if (!writes_gpr(candidate, needed_base))
+            continue;
+        if (candidate.instruction.mnemonic == ZYDIS_MNEMONIC_LEA && reg(candidate, 0, needed_base) &&
+            candidate.operands[1].type == ZYDIS_OPERAND_TYPE_MEMORY &&
+            candidate.operands[1].mem.base == ZYDIS_REGISTER_RIP &&
+            candidate.operands[1].mem.index == ZYDIS_REGISTER_NONE &&
+            candidate.instruction.address_width == 64) {
+            lea_at = at;
+            break;
         }
-        lea_at = cmp_at;
-        while (lea_at && code[lea_at].instruction.mnemonic != ZYDIS_MNEMONIC_LEA)
-            --lea_at;
-        if (code[lea_at].instruction.mnemonic != ZYDIS_MNEMONIC_LEA)
-            return {};
+        if (candidate.instruction.mnemonic == ZYDIS_MNEMONIC_MOV && reg(candidate, 0, needed_base) &&
+            candidate.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER && candidate.operands[1].size == 64 &&
+            number(candidate.operands[1].reg.value) < 16 &&
+            candidate.operands[1].reg.value != ZYDIS_REGISTER_RSP) {
+            needed_base = candidate.operands[1].reg.value;
+            continue;
+        }
+        return {};
     }
-    auto comparison_index = index;
-    if (copy_at != n) {
-        const auto &copy = code[copy_at];
-        if (copy.instruction.operand_count_visible != 2 ||
-            copy.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || copy.operands[0].size != 32 ||
-            enclosing(copy.operands[0].reg.value) != index ||
-            copy.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER || copy.operands[1].size != 32)
-            return {};
-        comparison_index = enclosing(copy.operands[1].reg.value);
-    }
-    const auto &lea = code[lea_at];
+    std::optional<std::uint64_t> invariant_base;
+    if (lea_at == n && needed_base == base && known_base)
+        invariant_base = known_base(load.range.address, number(base));
+    if ((lea_at == n && !invariant_base) || guard_at == n)
+        return {};
     const auto &guard = code[guard_at];
     const auto &cmp = code[cmp_at];
-    if (!reg(lea, 0, base) || lea.operands[1].type != ZYDIS_OPERAND_TYPE_MEMORY ||
-        lea.operands[1].mem.base != ZYDIS_REGISTER_RIP || lea.operands[1].mem.index != ZYDIS_REGISTER_NONE ||
-        lea.instruction.address_width != 64 || cmp.instruction.mnemonic != ZYDIS_MNEMONIC_CMP ||
-        (guard.instruction.mnemonic != ZYDIS_MNEMONIC_JNBE &&
-         guard.instruction.mnemonic != ZYDIS_MNEMONIC_JNB) ||
-        guard.operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE || !guard.operands[0].imm.is_relative ||
+    if (guard.operands[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE || !guard.operands[0].imm.is_relative ||
         cmp.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER ||
-        enclosing(cmp.operands[0].reg.value) != comparison_index ||
         (cmp.operands[0].size != 32 && cmp.operands[0].size != 64) ||
         cmp.operands[1].type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
+        return {};
+    const auto comparison_index = enclosing(cmp.operands[0].reg.value);
+    if (number(comparison_index) >= 16 || number(index) >= 16)
         return {};
     const auto &immediate = cmp.operands[1].imm;
     if (immediate.is_signed && immediate.value.s < 0)
@@ -134,43 +214,68 @@ std::optional<SwitchTable> recognize_switch(std::span<const std::uint8_t> execut
     if (!count)
         return {};
     auto entry_at = std::min(cmp_at, lea_at);
-    auto zero_at = n;
-    if (cmp.operands[0].size == 32 && copy_at == n) {
-        // A low-32 comparison cannot bound the full address index unless an
-        // unconditional 32-bit write has first cleared the upper half.
-        bool zero_extended = false;
+    bool upper_zero = cmp.operands[0].size == 64;
+    if (!upper_zero) {
         for (std::size_t at = cmp_at; at > 0;) {
             --at;
             const auto &writer = code[at];
-            if (at == lea_at)
-                continue; // Writes a distinct table-base register.
-            const auto &operand = writer.operands[0];
-            const auto mnemonic = writer.instruction.mnemonic;
-            const bool defined_write = mnemonic == ZYDIS_MNEMONIC_MOV || mnemonic == ZYDIS_MNEMONIC_MOVZX ||
-                                       mnemonic == ZYDIS_MNEMONIC_MOVSX || mnemonic == ZYDIS_MNEMONIC_LEA;
-            if (defined_write && writer.instruction.operand_count_visible &&
-                operand.type == ZYDIS_OPERAND_TYPE_REGISTER && enclosing(operand.reg.value) == index &&
-                operand.size == 32 && operand.actions == ZYDIS_OPERAND_ACTION_WRITE &&
-                writer.instruction.meta.category != ZYDIS_CATEGORY_CALL) {
+            if (writer.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER ||
+                enclosing(writer.operands[0].reg.value) != comparison_index ||
+                !(writer.operands[0].actions & ZYDIS_OPERAND_ACTION_MASK_WRITE))
+                continue;
+            if ((context_move(writer) || defined_alu32(writer)) &&
+                (writer.operands[0].actions == ZYDIS_OPERAND_ACTION_WRITE || defined_alu32(writer)) &&
+                (writer.operands[0].size == 32 ||
+                 (writer.instruction.mnemonic == ZYDIS_MNEMONIC_MOVSXD && writer.operands[0].size == 64 &&
+                  writer.operands[1].size == 32))) {
+                upper_zero = true;
                 entry_at = std::min(entry_at, at);
-                zero_at = at;
-                zero_extended = true;
             }
-            break; // No arbitrary backward dataflow guesses.
+            break;
         }
-        if (!zero_extended)
+    }
+    struct Bound {
+        bool low = false;
+        bool full = false;
+    };
+    std::array<Bound, 16> bounds{};
+    bounds[number(comparison_index)] = {true, upper_zero};
+    // Track only the guarded value through explicit moves. Modeled arithmetic
+    // after the guard kills facts; vector operations must leave GPRs and memory
+    // unchanged. No unrelated value is guessed to carry the bound.
+    for (std::size_t at = entry_at; at < load_at; ++at) {
+        if (at == cmp_at || at == guard_at)
+            continue;
+        const auto &i = code[at];
+        if (safe_vector(i))
+            continue;
+        if (!context_move(i) && !defined_alu32(i))
+            return {};
+        const auto destination_number = number(i.operands[0].reg.value);
+        if (at <= guard_at)
+            continue;
+        Bound value{};
+        if (i.instruction.mnemonic == ZYDIS_MNEMONIC_MOV &&
+            i.operands[1].type == ZYDIS_OPERAND_TYPE_REGISTER && i.operands[0].size == i.operands[1].size &&
+            number(i.operands[1].reg.value) < 16) {
+            value = bounds[number(i.operands[1].reg.value)];
+            if (i.operands[0].size == 32)
+                value.full = value.low;
+        }
+        bounds[destination_number] = value;
+    }
+    if (!bounds[number(index)].full)
+        return {};
+    ZyanU64 table = 0, out_of_bounds = 0;
+    if (invariant_base)
+        table = *invariant_base;
+    else {
+        const auto &lea = code[lea_at];
+        if (!ZYAN_SUCCESS(
+                ZydisCalcAbsoluteAddress(&lea.instruction, &lea.operands[1], lea.range.address, &table)))
             return {};
     }
-    // Between the LEA and CMP, only that proven index initialization is allowed.
-    for (std::size_t at = entry_at; at < cmp_at; ++at) {
-        if (at == lea_at || at == zero_at)
-            continue;
-        return {};
-    }
-    ZyanU64 table = 0, out_of_bounds = 0;
-    if (!ZYAN_SUCCESS(
-            ZydisCalcAbsoluteAddress(&lea.instruction, &lea.operands[1], lea.range.address, &table)) ||
-        !ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&guard.instruction, &guard.operands[0], guard.range.address,
+    if (!ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&guard.instruction, &guard.operands[0], guard.range.address,
                                                &out_of_bounds)))
         return {};
     if (out_of_bounds >= guard.range.address + guard.range.size &&
@@ -192,7 +297,9 @@ std::optional<SwitchTable> recognize_switch(std::span<const std::uint8_t> execut
         throw std::runtime_error("bounded switch table exceeds mapped source");
     const auto source = range->file_offset + table - range->address;
     SwitchTable result{
-        code[entry_at].range.address, guard.range.address, jump.range.address, table, bytes, {}};
+        code[entry_at].range.address, guard.range.address, jump.range.address, table, bytes, {}, {}};
+    if (invariant_base)
+        result.invariant_base = BaseRead{load.range.address, number(base)};
     for (std::uint64_t i = 0; i < count; ++i) {
         std::uint32_t bits = 0;
         for (unsigned byte = 0; byte < 4; ++byte)

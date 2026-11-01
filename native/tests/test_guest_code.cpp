@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "guest_code.hpp"
+#include "guest_constants.hpp"
 #include <openssl/evp.h>
 #include <array>
 #include <iomanip>
@@ -43,6 +44,110 @@ std::vector<std::uint8_t> switch_fixture(bool base_first = false) {
     code.insert(code.end(),rest.begin(),rest.end());
     return code;
 }
+std::vector<std::uint8_t> copy_switch_fixture(bool wide_compare, bool wide_copy, unsigned initialization=0, bool chain=false) {
+    std::vector<std::uint8_t> code;
+    if(initialization==1) code={0x89,0xf7}; // MOV EDI,ESI clears the high half.
+    if(initialization==2) code={0x48,0x63,0xfe}; // MOVSXD RDI,ESI; guard excludes negatives.
+    if(wide_compare) code.push_back(0x48);
+    code.insert(code.end(),{0x83,0xff,1});
+    const auto guard=code.size(); code.insert(code.end(),{0x77,0});
+    if(chain) code.insert(code.end(),{0x89,0xf9,0x89,0xc8}); // EDI -> ECX -> EAX.
+    else { if(wide_copy) code.push_back(0x48); code.insert(code.end(),{0x89,0xf8}); }
+    code.insert(code.end(),{0xb9,42,0,0,0}); // Unrelated MOV ECX,42 must not destroy RAX's bound.
+    const auto lea=code.size();code.insert(code.end(),{0x48,0x8d,0x15,0,0,0,0});
+    code.insert(code.end(),{0x48,0x63,0x04,0x82,0x48,0x01,0xd0,0xff,0xe0});
+    const auto default_case=code.size();code.push_back(0xc3);
+    const auto table=code.size();code.resize(code.size()+8);
+    const auto first=code.size();code.insert(code.end(),{0x64,0x48,0x8b,4,0x25,0,0,0,0,0xc3});
+    const auto second=code.size();code.push_back(0xc3);
+    code[guard+1]=static_cast<std::uint8_t>(default_case-guard-2);
+    for(unsigned i=0;i<4;++i) {
+        code[lea+3+i]=static_cast<std::uint8_t>((table-lea-7)>>(8*i));
+        code[table+i]=static_cast<std::uint8_t>((first-table)>>(8*i));
+        code[table+4+i]=static_cast<std::uint8_t>((second-table)>>(8*i));
+    }
+    return code;
+}
+void constant_tests() {
+    const std::array<std::uint64_t,1> root{0x10000};
+    const std::vector<std::uint8_t> loop{0x4c,0x8d,0x3d,0x39,0,0,0,0x90,0x75,0xfd,0xc3};
+    const auto evidence=analyze(loop,root);
+    std::map<std::uint64_t,GuestTls::CodeRange> instructions;
+    for(const auto& r:evidence.instructions) instructions.emplace(r.address,r);
+    const std::multimap<std::uint64_t,std::uint64_t> back_edge{{0x10007,0x10008}};
+    require(GuestCode::Detail::known_rip_base(loop,instructions,back_edge,{0x10000},{},0x10007,15)==0x10040);
+    require(!GuestCode::Detail::known_rip_base(loop,instructions,back_edge,{0x10000,0x10007},{},0x10007,15));
+    // Different incoming definitions must agree, even if both paths are valid.
+    std::vector<std::uint8_t> conflict{0x85,0xc0,0x74,9,
+        0x4c,0x8d,0x3d,0,0,0,0,0xeb,7,0x4c,0x8d,0x3d,0,0,0,0,0x90,0xc3};
+    const auto set_lea=[&](unsigned offset,std::uint64_t value) {
+        const auto displacement=static_cast<std::uint32_t>(value-(0x10000+offset+7));
+        for(unsigned i=0;i<4;++i) conflict[offset+3+i]=static_cast<std::uint8_t>(displacement>>(i*8));
+    };
+    set_lea(4,0x11000); set_lea(13,0x12000);
+    auto graph=analyze(conflict,root); instructions.clear();
+    for(const auto& r:graph.instructions) instructions.emplace(r.address,r);
+    const std::multimap<std::uint64_t,std::uint64_t> incoming{{0x1000d,0x10002},{0x10014,0x1000b}};
+    require(!GuestCode::Detail::known_rip_base(conflict,instructions,incoming,{0x10000},{},0x10014,15));
+    set_lea(13,0x11000);
+    require(GuestCode::Detail::known_rip_base(conflict,instructions,incoming,{0x10000},{},0x10014,15)==0x11000);
+    // Calls preserve guest callee-saved registers, but not RAX/other volatile registers.
+    for(unsigned gpr : {0u,15u}) {
+        std::vector<std::uint8_t> call={static_cast<std::uint8_t>(gpr==15?0x4c:0x48),0x8d,
+            static_cast<std::uint8_t>(gpr==15?0x3d:0x05),0x39,0,0,0,0xff,0xd2,0x90,0xc3};
+        graph=analyze(call,root); instructions.clear();
+        for(const auto& r:graph.instructions) instructions.emplace(r.address,r);
+        const auto value=GuestCode::Detail::known_rip_base(call,instructions,{}, {0x10000},{},0x10009,gpr);
+        require(gpr==15 ? value==0x10040 : !value);
+        require(!GuestCode::Detail::known_rip_base(call,instructions,{}, {0x10000},{0x10007},0x10009,gpr));
+    }
+}
+
+std::vector<std::uint8_t> invariant_switch_fixture() {
+    std::vector<std::uint8_t> code{0x4c,0x8d,0x3d,0,0,0,0,0xeb,8};
+    code.insert(code.end(),8,0xff); // Unreachable gap: no contiguous backward LEA search can cross it.
+    code.insert(code.end(),{0x89,0xf8,0x83,0xf8,1});
+    const auto guard=code.size();code.insert(code.end(),{0x77,0});
+    code.insert(code.end(),{0x49,0x63,0x04,0x87,0x4c,0x01,0xf8,0xff,0xe0});
+    const auto default_case=code.size();code.push_back(0xc3);
+    const auto table=code.size();code.resize(code.size()+8);
+    const auto first=code.size();code.insert(code.end(),{0x64,0x48,0x8b,4,0x25,0,0,0,0,0xc3});
+    const auto second=code.size();code.push_back(0xc3);
+    code[guard+1]=static_cast<std::uint8_t>(default_case-guard-2);
+    for(unsigned i=0;i<4;++i) {
+        code[3+i]=static_cast<std::uint8_t>((table-7)>>(8*i));
+        code[table+i]=static_cast<std::uint8_t>((first-table)>>(8*i));
+        code[table+4+i]=static_cast<std::uint8_t>((second-table)>>(8*i));
+    }
+    return code;
+}
+
+std::vector<std::uint8_t> decorated_switch_fixture(bool copied_base, bool copied_target, unsigned vector_kind=0, bool clobber_base=false) {
+    std::vector<std::uint8_t> code{0x89,0xf8,0x83,0xf8,1};
+    const auto guard=code.size();code.insert(code.end(),{0x77,0});
+    if(vector_kind==1) code.insert(code.end(),{0xc5,0xf8,0x57,0xc0}); // VXORPS XMM0,XMM0,XMM0.
+    if(vector_kind==2) code.insert(code.end(),{0xc5,0xfa,0x2c,0xc0}); // VCVTTSS2SI EAX,XMM0 kills the index bound.
+    const auto lea=code.size();code.insert(code.end(),{0x48,0x8d,static_cast<std::uint8_t>(copied_base?0x3d:0x15),0,0,0,0});
+    if(copied_base) code.insert(code.end(),{0x48,0x89,0xfa}); // RDI table address -> RDX.
+    if(clobber_base) code.insert(code.end(),{0xba,0,0,0,0});
+    if(vector_kind==3) code.insert(code.end(),{0xc5,0xfa,0x11,0x02}); // VMOVSS [RDX],XMM0 writes table memory.
+    code.insert(code.end(),{0x48,0x63,0x04,0x82,0x48,0x01,0xd0});
+    if(copied_target) code.insert(code.end(),{0x48,0x89,0xc1}); // Copy formed target RAX -> RCX.
+    code.insert(code.end(),{0xba,123,0,0,0}); // Base may be restored/clobbered AFTER the target is formed.
+    code.insert(code.end(),{0xff,static_cast<std::uint8_t>(copied_target?0xe1:0xe0)});
+    const auto default_case=code.size();code.push_back(0xc3);
+    const auto table=code.size();code.resize(code.size()+8);
+    const auto first=code.size();code.insert(code.end(),{0x64,0x48,0x8b,4,0x25,0,0,0,0,0xc3});
+    const auto second=code.size();code.push_back(0xc3);
+    code[guard+1]=static_cast<std::uint8_t>(default_case-guard-2);
+    for(unsigned i=0;i<4;++i) {
+        code[lea+3+i]=static_cast<std::uint8_t>((table-lea-7)>>(8*i));
+        code[table+i]=static_cast<std::uint8_t>((first-table)>>(8*i));
+        code[table+4+i]=static_cast<std::uint8_t>((second-table)>>(8*i));
+    }
+    return code;
+}
+
 void switch_tests() {
     const std::array<std::uint64_t,1> root{0x10000};
     for (bool base_first : {false,true}) {
@@ -63,12 +168,48 @@ void switch_tests() {
     require(analyze(copied_index,root).switch_tables.size()==1);
     auto unrelated_copy=copied_index; unrelated_copy[6]=0xc8; // MOV EAX,ECX, not EDI.
     require(analyze(unrelated_copy,root).switch_tables.empty());
+    require(analyze(copy_switch_fixture(false,false),root).switch_tables.size()==1);
+    require(analyze(copy_switch_fixture(false,true),root).switch_tables.empty()); // Unknown upper half copied too.
+    require(analyze(copy_switch_fixture(true,true),root).switch_tables.size()==1);
+    require(analyze(copy_switch_fixture(false,true,1),root).switch_tables.size()==1);
+    require(analyze(copy_switch_fixture(false,true,2),root).switch_tables.size()==1);
+    require(analyze(copy_switch_fixture(false,false,0,true),root).switch_tables.size()==1);
+    const auto invariant=invariant_switch_fixture();
+    require(analyze(invariant,root).switch_tables.size()==1);
+    require(analyze(invariant,std::array<std::uint64_t,2>{0x10000,0x10011}).switch_tables.empty());
+    for(bool copied_base : {false,true}) for(bool copied_target : {false,true}) {
+        const auto decorated=decorated_switch_fixture(copied_base,copied_target,1);
+        const auto discovered=analyze(decorated,root);
+        require(discovered.switch_tables.size()==1 && GuestTls::inspect(decorated,discovered.instructions).sites.size()==1);
+    }
+    require(analyze(decorated_switch_fixture(true,false,2),root).switch_tables.empty());
+    require(analyze(decorated_switch_fixture(true,false,3),root).switch_tables.empty());
+    require(analyze(decorated_switch_fixture(true,false,0,true),root).switch_tables.empty());
+    auto additional_caller=invariant;
+    const auto caller_offset=additional_caller.size();
+    additional_caller.push_back(0xe8);
+    const auto displacement=static_cast<std::uint32_t>(17-caller_offset-5);
+    for(unsigned i=0;i<4;++i) additional_caller.push_back(static_cast<std::uint8_t>(displacement>>(8*i)));
+    additional_caller.push_back(0xc3);
+    require(analyze(additional_caller,std::array<std::uint64_t,2>{0x10000,0x10000+caller_offset}).switch_tables.empty());
+    auto late_entry=invariant;
+    const auto second_root=late_entry.size();
+    auto second_switch=switch_fixture();
+    const auto cross_target=static_cast<std::uint32_t>(17-second_root-24);
+    for(unsigned i=0;i<4;++i) second_switch[24+i]=static_cast<std::uint8_t>(cross_target>>(8*i));
+    late_entry.insert(late_entry.end(),second_switch.begin(),second_switch.end());
+    const auto revalidated=analyze(late_entry,std::array<std::uint64_t,2>{0x10000,0x10000+second_root});
+    require(revalidated.switch_tables.size()==1 && revalidated.switch_tables[0].dispatch_address==0x10000+second_root+21);
     auto unknown_upper=switch_fixture(); unknown_upper[0]=0x90; unknown_upper[1]=0x90;
     require(analyze(unknown_upper,root).switch_tables.empty());
     auto undefined_writer=switch_fixture();
     undefined_writer.erase(undefined_writer.begin(),undefined_writer.begin()+2);
     undefined_writer.insert(undefined_writer.begin(),{0x0f,0xbc,0xc7}); // BSF EAX,EDI: zero input is undefined.
     require(analyze(undefined_writer,root).switch_tables.empty());
+    auto normalized_index=switch_fixture(); normalized_index[0]=0xff; normalized_index[1]=0xc8; // DEC EAX.
+    require(analyze(normalized_index,root).switch_tables.size()==1);
+    auto incremented_index=switch_fixture(); incremented_index[0]=0xff; incremented_index[1]=0xc0; // INC EAX.
+    require(analyze(incremented_index,root).switch_tables.size()==1);
     auto wrong_guard=switch_fixture(); wrong_guard[5]=0x76; // JBE does not guard the upper bound.
     require(analyze(wrong_guard,root).switch_tables.empty());
     auto guard_bypass=switch_fixture(); guard_bypass[6]=0; // Out-of-bound branch enters LEA.
@@ -146,6 +287,7 @@ int main() try {
     const std::vector<std::uint8_t> tail{0x90};
     require(analyze(tail,root).unresolved[0].target==0x10001);
     switch_tests();
+    constant_tests();
     std::cout << "guest control-flow evidence and strict refusal tests passed\n";
     return 0;
 } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
