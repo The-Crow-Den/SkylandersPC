@@ -10,6 +10,12 @@ with a Vulkan renderer for graphics. The parts the games share live in one
 runtime; anything specific to one game is kept in a small profile matched to
 that game's exact build.
 
+SkylandersPC builds on **bbport** ([bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
+by deadinside28), the native PS4 port work for Bloodborne. Its approach of running the original
+executable natively, and its Vulkan renderer (itself derived from
+[shadPS4](https://github.com/shadps4-emu/shadPS4)), are the foundation this project's host and
+renderer grew from.
+
 | Game | Status |
 | --- | --- |
 | Skylanders: Trap Team | Supported (US and EU) |
@@ -99,6 +105,14 @@ cmake --build .local/native-gpu-build
 - `tests/`: synthetic tests; none need a game.
 
 Unknown system calls are reported, never answered with a fake success.
+
+## Credits
+
+- [bbport / bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by deadinside28: the
+  native-port approach and the renderer this project's `renderer/` is forked from.
+- [shadPS4](https://github.com/shadps4-emu/shadPS4): the PS4 GPU and system-library work bbport
+  builds on.
+- [Cemu](https://github.com/cemu-project/Cemu): the Skylanders portal implementation.
 
 ## License
 
