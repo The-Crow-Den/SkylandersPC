@@ -37,3 +37,9 @@ extern "C" SKY_SYSV_ABI SkyHost::TlsState* sky_host_tls_state() noexcept {
 extern "C" [[noreturn]] SKY_SYSV_ABI void sky_host_bridge_fatal() noexcept {
     ExitProcess(126);
 }
+
+bool SkyHost::tls_access(TlsAccess& result) noexcept {
+    if (!sky_host_tls_state()) return false;
+    result = {static_cast<std::int32_t>(sky_host_tls_offset), true, true};
+    return true;
+}

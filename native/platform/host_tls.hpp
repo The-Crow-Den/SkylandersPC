@@ -2,10 +2,21 @@
 #pragma once
 #include "../guest_abi.hpp"
 #include <cstddef>
+#include <cstdint>
 
 namespace SkyHost {
 // Lives on the host thread, independently of guest FS. Nested entries save and
 // restore both fields. The assembly reads bridge at offset zero.
+// Generated code loads guest_tcb without calling host code or changing flags.
+// Windows: GS:[displacement] -> TlsState* -> guest_tcb. POSIX test path:
+// FS:[displacement] -> guest_tcb, while native FS remains selected.
+struct TlsAccess {
+    std::int32_t displacement;
+    bool indirect;
+    bool use_gs;
+};
+bool tls_access(TlsAccess& result) noexcept;
+
 struct TlsState {
     void* bridge = nullptr;
     void* guest_tcb = nullptr;

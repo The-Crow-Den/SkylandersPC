@@ -93,3 +93,107 @@ void verify(const Manifest& manifest, const Profile& profile) {
         throw std::runtime_error("guest TLS profile hash/count/site digest mismatch");
 }
 }
+
+namespace GuestTls {
+namespace {
+void append_u32(std::vector<std::uint8_t>& output, std::uint32_t value) {
+    for (unsigned i = 0; i < 4; ++i) output.push_back(static_cast<std::uint8_t>(value >> (i * 8)));
+}
+std::uint64_t checked_add(std::uint64_t a, std::uint64_t b) {
+    if (b > std::numeric_limits<std::uint64_t>::max() - a)
+        throw std::runtime_error("guest TLS address overflow");
+    return a + b;
+}
+void jump(std::vector<std::uint8_t>& output, std::uint64_t pc, std::uint64_t target) {
+    const auto next = checked_add(pc, 5);
+    const auto delta = target >= next ? target - next : next - target;
+    if (delta > (target >= next ? 0x7fffffffULL : 0x80000000ULL))
+        throw std::runtime_error("guest TLS trampoline is outside rel32 range");
+    const auto bits = static_cast<std::uint32_t>(delta);
+    output.push_back(0xe9);
+    append_u32(output, target >= next ? bits : 0u - bits);
+}
+// MOV dst, [dst + disp32]. Only dst is changed, and flags/stack are untouched.
+void load(std::vector<std::uint8_t>& output, unsigned reg, std::int32_t displacement) {
+    output.push_back(static_cast<std::uint8_t>(0x48 | (reg >= 8 ? 5 : 0)));
+    output.push_back(0x8b);
+    output.push_back(static_cast<std::uint8_t>(0x80 | ((reg & 7) << 3) | (reg & 7)));
+    if ((reg & 7) == 4) output.push_back(0x24); // R12 requires a SIB byte.
+    append_u32(output, static_cast<std::uint32_t>(displacement));
+}
+}
+RewritePlan prepare(std::span<const std::uint8_t> executable, std::span<const CodeRange> ranges,
+                    const Profile& profile, std::uint64_t arena_address, std::size_t arena_capacity,
+                    SkyHost::TlsAccess access) {
+    const auto manifest = inspect(executable, ranges);
+    verify(manifest, profile);
+    if (!arena_address) throw std::runtime_error("guest TLS arena address is null");
+    const auto arena_end = checked_add(arena_address, arena_capacity);
+    for (const auto& range : ranges) {
+        if (arena_address < checked_add(range.address, range.size) && range.address < arena_end)
+            throw std::runtime_error("guest TLS arena overlaps guest code");
+    }
+    RewritePlan plan;
+    plan.arena_address_ = arena_address;
+    for (const auto& site : manifest.sites) {
+        const auto start = checked_add(arena_address, plan.trampolines_.size());
+        const auto reg = site.destination_register;
+        // MOV dst, FS/GS:[disp32] (absolute SIB form, no RIP-relative addressing).
+        auto& out = plan.trampolines_;
+        out.push_back(access.use_gs ? 0x65 : 0x64);
+        out.push_back(static_cast<std::uint8_t>(0x48 | (reg >= 8 ? 4 : 0)));
+        out.push_back(0x8b);
+        out.push_back(static_cast<std::uint8_t>(((reg & 7) << 3) | 4));
+        out.push_back(0x25);
+        append_u32(out, static_cast<std::uint32_t>(access.displacement));
+        if (access.indirect) load(out, reg, 8); // TlsState::guest_tcb.
+        load(out, reg, static_cast<std::int32_t>(site.displacement));
+        jump(out, checked_add(arena_address, out.size()), checked_add(site.address, site.expected_bytes.size()));
+        if (out.size() > arena_capacity) throw std::runtime_error("guest TLS trampoline arena is too small");
+        Patch patch{site.address, site.expected_bytes, {}};
+        jump(patch.replacement, site.address, start);
+        patch.replacement.resize(site.expected_bytes.size(), 0x90);
+        plan.patches_.push_back(std::move(patch));
+    }
+    return plan;
+}
+void apply(const RewritePlan& plan, std::span<const WritableCode> code, std::span<std::uint8_t> arena) {
+    if (reinterpret_cast<std::uintptr_t>(arena.data()) != plan.arena_address_ ||
+        arena.size() < plan.trampolines_.size())
+        throw std::runtime_error("guest TLS trampoline mapping mismatch");
+    const auto arena_end = checked_add(plan.arena_address_, arena.size());
+    for (std::size_t i = 0; i < code.size(); ++i) {
+        const auto start = reinterpret_cast<std::uintptr_t>(code[i].bytes.data());
+        const auto end = checked_add(start, code[i].bytes.size());
+        if (start < arena_end && plan.arena_address_ < end)
+            throw std::runtime_error("guest TLS writable mappings overlap arena");
+        for (std::size_t j = 0; j < i; ++j) {
+            const auto other = reinterpret_cast<std::uintptr_t>(code[j].bytes.data());
+            if (start < checked_add(other, code[j].bytes.size()) && other < end)
+                throw std::runtime_error("guest TLS writable mappings overlap");
+        }
+    }
+    std::vector<std::span<std::uint8_t>> destinations;
+    destinations.reserve(plan.patches_.size());
+    for (const auto& patch : plan.patches_) {
+        std::span<std::uint8_t> destination;
+        for (const auto& mapping : code) {
+            const auto start = reinterpret_cast<std::uintptr_t>(mapping.bytes.data());
+            if (patch.address >= start && patch.address - start <= mapping.bytes.size() &&
+                patch.expected_bytes.size() <= mapping.bytes.size() - (patch.address - start)) {
+                destination = mapping.bytes.subspan(static_cast<std::size_t>(patch.address - start), patch.expected_bytes.size());
+                break;
+            }
+        }
+        if (destination.size() != patch.expected_bytes.size() ||
+            !std::equal(destination.begin(), destination.end(), patch.expected_bytes.begin()))
+            throw std::runtime_error("guest TLS original site bytes mismatch");
+        destinations.push_back(destination);
+    }
+    // All validation/allocation completed above: a late mismatch leaves every
+    // code site AND the trampoline arena untouched.
+    std::copy(plan.trampolines_.begin(), plan.trampolines_.end(), arena.begin());
+    for (std::size_t i = 0; i < destinations.size(); ++i)
+        std::copy(plan.patches_[i].replacement.begin(), plan.patches_[i].replacement.end(), destinations[i].begin());
+}
+}
