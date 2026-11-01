@@ -44,6 +44,38 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(sum(x['size'] for x in report['uncovered_ranges']), len(data) - 18)
         self.assertEqual(bytes(data), before)
 
+    def test_only_parsed_metadata_bytes_are_classified(self):
+        report = discover(fixture())
+        spans = report['metadata_ranges']
+        self.assertEqual(spans[-1], {'address': BASE + 0x400, 'size': 28, 'kind': 'unwind'})
+        self.assertTrue(any(s['address'] == BASE + 0x200 and s['size'] == 17 for s in spans))
+        self.assertFalse(any(s['address'] <= BASE + 0x219 < s['address'] + s['size'] for s in spans))
+        self.assertFalse(report['rewrite_authorized'])
+
+    def test_function_cannot_alias_unwind_metadata(self):
+        data = fixture()
+        struct.pack_into('<i', data, 0x228, 0x200 - 0x228)
+        struct.pack_into('<i', data, 0x40c, 0x200 - 0x400)
+        struct.pack_into('<i', data, 0x248, 0x300 - 0x248)
+        struct.pack_into('<i', data, 0x414, 0x300 - 0x400)
+        with self.assertRaisesRegex(ValueError, 'overlaps typed metadata'):
+            discover(data)
+
+    def test_interpreter_extent_is_a_bounded_mapped_string(self):
+        data = fixture()
+        struct.pack_into('<H', data, 56, 3)
+        struct.pack_into('<II6Q', data, 176, 3, 4, 0x180, BASE + 0x180, 0, 4, 4, 1)
+        data[0x180:0x184] = b'/ld\0'
+        report = discover(data)
+        self.assertIn({'address': BASE + 0x180, 'size': 4, 'kind': 'interpreter'}, report['metadata_ranges'])
+        data[0x183] = ord('x')
+        with self.assertRaisesRegex(ValueError, 'interpreter'):
+            discover(data)
+        data[0x183] = 0
+        struct.pack_into('<Q', data, 176 + 16, BASE + 0x190)
+        with self.assertRaisesRegex(ValueError, 'interpreter'):
+            discover(data)
+
     def test_hash_refused_before_container_parse(self):
         with self.assertRaisesRegex(ValueError, 'hash mismatch'):
             t.discover(b'not an ELF', '0' * 64)

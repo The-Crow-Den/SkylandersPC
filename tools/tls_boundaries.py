@@ -114,6 +114,10 @@ def discover(data, expected_sha256):
     if not 0 < count <= executable.MAX_TABLE or frame < 0 or frame >= header['vaddr']:
         raise ValueError('invalid unwind frame address/count')
     executable.take(raw, 12, count * 8)
+    table_size = 12 + count * 8
+    if table_size > header['memsz'] or image.virtual(header['vaddr'], table_size) != raw[:table_size]:
+        raise ValueError('unwind header file/virtual mappings disagree')
+    metadata = [(header['vaddr'], table_size, 'unwind')]
     loads = sorted((p for p in image.programs if p['type'] == 1 and p['flags'] & 1 and p['filesz']),
                    key=lambda p: p['vaddr'])
     for a, b in zip(loads, loads[1:]):
@@ -129,6 +133,7 @@ def discover(data, expected_sha256):
         if fde + 4 + len(record) > header['vaddr']:
             raise ValueError('unwind FDE crosses header')
         seen.add(fde)
+        metadata.append((fde, len(record) + 4, 'unwind'))
         cie_delta = executable.unpack('<I', record)[0]
         cie = fde + 4 - cie_delta
         if not frame <= cie < fde:
@@ -138,6 +143,7 @@ def discover(data, expected_sha256):
             if cie + 4 + len(cie_record) > fde:
                 raise ValueError('unwind CIE overlaps referring FDE')
             cache[cie] = _cie_encoding(cie_record)
+            metadata.append((cie, len(cie_record) + 4, 'unwind'))
         encoding = cache[cie]
         if encoding == 0x1b:
             delta, size = executable.unpack('<ii', record, 4)
@@ -162,6 +168,30 @@ def discover(data, expected_sha256):
             begin, _, source = mappings[0]
             physical = source + logical - begin
         ranges.append({'address': start, 'size': size, 'file_offset': physical})
+    for program in image.programs:
+        if program['type'] != 3:
+            continue
+        size = program['filesz']
+        if not 0 < size <= 4096 or size > program['memsz']:
+            raise ValueError('invalid interpreter metadata extent')
+        text = image.read(program['offset'], size)
+        if text[-1] != 0 or b'\0' in text[:-1] or image.virtual(program['vaddr'], size) != text:
+            raise ValueError('invalid interpreter metadata mapping/string')
+        metadata.append((program['vaddr'], size, 'interpreter'))
+    merged = []
+    for address, size, kind in sorted(metadata):
+        if merged and address < merged[-1]['address'] + merged[-1]['size']:
+            raise ValueError('typed metadata records overlap')
+        elif merged and kind == merged[-1]['kind'] and address == merged[-1]['address'] + merged[-1]['size']:
+            merged[-1]['size'] += size
+        else:
+            merged.append({'address': address, 'size': size, 'kind': kind})
+    index = 0
+    for item in ranges:
+        while index < len(merged) and merged[index]['address'] + merged[index]['size'] <= item['address']:
+            index += 1
+        if index < len(merged) and merged[index]['address'] < item['address'] + item['size']:
+            raise ValueError('unwind function overlaps typed metadata')
     uncovered = []
     index = 0
     for p in loads:
@@ -175,7 +205,8 @@ def discover(data, expected_sha256):
         if cursor < end:
             uncovered.append({'address': cursor, 'size': end - cursor})
     return {'executable_sha256': digest, 'source': 'unwind function metadata',
-            'rewrite_authorized': False, 'function_ranges': ranges, 'uncovered_ranges': uncovered}
+            'rewrite_authorized': False, 'function_ranges': ranges, 'uncovered_ranges': uncovered,
+            'metadata_ranges': merged}
 
 
 def nonreturning_import_thunks(data, expected_sha256):

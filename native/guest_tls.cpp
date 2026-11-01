@@ -65,7 +65,11 @@ Manifest inspect(std::span<const std::uint8_t> executable, std::span<const CodeR
             if (!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder, code.data(), code.size(), &instruction, operands)))
                 reject(address, code, "cannot decode instruction");
             const auto bytes = code.first(instruction.length);
-            if (instruction.attributes & ZYDIS_ATTRIB_HAS_SEGMENT_FS) {
+            // LEA computes an effective offset, and NOP performs no memory
+            // access. Their ignored segment prefixes do not read guest TLS.
+            const bool address_only = instruction.mnemonic == ZYDIS_MNEMONIC_LEA ||
+                                      instruction.mnemonic == ZYDIS_MNEMONIC_NOP;
+            if ((instruction.attributes & ZYDIS_ATTRIB_HAS_SEGMENT_FS) && !address_only) {
                 // First supported form: MOV r64, FS:[absolute disp32]. Other
                 // forms must be implemented and tested before being accepted.
                 if (instruction.mnemonic != ZYDIS_MNEMONIC_MOV || instruction.operand_count_visible != 2 ||

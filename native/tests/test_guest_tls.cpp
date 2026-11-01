@@ -133,6 +133,22 @@ void execution_tests(bool indirect_gs = false) {
     }
 }
 
+void address_only_tests() {
+    // FS-prefixed NOP must not dereference the noncanonical RAX. LEA must
+    // return the offset 42, independently of the host FS base on Linux/Windows.
+    const std::vector<std::uint8_t> original{0x48,0xc7,0xc0,0xff,0xff,0xff,0xff,
+        0x64,0x0f,0x1f,0x00,0x64,0x48,0x8d,0x04,0x25,42,0,0,0,0xc3};
+    SkyHost::CodeMemory code;
+    require(code.allocate(65536));
+    const std::array<GuestTls::CodeRange,1> ranges{{{0,code.address(),original.size()}}};
+    const auto manifest=GuestTls::inspect(original,ranges);
+    require(manifest.sites.empty());
+    std::copy(original.begin(),original.end(),code.writable().begin());
+    require(code.seal());
+    using Function=std::uint64_t (SKY_SYSV_ABI *)();
+    require(reinterpret_cast<Function>(static_cast<std::uintptr_t>(code.address()))()==42);
+}
+
 void patch_refusal_tests() {
     SkyHost::TlsAccess access{};
     require(SkyHost::tls_access(access));
@@ -198,6 +214,7 @@ int main() try {
     const std::array<GuestTls::CodeRange, 1> outside{{{code.size(),0x10000,1}}};
     rejects([&] { GuestTls::inspect(code,outside); });
     patch_refusal_tests();
+    address_only_tests();
     execution_tests();
 #ifndef _WIN32
     execution_tests(true);
