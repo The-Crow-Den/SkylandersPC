@@ -229,7 +229,49 @@ void switch_tests() {
     require(analyze(exclusive,root).switch_tables.size()==1);
 }
 
+void census_tests() {
+    // Operand-size/address-size/REX prefixes can precede FS. Starting only at
+    // 0x64 would lose the actual entry and can change operand/address width.
+    const std::vector<std::uint8_t> code{0xc3,0x66,0x64,0x48,0x8b,0x04,0x25,0,0,0,0,
+        0x67,0x64,0x48,0x8b,0x00,0x48,0x64,0x8b,0x00,
+        0x64,0x48,0x8d,0x00,0x64,0x0f,0x1f,0x00,0x64,0xa4,0x64,0xc3,0x64};
+    const std::array<GuestTls::CodeRange,1> ranges{{{0,0x10000,code.size()}}};
+    const auto candidates=GuestCode::fs_candidates(code,ranges,hash(code));
+    const auto kind_at=[&](unsigned offset, GuestCode::FsCandidateKind kind) {
+        for (const auto& c:candidates) if(c.bytes.address==0x10000+offset) {
+            require(c.bytes.file_offset==offset && c.kind==kind);
+            return;
+        }
+        require(false);
+    };
+    using Kind=GuestCode::FsCandidateKind;
+    for(unsigned offset:{1,2,11,12,16,17,28}) kind_at(offset,Kind::MemoryAccess);
+    kind_at(20,Kind::AddressOnly);
+    kind_at(24,Kind::AddressOnly);
+    kind_at(30,Kind::OtherPrefix);
+    kind_at(32,Kind::Undecodable);
+    rejects([&]{GuestCode::fs_candidates(code,ranges,std::string(64,'0'));},"SHA-256 mismatch");
+    rejects([&]{GuestCode::fs_candidates(code,ranges,hash(code),1);},"limit exceeded");
+    rejects([&]{GuestCode::fs_candidates(code,ranges,hash(code),0);},"bounded candidate limit");
+    const std::array<GuestTls::CodeRange,2> overlap{{ranges[0],ranges[0]}};
+    rejects([&]{GuestCode::fs_candidates(code,overlap,hash(code));},"overlapping");
+    auto outside=ranges;outside[0].size+=1;
+    rejects([&]{GuestCode::fs_candidates(code,outside,hash(code));},"invalid");
+    // Never concatenate mappings to finish a truncated prefix/instruction.
+    const std::array<std::uint8_t,3> split{0x64,0x8b,0x00};
+    const std::array<GuestTls::CodeRange,2> mappings{{{0,0x10000,1},{1,0x20000,2}}};
+    const auto truncated=GuestCode::fs_candidates(split,mappings,hash(split));
+    require(truncated.size()==1 && truncated[0].kind==Kind::Undecodable && truncated[0].bytes.size==1);
+    // FS is a source override on string instructions (hidden operands), but a
+    // later GS override does not access FS. Both still appear in the census.
+    const std::array<std::uint8_t,4> overridden{0x64,0x65,0x8b,0x00};
+    const std::array<GuestTls::CodeRange,1> overridden_range{{{0,0x10000,4}}};
+    const auto other=GuestCode::fs_candidates(overridden,overridden_range,hash(overridden));
+    require(other.size()==1 && other[0].kind==Kind::OtherPrefix);
+}
+
 int main() try {
+    census_tests();
     const std::array<std::uint64_t,1> root{0x10000};
     // Jump over undecodable inline data, then execute a guest FS load and RET.
     const std::vector<std::uint8_t> code{0xeb,4,0xff,0xff,0xff,0xff,

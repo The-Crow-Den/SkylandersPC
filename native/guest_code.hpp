@@ -34,6 +34,20 @@ struct Analysis {
     // Guarded relative tables for known roots/edges, not a completeness claim.
     std::vector<SwitchTable> switch_tables;
 };
+enum class FsCandidateKind { MemoryAccess, AddressOnly, OtherPrefix, Undecodable };
+struct FsCandidate {
+    // Decoded instruction bytes, or up to 15 diagnostic bytes if undecodable.
+    GuestTls::CodeRange bytes;
+    FsCandidateKind kind;
+};
+// Exhaustive diagnostic prefix census, including alternate/misaligned starts.
+// Scan every possible prefix start, including prefixes BEFORE the FS override.
+// No code/data exclusions are accepted here. A candidate is evidence requiring
+// classification, not proof of an instruction; an empty result is not proof of
+// control-flow completeness. Undecodable FS-prefix chains remain explicit.
+std::vector<FsCandidate> fs_candidates(std::span<const std::uint8_t> executable,
+    std::span<const GuestTls::CodeRange> executable_ranges, const std::string& expected_sha256,
+    std::size_t max_candidates = 1'000'000);
 // Diagnostic evidence only: roots do not prove that every possible entry was
 // supplied. Follow direct control flow without decoding unreachable inline
 // pools. Refine supported bounded relative switches. Record other indirect/external exits; never assume their targets or skip

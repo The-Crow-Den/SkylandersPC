@@ -19,6 +19,58 @@ namespace {
     throw std::runtime_error(message.str());
 }
 } // namespace
+std::vector<FsCandidate> fs_candidates(std::span<const std::uint8_t> executable,
+    std::span<const GuestTls::CodeRange> executable_ranges, const std::string& expected_sha256,
+    std::size_t max_candidates) {
+    GuestTls::verify_executable(executable, expected_sha256);
+    if (executable_ranges.empty() || !max_candidates || max_candidates>4'000'000)
+        throw std::runtime_error("FS census requires ranges and a bounded candidate limit");
+    std::vector<GuestTls::CodeRange> ranges(executable_ranges.begin(), executable_ranges.end());
+    std::sort(ranges.begin(),ranges.end(),[](const auto& a,const auto& b){return a.address<b.address;});
+    std::uint64_t end=0,total=0;
+    for (const auto& range:ranges) {
+        if (!range.size || range.file_offset>executable.size() ||
+            range.size>executable.size()-range.file_offset ||
+            range.address>std::numeric_limits<std::uint64_t>::max()-range.size || range.address<end ||
+            range.size>512*1024*1024-total)
+            throw std::runtime_error("FS census has invalid/overlapping/oversized executable ranges");
+        end=range.address+range.size;
+        total+=range.size;
+    }
+    const auto prefix=[](std::uint8_t byte) {
+        return (byte>=0x40 && byte<=0x4f) || byte==0xf0 || byte==0xf2 || byte==0xf3 ||
+            byte==0x2e || byte==0x36 || byte==0x3e || byte==0x26 || byte==0x64 ||
+            byte==0x65 || byte==0x66 || byte==0x67;
+    };
+    ZydisDecoder decoder{};
+    if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder,ZYDIS_MACHINE_MODE_LONG_64,ZYDIS_STACK_WIDTH_64)))
+        throw std::runtime_error("cannot initialize FS census decoder");
+    std::vector<FsCandidate> result;
+    for (const auto& range:ranges) for (std::uint64_t offset=0;offset<range.size;++offset) {
+        const auto source=range.file_offset+offset;
+        const auto available=static_cast<std::size_t>(std::min<std::uint64_t>(15,range.size-offset));
+        bool fs=false;
+        for (std::size_t i=0;i<available && prefix(executable[source+i]);++i)
+            fs |= executable[source+i]==0x64;
+        if (!fs) continue;
+        if (result.size()>=max_candidates) fail(range.address+offset,"FS census candidate limit exceeded");
+        ZydisDecodedInstruction instruction{};
+        ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT]{};
+        FsCandidate candidate{{source,range.address+offset,available},FsCandidateKind::Undecodable};
+        if (ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder,executable.data()+source,available,&instruction,operands))) {
+            candidate.bytes.size=instruction.length;
+            candidate.kind=FsCandidateKind::OtherPrefix;
+            if (instruction.mnemonic==ZYDIS_MNEMONIC_LEA || instruction.mnemonic==ZYDIS_MNEMONIC_NOP)
+                candidate.kind=FsCandidateKind::AddressOnly;
+            else for (unsigned i=0;i<instruction.operand_count;++i)
+                if (operands[i].type==ZYDIS_OPERAND_TYPE_MEMORY && operands[i].mem.segment==ZYDIS_REGISTER_FS)
+                    candidate.kind=FsCandidateKind::MemoryAccess;
+        }
+        result.push_back(candidate);
+    }
+    return result;
+}
+
 Analysis discover(std::span<const std::uint8_t> executable,
                   std::span<const GuestTls::CodeRange> executable_ranges,
                   std::span<const std::uint64_t> roots, const std::string &expected_sha256,
