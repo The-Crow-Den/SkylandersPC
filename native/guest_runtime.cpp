@@ -184,7 +184,7 @@ struct GuestRuntime::Impl {
             throw std::runtime_error("cannot protect diagnostic import thunks");
     }
 
-    [[noreturn]] static void trap(std::uint64_t id) {
+    [[noreturn]] static SKY_SYSV_ABI void trap(std::uint64_t id) {
         if (!active || id >= active->names.size()) _exit(126);
         const auto name = escaped(active->names[static_cast<std::size_t>(id)]);
         dprintf(STDERR_FILENO, "{\"event\":\"unsupported-import\",\"index\":%llu,\"name\":%s,\"guest_executed\":true}\n",
@@ -192,7 +192,7 @@ struct GuestRuntime::Impl {
         _exit(20);
     }
 
-    static std::uint64_t call(std::uint64_t id, const std::uint64_t* registers, const std::uint64_t* stack_arguments) {
+    static SKY_SYSV_ABI std::uint64_t call(std::uint64_t id, const std::uint64_t* registers, const std::uint64_t* stack_arguments) {
         if (!active || id >= active->names.size()) _exit(126);
         const auto& identity = active->names[static_cast<std::size_t>(id)];
         std::array<std::uint64_t, 12> arguments{};
@@ -355,7 +355,7 @@ struct GuestRuntime::Impl {
         }
     }
 
-    static int fault(int signal, void* raw_info, void* raw_context) {
+    static SKY_SYSV_ABI int fault(int signal, void* raw_info, void* raw_context) {
         if (SkyGpu::handle_fault(signal, raw_info, raw_context)) return 1;
         const auto* info = static_cast<siginfo_t*>(raw_info);
         const auto* context = static_cast<ucontext_t*>(raw_context);

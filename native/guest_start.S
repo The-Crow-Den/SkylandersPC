@@ -1,11 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-/* Original Linux x86-64 bridge: FS is guest TLS; GS holds our per-entry state. */
-#if !defined(__linux__) || !defined(__x86_64__)
-#error "sky_guest_start requires Linux x86-64"
+/* SysV bridge. Linux switches FS/GS; Windows keeps both host bases intact. */
+#if (!defined(__linux__) && !defined(_WIN32)) || !defined(__x86_64__)
+#error "sky_guest_start requires Linux or Windows x86-64"
+#endif
+#ifdef _WIN32
+#define BRIDGE(offset) offset(%r11)
+#else
+#define BRIDGE(offset) %gs:offset
 #endif
     .text
+#ifdef _WIN32
+    .macro load_bridge
+    movl sky_host_tls_offset(%rip), %r11d
+    testl %r11d, %r11d
+    jz .Lfatal
+    movq %gs:(%r11), %r11
+    testq %r11, %r11
+    jz .Lfatal
+    movq 0(%r11), %r11
+    testq %r11, %r11
+    jz .Lfatal
+    .endm
+#endif
     .globl sky_guest_start
+#ifdef __ELF__
     .type sky_guest_start,@function
+#endif
 sky_guest_start:
     testq %rdi, %rdi
     jz .Linvalid
@@ -27,6 +47,16 @@ sky_guest_start:
     movq %rsi, 8(%rsp)
     movq %rdi, 16(%rsp)
     movq $0, 24(%rsp)
+#ifdef _WIN32
+    call sky_host_tls_state
+    testq %rax, %rax
+    jz .Ltls_unavailable
+    movq %rax, 0(%rsp)
+    movq 0(%rax), %rdx
+    movq %rdx, 32(%rsp)
+    movq 8(%rax), %rdx
+    movq %rdx, 96(%rsp)
+#else
     movq $158, %rax
     movq $0x1003, %rdi
     movq %rsp, %rsi
@@ -39,6 +69,7 @@ sky_guest_start:
     syscall
     testq %rax, %rax
     jnz .Lreturn
+#endif
 .Lclaim:
     movl .Lactive(%rip), %eax
     cmpl $-1, %eax
@@ -49,10 +80,13 @@ sky_guest_start:
     movq $1, 24(%rsp)
     /* Feature selection runs under host FS, once cached by the C++ helper.
        This per-entry flag follows nested GS contexts without global mutation. */
+#ifndef _WIN32
     call sky_guest_fast_tls_enabled
     movl %eax, %eax
     movq %rax, 96(%rsp)
-    /* GS state: host FS, host stack, trap, fault, call, magic,
+#endif
+    /* Bridge state (Linux GS base, Windows host TLS pointer):
+       host FS/TLS state, host stack, trap, fault, call, magic,
        saved guest stack and per-entry direct-FS flag. */
     movq 0(%rsp), %rax
     movq %rax, 40(%rsp)
@@ -64,6 +98,14 @@ sky_guest_start:
     movq .Lcall_handler(%rip), %rax
     movq %rax, 72(%rsp)
     movq $0x534b5942, 80(%rsp)
+#ifdef _WIN32
+    movq 0(%rsp), %rax
+    leaq 40(%rsp), %rdx
+    movq %rdx, 0(%rax)
+    movq 16(%rsp), %r12
+    movq 16(%r12), %rdx
+    movq %rdx, 8(%rax)
+#else
     movq $158, %rax
     movq $0x1001, %rdi
     leaq 40(%rsp), %rsi
@@ -77,6 +119,7 @@ sky_guest_start:
     syscall
     testq %rax, %rax
     jnz .Lfinish
+#endif
     movq 8(%r12), %rdx
     andq $-16, %rdx
     subq $16, %rdx
@@ -90,16 +133,25 @@ sky_guest_start:
     movq %rax, %r13
     movq %r12, %rsp
 .Lentry_restore_fs:
+#ifndef _WIN32
     movq 0(%rsp), %rsi
     movq $0x1002, %rdi
     movq $158, %rax
     syscall
     testq %rax, %rax
     jnz .Lrestore_failed
+#endif
     movq 8(%rsp), %rdx
     movq %r13, 0(%rdx)
     xorl %eax, %eax
 .Lfinish:
+#ifdef _WIN32
+    movq 0(%rsp), %rdx
+    movq 32(%rsp), %rcx
+    movq %rcx, 0(%rdx)
+    movq 96(%rsp), %rcx
+    movq %rcx, 8(%rdx)
+#else
     movq %rax, 88(%rsp)
     movq 32(%rsp), %rsi
     movq $0x1001, %rdi
@@ -108,6 +160,7 @@ sky_guest_start:
     testq %rax, %rax
     jnz .Lrestore_failed
     movq 88(%rsp), %rax
+#endif
 .Lreturn:
     cmpq $0, 24(%rsp)
     je .Lregisters
@@ -127,27 +180,47 @@ sky_guest_start:
 .Linvalid:
     movl $-22, %eax
     ret
+#ifdef _WIN32
+.Ltls_unavailable:
+    movl $-12, %eax
+    jmp .Lreturn
+#else
 .Lrestore_failed:
     movq $231, %rax
     movq $127, %rdi
     syscall
     ud2
+#endif
+#ifdef __ELF__
     .size sky_guest_start, .-sky_guest_start
+#endif
 
     .globl sky_guest_configure_trap
+#ifdef __ELF__
     .type sky_guest_configure_trap,@function
+#endif
 sky_guest_configure_trap:
     leaq .Ltrap_handler(%rip), %r8
     jmp .Lconfigure
+#ifdef __ELF__
     .size sky_guest_configure_trap, .-sky_guest_configure_trap
+#endif
+#ifndef _WIN32
     .globl sky_guest_configure_fault
+#ifdef __ELF__
     .type sky_guest_configure_fault,@function
+#endif
 sky_guest_configure_fault:
     leaq .Lfault_handler(%rip), %r8
     jmp .Lconfigure
+#ifdef __ELF__
     .size sky_guest_configure_fault, .-sky_guest_configure_fault
+#endif
+#endif
     .globl sky_guest_configure_call
+#ifdef __ELF__
     .type sky_guest_configure_call,@function
+#endif
 sky_guest_configure_call:
     leaq .Lcall_handler(%rip), %r8
 .Lconfigure:
@@ -162,33 +235,58 @@ sky_guest_configure_call:
 .Lconfiguration_busy:
     movl $-16, %eax
     ret
+#ifdef __ELF__
     .size sky_guest_configure_call, .-sky_guest_configure_call
+#endif
 
     .globl sky_guest_trap_bridge
+#ifdef __ELF__
     .type sky_guest_trap_bridge,@function
+#endif
 sky_guest_trap_bridge:
-    cmpq $0x534b5942, %gs:40
+#ifdef _WIN32
+    load_bridge
+#endif
+    cmpq $0x534b5942, BRIDGE(40)
     jne .Lfatal
-    cmpq $0, %gs:16
+#ifdef _WIN32
+    // Valid entries terminate on the native stack, including absent handlers.
+    movq BRIDGE(8), %rsp
+#endif
+    cmpq $0, BRIDGE(16)
     je .Lfatal
-    movq %gs:0, %rsi
+#ifndef _WIN32
+    movq BRIDGE(0), %rsi
     movq $0x1002, %rdi
     movq $158, %rax
     syscall
     testq %rax, %rax
     jnz .Lrestore_failed
-    movq %gs:8, %rsp
+#endif
+    movq BRIDGE(8), %rsp
     movq %r10, %rdi
-    call *%gs:16
+    call *BRIDGE(16)
 .Lfatal:
+#ifdef _WIN32
+    // Termination helper is SysV; align even if entered via a guest JMP.
+    andq $-16, %rsp
+    call sky_host_bridge_fatal
+    ud2
+#else
     movq $231, %rax
     movq $126, %rdi
     syscall
     ud2
+#endif
+#ifdef __ELF__
     .size sky_guest_trap_bridge, .-sky_guest_trap_bridge
+#endif
 
+#ifndef _WIN32
     .globl sky_guest_fault_bridge
+#ifdef __ELF__
     .type sky_guest_fault_bridge,@function
+#endif
 sky_guest_fault_bridge:
     /* Stay on the alternate signal stack so a handled fault can sigreturn.
        Preserve callee-saved registers and the interrupted thread's FS base. */
@@ -216,9 +314,9 @@ sky_guest_fault_bridge:
     jnz .Lfatal
     cmpq $0, 32(%rsp)
     je .Lfault_host_ready
-    cmpq $0x534b5942, %gs:40
+    cmpq $0x534b5942, BRIDGE(40)
     jne .Lfatal
-    movq %gs:0, %rsi
+    movq BRIDGE(0), %rsi
     movq $0x1002, %rdi
     movq $158, %rax
     syscall
@@ -247,15 +345,30 @@ sky_guest_fault_bridge:
     popq %rbx
     popq %rbp
     ret
+#ifdef __ELF__
     .size sky_guest_fault_bridge, .-sky_guest_fault_bridge
+#endif
 
+#endif
     .globl sky_guest_call_bridge
+#ifdef __ELF__
     .type sky_guest_call_bridge,@function
+#endif
 sky_guest_call_bridge:
-    cmpq $0x534b5942, %gs:40
+#ifdef _WIN32
+    load_bridge
+#endif
+    cmpq $0x534b5942, BRIDGE(40)
     jne .Lfatal
-    cmpq $0, %gs:32
+    cmpq $0, BRIDGE(32)
+#ifdef _WIN32
+    jne .Lcall_present
+    movq BRIDGE(8), %rsp
+    jmp .Lfatal
+.Lcall_present:
+#else
     je .Lfatal
+#endif
     subq $72, %rsp
     movq %rdi, 0(%rsp)
     movq %rsi, 8(%rsp)
@@ -264,12 +377,13 @@ sky_guest_call_bridge:
     movq %r8, 32(%rsp)
     movq %r9, 40(%rsp)
     movq %r10, 48(%rsp)
-    movq %rsp, %gs:48
-    cmpq $0, %gs:56
+    movq %rsp, BRIDGE(48)
+#ifndef _WIN32
+    cmpq $0, BRIDGE(56)
     je .Lcall_syscall_fs
     rdfsbase %rax
     movq %rax, 56(%rsp)
-    movq %gs:0, %rax
+    movq BRIDGE(0), %rax
     wrfsbase %rax
     jmp .Lcall_host_fs_ready
 .Lcall_syscall_fs:
@@ -279,22 +393,27 @@ sky_guest_call_bridge:
     syscall
     testq %rax, %rax
     jnz .Lrestore_failed
-    movq %gs:0, %rsi
+    movq BRIDGE(0), %rsi
     movq $0x1002, %rdi
     movq $158, %rax
     syscall
     testq %rax, %rax
     jnz .Lrestore_failed
 .Lcall_host_fs_ready:
+#endif
     movq 48(%rsp), %rdi
     movq %rsp, %rsi
     leaq 80(%rsp), %rdx
-    movq %gs:8, %rsp
-    call *%gs:32
-    movq %gs:48, %rsp
+    movq BRIDGE(8), %rsp
+    call *BRIDGE(32)
+#ifdef _WIN32
+    load_bridge
+#endif
+    movq BRIDGE(48), %rsp
     movq %rax, 0(%rsp)
+#ifndef _WIN32
     movq 56(%rsp), %rsi
-    cmpq $0, %gs:56
+    cmpq $0, BRIDGE(56)
     je .Lcall_syscall_restore
     wrfsbase %rsi
     jmp .Lcall_guest_fs_ready
@@ -305,33 +424,74 @@ sky_guest_call_bridge:
     testq %rax, %rax
     jnz .Lrestore_failed
 .Lcall_guest_fs_ready:
+#endif
     movq 0(%rsp), %rax
     addq $72, %rsp
     ret
+#ifdef __ELF__
     .size sky_guest_call_bridge, .-sky_guest_call_bridge
+#endif
 
     .globl sky_guest_thread_exit
+#ifdef __ELF__
     .type sky_guest_thread_exit,@function
+#endif
 sky_guest_thread_exit:
+#ifdef _WIN32
+    load_bridge
+#endif
     /* Called with host FS from the explicit thread-exit service. No host
        resources may be held on the abandoned service stack. */
-    cmpq $0x534b5942, %gs:40
+    cmpq $0x534b5942, BRIDGE(40)
     jne .Lfatal
     movq %rdi, %r13
-    movq %gs:8, %rsp
+    movq BRIDGE(8), %rsp
     jmp .Lentry_restore_fs
+#ifdef __ELF__
     .size sky_guest_thread_exit, .-sky_guest_thread_exit
+#endif
 
     .globl sky_host_call_integer
+#ifdef __ELF__
     .type sky_host_call_integer,@function
+#endif
 sky_host_call_integer:
-    /* Host FS already selected. Twelve prepared integer/pointer arguments.
-       Pack six stack slots, then fill the six SysV argument registers. */
+    /* Host TLS already selected. Twelve prepared integer/pointer arguments.
+       The bridge entry is SysV; the target function uses the native host ABI. */
     pushq %r12
     pushq %r13
+#ifdef _WIN32
+    subq $104, %rsp
+#else
     subq $56, %rsp
+#endif
     movq %rdi, %r12
     movq %rsi, %r13
+#ifdef _WIN32
+    /* Win64 shadow space, then arguments five through twelve. */
+    movq 32(%r13), %rax
+    movq %rax, 32(%rsp)
+    movq 40(%r13), %rax
+    movq %rax, 40(%rsp)
+    movq 48(%r13), %rax
+    movq %rax, 48(%rsp)
+    movq 56(%r13), %rax
+    movq %rax, 56(%rsp)
+    movq 64(%r13), %rax
+    movq %rax, 64(%rsp)
+    movq 72(%r13), %rax
+    movq %rax, 72(%rsp)
+    movq 80(%r13), %rax
+    movq %rax, 80(%rsp)
+    movq 88(%r13), %rax
+    movq %rax, 88(%rsp)
+    movq 0(%r13), %rcx
+    movq 8(%r13), %rdx
+    movq 16(%r13), %r8
+    movq 24(%r13), %r9
+    call *%r12
+    addq $104, %rsp
+#else
     movq 48(%r13), %rax
     movq %rax, 0(%rsp)
     movq 56(%r13), %rax
@@ -352,14 +512,19 @@ sky_host_call_integer:
     movq 40(%r13), %r9
     call *%r12
     addq $56, %rsp
+#endif
     popq %r13
     popq %r12
     ret
+#ifdef __ELF__
     .size sky_host_call_integer, .-sky_host_call_integer
+#endif
     .bss
     .p2align 3
 .Ltrap_handler: .quad 0
 .Lfault_handler: .quad 0
 .Lcall_handler: .quad 0
 .Lactive: .long 0
+#ifdef __ELF__
     .section .note.GNU-stack,"",@progbits
+#endif

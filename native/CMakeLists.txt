@@ -4,14 +4,15 @@ project(SkylandersNativeHost LANGUAGES CXX ASM)
 find_package(Threads REQUIRED)
 # Host platform layer (platform/): POSIX on Linux, Win32 on Windows (MinGW).
 if(WIN32)
-  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp platform/host_tls_win32.cpp)
 else()
-  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp platform/host_tls_posix.cpp)
 endif()
 if(WIN32)
-  # Windows port in progress (docs/windows-port.md): the guest entry bridge,
-  # TLS, fault handling and the file sandbox are POSIX-only so far, so only the
+  # Windows port in progress (docs/windows-port.md): guest FS rewriting, fault
+  # handling and the file sandbox remain to be ported, so only the
   # host pieces that already have a Windows platform layer build and test here.
+  add_compile_options(-mno-ms-bitfields)
   include(CTest)
   find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 
@@ -41,6 +42,7 @@ if(WIN32)
     sky_windows_test(keyboard-pad hle/test_keyboard_pad.cpp)
     sky_windows_test(game-hooks tests/test_game_hooks.cpp)
     sky_windows_test(frame-profile tests/test_frame_profile.cpp)
+    add_subdirectory(tests/guest_start)
   endif()
   return()
 endif()
