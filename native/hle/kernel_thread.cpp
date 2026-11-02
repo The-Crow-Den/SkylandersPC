@@ -11,6 +11,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <thread>
 
 namespace {
