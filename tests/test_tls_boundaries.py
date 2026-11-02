@@ -32,7 +32,148 @@ def discover(data):
     return t.discover(data, hashlib.sha256(data).hexdigest())
 
 
+def exception_fixture(call_encoding=3, type_encoding=0xff, pointer_encoding=0x1b):
+    data = fixture()
+    cie = b'\0\0\0\0\x01zLR\0\x01\x78\x10\x02' + bytes((pointer_encoding, 0x1b))
+    struct.pack_into('<I', data, 0x200, len(cie))
+    data[0x204:0x204 + len(cie)] = cie
+    width = 4 if pointer_encoding == 0x1b else 8
+    for fde, pc in ((0x220, 0x100), (0x240, 0x120)):
+        value = 0 if pc == 0x120 else (0x300 - (fde + 17) if width == 4 else BASE + 0x300)
+        content = struct.pack('<IiiB', fde + 4 - 0x200, pc - fde - 8, 9, width)
+        content += struct.pack('<i' if width == 4 else '<Q', value)
+        struct.pack_into('<I', data, fde, len(content))
+        data[fde + 4:fde + 4 + len(content)] = content
+    header = bytes((0xff, type_encoding))
+    if type_encoding != 0xff:
+        header += b'\x3d'  # Type table base at0x340, relative to byte following this ULEB.
+    row = struct.pack('<III', 0, 3, 5) + b'\0' if call_encoding == 3 else bytes((0, 3, 5, 0))
+    blob = header + bytes((call_encoding, len(row))) + row
+    data[0x300:0x300 + len(blob)] = blob
+    return data
+
+
 class BoundaryTests(unittest.TestCase):
+    def test_exception_call_sites_add_roots_but_no_rewrite_authority(self):
+        data = exception_fixture()
+        before = bytes(data)
+        report = discover(data)
+        self.assertEqual(report['landing_pad_roots'], [BASE + 0x105])
+        table, = report['exception_tables']
+        self.assertEqual(table['address'], BASE + 0x300)
+        self.assertEqual(table['parsed_size'], 17)
+        self.assertEqual(table['call_sites'], [{'address': BASE + 0x100, 'size': 3,
+            'landing_pad': BASE + 0x105, 'action_offset': 0}])
+        self.assertFalse(table['action_type_payloads_parsed'])
+        self.assertFalse(report['rewrite_authorized'])
+        self.assertEqual(bytes(data), before)
+        self.assertIn({'address': BASE + 0x300, 'size': 17, 'kind': 'exception-call-sites'}, report['metadata_ranges'])
+
+    def test_uleb_call_sites_and_absolute_lsda_pointer(self):
+        report = discover(exception_fixture(call_encoding=1, pointer_encoding=0))
+        self.assertEqual(report['landing_pad_roots'], [BASE + 0x105])
+        self.assertEqual(report['exception_tables'][0]['parsed_size'], 8)
+
+    def test_exception_payloads_are_not_implicitly_classified(self):
+        data = exception_fixture(type_encoding=0x9b)
+        data[0x311] = 1  # First action at0x312; its payload is deliberately unparsed.
+        report = discover(data)
+        self.assertEqual(report['exception_tables'][0]['parsed_size'], 18)
+        self.assertFalse(any(r['address'] <= BASE + 0x312 < r['address'] + r['size']
+                             for r in report['metadata_ranges']))
+        data[0x311] = 127
+        with self.assertRaisesRegex(ValueError, 'action reference'):
+            discover(data)
+
+    def test_exception_encodings_and_lengths_refuse_unknown_forms(self):
+        for offset, value in ((0x300, 0x1b), (0x301, 0x12), (0x302, 0x81),
+                              (0x303, 12), (0x303, 14), (0x211, 3), (0x230, 0)):
+            data = exception_fixture()
+            data[offset] = value
+            with self.subTest(offset=offset, value=value), self.assertRaises(ValueError):
+                discover(data)
+        data = exception_fixture()
+        data[0x303:0x30e] = b'\x80' * 11
+        with self.assertRaisesRegex(ValueError, 'LEB'):
+            discover(data)
+
+    def test_exception_ranges_and_landing_pads_must_fit_the_function(self):
+        for offset, value in ((0x304, 10), (0x308, 10), (0x30c, 9)):
+            data = exception_fixture()
+            struct.pack_into('<I', data, offset, value)
+            with self.subTest(offset=offset), self.assertRaisesRegex(ValueError, 'function'):
+                discover(data)
+        data = exception_fixture()
+        struct.pack_into('<I', data, 0x30c, 0)
+        self.assertEqual(discover(data)['landing_pad_roots'], [])
+
+    def test_exception_overlapping_call_sites_are_refused(self):
+        data = exception_fixture()
+        row = data[0x304:0x311]
+        data[0x311:0x31e] = row
+        data[0x303] = 26
+        with self.assertRaisesRegex(ValueError, 'overlap'):
+            discover(data)
+
+    def test_exception_metadata_cannot_alias_function_code(self):
+        data = exception_fixture()
+        data[0x100:0x111] = data[0x300:0x311]
+        struct.pack_into('<i', data, 0x231, 0x100 - 0x231)
+        with self.assertRaisesRegex(ValueError, 'function overlaps typed metadata'):
+            discover(data)
+
+    def test_null_and_shared_exception_pointers(self):
+        data = exception_fixture()
+        struct.pack_into('<i', data, 0x231, 0)
+        self.assertEqual(discover(data)['exception_tables'], [])
+        data = exception_fixture()
+        struct.pack_into('<i', data, 0x251, 0x300 - 0x251)
+        report = discover(data)
+        self.assertEqual(report['landing_pad_roots'], [BASE + 0x105, BASE + 0x125])
+        self.assertEqual(len(report['exception_tables']), 2)
+        self.assertEqual(sum(r['kind'] == 'exception-call-sites' for r in report['metadata_ranges']), 1)
+
+    def test_empty_and_omitted_exception_tables(self):
+        data = exception_fixture()
+        data[0x303] = 0
+        report = discover(data)
+        self.assertEqual(report['landing_pad_roots'], [])
+        self.assertEqual(report['exception_tables'][0]['call_sites'], [])
+        self.assertEqual(report['exception_tables'][0]['parsed_size'], 4)
+        data = exception_fixture()
+        data[0x211] = 0xff
+        for fde, pc in ((0x220, 0x100), (0x240, 0x120)):
+            content = struct.pack('<IiiB', fde + 4 - 0x200, pc - fde - 8, 9, 0)
+            struct.pack_into('<I', data, fde, len(content))
+            data[fde + 4:fde + 4 + len(content)] = content
+        self.assertEqual(discover(data)['exception_tables'], [])
+
+    def test_exception_pointer_and_type_base_must_be_mapped(self):
+        data = exception_fixture()
+        struct.pack_into('<i', data, 0x231, 0x7fffffff)
+        with self.assertRaisesRegex(ValueError, 'read-only'):
+            discover(data)
+        data = exception_fixture(type_encoding=0x9b)
+        data[0x302] = 0
+        with self.assertRaisesRegex(ValueError, 'type table base'):
+            discover(data)
+        data = exception_fixture()
+        struct.pack_into('<I', data, 68, 7)
+        with self.assertRaisesRegex(ValueError, 'read-only'):
+            discover(data)
+
+    def test_exception_records_are_bounded_for_self_and_entry_budget(self):
+        elf = exception_fixture()
+        data = bytearray(0x700)
+        data[:4] = b'O\x15=\x1d'
+        struct.pack_into('<H', data, 24, 1)
+        struct.pack_into('<4Q', data, 32, 0x800, 0x200, len(elf), len(elf))
+        data[64:64 + 176] = elf[:176]
+        data[0x200:0x700] = elf
+        self.assertEqual(discover(data)['landing_pad_roots'], [BASE + 0x105])
+        with self.assertRaisesRegex(ValueError, 'budget'):
+            t._lsda_call_sites(t.executable.Image(elf), BASE + 0x300, BASE + 0x100, 9, 0)
+
     def test_ranges_are_metadata_evidence_and_leave_gaps_unknown(self):
         data = fixture()
         before = bytes(data)
@@ -167,6 +308,43 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(t.nonreturning_import_thunks(data, hashlib.sha256(data).hexdigest()), [])
         with self.assertRaisesRegex(ValueError, 'hash mismatch'):
             t.nonreturning_import_thunks(data, '0' * 64)
+
+    def test_terminate_thunks_use_exact_abi_name_and_both_scopes(self):
+        from test_prepare_native import native_fixture
+        for name, library, module, expected in (
+            ('_ZSt9terminatev', 'libc', 'libc', 1),
+            ('_ZSt9terminatev', 'libc', 'libkernel', 0),
+            ('_ZSt9terminatev', 'libkernel', 'libc', 0),
+            ('__cxa_begin_catch', 'libc', 'libc', 0),
+            ('_ZSt13set_terminatePFvvE', 'libc', 'libc', 0),
+        ):
+            with self.subTest(name=name, library=library, module=module):
+                data = native_fixture()
+                original = b'syntheticNID#A#B'
+                encoded = t.audit_imports.nid(name).encode() + b'#A#B'
+                at = data.index(original)
+                data[at:at + len(original)] = bytes(len(original))
+                data[at:at + len(encoded)] = encoded
+                for old, value in ((b'libSynthetic', library), (b'syntheticModule', module)):
+                    at = data.index(old)
+                    data[at:at + len(old)] = value.encode() + bytes(len(old) - len(value))
+                slot = 0x401008
+                thunk = b'\xff\x25' + struct.pack('<i', slot - (BASE + 0x180 + 6))
+                data[0x180:0x186] = thunk
+                report = t.nonreturning_import_thunks(data, hashlib.sha256(data).hexdigest())
+                self.assertEqual(len(report), expected)
+                if expected:
+                    self.assertEqual(report[0]['import'], t.audit_imports.nid(name) + '#libc#libc')
+                    self.assertEqual(report[0]['expected_bytes_hex'], thunk.hex())
+                    image = t.executable.Image(data)
+                    one, _, _ = t.link_native.dynamic_tables(image)
+                    symbol = next(s for s in t.module_graph.analyze_bytes(data, 'main')['imports']
+                                  if s['nid'] == t.audit_imports.nid(name))
+                    blob = next(p for p in image.programs if p['type'] == 0x61000000)
+                    info = blob['offset'] + one(0x61000039) + symbol['index'] * 24 + 4
+                    data[info] = (data[info] & 0xf0) | 1  # Object symbol cannot provide the function contract.
+                    with self.assertRaisesRegex(ValueError, 'function declaration'):
+                        t.nonreturning_import_thunks(data, hashlib.sha256(data).hexdigest())
 
     def test_bounded_leb_values_and_truncation(self):
         self.assertEqual(t._leb(b'\x78', 0, signed=True), (-8, 1))
