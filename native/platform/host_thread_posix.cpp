@@ -28,6 +28,12 @@ bool ThreadMemory::protect_none(std::size_t offset, std::size_t size) noexcept {
         return false;
     return mprotect(static_cast<unsigned char*>(data_) + offset, size, PROT_NONE) == 0;
 }
+bool ThreadMemory::protect_readonly(std::size_t offset, std::size_t size) noexcept {
+    const auto page = thread_page_size();
+    if (!data_ || !page || !size || offset > size_ || size > size_ - offset || offset % page || size % page)
+        return false;
+    return mprotect(static_cast<unsigned char*>(data_) + offset, size, PROT_READ) == 0;
+}
 struct ThreadFaultContext::Impl {
     ThreadMemory memory;
     stack_t previous{};

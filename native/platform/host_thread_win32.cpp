@@ -66,6 +66,13 @@ bool ThreadMemory::protect_none(std::size_t offset, std::size_t size) noexcept {
     DWORD previous = 0;
     return VirtualProtect(static_cast<unsigned char*>(data_) + offset, size, PAGE_NOACCESS, &previous) != 0;
 }
+bool ThreadMemory::protect_readonly(std::size_t offset, std::size_t size) noexcept {
+    const auto page = thread_page_size();
+    if (!data_ || !page || !size || offset > size_ || size > size_ - offset || offset % page || size % page)
+        return false;
+    DWORD previous = 0;
+    return VirtualProtect(static_cast<unsigned char*>(data_) + offset, size, PAGE_READONLY, &previous) != 0;
+}
 struct ThreadFaultContext::Impl {
     DWORD owner = 0;
     bool active = false;

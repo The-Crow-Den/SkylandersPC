@@ -8,19 +8,22 @@ endif()
 
 # Host platform layer (platform/): POSIX on Linux, Win32 on Windows (MinGW).
 if(WIN32)
-  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp platform/host_tls_win32.cpp platform/host_code_win32.cpp platform/host_fault_win32.cpp platform/host_thread_win32.cpp)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp platform/host_tls_win32.cpp platform/host_code_win32.cpp platform/host_fault_win32.cpp platform/host_thread_win32.cpp platform/host_random_win32.cpp)
 else()
-  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp platform/host_tls_posix.cpp platform/host_code_posix.cpp platform/host_fault_posix.cpp platform/host_thread_posix.cpp)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp platform/host_tls_posix.cpp platform/host_code_posix.cpp platform/host_fault_posix.cpp platform/host_thread_posix.cpp platform/host_random_posix.cpp)
 endif()
 
 # Fault dispatch needs the FS-restoring bridge on POSIX. Keep the platform
 # objects in an archive so memory-only tests don't acquire that dependency.
 add_library(sky-host-platform STATIC ${SKY_HOST_PLATFORM_SOURCES})
 target_compile_features(sky-host-platform PUBLIC cxx_std_20)
+if(WIN32)
+  target_link_libraries(sky-host-platform PUBLIC bcrypt)
+endif()
 target_compile_options(sky-host-platform PRIVATE -Wall -Wextra -Wconversion -Wshadow)
 include(CTest)
 if(BUILD_TESTING)
-  add_executable(host-fault-test tests/test_host_fault.cpp guest_start.S)
+  add_executable(host-fault-test tests/test_host_fault.cpp hle/kernel_data.cpp guest_start.S)
   if(NOT WIN32)
     target_sources(host-fault-test PRIVATE bridge_features.cpp)
   endif()
@@ -80,7 +83,7 @@ if(WIN32)
 
   add_library(sky-host-portable STATIC hle/pure_libc.cpp hle/kernel_sync.cpp
     hle/kernel_memory.cpp hle/offline_network.cpp hle/keyboard_pad.cpp frame_profile.cpp game_hooks.cpp
-    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp)
+    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp hle/kernel_data.cpp)
   target_compile_features(sky-host-portable PUBLIC cxx_std_20)
   target_compile_options(sky-host-portable PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(sky-host-portable PUBLIC sky-host-platform Threads::Threads OpenSSL::Crypto ws2_32)

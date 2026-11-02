@@ -6,7 +6,7 @@
 namespace SkyHost {
 std::size_t thread_page_size() noexcept;
 
-// Zeroed, private RW storage for guest stacks and thread blocks. Low placement
+// Zeroed, private RW storage for guest stacks, thread blocks and data. Low placement
 // retains the existing below-2-GiB guest-thread policy. This is an anywhere
 // allocation within that range, not a fixed-address mapping request.
 class ThreadMemory {
@@ -20,6 +20,7 @@ public:
     // inaccessible until this allocation is released; these are not one-shot
     // Windows PAGE_GUARD pages.
     bool protect_none(std::size_t offset, std::size_t size) noexcept;
+    bool protect_readonly(std::size_t offset, std::size_t size) noexcept;
     void* data() const noexcept { return data_; }
     std::size_t size() const noexcept { return size_; }
 private:

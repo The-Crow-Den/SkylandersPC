@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../platform/host_fault.hpp"
 #include "../platform/host_thread.hpp"
+#include "../platform/host_random.hpp"
+#include "../hle/kernel_data.hpp"
 #include "../guest_start.hpp"
 #include <array>
 #include <atomic>
@@ -241,12 +243,36 @@ int main() {
         require(sky_fault_load(address) == 42 && sky_fault_load(address) == 42);
     }
     require(handled.load() == 169);
+    std::array<std::uint8_t,1026> random_buffer{};
+    random_buffer.front() = 0x5a;
+    random_buffer.back() = 0xa5;
+    require(random_bytes({}) && random_bytes(std::span(random_buffer).subspan(1,1024)));
+    require(random_buffer.front() == 0x5a && random_buffer.back() == 0xa5);
+    ThreadMemory empty;
+    require(!empty.protect_readonly(0,page_size));
+    require(!guarded.protect_readonly(1,page_size) && !guarded.protect_readonly(0,1) &&
+            !guarded.protect_readonly(guarded.size(),page_size) && !guarded.protect_readonly(0,0));
+    KernelData data;
+    constexpr auto guard_identity = "f7uOxY9mM1U#libkernel#libkernel";
+    const auto* guard = static_cast<const unsigned char*>(data.resolve(guard_identity,1));
+    require(guard && !data.resolve(guard_identity,0) &&
+            !data.resolve("f7uOxY9mM1U#wrong#libkernel",1));
+    std::array<unsigned char,8> before{};
+    for (std::size_t i = 0; i < page_size; ++i) {
+        if (i < before.size()) before[i] = guard[i];
+        else require(guard[i] == 0);
+    }
+    memory_address = reinterpret_cast<std::uintptr_t>(guard);
+    require(sky_fault_store(const_cast<unsigned char*>(guard)) == 42);
+    require(sky_fault_store(const_cast<unsigned char*>(guard)) == 42);
+    for (std::size_t i = 0; i < before.size(); ++i) require(guard[i] == before[i]);
+    require(handled.load() == 171);
     decline.store(true);
 #ifdef _WIN32
     void* next=AddVectoredExceptionHandler(0,&fallback);
     require(next!=nullptr);
     RaiseException(0xe0421234,0,0,nullptr);
-    require(unknown_seen && handled.load()==169);
+    require(unknown_seen && handled.load()==171);
     require(sky_fault_probe()==42); // Original context reaches the next VEH.
     require(remove_fault_handler());
     require(sky_fault_probe()==42); // Our VEH was actually removed.
