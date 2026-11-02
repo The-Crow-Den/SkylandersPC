@@ -57,7 +57,7 @@ if(SKY_TLS_PREFLIGHT)
     target_include_directories(guest-code-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(guest-code-test PRIVATE sky-guest-tls OpenSSL::Crypto)
     add_test(NAME synthetic-guest-code-discovery COMMAND guest-code-test)
-    add_executable(thread-context-test tests/test_thread_context.cpp thread_context.cpp guest_start.S)
+    add_executable(thread-context-test tests/test_thread_context.cpp thread_context.cpp hle/kernel_thread.cpp frame_profile.cpp guest_start.S)
     if(NOT WIN32)
       target_sources(thread-context-test PRIVATE bridge_features.cpp)
     endif()
@@ -80,7 +80,7 @@ if(WIN32)
 
   add_library(sky-host-portable STATIC hle/pure_libc.cpp hle/kernel_sync.cpp
     hle/kernel_memory.cpp hle/offline_network.cpp hle/keyboard_pad.cpp frame_profile.cpp game_hooks.cpp
-    trap_team_hooks.cpp thread_context.cpp)
+    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp)
   target_compile_features(sky-host-portable PUBLIC cxx_std_20)
   target_compile_options(sky-host-portable PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(sky-host-portable PUBLIC sky-host-platform Threads::Threads OpenSSL::Crypto ws2_32)

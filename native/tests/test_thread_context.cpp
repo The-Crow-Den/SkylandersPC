@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "thread_context.hpp"
+#include "hle/kernel_thread.hpp"
 #include "guest_start.hpp"
 #include "guest_tls.hpp"
 #include "platform/host_code.hpp"
@@ -8,7 +9,9 @@
 #include <array>
 #include <atomic>
 #include <cstring>
+#include <chrono>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 #ifndef _WIN32
@@ -19,7 +22,8 @@ namespace {
 void require(bool value) { if (!value) throw std::runtime_error("thread context assertion failed"); }
 thread_local unsigned callback_depth = 0;
 std::uint64_t callback_entry = 0, template_entry = 0;
-std::uint64_t SKY_SYSV_ABI callback_handler(std::uint64_t index, const std::uint64_t*, const std::uint64_t*) {
+std::uint64_t SKY_SYSV_ABI callback_handler(std::uint64_t index, const std::uint64_t* arguments, const std::uint64_t*) {
+    if (index == 17) sky_guest_thread_exit(arguments[0]);
     // Never unwind across assembly, including on a failed assertion.
     try {
         auto* context = GuestThreadContext::current();
@@ -88,6 +92,10 @@ int main() {
     for (unsigned i = 0; i < 8; ++i) wrapper.push_back(static_cast<std::uint8_t>(bridge >> (8 * i)));
     wrapper.insert(wrapper.end(), {0xff,0xd0,0x48,0x83,0xc4,0x08,0xc3});
     callback_entry = function(wrapper);
+    std::vector<std::uint8_t> exit_code{0x49,0xc7,0xc2,17,0,0,0,0x48,0xb8};
+    for (unsigned i = 0; i < 8; ++i) exit_code.push_back(static_cast<std::uint8_t>(bridge >> (8 * i)));
+    exit_code.insert(exit_code.end(), {0xff,0xe0}); // JMP to the host import bridge.
+    const auto exit_entry = function(exit_code);
     std::copy(original.begin(), original.end(), code.writable().begin());
 #ifdef _WIN32
     // Only these fully known synthetic functions constitute this profile.
@@ -144,5 +152,46 @@ int main() {
     std::vector<std::thread> threads;
     for (unsigned i = 1; i <= 4; ++i) threads.emplace_back(exercise, i);
     for (auto& thread : threads) thread.join();
-    require(sky_guest_configure_call(nullptr) == 0 && failures == 0);
+    require(failures == 0);
+    // Exercise the production guest thread manager using the same admitted
+    // functions: real host threads, independent TLS, join results and teardown.
+    KernelThread manager;
+    std::atomic<unsigned> finalized = 0;
+    manager.configure(boot, [&](GuestThreadContext& context) {
+        require(context.run(template_entry, nullptr) == initial);
+        ++finalized;
+    });
+    auto pointer = [](auto* value) { return reinterpret_cast<std::uintptr_t>(value); };
+    auto call = [&](const char* nid, std::array<std::uint64_t,6> arguments = {}) {
+        return manager.call(std::string(nid) + "#libkernel#libkernel", arguments.data());
+    };
+    std::uint64_t attributes = 0;
+    require(call("nsYoNRywwNg", {pointer(&attributes)}) == 0);
+    require(call("UTXzJbWhhTE", {pointer(&attributes),65536}) == 0);
+    std::array<std::uint64_t,4> handles{};
+    for (auto& handle : handles)
+        require(call("6UgtwV+0zb4", {pointer(&handle),pointer(&attributes),callback_entry}) == 0 && handle);
+    for (const auto handle : handles) {
+        std::uint64_t result = 0;
+        require(call("onNY9Byn-W8", {handle,pointer(&result)}) == 0 && result == initial + 2);
+        require(call("onNY9Byn-W8", {handle,pointer(&result)}) == 0x80020003);
+    }
+    require(finalized == 4);
+    std::uint64_t exiting = 0, exit_result = 0;
+    require(call("6UgtwV+0zb4", {pointer(&exiting),pointer(&attributes),exit_entry,73}) == 0);
+    require(call("onNY9Byn-W8", {exiting,pointer(&exit_result)}) == 0 && exit_result == 73);
+    require(finalized == 5);
+    require(call("-Wreprtu0Qs", {pointer(&attributes),1}) == 0);
+    std::uint64_t detached = 0;
+    require(call("6UgtwV+0zb4", {pointer(&detached),pointer(&attributes),template_entry}) == 0);
+    require(call("onNY9Byn-W8", {detached}) != 0);
+    bool released = false;
+    for (unsigned i = 0; i < 2000; ++i) {
+        std::int32_t priority = 0;
+        if (call("1tKyG7RlMJo", {detached,pointer(&priority)}) == 0x80020003) { released = true; break; }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    require(released && finalized == 6);
+    require(call("62KCwEMmzcM", {pointer(&attributes)}) == 0);
+    require(sky_guest_configure_call(nullptr) == 0);
 }
