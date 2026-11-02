@@ -20,9 +20,16 @@ std::size_t thread_page_size() noexcept {
 }
 ThreadMemory::~ThreadMemory() { if (data_) VirtualFree(data_, 0, MEM_RELEASE); }
 bool ThreadMemory::allocate(std::size_t size, bool low) noexcept {
+    return allocate_impl(size, low, false);
+}
+bool ThreadMemory::allocate_inaccessible(std::size_t size, bool low) noexcept {
+    return allocate_impl(size, low, true);
+}
+bool ThreadMemory::allocate_impl(std::size_t size, bool low, bool inaccessible) noexcept {
     if (data_ || !size) return false;
     const auto allocate_at = [&](std::uintptr_t address) {
-        void* data = VirtualAlloc(reinterpret_cast<void*>(address), size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+        void* data = VirtualAlloc(reinterpret_cast<void*>(address), size, MEM_RESERVE | MEM_COMMIT,
+                                  inaccessible ? PAGE_NOACCESS : PAGE_READWRITE);
         if (!data) return false;
         if (address && reinterpret_cast<std::uintptr_t>(data) != address) {
             VirtualFree(data, 0, MEM_RELEASE);

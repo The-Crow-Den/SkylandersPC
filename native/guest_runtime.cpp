@@ -7,6 +7,8 @@
 #include "gpu_backend.hpp"
 #include "game_hooks.hpp"
 #include "frame_profile.hpp"
+#include "platform/host_memory.hpp"
+#include "platform/host_thread.hpp"
 #include "hle/kernel_data.hpp"
 #include "hle/kernel_sync.hpp"
 #include "hle/kernel_memory.hpp"
@@ -38,21 +40,28 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
-#include <sys/mman.h>
 #include <sys/syscall.h>
 #include <ucontext.h>
 #include <unistd.h>
 
 namespace {
 struct Mapping {
-    void* value = MAP_FAILED;
+    SkyHost::ThreadMemory storage;
+    void* value;
     std::size_t size;
-    Mapping(std::size_t length, int protection) : size(length) {
-        value = mmap(nullptr, size, protection, MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
-        if (value == MAP_FAILED) throw std::runtime_error("diagnostic mmap failed");
+    Mapping(std::size_t length, bool inaccessible = false) : size(length) {
+        if (!(inaccessible ? storage.allocate_inaccessible(size) : storage.allocate(size)))
+            throw std::runtime_error("cannot allocate runtime import memory");
+        value = storage.data();
     }
-    ~Mapping() { if (value != MAP_FAILED) munmap(value, size); }
 };
+std::size_t runtime_page_size(std::size_t names, std::size_t types) {
+    if (names != types || names > 1000000)
+        throw std::runtime_error("import types count differs from pack");
+    const auto page = SkyHost::memory_page_size();
+    if (!page) throw std::runtime_error("cannot determine runtime page size");
+    return static_cast<std::size_t>(page);
+}
 std::string escaped(const std::string& text) {
     std::string result = "\"";
     for (unsigned char c : text) {
@@ -125,9 +134,9 @@ struct GuestRuntime::Impl {
     static Impl* active;
 
     Impl(const std::vector<std::string>& input, const std::vector<unsigned char>& input_types)
-        : names(input), types(input_types), page(static_cast<std::size_t>(sysconf(_SC_PAGESIZE))),
-          code(std::max<std::size_t>(page, ((names.size() * 32 + page - 1) / page) * page), PROT_READ | PROT_WRITE),
-          guards(std::max<std::size_t>(page, names.size() * page), PROT_NONE) {
+        : names(input), types(input_types), page(runtime_page_size(input.size(), input_types.size())),
+          code(std::max<std::size_t>(page, ((names.size() * 32 + page - 1) / page) * page)),
+          guards(std::max<std::size_t>(page, names.size() * page), true) {
         service_calls.resize(names.size());
         service_kinds.reserve(names.size()); stack_counts.reserve(names.size());
         for (const auto& identity : names) {
@@ -162,8 +171,6 @@ struct GuestRuntime::Impl {
                 identity == "Ga6r7H6Y0RI#libSceGnmDriver#libSceGnmDriver");
             stack_counts.push_back(std::max(SkyGpu::stack_arguments(identity),VirtualPortal::stack_arguments(identity)));
         }
-        if (names.size() != types.size() || names.size() > 1000000)
-            throw std::runtime_error("import types count differs from pack");
         auto* bytes = static_cast<unsigned char*>(code.value);
         for (std::size_t i = 0; i < names.size(); ++i) {
             weak.push_back((types[i] & 0x80) != 0);
@@ -180,7 +187,8 @@ struct GuestRuntime::Impl {
             std::memcpy(thunk + 12, &bridge, 8);
             thunk[20] = 0xff; thunk[21] = 0xe0;
         }
-        if (mprotect(code.value, code.size, PROT_READ | PROT_EXEC))
+        if (!SkyHost::protect(reinterpret_cast<std::uintptr_t>(code.value), code.size,
+                              SkyHost::ProtRead | SkyHost::ProtExec))
             throw std::runtime_error("cannot protect diagnostic import thunks");
     }
 

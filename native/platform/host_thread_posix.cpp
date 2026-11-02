@@ -14,8 +14,14 @@ std::size_t thread_page_size() noexcept {
 }
 ThreadMemory::~ThreadMemory() { if (data_) munmap(data_, size_); }
 bool ThreadMemory::allocate(std::size_t size, bool low) noexcept {
+    return allocate_impl(size, low, false);
+}
+bool ThreadMemory::allocate_inaccessible(std::size_t size, bool low) noexcept {
+    return allocate_impl(size, low, true);
+}
+bool ThreadMemory::allocate_impl(std::size_t size, bool low, bool inaccessible) noexcept {
     if (data_ || !size) return false;
-    void* data = mmap(nullptr, size, PROT_READ | PROT_WRITE,
+    void* data = mmap(nullptr, size, inaccessible ? PROT_NONE : PROT_READ | PROT_WRITE,
                       MAP_PRIVATE | MAP_ANONYMOUS | (low ? MAP_32BIT : 0), -1, 0);
     if (data == MAP_FAILED) return false;
     data_ = data;

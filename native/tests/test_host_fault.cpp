@@ -253,6 +253,18 @@ int main() {
     memory_address = reinterpret_cast<std::uintptr_t>(inaccessible);
     require(sky_fault_load(inaccessible) == 42 && sky_fault_load(inaccessible) == 42);
     require(handled.load() == 173);
+    ThreadMemory initial_guard;
+    require(!initial_guard.allocate_inaccessible(0) && initial_guard.allocate_inaccessible(page_size));
+    require(!initial_guard.allocate(page_size) && !initial_guard.allocate_inaccessible(page_size));
+    require(initial_guard.size() == page_size && reinterpret_cast<std::uintptr_t>(initial_guard.data()) < 0x80000000);
+    memory_address = reinterpret_cast<std::uintptr_t>(initial_guard.data());
+    require(sky_fault_load(initial_guard.data()) == 42 && sky_fault_load(initial_guard.data()) == 42);
+    require(sky_fault_store(initial_guard.data()) == 42 && sky_fault_store(initial_guard.data()) == 42);
+    require(handled.load() == 177);
+    // Initial no-access storage is zero-filled too when its owner publishes it.
+    require(initial_guard.protect_readonly(0,page_size));
+    for (std::size_t i = 0; i < page_size; ++i)
+        require(static_cast<const unsigned char*>(initial_guard.data())[i] == 0);
     std::array<std::uint8_t,1026> random_buffer{};
     random_buffer.front() = 0x5a;
     random_buffer.back() = 0xa5;
@@ -276,13 +288,13 @@ int main() {
     require(sky_fault_store(const_cast<unsigned char*>(guard)) == 42);
     require(sky_fault_store(const_cast<unsigned char*>(guard)) == 42);
     for (std::size_t i = 0; i < before.size(); ++i) require(guard[i] == before[i]);
-    require(handled.load() == 175);
+    require(handled.load() == 179);
     decline.store(true);
 #ifdef _WIN32
     void* next=AddVectoredExceptionHandler(0,&fallback);
     require(next!=nullptr);
     RaiseException(0xe0421234,0,0,nullptr);
-    require(unknown_seen && handled.load()==175);
+    require(unknown_seen && handled.load()==179);
     require(sky_fault_probe()==42); // Original context reaches the next VEH.
     require(remove_fault_handler());
     require(sky_fault_probe()==42); // Our VEH was actually removed.

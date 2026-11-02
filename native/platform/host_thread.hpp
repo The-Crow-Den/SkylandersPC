@@ -16,14 +16,17 @@ public:
     ThreadMemory(const ThreadMemory&) = delete;
     ThreadMemory& operator=(const ThreadMemory&) = delete;
     bool allocate(std::size_t size, bool low = true) noexcept;
-    // Exact page-aligned subrange, no rounding. Guards stay permanently
-    // inaccessible until this allocation is released; these are not one-shot
-    // Windows PAGE_GUARD pages.
+    // Initially inaccessible private storage, e.g. unresolved data-import pages.
+    // POSIX maps PROT_NONE directly, without charging a temporary RW mapping.
+    bool allocate_inaccessible(std::size_t size, bool low = true) noexcept;
+    // Exact page-aligned subrange, no rounding. Protection stays in force across
+    // faults; this is not a one-shot Windows PAGE_GUARD page.
     bool protect_none(std::size_t offset, std::size_t size) noexcept;
     bool protect_readonly(std::size_t offset, std::size_t size) noexcept;
     void* data() const noexcept { return data_; }
     std::size_t size() const noexcept { return size_; }
 private:
+    bool allocate_impl(std::size_t size, bool low, bool inaccessible) noexcept;
     void* data_ = nullptr;
     std::size_t size_ = 0;
 };
