@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../platform/host_fault.hpp"
+#include "../platform/host_thread.hpp"
 #include "../guest_start.hpp"
 #include <array>
 #include <atomic>
@@ -221,12 +222,31 @@ int main() {
     });
     for (auto& worker:workers) worker.join();
     require(handled.load()==165);
+    // Permanent guards on both ends of the production stack allocation must
+    // fault on every access, including repeated reads after a handled fault.
+    ThreadMemory guarded;
+    const auto page_size = thread_page_size();
+    require(page_size && !guarded.allocate(0) && guarded.allocate(4 * page_size));
+    require(!guarded.allocate(page_size));
+    const auto base = reinterpret_cast<std::uintptr_t>(guarded.data());
+    require(base < 0x80000000 && guarded.size() == 4 * page_size);
+    const auto* bytes = static_cast<const unsigned char*>(guarded.data());
+    for (std::size_t i = 0; i < guarded.size(); ++i) require(bytes[i] == 0);
+    require(!guarded.protect_none(1,page_size) && !guarded.protect_none(0,1) &&
+            !guarded.protect_none(guarded.size(),page_size) && !guarded.protect_none(0,0));
+    require(guarded.protect_none(0,page_size) && guarded.protect_none(3 * page_size,page_size));
+    for (const auto offset : {std::size_t{0},3 * page_size}) {
+        auto* address = static_cast<unsigned char*>(guarded.data()) + offset;
+        memory_address = reinterpret_cast<std::uintptr_t>(address);
+        require(sky_fault_load(address) == 42 && sky_fault_load(address) == 42);
+    }
+    require(handled.load() == 169);
     decline.store(true);
 #ifdef _WIN32
     void* next=AddVectoredExceptionHandler(0,&fallback);
     require(next!=nullptr);
     RaiseException(0xe0421234,0,0,nullptr);
-    require(unknown_seen && handled.load()==165);
+    require(unknown_seen && handled.load()==169);
     require(sky_fault_probe()==42); // Original context reaches the next VEH.
     require(remove_fault_handler());
     require(sky_fault_probe()==42); // Our VEH was actually removed.

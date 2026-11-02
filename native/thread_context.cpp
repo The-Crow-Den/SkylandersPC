@@ -1,36 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "thread_context.hpp"
 #include "guest_start.hpp"
+#include "platform/host_thread.hpp"
 #include <array>
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
-#include <sys/mman.h>
-#include <unistd.h>
 
 namespace {
 thread_local GuestThreadContext* current_context = nullptr;
-// Guest-visible stacks and TLS stay below 2 GiB as before; no requirement for
-// this is documented, so it is kept until a guest is verified without it.
-// Host-only memory such as the signal stack passes low = false.
+// Keep the existing low-address policy for guest stacks/TLS. Host fault-stack
+// support is selected by the platform layer (POSIX alternate stack, native VEH).
 struct Memory {
+    SkyHost::ThreadMemory memory;
     void* pointer;
     std::size_t size;
-    Memory(std::size_t length, int protection, bool low = true) : size(length) {
-        pointer = mmap(nullptr, length, protection, MAP_PRIVATE | MAP_ANONYMOUS | (low ? MAP_32BIT : 0), -1, 0);
-        if (pointer == MAP_FAILED) throw std::runtime_error("cannot allocate guest thread memory");
+    Memory(std::size_t length) : size(length) {
+        if (!memory.allocate(length)) throw std::runtime_error("cannot allocate guest thread memory");
+        pointer = memory.data();
     }
-    ~Memory() { munmap(pointer, size); }
 };
 std::size_t page_size() {
-    const auto size = sysconf(_SC_PAGESIZE);
-    if (size <= 0) throw std::runtime_error("cannot query thread page size");
-    return static_cast<std::size_t>(size);
+    const auto size = SkyHost::thread_page_size();
+    if (!size) throw std::runtime_error("cannot query thread page size");
+    return size;
 }
 std::unique_ptr<Memory> guarded_stack(std::size_t usable, std::size_t page) {
-    auto stack = std::make_unique<Memory>(usable + 2 * page, PROT_READ | PROT_WRITE);
-    if (mprotect(stack->pointer, page, PROT_NONE) ||
-        mprotect(static_cast<unsigned char*>(stack->pointer) + stack->size - page, page, PROT_NONE))
+    auto stack = std::make_unique<Memory>(usable + 2 * page);
+    if (!stack->memory.protect_none(0, page) || !stack->memory.protect_none(stack->size - page, page))
         throw std::runtime_error("cannot guard guest callback stack");
     return stack;
 }
@@ -38,7 +35,8 @@ std::unique_ptr<Memory> guarded_stack(std::size_t usable, std::size_t page) {
 struct GuestThreadContext::Impl {
     std::size_t page = page_size();
     std::size_t guard;
-    Memory stack, tls, alternate;
+    Memory stack, tls;
+    SkyHost::ThreadFaultContext fault_context;
     unsigned char* tcb;
     std::array<std::uint64_t, 18> dtv{};
     std::array<unsigned char*, 17> tls_blocks{};
@@ -49,12 +47,10 @@ struct GuestThreadContext::Impl {
     unsigned callback_depth = 0;
     Impl(const SkyBootPlan& boot, std::size_t stack_size, std::size_t guard_size)
         : guard(std::max<std::size_t>(page, ((guard_size + page - 1) / page) * page)),
-          stack(((stack_size + page - 1) / page) * page + 2 * guard, PROT_READ | PROT_WRITE),
-          tls(2 * 1024 * 1024 + page, PROT_READ | PROT_WRITE),
-          alternate(128 * 1024, PROT_READ | PROT_WRITE, false),
+          stack(((stack_size + page - 1) / page) * page + 2 * guard),
+          tls(2 * 1024 * 1024 + page),
           tcb(static_cast<unsigned char*>(tls.pointer) + 2 * 1024 * 1024) {
-        if (mprotect(stack.pointer, guard, PROT_NONE) ||
-            mprotect(static_cast<unsigned char*>(stack.pointer) + stack.size - guard, guard, PROT_NONE))
+        if (!stack.memory.protect_none(0, guard) || !stack.memory.protect_none(stack.size - guard, guard))
             throw std::runtime_error("cannot guard guest thread stack");
         auto** fields = reinterpret_cast<void**>(tcb);
         fields[0] = tcb; fields[1] = dtv.data(); fields[2] = tcb + 128;
@@ -67,7 +63,7 @@ struct GuestThreadContext::Impl {
                 const auto size = (module.tls_memsz + module.tls_align - 1) & ~(module.tls_align - 1);
                 block = tcb - size;
             } else {
-                auto memory = std::make_unique<Memory>(module.tls_memsz, PROT_READ | PROT_WRITE);
+                auto memory = std::make_unique<Memory>(module.tls_memsz);
                 block = static_cast<unsigned char*>(memory->pointer);
                 module_tls.push_back(std::move(memory));
             }
@@ -114,11 +110,9 @@ std::uint64_t GuestThreadContext::tls_address(std::uint64_t module, std::uint64_
 std::uint64_t GuestThreadContext::run(std::uint64_t entry, const void* argument) {
     auto* prior_context = current_context;
     current_context = this;
-    stack_t alternate{}, prior_stack{};
-    alternate.ss_sp = impl_->alternate.pointer; alternate.ss_size = impl_->alternate.size;
-    if (sigaltstack(&alternate, &prior_stack)) {
+    if (!impl_->fault_context.enter()) {
         current_context = prior_context;
-        throw std::runtime_error("cannot install thread signal stack");
+        throw std::runtime_error("cannot enter thread fault context");
     }
     SkyGuestStartContext context{reinterpret_cast<void*>(entry),
         static_cast<unsigned char*>(impl_->stack.pointer) + impl_->stack.size - impl_->guard - 64,
@@ -126,7 +120,7 @@ std::uint64_t GuestThreadContext::run(std::uint64_t entry, const void* argument)
     std::uint64_t result = 0;
     const auto status = sky_guest_start(&context, &result);
     current_context = prior_context;
-    if (sigaltstack(&prior_stack, nullptr)) throw std::runtime_error("cannot restore thread signal stack");
+    if (!impl_->fault_context.leave()) throw std::runtime_error("cannot restore thread fault context");
     if (status) throw std::runtime_error("guest thread entry bridge failed");
     return result;
 }

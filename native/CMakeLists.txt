@@ -8,9 +8,9 @@ endif()
 
 # Host platform layer (platform/): POSIX on Linux, Win32 on Windows (MinGW).
 if(WIN32)
-  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp platform/host_tls_win32.cpp platform/host_code_win32.cpp platform/host_fault_win32.cpp)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_win32.cpp platform/host_tls_win32.cpp platform/host_code_win32.cpp platform/host_fault_win32.cpp platform/host_thread_win32.cpp)
 else()
-  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp platform/host_tls_posix.cpp platform/host_code_posix.cpp platform/host_fault_posix.cpp)
+  set(SKY_HOST_PLATFORM_SOURCES platform/host_memory_posix.cpp platform/host_tls_posix.cpp platform/host_code_posix.cpp platform/host_fault_posix.cpp platform/host_thread_posix.cpp)
 endif()
 
 # Fault dispatch needs the FS-restoring bridge on POSIX. Keep the platform
@@ -57,6 +57,17 @@ if(SKY_TLS_PREFLIGHT)
     target_include_directories(guest-code-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(guest-code-test PRIVATE sky-guest-tls OpenSSL::Crypto)
     add_test(NAME synthetic-guest-code-discovery COMMAND guest-code-test)
+    add_executable(thread-context-test tests/test_thread_context.cpp thread_context.cpp guest_start.S)
+    if(NOT WIN32)
+      target_sources(thread-context-test PRIVATE bridge_features.cpp)
+    endif()
+    target_include_directories(thread-context-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(thread-context-test PRIVATE sky-guest-tls sky-host-platform Threads::Threads)
+    add_test(NAME synthetic-guest-thread-context COMMAND thread-context-test)
+    if(NOT WIN32)
+      add_test(NAME synthetic-guest-thread-context-syscall COMMAND thread-context-test)
+      set_tests_properties(synthetic-guest-thread-context-syscall PROPERTIES ENVIRONMENT "SKY_TLS_BRIDGE=syscall")
+    endif()
   endif()
 endif()
 
@@ -69,7 +80,7 @@ if(WIN32)
 
   add_library(sky-host-portable STATIC hle/pure_libc.cpp hle/kernel_sync.cpp
     hle/kernel_memory.cpp hle/offline_network.cpp hle/keyboard_pad.cpp frame_profile.cpp game_hooks.cpp
-    trap_team_hooks.cpp)
+    trap_team_hooks.cpp thread_context.cpp)
   target_compile_features(sky-host-portable PUBLIC cxx_std_20)
   target_compile_options(sky-host-portable PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(sky-host-portable PUBLIC sky-host-platform Threads::Threads OpenSSL::Crypto ws2_32)
@@ -272,3 +283,10 @@ if(BUILD_TESTING)
   target_link_libraries(frame-profile-test PRIVATE Threads::Threads)
   add_test(NAME native-frame-profile COMMAND frame-profile-test)
 endif()
+
+# Guest thread contexts use the platform-owned stack/TCB allocation layer.
+foreach(thread_target virtual-portal-test kernel-thread-test platform-services-test gpu-adapter-test)
+  if(TARGET ${thread_target})
+    target_link_libraries(${thread_target} PRIVATE sky-host-platform)
+  endif()
+endforeach()
