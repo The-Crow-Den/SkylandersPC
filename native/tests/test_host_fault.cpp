@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../platform/host_fault.hpp"
 #include "../platform/host_thread.hpp"
+#include "../platform/host_memory.hpp"
 #include "../platform/host_random.hpp"
 #include "../hle/kernel_data.hpp"
 #include "../guest_start.hpp"
@@ -243,6 +244,15 @@ int main() {
         require(sky_fault_load(address) == 42 && sky_fault_load(address) == 42);
     }
     require(handled.load() == 169);
+    require(protect(base + page_size,page_size,ProtRead));
+    auto* readonly = static_cast<unsigned char*>(guarded.data()) + page_size;
+    memory_address = reinterpret_cast<std::uintptr_t>(readonly);
+    require(sky_fault_store(readonly) == 42 && sky_fault_store(readonly) == 42 && *readonly == 0);
+    require(protect(base + 2 * page_size,page_size,ProtNone));
+    auto* inaccessible = static_cast<unsigned char*>(guarded.data()) + 2 * page_size;
+    memory_address = reinterpret_cast<std::uintptr_t>(inaccessible);
+    require(sky_fault_load(inaccessible) == 42 && sky_fault_load(inaccessible) == 42);
+    require(handled.load() == 173);
     std::array<std::uint8_t,1026> random_buffer{};
     random_buffer.front() = 0x5a;
     random_buffer.back() = 0xa5;
@@ -266,13 +276,13 @@ int main() {
     require(sky_fault_store(const_cast<unsigned char*>(guard)) == 42);
     require(sky_fault_store(const_cast<unsigned char*>(guard)) == 42);
     for (std::size_t i = 0; i < before.size(); ++i) require(guard[i] == before[i]);
-    require(handled.load() == 171);
+    require(handled.load() == 175);
     decline.store(true);
 #ifdef _WIN32
     void* next=AddVectoredExceptionHandler(0,&fallback);
     require(next!=nullptr);
     RaiseException(0xe0421234,0,0,nullptr);
-    require(unknown_seen && handled.load()==171);
+    require(unknown_seen && handled.load()==175);
     require(sky_fault_probe()==42); // Original context reaches the next VEH.
     require(remove_fault_handler());
     require(sky_fault_probe()==42); // Our VEH was actually removed.

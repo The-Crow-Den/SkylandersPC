@@ -18,8 +18,7 @@
 #include <string>
 #include <vector>
 
-#include <sys/mman.h>
-#include <unistd.h>
+#include "platform/host_memory.hpp"
 
 #include "hle/pure_libc.hpp"
 #include "guest_runtime.hpp"
@@ -192,7 +191,8 @@ public:
 };
 
 class Arena {
-    void* memory_ = MAP_FAILED;
+    void* memory_ = nullptr;
+    bool mapped_ = false;
     std::size_t length_{};
     std::vector<u64> import_addresses_;
     bool diagnostic_ = false;
@@ -200,29 +200,26 @@ public:
     Arena() = default;
     Arena(const Arena&) = delete;
     Arena& operator=(const Arena&) = delete;
-    ~Arena() { if (memory_ != MAP_FAILED) munmap(memory_, length_); }
+    ~Arena() { if (mapped_) SkyHost::unmap(reinterpret_cast<std::uintptr_t>(memory_), length_, false); }
 
     bool resolved(u64 id) const { return !diagnostic_ && id < import_addresses_.size() && import_addresses_[index(id)] != 0; }
 
     void load(const Pack& pack, GuestRuntime* diagnostic = nullptr) {
         diagnostic_ = diagnostic != nullptr;
-        const auto raw_page = sysconf(_SC_PAGESIZE);
-        if (raw_page <= 0) fail("cannot determine page size");
+        const auto raw_page = SkyHost::memory_page_size();
+        if (!raw_page) fail("cannot determine page size");
         const auto page = static_cast<u64>(raw_page);
         if (pack.base % page) fail("guest image base must be page aligned for load");
         const auto rounded = add(pack.size, page - 1) / page * page;
         length_ = index(rounded);
-#if defined(__linux__) && defined(MAP_FIXED_NOREPLACE)
         if (pack.base > std::numeric_limits<std::uintptr_t>::max()) fail("guest base exceeds host pointer range");
-        auto* requested = reinterpret_cast<void*>(static_cast<std::uintptr_t>(pack.base));
-        memory_ = mmap(requested, length_, PROT_READ | PROT_WRITE,
-                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
-        if (memory_ == MAP_FAILED) fail(std::string("mmap failed: ") + std::strerror(errno));
-        if (memory_ != requested) fail("kernel did not honor no-replace guest mapping");
+        const auto granularity = SkyHost::map_granularity();
+        if (!granularity || pack.base % granularity) fail("guest image base must meet host placement granularity");
+        const auto placed = SkyHost::map_anonymous(pack.base, length_, SkyHost::ProtRead | SkyHost::ProtWrite);
+        if (placed != SkyHost::MapStatus::Mapped) fail("cannot map guest image at its exact requested address");
+        memory_ = reinterpret_cast<void*>(static_cast<std::uintptr_t>(pack.base));
+        mapped_ = true;
         SkyGpu::set_guest_image(pack.base, length_);
-#else
-        fail("fixed guest loading requires Linux MAP_FIXED_NOREPLACE; inspect mode remains available");
-#endif
         auto* memory = static_cast<unsigned char*>(memory_);
         for (std::size_t i = 0; i < pack.imports.size(); ++i) {
             import_addresses_.push_back(diagnostic ? diagnostic->address(i) :
@@ -249,10 +246,10 @@ public:
         }
         const bool unresolved = std::any_of(pack.relocations.begin(), pack.relocations.end(),
                                             [this](const auto& r) { return (r.type & kImportFlag) && !resolved(r.symbol); });
-        std::vector<int> permissions(index(rounded / page), PROT_NONE);
+        std::vector<int> permissions(index(rounded / page), SkyHost::ProtNone);
         for (const auto& segment : pack.segments) {
-            const int flags = ((segment.flags & 4) ? PROT_READ : 0) | ((segment.flags & 2) ? PROT_WRITE : 0) |
-                              ((segment.flags & 1) && (!unresolved || diagnostic_) ? PROT_EXEC : 0);
+            const int flags = ((segment.flags & 4) ? SkyHost::ProtRead : 0) | ((segment.flags & 2) ? SkyHost::ProtWrite : 0) |
+                              ((segment.flags & 1) && (!unresolved || diagnostic_) ? SkyHost::ProtExec : 0);
             const auto begin = (segment.va - pack.base) / page;
             const auto end = add(segment.va - pack.base, segment.memory_size - 1) / page;
             for (u64 p = begin; p <= end; ++p) permissions[index(p)] |= flags;
@@ -260,8 +257,8 @@ public:
         for (std::size_t begin = 0; begin < permissions.size();) {
             std::size_t end = begin + 1;
             while (end < permissions.size() && permissions[end] == permissions[begin]) ++end;
-            if (mprotect(memory + begin * index(page), (end - begin) * index(page), permissions[begin]) != 0)
-                fail(std::string("mprotect failed: ") + std::strerror(errno));
+            if (!SkyHost::protect(pack.base + begin * page, (end - begin) * page, permissions[begin]))
+                fail("cannot protect guest image pages");
             begin = end;
         }
     }

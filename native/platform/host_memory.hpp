@@ -16,6 +16,11 @@ enum class MapStatus { Mapped, Occupied, Failed };
 // Placement unit for mappings: the page size on Linux, the 64 KiB allocation
 // granularity on Windows. Addresses and section offsets must be multiples.
 std::uint64_t map_granularity() noexcept;
+// Page unit for protection changes; distinct from Windows placement granularity.
+std::uint64_t memory_page_size() noexcept;
+// Change an exact page-aligned owned range. Does not round or relocate. Flushes
+// the instruction cache before returning success for executable protection.
+bool protect(std::uint64_t address, std::uint64_t size, int protection) noexcept;
 
 // A shared, zero-filled backing store that several views can alias.
 class SharedMemory {

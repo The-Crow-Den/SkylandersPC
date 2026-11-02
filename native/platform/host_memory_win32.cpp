@@ -7,6 +7,7 @@
 #endif
 #include "host_memory.hpp"
 #include <windows.h>
+#include <limits>
 
 // Sections stand in for the memfd and VirtualAlloc for anonymous memory. Views
 // need 64 KiB-aligned addresses and offsets; callers place by map_granularity().
@@ -41,6 +42,20 @@ std::uint64_t map_granularity() noexcept {
     return info.dwAllocationGranularity;
 }
 
+std::uint64_t memory_page_size() noexcept {
+    SYSTEM_INFO info{};
+    GetSystemInfo(&info);
+    return info.dwPageSize;
+}
+bool protect(std::uint64_t address, std::uint64_t size, int protection) noexcept {
+    const auto page = memory_page_size();
+    if (!page || !size || address % page || size % page ||
+        size > std::numeric_limits<std::uint64_t>::max() - address || (protection & ~7)) return false;
+    DWORD previous = 0;
+    if (!VirtualProtect(reinterpret_cast<void*>(address), size, page_protection(protection), &previous)) return false;
+    return !(protection & ProtExec) || FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void*>(address), size);
+}
+
 SharedMemory::~SharedMemory() { if (handle_) CloseHandle(handle_); }
 
 bool SharedMemory::open(const char*, std::uint64_t size) noexcept {
@@ -56,10 +71,15 @@ bool SharedMemory::is_open() const noexcept { return handle_ != nullptr; }
 
 MapStatus SharedMemory::map(std::uint64_t address, std::uint64_t size, std::uint64_t offset, int protection) const noexcept {
     const auto granularity = map_granularity();
-    if (!handle_ || address % granularity || offset % granularity) return MapStatus::Failed;
+    if (!handle_ || !size || size > std::numeric_limits<std::uint64_t>::max() - address ||
+        address % granularity || offset % granularity) return MapStatus::Failed;
     void* view = MapViewOfFileEx(handle_, FILE_MAP_ALL_ACCESS, static_cast<DWORD>(offset >> 32),
                                  static_cast<DWORD>(offset), size, reinterpret_cast<void*>(address));
     if (!view) return failure(address, size);
+    if (reinterpret_cast<std::uintptr_t>(view) != address) {
+        UnmapViewOfFile(view);
+        return MapStatus::Failed;
+    }
     DWORD previous = 0;
     if (!VirtualAlloc(view, size, MEM_COMMIT, PAGE_READWRITE) ||
         !VirtualProtect(view, size, page_protection(protection), &previous)) {
@@ -70,10 +90,15 @@ MapStatus SharedMemory::map(std::uint64_t address, std::uint64_t size, std::uint
 }
 
 MapStatus map_anonymous(std::uint64_t address, std::uint64_t size, int protection) noexcept {
-    if (address % map_granularity()) return MapStatus::Failed;
+    if (!size || size > std::numeric_limits<std::uint64_t>::max() - address ||
+        address % map_granularity()) return MapStatus::Failed;
     void* memory = VirtualAlloc(reinterpret_cast<void*>(address), size, MEM_RESERVE | MEM_COMMIT,
                                 page_protection(protection));
     if (!memory) return failure(address, size);
+    if (reinterpret_cast<std::uintptr_t>(memory) != address) {
+        VirtualFree(memory, 0, MEM_RELEASE);
+        return MapStatus::Failed;
+    }
     return MapStatus::Mapped;
 }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "host_memory.hpp"
 #include <cerrno>
+#include <limits>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -9,12 +10,32 @@ namespace {
 MapStatus place(std::uint64_t address, std::uint64_t size, int protection, int flags, int fd, std::uint64_t offset) noexcept {
     void* view = mmap(reinterpret_cast<void*>(address), size, protection, MAP_FIXED_NOREPLACE | flags, fd,
                       static_cast<off_t>(offset));
-    if (view != MAP_FAILED) return MapStatus::Mapped;
+    if (view != MAP_FAILED) {
+        if (reinterpret_cast<std::uintptr_t>(view) == address) return MapStatus::Mapped;
+        // Older kernels may ignore MAP_FIXED_NOREPLACE. Never accept a hint
+        // allocation as the requested guest mapping.
+        munmap(view, size);
+        errno = EADDRNOTAVAIL;
+        return MapStatus::Failed;
+    }
     return errno == EEXIST ? MapStatus::Occupied : MapStatus::Failed;
 }
 }
 
-std::uint64_t map_granularity() noexcept { return static_cast<std::uint64_t>(sysconf(_SC_PAGESIZE)); }
+std::uint64_t memory_page_size() noexcept {
+    const auto page = sysconf(_SC_PAGESIZE);
+    return page > 0 ? static_cast<std::uint64_t>(page) : 0;
+}
+std::uint64_t map_granularity() noexcept { return memory_page_size(); }
+bool protect(std::uint64_t address, std::uint64_t size, int protection) noexcept {
+    const auto page = memory_page_size();
+    if (!page || !size || address % page || size % page ||
+        size > std::numeric_limits<std::uint64_t>::max() - address || (protection & ~7)) return false;
+    if (mprotect(reinterpret_cast<void*>(address), size, protection)) return false;
+    if (protection & ProtExec)
+        __builtin___clear_cache(reinterpret_cast<char*>(address), reinterpret_cast<char*>(address + size));
+    return true;
+}
 
 SharedMemory::~SharedMemory() { if (fd_ >= 0) close(fd_); }
 
