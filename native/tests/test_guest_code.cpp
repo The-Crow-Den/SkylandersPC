@@ -262,6 +262,17 @@ void cfg_bound_tests() {
     const std::array<std::uint64_t,2> alias_entry{0x10000,0x10007};
     require(!query(alias,22,alias_edges,alias_entry,1));
     require(query(original,13,edges,root)==2);
+    auto flag_gap=original;flag_gap.insert(flag_gap.begin()+5,{0x89,0xd9}); // MOV ECX,EBX preserves flags.
+    const std::multimap<std::uint64_t,std::uint64_t> gap_edges{{0x10010,0x10007},{0x1000f,0x10009}};
+    require(query(flag_gap,15,gap_edges,root)==2);
+    auto changed_register=flag_gap;changed_register[6]=0xd8; // MOV EAX,EBX invalidates the compared value.
+    require(!query(changed_register,15,gap_edges,root));
+    auto changed_flags=original;changed_flags.insert(changed_flags.begin()+5,{0xff,0xc1}); // INC ECX writes ZF.
+    require(!query(changed_flags,15,gap_edges,root));
+    changed_flags[7]=0x73; // JAE needs CF only; INC preserves it.
+    require(query(changed_flags,15,gap_edges,root)==1);
+    const std::array<std::uint64_t,2> inside_flags{0x10000,0x10005};
+    require(!query(flag_gap,15,gap_edges,inside_flags));
     const std::array<std::uint64_t,2> at_guard{0x10000,0x10005};
     require(!query(original,13,edges,at_guard));
     const std::array<std::uint64_t,2> at_read{0x10000,0x1000d};
@@ -303,6 +314,14 @@ void cfg_bound_tests() {
     const std::vector<std::uint8_t> saved{0x41,0x89,0xfc,0x41,0x83,0xfc,1,0x77,12,
         0xe8,7,0,0,0,0xeb,4,0xff,0xff,0xff,0xff,0xc3,0xc3};
     require(query(saved,20,{{0x10015,0x10007},{0x10014,0x1000e}},root,12)==2);
+    const std::vector<std::uint8_t> flags_call{0x41,0x89,0xfc,0x41,0x83,0xfc,1,
+        0xe8,9,0,0,0,0x77,7,0xeb,4,0xff,0xff,0xff,0xff,0xc3,0xc3};
+    const std::multimap<std::uint64_t,std::uint64_t> flags_call_edges{{0x10015,0x1000c},{0x10014,0x1000e}};
+    require(!query(flags_call,20,flags_call_edges,root,12)); // Call preserves R12 but not comparison flags.
+    auto undefined_flags=flags_call;
+    undefined_flags[7]=0xf7;undefined_flags[8]=0xf1; // DIV ECX leaves used flags undefined.
+    for(unsigned i=9;i<12;++i) undefined_flags[i]=0x90;
+    require(!query(undefined_flags,20,flags_call_edges,root,12));
     auto partial=original;partial.insert(partial.begin()+7,{0xb0,0xff});partial[6]+=2; // MOV AL,255.
     require(!query(partial,15,{{0x10010,0x10005},{0x1000f,0x10009}},root));
 }
@@ -335,6 +354,26 @@ void cfg_switch_tests() {
     require(a.switch_tables.size()==1 && a.switch_tables[0].invariant_index.has_value() &&
         a.switch_tables[0].invariant_base.has_value() && a.switch_tables[0].table_size==8);
     require(GuestTls::inspect(code,a.instructions).sites.size()==1);
+    auto context_move=code;context_move.insert(context_move.begin()+31,{0x48,0x8b,0x1f}); // MOV RBX,[RDI].
+    context_move[6]+=3;context_move[20]+=3;
+    const auto context_graph=analyze(context_move,root);
+    require(context_graph.switch_tables.size()==1 && context_graph.switch_tables[0].invariant_index.has_value());
+    require(GuestTls::inspect(context_move,context_graph.instructions).sites.size()==1);
+    auto clobbered=context_move;clobbered[33]=0x07; // MOV RAX,[RDI] destroys the target.
+    require(analyze(clobbered,root).switch_tables.empty());
+    auto stored=context_move;stored[32]=0x89;stored[33]=3; // MOV [RBX],RAX is not a context move.
+    require(analyze(stored,root).switch_tables.empty());
+    auto copied_target=code;
+    copied_target.insert(copied_target.begin()+31,{0x48,0x89,0xc2,0x48,0x8b,0x07});
+    copied_target[6]+=6;copied_target[20]+=6;copied_target[38]=0xe2; // JMP RDX after copy, then RAX clobber.
+    require(analyze(copied_target,root).switch_tables.size()==1);
+    const std::array<std::uint64_t,2> mid_target{0x10000,0x1001f};
+    require(analyze(copied_target,mid_target).switch_tables.empty());
+    auto scheduled=code;scheduled.insert(scheduled.begin()+5,{0x89,0xd9});
+    const auto scheduled_graph=analyze(scheduled,root);
+    require(scheduled_graph.switch_tables.size()==1 && scheduled_graph.switch_tables[0].table_size==8 &&
+        scheduled_graph.switch_tables[0].invariant_index.has_value());
+    require(GuestTls::inspect(scheduled,scheduled_graph.instructions).sites.size()==1);
     auto masked=code;
     for(unsigned i=2;i<7;++i) masked[i]=0x90; // Remove CMP+JA.
     masked.insert(masked.begin()+2,{0x48,0x83,0xe0,1});
@@ -383,10 +422,10 @@ void repeated_guard_tests() {
     require(GuestTls::inspect(code,analyze(code,root).instructions).sites.size()==1);
     auto different=code;different[7]=0x73; // JAE is not redundant after JA.
     // The local redundant-guard proof cannot handle JAE. The CFG bound can
-    // independently use the earlier JA: an extra branch does not widen EAX.
+    // use the same CMP flags through JA, then JAE narrows the index to zero.
     const auto narrowed=analyze(different,root);
     require(narrowed.switch_tables.size()==1 && narrowed.switch_tables[0].invariant_index.has_value() &&
-            narrowed.switch_tables[0].table_size==8);
+            narrowed.switch_tables[0].table_size==4);
     // An entry directly at the duplicate guard bypasses the proven compare.
     const std::array<std::uint64_t,2> bypass{0x10000,0x10007};
     require(analyze(code,bypass).switch_tables.empty());

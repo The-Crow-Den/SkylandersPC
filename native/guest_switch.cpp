@@ -361,38 +361,69 @@ std::optional<SwitchTable> recognize_cfg_switch(
     std::span<const GuestTls::CodeRange> tail,
     const std::function<std::optional<std::uint64_t>(std::uint64_t, unsigned)> &known_base,
     const std::function<std::optional<std::uint64_t>(std::uint64_t, unsigned)> &known_bound) {
-    if (tail.size() < 3 || !known_base || !known_bound)
+    if (tail.size() < 3 || tail.size() > 32 || !known_base || !known_bound)
         return {};
     ZydisDecoder decoder{};
     if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64)))
         return {};
-    std::array<Decoded, 3> code;
-    for (unsigned i = 0; i < 3; ++i) {
-        const auto &r = tail[tail.size() - 3 + i];
+    std::vector<Decoded> code;
+    for (const auto &r : tail) {
         if (r.file_offset > executable.size() || r.size > executable.size() - r.file_offset)
             return {};
-        auto &c = code[i];
-        c.range = r;
+        Decoded c{r};
         if (!ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder, executable.data() + r.file_offset,
                                                  static_cast<std::size_t>(r.size), &c.instruction,
                                                  c.operands.data())) ||
             c.instruction.length != r.size ||
-            (i && code[i - 1].range.address + code[i - 1].range.size != r.address))
+            (!code.empty() && code.back().range.address + code.back().range.size != r.address))
             return {};
+        code.push_back(c);
     }
-    const auto &load = code[0];
-    const auto &add = code[1];
-    const auto &jump = code[2];
+    const auto valid_gpr = [](ZydisRegister r) {
+        r = enclosing(r);
+        return r >= ZYDIS_REGISTER_RAX && r <= ZYDIS_REGISTER_R15 && r != ZYDIS_REGISTER_RSP;
+    };
+    const auto &jump = code.back();
     if (jump.instruction.mnemonic != ZYDIS_MNEMONIC_JMP || jump.instruction.operand_count_visible != 1 ||
-        jump.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || jump.operands[0].size != 64)
+        jump.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || jump.operands[0].size != 64 ||
+        !valid_gpr(jump.operands[0].reg.value))
         return {};
-    const auto destination = jump.operands[0].reg.value;
-    if (destination < ZYDIS_REGISTER_RAX || destination > ZYDIS_REGISTER_R15 ||
-        destination == ZYDIS_REGISTER_RSP || add.instruction.mnemonic != ZYDIS_MNEMONIC_ADD ||
-        add.instruction.operand_count_visible != 2 || !reg(add, 0, destination) ||
-        add.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER || add.operands[1].size != 64 ||
-        load.instruction.mnemonic != ZYDIS_MNEMONIC_MOVSXD || load.instruction.operand_count_visible != 2 ||
-        !reg(load, 0, destination))
+    auto destination = jump.operands[0].reg.value;
+    auto add_at = code.size();
+    for (std::size_t at = code.size() - 1; at > 0;) {
+        --at;
+        const auto &c = code[at];
+        if (c.instruction.mnemonic == ZYDIS_MNEMONIC_ADD && reg(c, 0, destination)) {
+            add_at = at;
+            break;
+        }
+        if (c.instruction.mnemonic == ZYDIS_MNEMONIC_NOP)
+            continue;
+        // These moves cannot alter the computed target unless they write its
+        // current register. Track a full-width register copy backwards; refuse
+        // partial writes, memory stores, stack changes and unknown operations.
+        if (c.instruction.mnemonic != ZYDIS_MNEMONIC_MOV || c.instruction.operand_count_visible != 2 ||
+            c.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || !valid_gpr(c.operands[0].reg.value) ||
+            (c.operands[0].size != 32 && c.operands[0].size != 64))
+            return {};
+        if (c.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER &&
+            c.operands[1].type != ZYDIS_OPERAND_TYPE_MEMORY &&
+            c.operands[1].type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
+            return {};
+        if (enclosing(c.operands[0].reg.value) == destination) {
+            if (!reg(c, 0, destination) || c.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER ||
+                c.operands[1].size != 64 || !valid_gpr(c.operands[1].reg.value))
+                return {};
+            destination = c.operands[1].reg.value;
+        }
+    }
+    if (add_at == code.size() || !add_at)
+        return {};
+    const auto &add = code[add_at];
+    const auto &load = code[add_at - 1];
+    if (add.instruction.operand_count_visible != 2 || add.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER ||
+        add.operands[1].size != 64 || load.instruction.mnemonic != ZYDIS_MNEMONIC_MOVSXD ||
+        load.instruction.operand_count_visible != 2 || !reg(load, 0, destination))
         return {};
     const auto base = add.operands[1].reg.value;
     const auto &memory = load.operands[1];

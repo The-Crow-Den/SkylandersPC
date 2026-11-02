@@ -8,6 +8,8 @@ namespace GuestCode::Detail {
 // and JB/JBE taken edges bound an index; their opposite edges do not. A branch
 // targeting its own fallthrough cannot constrain values. Callers must repeat
 // the query after adding control-flow edges.
+// The guard's CF/ZF producer may precede unchanged instructions along a unique
+// path (32 nodes); calls, used-flag writes and queried-register writes refuse.
 // Register copies and immediate AND masks retain the queried expression. A
 // guarded copied/masked alias must agree along a unique path without changing
 // the queried source; a mask alone does not classify a table. Alias walk:64 nodes.

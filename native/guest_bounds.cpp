@@ -178,18 +178,35 @@ struct Graph {
         if (!ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&ins.i, &ins.operands[0], source, &taken)) ||
             taken == fallthrough || target != (bounded_taken ? taken : fallthrough))
             return {};
-        auto at = instructions.find(source);
-        if (at == instructions.begin())
-            return {};
-        --at;
-        if (at->first + at->second.size != source)
-            return {};
-        const auto guard_predecessors = predecessors(source);
-        if (entries.contains(source) || guard_predecessors.size() != 1 || guard_predecessors[0] != at->first)
-            return {};
         Instruction cmp;
-        if (!decode(at->first, cmp) || cmp.i.mnemonic != ZYDIS_MNEMONIC_CMP ||
-            cmp.i.operand_count_visible != 2)
+        auto compare_pc = source;
+        const auto required_flags =
+            ZYDIS_CPUFLAG_CF |
+            ((ins.i.mnemonic == ZYDIS_MNEMONIC_JBE || ins.i.mnemonic == ZYDIS_MNEMONIC_JNBE)
+                 ? ZYDIS_CPUFLAG_ZF
+                 : 0);
+        bool found_compare = false;
+        for (unsigned step = 0; step < 32; ++step) {
+            if (entries.contains(compare_pc))
+                return {};
+            const auto from = predecessors(compare_pc);
+            if (from.size() != 1)
+                return {};
+            compare_pc = from[0];
+            if (!decode(compare_pc, cmp) || cmp.i.meta.category == ZYDIS_CATEGORY_CALL || writes(cmp, r))
+                return {};
+            if (!cmp.i.cpu_flags)
+                continue;
+            const auto &flags = *cmp.i.cpu_flags;
+            const auto written = flags.modified | flags.set_0 | flags.set_1 | flags.undefined;
+            if (!(written & required_flags))
+                continue;
+            if (cmp.i.mnemonic != ZYDIS_MNEMONIC_CMP)
+                return {};
+            found_compare = true;
+            break;
+        }
+        if (!found_compare || cmp.i.operand_count_visible != 2)
             return {};
         const auto &reg = cmp.operands[0];
         const auto &immediate = cmp.operands[1];
@@ -197,7 +214,7 @@ struct Graph {
             (reg.size != 32 && reg.size != 64) || immediate.type != ZYDIS_OPERAND_TYPE_IMMEDIATE ||
             (immediate.imm.is_signed && immediate.imm.value.s < 0) || immediate.imm.value.u > 65535)
             return {};
-        if (!same_masked_value(at->first, number(reg.reg.value), reg.size, r, mask))
+        if (!same_masked_value(compare_pc, number(reg.reg.value), reg.size, r, mask))
             return {};
         const bool inclusive = ins.i.mnemonic == ZYDIS_MNEMONIC_JNBE || ins.i.mnemonic == ZYDIS_MNEMONIC_JBE;
         const auto count = immediate.imm.value.u + (inclusive ? 1u : 0u);
