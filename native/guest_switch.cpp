@@ -388,6 +388,25 @@ std::optional<SwitchTable> recognize_cfg_switch(
         jump.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || jump.operands[0].size != 64 ||
         !valid_gpr(jump.operands[0].reg.value))
         return {};
+    const auto preserve_move = [&](const Decoded &c, ZydisRegister &target) {
+        if (c.instruction.mnemonic == ZYDIS_MNEMONIC_NOP)
+            return true;
+        if (c.instruction.mnemonic != ZYDIS_MNEMONIC_MOV || c.instruction.operand_count_visible != 2 ||
+            c.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || !valid_gpr(c.operands[0].reg.value) ||
+            (c.operands[0].size != 32 && c.operands[0].size != 64))
+            return false;
+        if (c.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER &&
+            c.operands[1].type != ZYDIS_OPERAND_TYPE_MEMORY &&
+            c.operands[1].type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
+            return false;
+        if (enclosing(c.operands[0].reg.value) == target) {
+            if (!reg(c, 0, target) || c.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER ||
+                c.operands[1].size != 64 || !valid_gpr(c.operands[1].reg.value))
+                return false;
+            target = c.operands[1].reg.value;
+        }
+        return true;
+    };
     auto destination = jump.operands[0].reg.value;
     auto add_at = code.size();
     for (std::size_t at = code.size() - 1; at > 0;) {
@@ -397,35 +416,39 @@ std::optional<SwitchTable> recognize_cfg_switch(
             add_at = at;
             break;
         }
-        if (c.instruction.mnemonic == ZYDIS_MNEMONIC_NOP)
-            continue;
-        // These moves cannot alter the computed target unless they write its
-        // current register. Track a full-width register copy backwards; refuse
-        // partial writes, memory stores, stack changes and unknown operations.
-        if (c.instruction.mnemonic != ZYDIS_MNEMONIC_MOV || c.instruction.operand_count_visible != 2 ||
-            c.operands[0].type != ZYDIS_OPERAND_TYPE_REGISTER || !valid_gpr(c.operands[0].reg.value) ||
-            (c.operands[0].size != 32 && c.operands[0].size != 64))
+        if (!preserve_move(c, destination))
             return {};
-        if (c.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER &&
-            c.operands[1].type != ZYDIS_OPERAND_TYPE_MEMORY &&
-            c.operands[1].type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
-            return {};
-        if (enclosing(c.operands[0].reg.value) == destination) {
-            if (!reg(c, 0, destination) || c.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER ||
-                c.operands[1].size != 64 || !valid_gpr(c.operands[1].reg.value))
-                return {};
-            destination = c.operands[1].reg.value;
-        }
     }
     if (add_at == code.size() || !add_at)
         return {};
     const auto &add = code[add_at];
-    const auto &load = code[add_at - 1];
     if (add.instruction.operand_count_visible != 2 || add.operands[1].type != ZYDIS_OPERAND_TYPE_REGISTER ||
-        add.operands[1].size != 64 || load.instruction.mnemonic != ZYDIS_MNEMONIC_MOVSXD ||
-        load.instruction.operand_count_visible != 2 || !reg(load, 0, destination))
+        add.operands[1].size != 64)
         return {};
     const auto base = add.operands[1].reg.value;
+    if (!valid_gpr(base) || base == destination)
+        return {};
+    // The signed offset may be copied before ADD, but the table base must not
+    // change between the load and its use in ADD. Track only MOV/NOP paths.
+    auto offset_register = destination;
+    auto load_at = code.size();
+    for (std::size_t at = add_at; at > 0;) {
+        --at;
+        const auto &c = code[at];
+        if (c.instruction.mnemonic == ZYDIS_MNEMONIC_MOVSXD && reg(c, 0, offset_register)) {
+            load_at = at;
+            break;
+        }
+        if (c.operands[0].type == ZYDIS_OPERAND_TYPE_REGISTER && enclosing(c.operands[0].reg.value) == base)
+            return {};
+        if (!preserve_move(c, offset_register) || offset_register == base)
+            return {};
+    }
+    if (load_at == code.size())
+        return {};
+    const auto &load = code[load_at];
+    if (load.instruction.operand_count_visible != 2)
+        return {};
     const auto &memory = load.operands[1];
     if (base < ZYDIS_REGISTER_RAX || base > ZYDIS_REGISTER_R15 || base == ZYDIS_REGISTER_RSP ||
         base == destination || memory.type != ZYDIS_OPERAND_TYPE_MEMORY || memory.size != 32 ||

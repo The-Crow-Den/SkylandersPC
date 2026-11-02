@@ -369,6 +369,21 @@ void cfg_switch_tests() {
     require(analyze(copied_target,root).switch_tables.size()==1);
     const std::array<std::uint64_t,2> mid_target{0x10000,0x1001f};
     require(analyze(copied_target,mid_target).switch_tables.empty());
+    auto saved_index=code;saved_index.insert(saved_index.begin()+28,{0x48,0x89,0xc3}); // MOV RBX,RAX.
+    saved_index[6]+=3;saved_index[20]+=3;
+    const auto saved_graph=analyze(saved_index,root);
+    require(saved_graph.switch_tables.size()==1 && saved_graph.switch_tables[0].invariant_index.has_value());
+    require(GuestTls::inspect(saved_index,saved_graph.instructions).sites.size()==1);
+    auto base_clobber=saved_index;base_clobber[30]=0xc1; // MOV RCX,RAX destroys table base before ADD.
+    require(analyze(base_clobber,root).switch_tables.empty());
+    auto partial_offset=saved_index;partial_offset[28]=0x89;partial_offset[29]=0xd8;partial_offset[30]=0x90;
+    require(analyze(partial_offset,root).switch_tables.empty()); // MOV EAX,EBX; NOP destroys signed offset.
+    auto offset_copy=code;offset_copy[26]=0x14; // Load offset into RDX instead of RAX.
+    offset_copy.insert(offset_copy.begin()+28,{0x48,0x89,0xd0}); // MOV RAX,RDX before ADD.
+    offset_copy[6]+=3;offset_copy[20]+=3;
+    require(analyze(offset_copy,root).switch_tables.size()==1);
+    const std::array<std::uint64_t,2> mid_offset{0x10000,0x1001c};
+    require(analyze(offset_copy,mid_offset).switch_tables.empty());
     auto scheduled=code;scheduled.insert(scheduled.begin()+5,{0x89,0xd9});
     const auto scheduled_graph=analyze(scheduled,root);
     require(scheduled_graph.switch_tables.size()==1 && scheduled_graph.switch_tables[0].table_size==8 &&
