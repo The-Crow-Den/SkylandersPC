@@ -8,6 +8,8 @@ namespace GuestCode::Detail {
 // and JB/JBE taken edges bound an index; their opposite edges do not. A branch
 // targeting its own fallthrough cannot constrain values. Callers must repeat
 // the query after adding control-flow edges.
+// Known nonzero immediate SHL/SHR/SAR of r32 can establish zero high bits;
+// zero/variable counts do not provide a new definition.
 // The guard's CF/ZF producer may precede unchanged instructions along a unique
 // path (32 nodes); calls, used-flag writes and queried-register writes refuse.
 // Register copies and immediate AND masks retain the queried expression. A

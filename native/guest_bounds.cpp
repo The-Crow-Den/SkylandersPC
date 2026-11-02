@@ -98,6 +98,18 @@ struct Graph {
                     continue;
                 }
                 const auto &o = ins.operands[0];
+                // A nonzero fixed-count 32-bit shift defines the complete
+                // result and clears its high half. A zero/variable count is
+                // not a write witness; use x86's masked immediate count.
+                const auto mnemonic = ins.i.mnemonic;
+                if (o.type == ZYDIS_OPERAND_TYPE_REGISTER && number(o.reg.value) == r && o.size == 32 &&
+                    (mnemonic == ZYDIS_MNEMONIC_SHL || mnemonic == ZYDIS_MNEMONIC_SHR ||
+                     mnemonic == ZYDIS_MNEMONIC_SAR) &&
+                    ins.i.operand_count >= 2 && ins.operands[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
+                    (ins.operands[1].imm.value.u & 31)) {
+                    definition = true;
+                    continue;
+                }
                 if (o.type != ZYDIS_OPERAND_TYPE_REGISTER || number(o.reg.value) != r || o.size != 32 ||
                     !(o.actions & ZYDIS_OPERAND_ACTION_WRITE) || (o.actions & ZYDIS_OPERAND_ACTION_CONDWRITE))
                     return false;

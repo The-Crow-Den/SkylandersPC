@@ -3,7 +3,9 @@
 #include "guest_constants.hpp"
 #include "guest_bounds.hpp"
 #include "guest_switch.hpp"
+#include "platform/host_code.hpp"
 #include <openssl/evp.h>
+#include <algorithm>
 #include <array>
 #include <iomanip>
 #include <iostream>
@@ -262,6 +264,31 @@ void cfg_bound_tests() {
     const std::array<std::uint64_t,2> alias_entry{0x10000,0x10007};
     require(!query(alias,22,alias_edges,alias_entry,1));
     require(query(original,13,edges,root)==2);
+    for(const auto shift:{std::uint8_t{0xe8},std::uint8_t{0xe0},std::uint8_t{0xf8}}) {
+        for(const auto count:{std::uint8_t{1},std::uint8_t{30},std::uint8_t{31},std::uint8_t{33}}) {
+            // The incoming RDI is a full-width unknown. Only the nonzero r32
+            // shift can establish the high bits before the 32-bit comparison.
+            auto shifted=original;shifted.insert(shifted.begin()+1,0x89);shifted[0]=0x48;shifted[2]=0xf8;
+            shifted.insert(shifted.begin()+3,{0xc1,shift,count});
+            require(query(shifted,17,{{0x10012,0x10009},{0x10011,0x1000b}},root)==2);
+        }
+    }
+    for(const auto count:{std::uint8_t{0},std::uint8_t{32},std::uint8_t{64}}) {
+        auto shifted=original;shifted.insert(shifted.begin()+1,0x89);shifted[0]=0x48;shifted[2]=0xf8;
+        shifted.insert(shifted.begin()+3,{0xc1,0xe8,count});
+        require(!query(shifted,17,{{0x10012,0x10009},{0x10011,0x1000b}},root));
+    }
+    auto variable=original;variable.insert(variable.begin()+1,0x89);variable[0]=0x48;variable[2]=0xf8;
+    variable.insert(variable.begin()+3,{0xd3,0xe8}); // SHR EAX,CL cannot define high bits for every count.
+    require(!query(variable,16,{{0x10011,0x10008},{0x10010,0x1000a}},root));
+    auto one=variable;one[3]=0xd1; // Implicit immediate count one, not CL.
+    require(query(one,16,{{0x10011,0x10008},{0x10010,0x1000a}},root)==2);
+    for(const auto prefix:{std::uint8_t{0x66},std::uint8_t{0x48}}) {
+        auto other_width=original;other_width.insert(other_width.begin()+1,0x89);
+        other_width[0]=0x48;other_width[2]=0xf8;
+        other_width.insert(other_width.begin()+3,{prefix,0xc1,0xe8,1});
+        require(!query(other_width,18,{{0x10013,0x1000a},{0x10012,0x1000c}},root));
+    }
     auto flag_gap=original;flag_gap.insert(flag_gap.begin()+5,{0x89,0xd9}); // MOV ECX,EBX preserves flags.
     const std::multimap<std::uint64_t,std::uint64_t> gap_edges{{0x10010,0x10007},{0x1000f,0x10009}};
     require(query(flag_gap,15,gap_edges,root)==2);
@@ -523,7 +550,28 @@ void census_tests() {
     require(other.size()==1 && other[0].kind==Kind::OtherPrefix);
 }
 
+void shift_execution_tests() {
+    for(const auto shift:{std::uint8_t{0xe8},std::uint8_t{0xe0},std::uint8_t{0xf8}}) {
+        for(const auto count:{std::uint8_t{1},std::uint8_t{30},std::uint8_t{31},std::uint8_t{33}}) {
+            std::vector<std::uint8_t> code{0x48,0xb8}; // MOVABS RAX,-1, then shift EAX and RET.
+            code.insert(code.end(),8,0xff);
+            code.insert(code.end(),{0xc1,shift,count,0xc3});
+            SkyHost::CodeMemory memory;
+            require(memory.allocate(65536));
+            std::copy(code.begin(),code.end(),memory.writable().begin());
+            require(memory.seal());
+            using Function=std::uint64_t (SKY_SYSV_ABI *)();
+            const auto actual=reinterpret_cast<Function>(static_cast<std::uintptr_t>(memory.address()))();
+            const unsigned effective=count&31;
+            const auto expected=shift==0xe8 ? std::uint32_t{0xffffffff}>>effective :
+                shift==0xe0 ? std::uint32_t{0xffffffff}<<effective : std::uint32_t{0xffffffff};
+            require(actual==expected);
+        }
+    }
+}
+
 int main() try {
+    shift_execution_tests();
     cfg_bound_tests();
     cfg_switch_tests();
     census_tests();
