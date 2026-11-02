@@ -4,6 +4,7 @@
 #include <string_view>
 #include <string>
 class KeyboardPad;
+namespace SkyHost { struct Fault; }
 
 // Optional, privately built GPL renderer/memory component. Unknown APIs stop.
 namespace SkyGpu {
@@ -15,6 +16,7 @@ void set_guest_image(std::uint64_t base, std::uint64_t size);
 void bind_keyboard(KeyboardPad* pad);
 void bind_portal(void (*load)(const char*), void (*remove)(), void (*trap)(const char*), void (*remove_trap)());
 bool handle_fault(int signal, void* info, void* context);
+bool handle_fault(SkyHost::Fault& fault);
 void prepare_cpu_write(std::uint64_t address, std::uint64_t size);
 void note_cpu_write(std::uint64_t address, std::uint64_t size);
 bool supports(std::string_view identity) noexcept;

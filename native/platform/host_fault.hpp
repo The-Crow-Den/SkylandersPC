@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "../guest_abi.hpp"
 #include <array>
 #include <cstdint>
 
@@ -20,6 +21,9 @@ struct Fault {
     FaultAccess access;
     std::uint64_t address;
     std::uint32_t native_code;
+    // Original host detail: x86 REG_ERR on POSIX; access-operation word for a
+    // Windows access violation (0/1/8). Not a portable page-fault bit mask.
+    std::uint64_t native_error = 0;
     FaultContext cpu;
 };
 // Native host ABI. Runs in exception/signal context, with host TLS selected.
@@ -35,4 +39,11 @@ using FaultHandler = bool (*)(Fault&) noexcept;
 // No handler may be installed through sky_guest_configure_fault concurrently.
 bool install_fault_handler(FaultHandler handler) noexcept;
 bool remove_fault_handler() noexcept;
+#ifndef _WIN32
+// Original POSIX renderer recovery retains its live native signal context.
+// Shares exclusive bridge ownership with the normalized handler above.
+using LegacyFaultHandler = int (SKY_SYSV_ABI *)(int, void*, void*);
+bool install_legacy_fault_handler(LegacyFaultHandler handler) noexcept;
+bool remove_legacy_fault_handler() noexcept;
+#endif
 }

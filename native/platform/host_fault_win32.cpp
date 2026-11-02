@@ -14,10 +14,12 @@ LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     if (record->ExceptionFlags & EXCEPTION_NONCONTINUABLE) return EXCEPTION_CONTINUE_SEARCH;
     Fault fault{};
     fault.native_code = record->ExceptionCode;
+    fault.address = reinterpret_cast<std::uintptr_t>(record->ExceptionAddress);
     switch (record->ExceptionCode) {
     case EXCEPTION_ACCESS_VIOLATION:
         if (record->NumberParameters < 2) return EXCEPTION_CONTINUE_SEARCH;
         fault.kind = FaultKind::access;
+        fault.native_error = record->ExceptionInformation[0];
         fault.address = record->ExceptionInformation[1];
         switch (record->ExceptionInformation[0]) {
         case 0: fault.access = FaultAccess::read; break;

@@ -5,6 +5,7 @@
 #endif
 #include "thread_context.hpp"
 #include "guest_start.hpp"
+#include "platform/host_fault.hpp"
 #include "hle/kernel_clock.hpp"
 #include "hle/keyboard_pad.hpp"
 #include "game_hooks.hpp"
@@ -449,6 +450,16 @@ bool handle_fault(int signal, void* info, void* context) {
     return presenter_ready && Renderer::handle_fault(context, static_cast<siginfo_t*>(info)->si_addr);
 #else
     (void)signal; (void)info; (void)context;
+    return false;
+#endif
+}
+bool handle_fault(SkyHost::Fault& fault) {
+#ifdef SKY_RENDERER
+    if (fault.kind != SkyHost::FaultKind::access) return false;
+    if (runtime_fault_recover) siglongjmp(*runtime_fault_recover, 1);
+    return presenter_ready && Renderer::handle_fault(fault);
+#else
+    (void)fault;
     return false;
 #endif
 }
