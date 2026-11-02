@@ -15,6 +15,7 @@
 #endif
 #include <array>
 #include <iostream>
+#include <exception>
 #include <stdexcept>
 
 void require(bool condition) { if (!condition) throw std::runtime_error("TLS manifest assertion failed"); }

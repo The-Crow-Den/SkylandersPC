@@ -104,7 +104,13 @@ U KernelSemaphore::call(std::string_view identity, const U* a, int caller_priori
             constexpr auto maximum = std::chrono::nanoseconds::max().count();
             if (time[0] > (maximum - time[1]) / 1000000000)
                 deadline = std::chrono::system_clock::time_point::max();
-            else deadline = std::chrono::system_clock::time_point(std::chrono::nanoseconds(time[0] * 1000000000 + time[1]));
+            else {
+                // libc++ may use a coarser system_clock duration. Round toward
+                // the future so conversion cannot expire a guest deadline early.
+                const auto duration = std::chrono::nanoseconds(time[0] * 1000000000 + time[1]);
+                deadline = std::chrono::system_clock::time_point(
+                    std::chrono::ceil<std::chrono::system_clock::duration>(duration));
+            }
         }
         sem->waiters.push_back(&waiter);
         if (posix == 6) {

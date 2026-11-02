@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <exception>
 #include <stdexcept>
 namespace {
 void require(bool value) { if (!value) throw std::runtime_error("host memory assertion failed"); }

@@ -5,6 +5,7 @@
 #include "local_players.hpp"
 #include "local_np.hpp"
 #include <array>
+#include <chrono>
 #include <future>
 #include <iostream>
 #include <stdexcept>
@@ -110,6 +111,13 @@ int main() {
         check(posix_waiter.get() == 0);
         std::array<std::int64_t, 2> expired{0, 0};
         check(posix("w5IHyvahg-o", {pointer(&posix_handle), pointer(expired.data())}) == static_cast<U>(-1));
+        const auto deadline_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count() + 2000001;
+        const std::array<std::int64_t,2> future_deadline{deadline_ns / 1000000000,deadline_ns % 1000000000};
+        check(posix("w5IHyvahg-o", {pointer(&posix_handle),pointer(future_deadline.data())}) == static_cast<U>(-1));
+        const auto returned_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        check(returned_ns >= deadline_ns); // Coarse host clocks must not round down.
         expired[1] = 1000000000;
         check(posix("w5IHyvahg-o", {pointer(&posix_handle), pointer(expired.data())}) == static_cast<U>(-1));
         check(posix("IKP8typ0QUk", {pointer(&posix_handle)}) == 0);
