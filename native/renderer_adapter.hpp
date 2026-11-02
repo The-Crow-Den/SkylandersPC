@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <cstdint>
+namespace SkyHost { struct Fault; }
 
 // The host's view of the optional renderer component (skyrender).
 // renderer_adapter.cpp is the one place that calls the library's C API.
@@ -20,6 +21,8 @@ void register_kernel();
 bool init(const WindowConfig& config);
 std::uintptr_t resolve(const char* scoped_nid);
 bool handle_fault(void* context, void* address);
+// Portable register-only path for the host fault layer; commits only on true.
+bool handle_fault(SkyHost::Fault& fault);
 bool overlay_captures_input();
 bool has_menu_toggle();
 void toggle_menu();

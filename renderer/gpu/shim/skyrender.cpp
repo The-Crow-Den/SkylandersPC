@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "renderer_write_log.h"
+#include "fault_context.h"
 // renderer: glue between the C loader and the vendored shadPS4 video core.
 #include "renderer_overlay.h"
 #include "renderer_settings.h"
@@ -307,6 +308,12 @@ extern "C" uintptr_t skyrender_resolve(const char* scoped_nid) {
 
 extern "C" int skyrender_handle_fault(void* ucontext, void* address) {
     return Core::Signals::Instance()->DispatchAccessViolation(ucontext, address) ? 1 : 0;
+}
+
+extern "C" int skyrender_handle_access_fault(SkyRenderAccessFault* fault) {
+    return SkyRender::DispatchAccessFault(fault, [](void* context, void* address) {
+        return Core::Signals::Instance()->DispatchAccessViolation(context, address);
+    }) ? 1 : 0;
 }
 
 extern "C" unsigned skyrender_symbol_count(void) {

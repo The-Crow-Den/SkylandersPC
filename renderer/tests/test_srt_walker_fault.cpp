@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "shader/ir/passes/srt.h"
+#include "../gpu/skyrender.h"
 #include "shader/info.h"
 
 extern "C" int skyrender_handle_fault(void*, void*);
@@ -22,6 +23,7 @@ namespace {
 std::atomic<unsigned> faults{0};
 std::atomic<unsigned> rendezvous{0};
 std::atomic<bool> synchronize{false};
+std::atomic<bool> normalized{false};
 static_assert(std::atomic<unsigned>::is_always_lock_free);
 
 void OnFault(int, siginfo_t* info, void* context) {
@@ -31,7 +33,23 @@ void OnFault(int, siginfo_t* info, void* context) {
         rendezvous.fetch_add(1, std::memory_order_relaxed);
         while (rendezvous.load(std::memory_order_relaxed) < 2) {}
     }
-    if (!skyrender_handle_fault(context, info->si_addr)) _exit(90);
+    if (!normalized.load(std::memory_order_relaxed)) {
+        if (!skyrender_handle_fault(context, info->si_addr)) _exit(90);
+        return;
+    }
+    constexpr std::array registers{REG_RAX,REG_RCX,REG_RDX,REG_RBX,REG_RSP,REG_RBP,REG_RSI,REG_RDI,
+                                  REG_R8,REG_R9,REG_R10,REG_R11,REG_R12,REG_R13,REG_R14,REG_R15};
+    auto& native = static_cast<ucontext_t*>(context)->uc_mcontext.gregs;
+    SkyRenderAccessFault fault{};
+    for (unsigned i = 0; i < registers.size(); ++i) fault.gpr[i] = static_cast<uint64_t>(native[registers[i]]);
+    fault.pc = static_cast<uint64_t>(native[REG_RIP]);
+    fault.flags = static_cast<uint64_t>(native[REG_EFL]);
+    fault.address = reinterpret_cast<uintptr_t>(info->si_addr);
+    fault.access = (native[REG_ERR] & 16) ? 3 : (native[REG_ERR] & 2) ? 2 : 1;
+    if (!skyrender_handle_access_fault(&fault)) _exit(91);
+    for (unsigned i = 0; i < registers.size(); ++i) native[registers[i]] = static_cast<greg_t>(fault.gpr[i]);
+    native[REG_RIP] = static_cast<greg_t>(fault.pc);
+    native[REG_EFL] = static_cast<greg_t>(fault.flags);
 }
 }
 
@@ -84,6 +102,7 @@ int main() {
     assert(result == value); // earlier failures must not poison this walker
     assert(std::memcmp(reinterpret_cast<const void*>(walker), code.data(), code.size()) == 0);
 
+    normalized.store(true);
     synchronize.store(true);
     auto simultaneous = [&] {
         u32 out = 1;

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../gpu_backend.hpp"
+#include "../renderer_adapter.hpp"
+#include "../platform/host_fault.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -11,6 +13,20 @@ int main() {
         const auto check = [](bool value) { if (!value) throw std::runtime_error("GPU adapter contract failed"); };
         const auto pointer = [](auto* value) { return reinterpret_cast<std::uintptr_t>(value); };
         check(SkyGpu::enabled());
+        // Before renderer initialization no access handler owns this address.
+        // A decline through the real C ABI preserves the host fault snapshot.
+        SkyHost::Fault fault{};
+        fault.kind = SkyHost::FaultKind::access;
+        fault.access = SkyHost::FaultAccess::read;
+        fault.address = 0x80;
+        fault.cpu.pc = 0x12345678;
+        fault.cpu.flags = 0x247;
+        fault.cpu.gpr.fill(0xfedcba9876543210);
+        const auto before = fault.cpu;
+        check(!Renderer::handle_fault(fault));
+        check(fault.cpu.gpr == before.gpr && fault.cpu.pc == before.pc && fault.cpu.flags == before.flags);
+        fault.kind = SkyHost::FaultKind::illegal_instruction;
+        check(!Renderer::handle_fault(fault));
         check(!SkyGpu::supports("Idffwf3yh8s#wrong#libSceGnmDriver"));
         check(SkyGpu::stack_arguments("xbxNatawohc#libSceGnmDriver#libSceGnmDriver") == 3);
         std::array<std::uint32_t, 4096> commands{};
