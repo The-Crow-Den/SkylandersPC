@@ -11,13 +11,9 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <mutex>
 #include <stdexcept>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
 namespace {
 using U=std::uint64_t;
 constexpr std::array<std::string_view,8> names{
@@ -42,33 +38,6 @@ bool directory(const std::filesystem::path& path) {
     std::filesystem::create_directories(path,ec);
     return !ec && std::filesystem::canonical(path,ec)==std::filesystem::absolute(path).lexically_normal() && !ec;
 }
-bool write_private(const std::filesystem::path& path,const void* data,std::size_t size) {
-    // Never truncate the last valid metadata. Publish a fully synced sibling
-    // only after every byte has been written successfully.
-    struct stat original{};
-    if(lstat(path.c_str(),&original)==0) {
-        if(!S_ISREG(original.st_mode)||original.st_nlink!=1)return false;
-    } else if(errno!=ENOENT)return false;
-    const int parent=open(path.parent_path().c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-    if(parent<0)return false;
-    std::string temporary=path.string()+".pending-XXXXXX";
-    const int fd=mkostemp(temporary.data(),O_CLOEXEC);
-    if(fd<0){close(parent);return false;}
-    bool ok=true;
-    std::size_t done=0;
-    while(done<size){
-        const auto n=write(fd,static_cast<const unsigned char*>(data)+done,size-done);
-        if(n<0 && errno==EINTR)continue;
-        if(n<=0){ok=false;break;}
-        done+=static_cast<std::size_t>(n);
-    }
-    if(ok){int result;do{result=fsync(fd);}while(result<0 && errno==EINTR);ok=result==0;}
-    if(close(fd)!=0)ok=false;
-    if(ok)ok=rename(temporary.c_str(),path.c_str())==0;
-    if(!ok)unlink(temporary.c_str());
-    else {int result;do{result=fsync(parent);}while(result<0 && errno==EINTR);ok=result==0;}
-    close(parent);return ok;
-}
 }
 struct SaveData::Impl {
     KernelFile& files;
@@ -76,7 +45,7 @@ struct SaveData::Impl {
     std::filesystem::path root;
     std::string title;
     bool initialized=false;
-    struct Slot {std::filesystem::path data,meta;bool read_only;};
+    struct Slot {std::filesystem::path data;SkyHost::File meta;bool read_only;};
     std::map<std::string,Slot> slots;
     explicit Impl(KernelFile& f):files(f){}
 };
@@ -131,7 +100,6 @@ U SaveData::call(std::string_view identity,const U* a) {
         if(!parent.open_directory(user_root,false,true))return 0x809f000b;
         const std::string name(raw,length);
         const auto data=user_root/name;
-        const auto meta=user_root/(name+".sce_sys");
         SkyHost::FileInfo info{};
         bool exists=false;
         if(!parent.child_info(name,info,exists))return 0x809f000b;
@@ -147,7 +115,7 @@ U SaveData::call(std::string_view identity,const U* a) {
         for(;index<16;++index){point="/savedata"+std::to_string(index);if(!impl_->slots.contains(point))break;}
         if(index==16)return 0x809f000c;
         if(!impl_->files.mount_save(point,data_directory,read_only))return 0x809f000b;
-        impl_->slots.emplace(point,Impl::Slot{data,meta,read_only});
+        impl_->slots.emplace(point,Impl::Slot{data,std::move(meta_directory),read_only});
         auto& out=*reinterpret_cast<MountResult*>(a[1]);out={};std::memcpy(out.point,point.c_str(),point.size());out.status=exists?0:1;
         return 0;
     }
@@ -163,18 +131,34 @@ U SaveData::call(std::string_view identity,const U* a) {
         if(!a[1])return 0x809f0000;
         const auto& icon=*reinterpret_cast<const Icon*>(a[1]);
         if(!icon.buffer||icon.size>icon.capacity||icon.size>2*1024*1024)return 0x809f0000;
-        return write_private(slot.meta/"icon0.png",reinterpret_cast<const void*>(icon.buffer),icon.size)?0:0x809f000b;
+        return slot.meta.write_atomic("icon0.png",reinterpret_cast<const void*>(icon.buffer),icon.size)?0:0x809f000b;
     }
     if(op==3||op==4){
         if(!a[2])return 0x809f0000;
-        Param param{};std::ifstream input(slot.meta/"param.bin",std::ios::binary);
-        if(input){input.read(reinterpret_cast<char*>(&param),sizeof(param));if(input.gcount()!=sizeof(param))return 0x809f000f;}
+        Param param{};
+        SkyHost::FileInfo info{};
+        bool exists=false;
+        if(!slot.meta.child_info("param.bin",info,exists))return 0x809f000b;
+        if(exists){
+            if(!info.regular||info.links!=1)return 0x809f000b;
+            SkyHost::File input;
+            if(!slot.meta.open_child("param.bin",{},true,input))return 0x809f000b;
+            if(!input.stat(info)||!info.regular||info.links!=1)return 0x809f000b;
+            std::size_t done=0;
+            while(done<sizeof(param)){
+                const auto count=input.read(reinterpret_cast<unsigned char*>(&param)+done,sizeof(param)-done);
+                if(count<0&&errno==EINTR)continue;
+                if(count<0)return 0x809f000b;
+                if(!count)return 0x809f000f;
+                done+=static_cast<std::size_t>(count);
+            }
+        }
         void* field=nullptr;std::size_t size=0;
         switch(a[1]){case 0:field=&param;size=sizeof(param);break;case 1:field=param.title;size=128;break;case 2:field=param.subtitle;size=128;break;case 3:field=param.detail;size=1024;break;case 4:field=&param.user;size=4;break;default:return 0x809f0000;}
         if(op==3){
             if((a[1]==0||a[1]==4)&&a[3]<size)return 0x809f0000;
             std::memset(field,0,size);std::memcpy(field,reinterpret_cast<const void*>(a[2]),std::min<U>(a[3],size));
-            return write_private(slot.meta/"param.bin",&param,sizeof(param))?0:0x809f000b;
+            return slot.meta.write_atomic("param.bin",&param,sizeof(param))?0:0x809f000b;
         }
         if(a[3]<size)return 0x809f0000;
         std::memcpy(reinterpret_cast<void*>(a[2]),field,size);

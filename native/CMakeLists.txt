@@ -17,7 +17,7 @@ endif()
 
 # Fault dispatch needs the FS-restoring bridge on POSIX. Keep the platform
 # objects in an archive so memory-only tests don't acquire that dependency.
-add_library(sky-host-platform STATIC ${SKY_HOST_PLATFORM_SOURCES})
+add_library(sky-host-platform STATIC platform/host_files.cpp ${SKY_HOST_PLATFORM_SOURCES})
 target_compile_features(sky-host-platform PUBLIC cxx_std_20)
 if(CMAKE_DL_LIBS)
   target_link_libraries(sky-host-platform PUBLIC ${CMAKE_DL_LIBS})
@@ -29,7 +29,7 @@ target_compile_options(sky-host-platform PRIVATE -Wall -Wextra -Wconversion -Wsh
 include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 3.11 COMPONENTS Interpreter REQUIRED)
-  add_executable(host-files-test tests/test_host_files.cpp hle/kernel_file.cpp)
+  add_executable(host-files-test tests/test_host_files.cpp hle/kernel_file.cpp hle/save_data.cpp)
   target_compile_features(host-files-test PRIVATE cxx_std_20)
   target_compile_options(host-files-test PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(host-files-test PRIVATE sky-host-platform Threads::Threads)

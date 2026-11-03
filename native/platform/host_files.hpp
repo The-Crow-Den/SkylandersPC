@@ -46,6 +46,12 @@ public:
     // Missing entries succeed with exists=false; unsafe links are failures.
     // Does not open file data (and therefore cannot block on a FIFO).
     bool child_info(std::string_view name, FileInfo& output, bool& exists) const;
+    // Replace one regular, single-link child with a fully written/flushed
+    // sibling. A failure after publication may leave the new file installed;
+    // it never rolls back by deleting that installed file. POSIX also fsyncs
+    // the parent; Windows flushes the renamed file, without claiming directory
+    // fsync/power-loss equivalence.
+    bool write_atomic(std::string_view name, const void* data, std::size_t size) const;
     // single_link requires a directory or regular file with exactly one link;
     // validate that before truncation so save hard links cannot modify outside data.
     bool open_child(std::string_view name, const FileOpen& options, bool single_link, File& output) const;
@@ -59,6 +65,9 @@ public:
     int truncate(std::int64_t size);
     int close();
 private:
+    bool create_temporary(std::string_view name, File& output) const;
+    bool publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const;
+    bool discard_temporary(File& temporary, std::string_view name) const;
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

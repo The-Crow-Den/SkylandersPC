@@ -122,6 +122,9 @@ bool File::open_child(std::string_view name, const FileOpen& options, bool singl
     case FileAccess::ReadWrite: flags |= O_RDWR; break;
     default: errno = EINVAL; return false;
     }
+    // A substituted FIFO must not block a save-file open before fstat can
+    // reject it. O_NONBLOCK has no effect on the accepted regular files.
+    if (single_link) flags |= O_NONBLOCK;
     if (options.append) flags |= O_APPEND;
     if (options.create) flags |= O_CREAT;
     if (options.exclusive) flags |= O_EXCL;
@@ -140,6 +143,33 @@ bool File::open_child(std::string_view name, const FileOpen& options, bool singl
     }
     output.impl_ = std::move(next);
     return true;
+}
+bool File::create_temporary(std::string_view name, File& output) const {
+    FileOpen options;
+    options.access = FileAccess::Write;
+    options.create = options.exclusive = true;
+    return open_child(name,options,true,output);
+}
+bool File::publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const {
+    if (!valid() || !temporary.valid()) { errno=EBADF; return false; }
+    if (!component_name(source) || !component_name(target)) return false;
+    if (temporary.close()) return false;
+    const std::string from(source), to(target);
+    if (::renameat(impl_->fd,from.c_str(),impl_->fd,to.c_str())) return false;
+    published = true;
+    int result;
+    do { result = ::fsync(impl_->fd); } while (result < 0 && errno == EINTR);
+    return result == 0;
+}
+bool File::discard_temporary(File& temporary, std::string_view name) const {
+    if (!valid()) { errno=EBADF; return false; }
+    if (!component_name(name)) return false;
+    const bool closed = !temporary.valid() || temporary.close() == 0;
+    const auto error = errno;
+    const std::string component(name);
+    if (::unlinkat(impl_->fd,component.c_str(),0) && errno != ENOENT) return false;
+    if (!closed) errno = error;
+    return closed;
 }
 bool File::stat(FileInfo& output) const {
     if (!valid()) { errno = EBADF; return false; }

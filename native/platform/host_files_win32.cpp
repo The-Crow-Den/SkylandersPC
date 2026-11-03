@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <cstring>
+#include <vector>
 #include <limits>
 #include <mutex>
 #include <stdexcept>
@@ -116,7 +118,7 @@ struct File::Impl {
     mutable std::mutex mutex;
     ~Impl() { const auto saved=errno; if (handle) CloseHandle(handle); errno=saved; }
     static std::unique_ptr<Impl> open(HANDLE parent, std::wstring_view name, const FileOpen& options,
-                                      bool single_link, bool insensitive, bool directory_creation = false, bool metadata_only = false) {
+                                      bool single_link, bool insensitive, bool directory_creation = false, bool metadata_only = false, bool delete_access = false) {
         if (name.empty() || name.size() > 32767) { errno=ENAMETOOLONG; return {}; }
         if (options.directory && options.create && !directory_creation) { errno=EINVAL; return {}; }
         ACCESS_MASK desired = SYNCHRONIZE | FILE_READ_ATTRIBUTES;
@@ -127,6 +129,7 @@ struct File::Impl {
         default: errno=EINVAL; return {};
         }
         if (options.directory) desired |= FILE_TRAVERSE;
+        if (delete_access) desired |= DELETE;
         UNICODE_STRING text{};
         text.Length = static_cast<USHORT>(name.size() * sizeof(wchar_t));
         text.MaximumLength = text.Length;
@@ -296,6 +299,84 @@ bool File::open_child(std::string_view name, const FileOpen& options, bool singl
     auto next = Impl::open(impl_->handle,wide,options,single_link,false);
     if (!next) return false;
     output.impl_ = std::move(next);
+    return true;
+}
+bool File::create_temporary(std::string_view name, File& output) const {
+    if (&output == this) { errno=EINVAL; return false; }
+    std::wstring wide;
+    if (!component_name(name,wide)) return false;
+    if (!impl_) { errno=EBADF; return false; }
+    std::lock_guard lock(impl_->mutex);
+    if (!impl_->handle) { errno=EBADF; return false; }
+    if (!impl_->directory) { errno=ENOTDIR; return false; }
+    FileOpen options;
+    options.access = FileAccess::Write;
+    options.create = options.exclusive = true;
+    auto next = Impl::open(impl_->handle,wide,options,true,false,false,false,true);
+    if (!next) return false;
+    output.impl_ = std::move(next);
+    return true;
+}
+bool File::publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const {
+    (void)source; // Rename the owned handle, never reopen the temporary name.
+    std::wstring wide;
+    if (!component_name(target,wide)) return false;
+    if (!impl_ || !temporary.impl_ || &temporary == this) { errno=EBADF; return false; }
+    std::scoped_lock lock(impl_->mutex,temporary.impl_->mutex);
+    if (!impl_->handle || !temporary.impl_->handle) { errno=EBADF; return false; }
+    const auto bytes = wide.size() * sizeof(wchar_t);
+    const auto length = sizeof(FILE_RENAME_INFORMATION) + bytes;
+    std::vector<std::max_align_t> storage((length + sizeof(std::max_align_t)-1) / sizeof(std::max_align_t));
+    FILE_RENAME_INFORMATION header{};
+    header.ReplaceIfExists = TRUE;
+    header.RootDirectory = impl_->handle;
+    header.FileNameLength = static_cast<ULONG>(bytes);
+    std::memcpy(storage.data(),&header,sizeof(header));
+    std::memcpy(reinterpret_cast<unsigned char*>(storage.data()) + offsetof(FILE_RENAME_INFORMATION,FileName),wide.data(),bytes);
+    IO_STATUS_BLOCK io{};
+    auto status = NtSetInformationFile(temporary.impl_->handle,&io,storage.data(),static_cast<ULONG>(length),FileRenameInformation);
+    if (status == 0x103) {
+        const auto wait = WaitForSingleObject(temporary.impl_->handle,INFINITE);
+        if (wait != WAIT_OBJECT_0) {
+            // Completion is uncertain; never delete a potentially published
+            // file while trying to clean up the temporary.
+            published = true;
+            failure(wait == WAIT_FAILED ? GetLastError() : ERROR_GEN_FAILURE);
+            return false;
+        }
+        status = io.Status;
+    }
+    if (status < 0) { status_failure(status); return false; }
+    if (status != 0) {
+        published = true;
+        throw std::runtime_error("unexpected Windows rename completion status " + std::to_string(status));
+    }
+    // From here cleanup must never mark this handle for deletion: it now owns
+    // the published file, including if the post-rename flush or close fails.
+    published = true;
+    if (!FlushFileBuffers(temporary.impl_->handle)) { failure(GetLastError()); return false; }
+    const auto handle = std::exchange(temporary.impl_->handle,nullptr);
+    if (!CloseHandle(handle)) { failure(GetLastError()); return false; }
+    return true;
+}
+bool File::discard_temporary(File& temporary, std::string_view name) const {
+    (void)name; // Delete only the owned temporary, even if its name was moved.
+    if (&temporary == this) { errno=EINVAL; return false; }
+    if (!temporary.impl_) return true;
+    std::lock_guard lock(temporary.impl_->mutex);
+    if (!temporary.impl_->handle) return true;
+    FILE_DISPOSITION_INFORMATION info{TRUE};
+    IO_STATUS_BLOCK io{};
+    auto status = NtSetInformationFile(temporary.impl_->handle,&io,&info,sizeof(info),FileDispositionInformation);
+    if (status == 0x103) {
+        const auto wait = WaitForSingleObject(temporary.impl_->handle,INFINITE);
+        if (wait != WAIT_OBJECT_0) { failure(wait == WAIT_FAILED ? GetLastError() : ERROR_GEN_FAILURE); return false; }
+        status = io.Status;
+    }
+    if (status < 0) { status_failure(status); return false; }
+    if (status != 0) throw std::runtime_error("unexpected Windows delete completion status " + std::to_string(status));
+    const auto handle = std::exchange(temporary.impl_->handle,nullptr);
+    if (!CloseHandle(handle)) { failure(GetLastError()); return false; }
     return true;
 }
 bool File::stat(FileInfo& output) const {

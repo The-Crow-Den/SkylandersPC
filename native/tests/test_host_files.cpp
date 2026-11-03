@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../platform/host_files.hpp"
 #include "../hle/kernel_file.hpp"
+#include "../hle/save_data.hpp"
 #include <array>
 #include <cerrno>
 #include <cstring>
@@ -167,6 +168,89 @@ void directory_tests(const std::filesystem::path& root) {
     require(files.call("UK2Tl2DWUns#libkernel#libkernel",close.data()) == 0);
     require(files.unmount_save("/savedata0"));
 }
+void atomic_tests(const std::filesystem::path& root) {
+    using namespace SkyHost;
+    File directory;
+    require(directory.open_directory(root/"save"));
+    require(directory.write_atomic("metadata","first",5));
+    require(directory.write_atomic("metadata","second",6));
+    File read;
+    require(directory.open_child("metadata",{},true,read));
+    std::array<char,8> data{};
+    require(read.read(data.data(),data.size()) == 6 && std::string(data.data(),6) == "second");
+    require(read.close() == 0);
+    require(!directory.write_atomic("hardlink","BAD",3));
+#ifdef _WIN32
+    // Python holds the destination without delete sharing: publication must
+    // fail, remove the owned sibling, and preserve the previous contents.
+    require(!directory.write_atomic("locked","BAD",3) && errno == EACCES);
+#endif
+    require(!directory.write_atomic("../outside.bin","BAD",3));
+    require(!directory.write_atomic("progress",nullptr,1) && errno == EINVAL);
+    require(directory.write_atomic("empty",nullptr,0));
+    FileInfo info{};
+    bool exists = false;
+    require(directory.child_info("empty",info,exists) && exists && info.size == 0);
+    File game;
+    require(game.open_directory(root/"game"));
+    require(!game.write_atomic("escape","BAD",3));
+#ifndef _WIN32
+    require(!game.write_atomic("fifo","BAD",3));
+    File fifo;
+    require(!game.open_child("fifo",{},true,fifo));
+    require(!game.write_atomic("link.bin","BAD",3));
+#endif
+    for (const auto& item : std::filesystem::directory_iterator(root/"save"))
+        require(!item.path().filename().string().starts_with(".pending-"));
+}
+void save_metadata_tests(const std::filesystem::path& root) {
+    using U = std::uint64_t;
+    const auto pointer = [](auto* value) { return reinterpret_cast<std::uintptr_t>(value); };
+    KernelFile files;
+    SaveData saves(files);
+    saves.configure(root/"metadata-saves","CUSA00697");
+    auto save = [&](const char* nid, std::array<U,6> args = {}) {
+        return saves.call(std::string(nid)+"#libSceSaveData#libSceSaveData",args.data());
+    };
+    struct Mount {std::int32_t user,pad;U title,dir,fingerprint,blocks;std::uint32_t mode;unsigned char reserved[32];};
+    Mount mount{0x1000,0,0,pointer("synthetic"),0,96,34,{}};
+    alignas(8) std::array<char,64> result{};
+    require(save("ZkZhskCPXFw") == 0);
+    require(save("32HQAQdwM2o",{pointer(&mount),pointer(result.data())}) == 0);
+    std::array<char,128> title{};
+    require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0 && title[0] == 0);
+    const char initial[] = "held directory";
+    require(save("85zul--eGXs",{pointer(result.data()),1,pointer(initial),sizeof(initial)}) == 0);
+    require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0 && std::string(title.data()) == initial);
+    const auto parent = root/"metadata-saves"/"CUSA00697"/"user-4096";
+    const auto metadata = parent/"synthetic.sce_sys";
+    std::filesystem::rename(metadata,parent/"held");
+    std::filesystem::rename(root/"metadata_escape",metadata);
+    const char updated[] = "updated held directory";
+    require(save("85zul--eGXs",{pointer(result.data()),1,pointer(updated),sizeof(updated)}) == 0);
+    require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0 && std::string(title.data()) == updated);
+    // A hard-linked metadata entry must neither disclose nor replace outside data.
+    std::filesystem::remove(parent/"held"/"param.bin");
+    std::filesystem::create_hard_link(root/"outside.bin",parent/"held"/"param.bin");
+    require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0x809f000b);
+    require(save("85zul--eGXs",{pointer(result.data()),1,pointer(initial),sizeof(initial)}) == 0x809f000b);
+    std::filesystem::remove(parent/"held"/"param.bin");
+    // Truncated metadata is reported as corrupt, and never silently reset.
+    SkyHost::File meta;
+    require(meta.open_directory(parent/"held"));
+    require(meta.write_atomic("param.bin","short",5));
+    require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0x809f000f);
+    struct Icon {U buffer,capacity,size;unsigned char reserved[32];};
+    Icon icon{pointer("icon"),4,4,{}};
+    require(save("c88Yy54Mx0w",{pointer(result.data()),pointer(&icon)}) == 0);
+    std::filesystem::remove(parent/"held"/"param.bin");
+    std::filesystem::rename(root/"metadata_file_escape",parent/"held"/"param.bin");
+    require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0x809f000b);
+    require(save("85zul--eGXs",{pointer(result.data()),1,pointer(initial),sizeof(initial)}) == 0x809f000b);
+    require(save("BMR4F-Uek3E",{pointer(result.data())}) == 0);
+    require(!std::filesystem::exists(root/"outside"/"param.bin"));
+    require(!std::filesystem::exists(root/"outside"/"icon0.png"));
+}
 void guest_tests(const std::filesystem::path& root) {
     using U = std::uint64_t;
     const auto pointer = [](auto* value) { return reinterpret_cast<std::uintptr_t>(value); };
@@ -240,7 +324,7 @@ int main(int argc, char** argv) {
         require(argc == 2 || argc == 3);
         const auto root = decode_path(argv[1]);
         if (argc == 3 && std::string_view(argv[2]) == "race") race_tests(root);
-        else { capability_tests(root); directory_tests(root); guest_tests(root); }
+        else { capability_tests(root); directory_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
         std::cout << "file capability tests passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
