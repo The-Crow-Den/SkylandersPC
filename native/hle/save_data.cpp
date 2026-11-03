@@ -81,7 +81,7 @@ struct SaveData::Impl {
 };
 SaveData::SaveData(KernelFile& files):impl_(std::make_unique<Impl>(files)){}
 SaveData::~SaveData()=default;
-void SaveData::configure(const std::string& root,const std::string& title) {
+void SaveData::configure(const std::filesystem::path& root,const std::string& title) {
     if(!safe(title)||title.size()!=9||!title.starts_with("CUSA"))throw std::runtime_error("save title ID unavailable");
     impl_->root=std::filesystem::absolute(root).lexically_normal();impl_->title=title;
 }

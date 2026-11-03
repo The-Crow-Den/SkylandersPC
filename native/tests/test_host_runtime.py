@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 
 BINARY = Path(sys.argv.pop(1)).resolve()
@@ -45,6 +46,30 @@ class RuntimeHostTests(unittest.TestCase):
         result = self.run_native('--diagnostic')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stderr, 'runtime-host-check:42:flushed\n')
+
+    def test_diagnostic_worker_does_not_return(self):
+        with subprocess.Popen([str(BINARY), '--suspend'], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, encoding='utf-8') as process:
+            ready = threading.Event()
+            line = []
+
+            def read_marker():
+                line.append(process.stderr.readline())
+                ready.set()
+
+            reader = threading.Thread(target=read_marker)
+            reader.start()
+            try:
+                self.assertTrue(ready.wait(15), 'worker did not reach suspension')
+                reader.join(1)
+                self.assertEqual(line, ['runtime-worker-suspended\n'])
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    process.wait(timeout=0.1)
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                process.communicate(timeout=15)
+                reader.join(1)
 
     def test_save_root_and_unicode_environment(self):
         with tempfile.TemporaryDirectory() as directory:

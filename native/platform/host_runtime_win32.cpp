@@ -15,6 +15,7 @@
 #include <vector>
 namespace SkyHost {
 std::uint64_t current_thread_id() noexcept { return GetCurrentThreadId(); }
+[[noreturn]] void suspend_diagnostic_worker() noexcept { for (;;) Sleep(INFINITE); }
 int diagnostic_printf(const char* format, ...) noexcept {
     va_list arguments;
     va_start(arguments,format);

@@ -315,7 +315,7 @@ struct GuestRuntime::Impl {
                 if (suspend) {
                     SkyHost::diagnostic_printf("{\"event\":\"diagnostic-network-worker-suspended\",\"index\":%llu,\"call_returned\":false}\n",
                         static_cast<unsigned long long>(id));
-                    for (;;) pause();
+                    SkyHost::suspend_diagnostic_worker();
                 }
                 std::_Exit(20);
             }

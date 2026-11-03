@@ -107,6 +107,10 @@ int main(int argc, char** argv) {
             std::cout << '\n';
             return 0;
         }
+        if (mode == "--suspend") {
+            diagnostic_printf("runtime-worker-suspended\n");
+            suspend_diagnostic_worker();
+        }
         if (mode == "--diagnostic") {
             require(diagnostic_printf("runtime-host-check:%llu:%s\n",42ULL,"flushed") > 0);
             std::_Exit(0);

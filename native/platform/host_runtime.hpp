@@ -6,6 +6,9 @@
 #include <string>
 namespace SkyHost {
 std::uint64_t current_thread_id() noexcept;
+// Explicit diagnostic-only suspension after reporting an unsupported worker
+// import. Never resumes the guest or fabricates a successful call result.
+[[noreturn]] void suspend_diagnostic_worker() noexcept;
 // Existing runtime diagnostics: not a signal-safe logging abstraction. POSIX
 // retains vdprintf; Windows flushes stderr before a subsequent immediate exit.
 int diagnostic_printf(const char* format, ...) noexcept __attribute__((format(printf,1,2)));
