@@ -4,7 +4,22 @@
 #include <filesystem>
 #include <fstream>
 #include <chrono>
-int main() {
+int main(int argc, char** argv) {
+  std::filesystem::path directory_link;
+  if(argc!=1) {
+    if(argc!=3||std::string_view(argv[1])!="--directory-link")return 2;
+    const std::string_view hex=argv[2];
+    if(hex.size()%2)return 2;
+    std::u8string decoded;
+    auto digit=[](char c)->int {return c>='0'&&c<='9'?c-'0':c>='a'&&c<='f'?c-'a'+10:-1;};
+    for(std::size_t i=0;i<hex.size();i+=2) {
+      const auto high=digit(hex[i]),low=digit(hex[i+1]);
+      if(high<0||low<0)return 2;
+      decoded.push_back(static_cast<char8_t>(16*high+low));
+    }
+    directory_link=std::filesystem::path(decoded);
+    if(!directory_link.is_absolute())return 2;
+  }
   if(!trapteam::cemu_portal_self_test()) {
     std::cerr<<"Cemu portal core regression failed\n";return 1;
   }
@@ -42,7 +57,9 @@ int main() {
   trapteam::cemu_portal_remove_figure(figure.slot);cleanup.slot=16;
   // Neither a link to the original nor a corrupt source may become writable.
   const auto backup=root/"private-backup.sky";
-  fs::rename(figure.working_copy,backup);fs::create_symlink(source,figure.working_copy);
+  fs::rename(figure.working_copy,backup);
+  if(directory_link.empty())fs::create_symlink(source,figure.working_copy);
+  else fs::rename(directory_link,figure.working_copy); // Move the fixture entry, never follow its target.
   if(trapteam::cemu_portal_load_figure(source,&figure,&error)) return 1;
   fs::remove(figure.working_copy);fs::create_hard_link(source,figure.working_copy);
   if(trapteam::cemu_portal_load_figure(source,&figure,&error)) return 1;

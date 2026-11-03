@@ -182,7 +182,9 @@ inline sint16 _swapEndianS16(sint16 v)
 #else
 inline uint64 _swapEndianU64(uint64 v)
 {
-#if BOOST_OS_MACOS
+#if BOOST_OS_WINDOWS
+    return __builtin_bswap64(v);
+#elif BOOST_OS_MACOS
     return OSSwapInt64(v);
 #elif BOOST_OS_BSD
 #ifdef __OpenBSD__
@@ -197,7 +199,9 @@ inline uint64 _swapEndianU64(uint64 v)
 
 inline uint32 _swapEndianU32(uint32 v)
 {
-#if BOOST_OS_MACOS
+#if BOOST_OS_WINDOWS
+    return __builtin_bswap32(v);
+#elif BOOST_OS_MACOS
     return OSSwapInt32(v);
 #elif BOOST_OS_BSD
 #ifdef __OpenBSD__
@@ -212,7 +216,9 @@ inline uint32 _swapEndianU32(uint32 v)
 
 inline sint32 _swapEndianS32(sint32 v)
 {
-#if BOOST_OS_MACOS
+#if BOOST_OS_WINDOWS
+    return (sint32)__builtin_bswap32((uint32)v);
+#elif BOOST_OS_MACOS
     return (sint32)OSSwapInt32((uint32)v);
 #elif BOOST_OS_BSD
 #ifdef __OpenBSD__
@@ -241,6 +247,7 @@ inline uint64 _umul128(uint64 multiplier, uint64 multiplicand, uint64 *highProdu
     return x & 0xFFFFFFFFFFFFFFFF;
 }
 
+#ifndef _WIN32
 typedef uint8_t BYTE;
 typedef uint32_t DWORD;
 typedef int32_t LONG;
@@ -266,7 +273,8 @@ typedef union _LARGE_INTEGER {
     inline T& operator|= (T& a, T b) { return reinterpret_cast<T&>( reinterpret_cast<std::underlying_type<T>::type&>(a) |= static_cast<std::underlying_type<T>::type>(b) ); }   \
     inline T& operator&= (T& a, T b) { return reinterpret_cast<T&>( reinterpret_cast<std::underlying_type<T>::type&>(a) &= static_cast<std::underlying_type<T>::type>(b) ); }   \
     inline T& operator^= (T& a, T b) { return reinterpret_cast<T&>( reinterpret_cast<std::underlying_type<T>::type&>(a) ^= static_cast<std::underlying_type<T>::type>(b) ); }
-#endif
+#endif // !_WIN32
+#endif // !_MSC_VER
 
 template<typename T>
 inline T GetBits(T value, uint32 index, uint32 numBits)
@@ -308,8 +316,8 @@ inline uint64 _udiv128(uint64 highDividend, uint64 lowDividend, uint64 divisor, 
     #error Unknown compiler
 #endif
 
-#if defined(_MSC_VER)
-    #define DEBUG_BREAK __debugbreak()
+#if defined(_WIN32)
+    #define DEBUG_BREAK DebugBreak()
 #else
     #include <csignal>
     #define DEBUG_BREAK raise(SIGTRAP) 
@@ -480,7 +488,7 @@ bool match_any_of(T1&& value, Types&&... others)
 // we cache the frequency in a static variable
 [[nodiscard]] static std::chrono::high_resolution_clock::time_point now_cached() noexcept
 {
-#ifdef _WIN32
+#if defined(_WIN32) && defined(_MSC_VER)
     // get current time
 	static const long long _Freq = _Query_perf_frequency();	// doesn't change after system boot
 	const long long _Ctr = _Query_perf_counter();
@@ -495,7 +503,7 @@ bool match_any_of(T1&& value, Types&&... others)
 
 [[nodiscard]] static std::chrono::steady_clock::time_point tick_cached() noexcept
 {
-#if BOOST_OS_WINDOWS
+#if BOOST_OS_WINDOWS && defined(_MSC_VER)
     // get current time
 	static const long long _Freq = _Query_perf_frequency();	// doesn't change after system boot
 	const long long _Ctr = _Query_perf_counter();
@@ -503,6 +511,8 @@ bool match_any_of(T1&& value, Types&&... others)
 	const long long _Whole = (_Ctr / _Freq) * std::nano::den;
 	const long long _Part = (_Ctr % _Freq) * std::nano::den / _Freq;
 	return (std::chrono::steady_clock::time_point(std::chrono::nanoseconds(_Whole + _Part)));
+#elif BOOST_OS_WINDOWS
+    return std::chrono::steady_clock::now();
 #elif BOOST_OS_LINUX
 	struct timespec tp;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &tp);

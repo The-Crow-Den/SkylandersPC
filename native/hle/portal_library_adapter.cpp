@@ -56,7 +56,12 @@ extern "C" bool sky_portal_blank_adapter(const char* path,unsigned id,unsigned v
     bool success=false;
     try {
         success=nsyshid::g_skyportal.CreateSkylander(temporary,static_cast<uint16>(id),static_cast<uint16>(variant)) &&
-            fs::file_size(temporary)==1024 && ::link(temporary.c_str(),destination.c_str())==0;
+            fs::file_size(temporary)==1024;
+        if(success) {
+            std::error_code ec;
+            fs::create_hard_link(temporary,destination,ec); // Native no-replace publication on either OS.
+            success=!ec;
+        }
     }catch(...) {success=false;}
     std::error_code ec;fs::remove_all(directory,ec);
     return success;

@@ -78,8 +78,9 @@
     },
     {
       "path": "Cemu-main/src/Common/precompiled.h",
-      "sha256": "d4acb2c328647a64bd5e5d7c83440afaadaad596538b600da8f548ce66cce22d",
-      "origin": "Cemu, unmodified"
+      "sha256": "d9b2b997029aa61ad2a0780eb68c216fd6b878060fa69fb5b13788cd192f5b31",
+      "origin": "Cemu, modified",
+      "modifications": "MinGW uses native Windows types, compiler byte swaps, DebugBreak and standard-library clocks instead of MSVC internals; Linux branches unchanged."
     },
     {
       "path": "Cemu-main/src/Common/unix/FileStream_unix.cpp",
@@ -113,8 +114,27 @@
     },
     {
       "path": "tools/cemu_portal_core_test.cpp",
-      "sha256": "a0e939e217d68f7ef5302a1b7b58c178b9716a36e0247540849f7e70adeb6fa4",
+      "sha256": "9fb9675fc0dfe12637cbb0770af5959af2221d9ad4db15c43f9221e52a9c9ca7",
       "origin": "project adapter"
+    },
+    {
+      "path": "Cemu-main/src/Common/windows/FileStream_win32.cpp",
+      "sha256": "bbcc89fd9e0c80594ea21d7df433610894fd616600fcfc8a90ccd43fec36703f",
+      "origin": "Cemu, unmodified",
+      "upstream_sha256": "bbcc89fd9e0c80594ea21d7df433610894fd616600fcfc8a90ccd43fec36703f"
+    },
+    {
+      "path": "Cemu-main/src/Common/windows/FileStream_win32.h",
+      "sha256": "9b6f83fe24ec9536b670d4606f6d38f344513ed4b53bc476fd033e1a0627e25a",
+      "origin": "Cemu, unmodified",
+      "upstream_sha256": "9b6f83fe24ec9536b670d4606f6d38f344513ed4b53bc476fd033e1a0627e25a"
+    },
+    {
+      "path": "Cemu-main/src/Common/windows/platform.h",
+      "sha256": "8276154bfa9878ebe1937f0c78ca56c1cad380b55d93c2498361ccfe2b0dfc9a",
+      "origin": "Cemu, modified",
+      "upstream_sha256": "551a42d06f1b9f4c246438f22add7b17e291e5f98a9f931c031103ea8c678db5",
+      "modifications": "Use lowercase windows.h for case-sensitive MinGW cross-compilation."
     }
   ]
 }

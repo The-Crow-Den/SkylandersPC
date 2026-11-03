@@ -114,11 +114,37 @@ if(SKY_TLS_PREFLIGHT)
   endif()
 endif()
 
+set(SKY_PORTAL_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cemu" CACHE PATH "MPL-2.0 Cemu portal sources (native/third_party/cemu); empty disables the portal core")
+function(sky_add_portal_core)
+  if(NOT SKY_PORTAL_SOURCE_ROOT OR TARGET sky-portal-core)
+    return()
+  endif()
+  find_package(fmt REQUIRED)
+  if(WIN32)
+    set(SKY_PORTAL_FILE_STREAM "windows/FileStream_win32.cpp")
+  else()
+    set(SKY_PORTAL_FILE_STREAM "unix/FileStream_unix.cpp")
+  endif()
+  set(SKY_PORTAL_EXTERNAL
+    "${SKY_PORTAL_SOURCE_ROOT}/src/runtime/cemu_portal.cpp"
+    "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp"
+    "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Common/${SKY_PORTAL_FILE_STREAM}")
+  add_library(sky-portal-core STATIC ${SKY_PORTAL_EXTERNAL} hle/portal_logging.cpp hle/portal_library_adapter.cpp)
+  target_compile_features(sky-portal-core PRIVATE cxx_std_20)
+  target_include_directories(sky-portal-core PUBLIC "${SKY_PORTAL_SOURCE_ROOT}/src"
+    "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src" "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Cafe")
+  target_compile_definitions(sky-portal-core PRIVATE TRAPTEAM_STANDALONE_PORTAL=1)
+  target_compile_options(sky-portal-core PRIVATE -include "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Common/precompiled.h"
+    -ffunction-sections -fdata-sections -w)
+  target_link_libraries(sky-portal-core PUBLIC fmt::fmt)
+endfunction()
+
 if(WIN32)
   # Windows port in progress: compile the real portable providers and loader.
   # Full executable/renderer linking and real-game TLS admission remain gated.
   include(CTest)
   find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+  sky_add_portal_core()
 
   add_library(sky-host-portable STATIC hle/pure_libc.cpp hle/kernel_sync.cpp
     hle/kernel_memory.cpp hle/offline_network.cpp hle/keyboard_pad.cpp frame_profile.cpp game_hooks.cpp
@@ -137,6 +163,13 @@ if(WIN32)
   target_compile_options(sky-pack-loader PRIVATE -Wall -Wextra -Wconversion -Wshadow)
 
   if(BUILD_TESTING)
+    if(TARGET sky-portal-core)
+      add_executable(portal-figure-copy-test "${SKY_PORTAL_SOURCE_ROOT}/tools/cemu_portal_core_test.cpp")
+      target_compile_features(portal-figure-copy-test PRIVATE cxx_std_20)
+      target_link_libraries(portal-figure-copy-test PRIVATE sky-portal-core)
+      add_test(NAME native-portal-figure-copy COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cemu_portal.py $<TARGET_FILE:portal-figure-copy-test>)
+    endif()
     function(sky_windows_test name source)
       add_executable(${name} ${source})
       target_link_libraries(${name} PRIVATE sky-host-portable)
@@ -206,23 +239,10 @@ endif()
 include(CTest)
 target_sources(skylanders-native-host PRIVATE hle/virtual_portal.cpp)
 target_sources(skylanders-native-host PRIVATE hle/save_data.cpp)
-set(SKY_PORTAL_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cemu" CACHE PATH "MPL-2.0 Cemu portal sources (native/third_party/cemu); empty disables the portal core")
 if(SKY_PORTAL_SOURCE_ROOT)
-  find_package(fmt REQUIRED)
+  sky_add_portal_core()
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(SkyUSB REQUIRED IMPORTED_TARGET libusb-1.0)
-  set(SKY_PORTAL_EXTERNAL
-    "${SKY_PORTAL_SOURCE_ROOT}/src/runtime/cemu_portal.cpp"
-    "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp"
-    "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Common/unix/FileStream_unix.cpp")
-  add_library(sky-portal-core STATIC ${SKY_PORTAL_EXTERNAL} hle/portal_logging.cpp hle/portal_library_adapter.cpp)
-  target_compile_features(sky-portal-core PRIVATE cxx_std_20)
-  target_include_directories(sky-portal-core PUBLIC "${SKY_PORTAL_SOURCE_ROOT}/src"
-    "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src" "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Cafe")
-  target_compile_definitions(sky-portal-core PRIVATE TRAPTEAM_STANDALONE_PORTAL=1)
-  target_compile_options(sky-portal-core PRIVATE -include "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Common/precompiled.h"
-    -ffunction-sections -fdata-sections -w)
-  target_link_libraries(sky-portal-core PUBLIC fmt::fmt)
   target_compile_definitions(skylanders-native-host PRIVATE SKY_CEMU_PORTAL=1)
   target_link_libraries(skylanders-native-host PRIVATE sky-portal-core PkgConfig::SkyUSB)
   target_link_options(skylanders-native-host PRIVATE -Wl,--gc-sections)
