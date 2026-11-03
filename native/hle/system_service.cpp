@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system_service.hpp"
+#include "../platform/host_clock.hpp"
 #include <algorithm>
 #include <array>
 #include <cstring>
-#include <ctime>
+#include <limits>
 #include <stdexcept>
 
 namespace {
@@ -25,10 +26,11 @@ std::uint64_t SystemService::call(std::string_view identity, const std::uint64_t
             case 2: *out = 1; break; // DD/MM/YYYY.
             case 3: *out = 1; break; // 24-hour clock.
             case 4: case 5: {
-                const auto now = std::time(nullptr);
-                std::tm local{};
-                if (!localtime_r(&now, &local)) throw std::runtime_error("cannot read local timezone");
-                *out = a[0] == 4 ? static_cast<std::int32_t>(local.tm_gmtoff / 60) : local.tm_isdst > 0;
+                std::int32_t west = 0;
+                bool dst_active = false;
+                if (!SkyHost::timezone_minutes_west(west,&dst_active)) throw std::runtime_error("cannot read local timezone");
+                if(a[0]==4&&west==std::numeric_limits<std::int32_t>::min())throw std::runtime_error("timezone offset outside guest range");
+                *out = a[0] == 4 ? -west : dst_active;
                 break;
             }
             case 7: *out = 0; break; // No configured parental restriction.

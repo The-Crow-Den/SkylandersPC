@@ -17,11 +17,12 @@ bool clock_time(Clock clock, ClockTime& output) noexcept {
     output = {static_cast<std::int64_t>(now.tv_sec), static_cast<std::int32_t>(now.tv_nsec)};
     return true;
 }
-bool timezone_minutes_west(std::int32_t& output) noexcept {
+bool timezone_minutes_west(std::int32_t& output, bool* dst_active) noexcept {
     const auto now = time(nullptr);
     tm local{};
     if (!localtime_r(&now, &local)) return false;
     output = static_cast<std::int32_t>(-local.tm_gmtoff / 60);
+    if (dst_active) *dst_active = local.tm_isdst > 0;
     return true;
 }
 SleepResult sleep_microseconds(std::uint32_t duration, bool restart) noexcept {

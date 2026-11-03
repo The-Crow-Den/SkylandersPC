@@ -115,15 +115,14 @@ if(SKY_TLS_PREFLIGHT)
 endif()
 
 if(WIN32)
-  # Windows port in progress (docs/windows-port.md): guest FS rewriting, fault
-  # handling and the file sandbox remain to be ported, so only the
-  # host pieces that already have a Windows platform layer build and test here.
+  # Windows port in progress: compile the real portable providers and loader.
+  # Full executable/renderer linking and real-game TLS admission remain gated.
   include(CTest)
   find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 
   add_library(sky-host-portable STATIC hle/pure_libc.cpp hle/kernel_sync.cpp
     hle/kernel_memory.cpp hle/offline_network.cpp hle/keyboard_pad.cpp frame_profile.cpp game_hooks.cpp
-    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp hle/kernel_data.cpp hle/kernel_clock.cpp hle/kernel_semaphore.cpp hle/user_service.cpp hle/local_np.cpp hle/kernel_file.cpp hle/save_data.cpp)
+    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp hle/kernel_data.cpp hle/kernel_clock.cpp hle/kernel_semaphore.cpp hle/user_service.cpp hle/local_np.cpp hle/kernel_file.cpp hle/save_data.cpp hle/kernel_event.cpp hle/system_service.cpp hle/app_content.cpp hle/local_playgo.cpp hle/empty_usb_bus.cpp)
   target_compile_features(sky-host-portable PUBLIC cxx_std_20)
   target_compile_options(sky-host-portable PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(sky-host-portable PUBLIC sky-host-platform Threads::Threads OpenSSL::Crypto ws2_32)
@@ -281,7 +280,7 @@ if(BUILD_TESTING)
   target_compile_features(local-trophies-test PRIVATE cxx_std_20)
   target_link_libraries(local-trophies-test PRIVATE Threads::Threads)
   add_test(NAME native-local-trophies COMMAND local-trophies-test)
-  add_executable(platform-services-test hle/test_platform_services.cpp hle/kernel_clock.cpp hle/kernel_semaphore.cpp hle/user_service.cpp hle/local_np.cpp thread_context.cpp guest_start.S bridge_features.cpp)
+  add_executable(platform-services-test hle/test_platform_services.cpp hle/system_service.cpp hle/kernel_clock.cpp hle/kernel_semaphore.cpp hle/user_service.cpp hle/local_np.cpp thread_context.cpp guest_start.S bridge_features.cpp)
   target_compile_features(platform-services-test PRIVATE cxx_std_20)
   target_link_libraries(platform-services-test PRIVATE Threads::Threads)
   add_test(NAME native-platform-services COMMAND platform-services-test)

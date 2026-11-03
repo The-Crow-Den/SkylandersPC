@@ -55,7 +55,7 @@ bool clock_time(Clock clock, ClockTime& output) noexcept {
     output = result;
     return true;
 }
-bool timezone_minutes_west(std::int32_t& output) noexcept {
+bool timezone_minutes_west(std::int32_t& output, bool* dst_active) noexcept {
     DYNAMIC_TIME_ZONE_INFORMATION zone{};
     const auto state = GetDynamicTimeZoneInformation(&zone);
     if (state == TIME_ZONE_ID_INVALID) return false;
@@ -64,6 +64,7 @@ bool timezone_minutes_west(std::int32_t& output) noexcept {
     else if (state == TIME_ZONE_ID_STANDARD) bias += zone.StandardBias;
     if (bias < std::numeric_limits<std::int32_t>::min() || bias > std::numeric_limits<std::int32_t>::max()) return false;
     output = static_cast<std::int32_t>(bias);
+    if (dst_active) *dst_active = state == TIME_ZONE_ID_DAYLIGHT;
     return true;
 }
 SleepResult sleep_microseconds(std::uint32_t duration, bool restart) noexcept {

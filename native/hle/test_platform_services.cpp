@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "kernel_clock.hpp"
+#include "system_service.hpp"
+#include "../platform/host_clock.hpp"
 #include "kernel_semaphore.hpp"
 #include "user_service.hpp"
 #include "local_players.hpp"
@@ -48,6 +50,19 @@ int main() {
         check(clock.call("1jfXLRVzisc#libkernel#libkernel",sleep_arguments.data()) == 0);
         check(clock.call("4J2sUJmuHZQ#libkernel#libkernel",empty.data()) >= elapsed_before + 1000);
         check(!KernelClock::supports("QBi7HCK03hw#wrong#libkernel"));
+        SystemService system;
+        std::int32_t west = 0, offset = 12345, dst = -1;
+        bool dst_active = false;
+        check(SkyHost::timezone_minutes_west(west,&dst_active));
+        const auto setting = [&](U id,std::int32_t* output) {
+            const std::array<U,6> args{id,pointer(output)};
+            return system.call("fZo48un7LK4#libSceSystemService#libSceSystemService",args.data());
+        };
+        check(setting(4,&offset) == 0 && offset == -west);
+        check(setting(5,&dst) == 0 && dst == static_cast<int>(dst_active));
+        check(setting(4,nullptr) == 0x80a10003);
+        offset = 12345;
+        check(setting(999,&offset) == 0x80a10003 && offset == 12345);
         UserService users;
         const auto user = [&](const char* nid, std::array<U, 6> args = {}) {
             return users.call(std::string(nid) + "#libSceUserService#libSceUserService", args.data());

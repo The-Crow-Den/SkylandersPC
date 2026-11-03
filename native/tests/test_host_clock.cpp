@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../platform/host_clock.hpp"
+#include "../platform/host_compat.hpp"
+#include <cstdlib>
+#include <ctime>
+#include <string>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -48,6 +52,30 @@ int main() {
     require(ns(wall) >= system_ns(wall_before) - 1000000 && ns(wall) <= system_ns(wall_after) + 1000000);
     std::int32_t west = 0;
     require(timezone_minutes_west(west) && west >= -1440 && west <= 1440);
+#ifndef _WIN32
+    // Process-local POSIX TZ settings exercise signs, fractional offsets and
+    // actual daylight state without changing the machine's timezone.
+    const auto* prior_tz = std::getenv("TZ");
+    const bool had_tz = prior_tz != nullptr;
+    const std::string saved_tz = prior_tz ? prior_tz : "";
+    for (const auto& [zone,expected] : std::array<std::pair<const char*,int>,3>{{
+            {"UTC0",0},{"TST-5:45",-345},{"TST8",480}}}) {
+        require(set_environment("TZ",zone) == 0);
+        tzset();
+        bool dst_active = true;
+        require(timezone_minutes_west(west,&dst_active) && west == expected && !dst_active);
+    }
+    require(set_environment("TZ","STD0DST,J1,J365") == 0);
+    tzset();
+    const auto now = std::time(nullptr);
+    std::tm native{};
+    require(localtime_r(&now,&native) != nullptr);
+    bool dst_active = false;
+    require(timezone_minutes_west(west,&dst_active));
+    require(west == -native.tm_gmtoff / 60 && dst_active == (native.tm_isdst > 0));
+    require((had_tz ? set_environment("TZ",saved_tz.c_str()) : unset_environment("TZ")) == 0);
+    tzset();
+#endif
     const auto before = read(Clock::Monotonic);
     const auto cpu_before = read(Clock::ThreadCpu), process_before = read(Clock::ProcessCpu);
     require(sleep_microseconds(0) == SleepResult::Completed);
