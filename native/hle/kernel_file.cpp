@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "kernel_file.hpp"
+#include "../platform/host_files.hpp"
 #include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <fcntl.h>
 #include <map>
 #include <mutex>
 #include <stdexcept>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <vector>
 #include <atomic>
 #include <memory>
@@ -51,13 +49,15 @@ struct GuestStat {
     Timespec birthtime;
 };
 static_assert(sizeof(GuestStat) == 120);
-void convert(const struct stat& s, GuestStat* out) {
+void convert(const SkyHost::FileInfo& s, GuestStat* out) {
     *out = {};
-    out->device = static_cast<std::uint32_t>(s.st_dev); out->inode = static_cast<std::uint32_t>(s.st_ino);
-    out->mode = static_cast<std::uint16_t>(s.st_mode); out->links = static_cast<std::uint16_t>(s.st_nlink);
-    out->size = s.st_size; out->blocks = s.st_blocks; out->block_size = static_cast<std::uint32_t>(s.st_blksize);
-    out->atime = {s.st_atim.tv_sec, s.st_atim.tv_nsec}; out->mtime = {s.st_mtim.tv_sec, s.st_mtim.tv_nsec};
-    out->ctime = {s.st_ctim.tv_sec, s.st_ctim.tv_nsec}; out->birthtime = out->ctime;
+    out->device = s.device; out->inode = s.inode;
+    out->mode = s.mode; out->links = static_cast<std::uint16_t>(s.links);
+    out->size = s.size; out->blocks = s.blocks; out->block_size = s.block_size;
+    out->atime = {s.atime.seconds,s.atime.nanoseconds};
+    out->mtime = {s.mtime.seconds,s.mtime.nanoseconds};
+    out->ctime = {s.ctime.seconds,s.ctime.nanoseconds};
+    out->birthtime = {s.birthtime.seconds,s.birthtime.nanoseconds};
 }
 }
 struct KernelFile::Impl {
@@ -65,34 +65,33 @@ struct KernelFile::Impl {
     // descriptor outside it; the last user closes the host fd, so a
     // concurrent guest close never lets a read reach a reused fd.
     struct Descriptor {
-        int fd;
+        SkyHost::File host;
         std::string owner; // Save mount name; empty for read-only game files.
         std::atomic<bool> dirty = false;
-        Descriptor(int host, std::string mount) : fd(host), owner(std::move(mount)) {}
-        ~Descriptor() { if (fd >= 0) close(fd); }
+        Descriptor(SkyHost::File&& file, std::string mount) : host(std::move(file)), owner(std::move(mount)) {}
     };
     std::mutex lock;
-    int root = -1, next = 3;
+    SkyHost::File root;
+    int next = 3;
     std::map<int, std::shared_ptr<Descriptor>> descriptors;
-    struct SaveMount { int fd; bool read_only; };
+    struct SaveMount { SkyHost::File directory; bool read_only; };
     std::map<std::string, SaveMount> mounts;
-    ~Impl() { for(auto& [name,m]:mounts)close(m.fd); if (root >= 0) close(root); }
     // Walk from the configured directory descriptor. Never follow a symlink or
     // resolve '..', even when a game path names a host absolute path.
-    int open_path(const char* input, int flags, std::string* owner = nullptr) {
-        if (!input) { errno = EFAULT; return -1; }
+    bool open_path(const char* input, const SkyHost::FileOpen& flags, SkyHost::File& output, std::string* owner = nullptr) {
+        if (!input) { errno = EFAULT; return false; }
         const auto length = strnlen(input, 1024);
-        if (length == 1024) { errno = ENAMETOOLONG; return -1; }
+        if (length == 1024) { errno = ENAMETOOLONG; return false; }
         std::string_view path(input, length);
-        int selected = root;
+        const auto* selected = &root;
         bool writable = false;
         bool save_mount = false;
         if (path.starts_with("/savedata")) {
             const auto slash=path.find('/',1);
             const std::string key(path.substr(0,slash));
             const auto found=mounts.find(key);
-            if(found==mounts.end()){errno=ENOENT;return -1;}
-            selected=found->second.fd; writable=!found->second.read_only;
+            if(found==mounts.end()){errno=ENOENT;return false;}
+            selected=&found->second.directory; writable=!found->second.read_only;
             save_mount=true;
             if(owner)*owner=key;
             path=slash==path.npos ? std::string_view{} : path.substr(slash+1);
@@ -100,58 +99,51 @@ struct KernelFile::Impl {
         else if (path == "/app0" || path == "/hostapp") path = "";
         else if (path.starts_with("/app0/")) path.remove_prefix(6);
         else if (path.starts_with("/hostapp/")) path.remove_prefix(9);
-        else if (path.starts_with('/')) { errno = ENOENT; return -1; }
-        if (!writable && (flags & (O_WRONLY|O_RDWR|O_APPEND|O_CREAT|O_TRUNC))) {errno=EROFS;return -1;}
-        if (selected < 0) throw std::runtime_error("game root is required for file access");
+        else if (path.starts_with('/')) { errno = ENOENT; return false; }
+        if (!writable && (flags.access != SkyHost::FileAccess::Read || flags.append || flags.create || flags.truncate)) {errno=EROFS;return false;}
+        if (!selected->valid()) throw std::runtime_error("game root is required for file access");
         std::vector<std::string> components;
         while (!path.empty()) {
             const auto slash = path.find('/');
             const auto part = path.substr(0, slash);
-            if (part == "..") { errno = EACCES; return -1; }
+            if (part == "..") { errno = EACCES; return false; }
             if (!part.empty() && part != ".") components.emplace_back(part);
             if (slash == std::string_view::npos) break;
             path.remove_prefix(slash + 1);
         }
-        int directory = dup(selected);
-        if (directory < 0) return -1;
+        SkyHost::File directory;
+        if (!selected->duplicate_directory(directory)) return false;
         for (std::size_t i = 0; i < components.size(); ++i) {
-            const bool final=i+1==components.size();
-            const int final_flags=save_mount ? flags&~O_TRUNC : flags;
-            int next_fd = openat(directory, components[i].c_str(),
-                O_NOFOLLOW | O_CLOEXEC | (final ? final_flags : O_RDONLY | O_DIRECTORY),0600);
-            if(next_fd>=0 && final && save_mount){
-                struct stat info{};
-                if(fstat(next_fd,&info)||(!S_ISDIR(info.st_mode)&&(!S_ISREG(info.st_mode)||info.st_nlink!=1))){
-                    close(next_fd);next_fd=-1;errno=EACCES;
-                }else if((flags&O_TRUNC)&&ftruncate(next_fd,0)){const auto saved=errno;close(next_fd);next_fd=-1;errno=saved;}
-            }
-            const int saved = errno;
-            close(directory); directory = next_fd;
-            if (directory < 0) { errno = saved; return -1; }
+            const bool final = i + 1 == components.size();
+            auto options = final ? flags : SkyHost::FileOpen{};
+            if (!final) options.directory = true;
+            SkyHost::File next_file;
+            if (!directory.open_child(components[i],options,save_mount && final,next_file)) return false;
+            directory = std::move(next_file);
         }
-        return directory;
+        output = std::move(directory);
+        return true;
     }
 };
 KernelFile::KernelFile() : impl_(std::make_unique<Impl>()) {}
 KernelFile::~KernelFile() = default;
-bool KernelFile::mount_save(const std::string& guest,const std::string& host,bool read_only) {
+bool KernelFile::mount_save(const std::string& guest,const std::filesystem::path& host,bool read_only) {
     std::lock_guard lock(impl_->lock);
     if(impl_->mounts.contains(guest))return false;
-    const int fd=open(host.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-    if(fd<0)return false;
-    impl_->mounts.emplace(guest,Impl::SaveMount{fd,read_only});return true;
+    SkyHost::File directory;
+    if (!directory.open_directory(host)) return false;
+    impl_->mounts.emplace(guest,Impl::SaveMount{std::move(directory),read_only});return true;
 }
 bool KernelFile::unmount_save(const std::string& guest) {
     std::lock_guard lock(impl_->lock);
     const auto mount=impl_->mounts.find(guest);
     if(mount==impl_->mounts.end())return false;
     for(const auto& [id,file]:impl_->descriptors)if(file->owner==guest)return false;
-    close(mount->second.fd);impl_->mounts.erase(mount);return true;
+    impl_->mounts.erase(mount);return true;
 }
-void KernelFile::configure(const std::string& root) {
+void KernelFile::configure(const std::filesystem::path& root) {
     if (root.empty()) return;
-    impl_->root = open(root.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (impl_->root < 0) throw std::runtime_error("cannot open game root directory");
+    if (!impl_->root.open_directory(root,true)) throw std::runtime_error("cannot open game root directory");
 }
 bool KernelFile::supports(std::string_view identity) noexcept {
     return std::find(names.begin(), names.end(), identity) != names.end();
@@ -161,34 +153,32 @@ U KernelFile::call(std::string_view identity, const U* a) {
     if (operation == 0) {
         if ((a[1]&3)==3)return error(EINVAL);
         if (a[1] & ~0x20e8full) throw std::runtime_error("unsupported file-open flags");
-        int flags=(a[1]&3)==2 ? O_RDWR : (a[1]&3)==1 ? O_WRONLY : O_RDONLY;
-        if(a[1]&8)flags|=O_APPEND;
-        if(a[1]&0x200)flags|=O_CREAT;
-        if(a[1]&0x400)flags|=O_TRUNC;
-        if(a[1]&0x800)flags|=O_EXCL;
-        if(a[1]&0x20000)flags|=O_DIRECTORY;
+        SkyHost::FileOpen flags;
+        flags.access = (a[1]&3)==2 ? SkyHost::FileAccess::ReadWrite : (a[1]&3)==1 ? SkyHost::FileAccess::Write : SkyHost::FileAccess::Read;
+        flags.append = (a[1]&8) != 0;
+        flags.create = (a[1]&0x200) != 0;
+        flags.truncate = (a[1]&0x400) != 0;
+        flags.exclusive = (a[1]&0x800) != 0;
+        flags.directory = (a[1]&0x20000) != 0;
         std::lock_guard lock(impl_->lock);
         std::string owner;
-        const int fd = impl_->open_path(reinterpret_cast<const char*>(a[0]), flags,&owner);
-        if (fd < 0) return error(errno);
-        auto file = std::make_shared<Impl::Descriptor>(fd, std::move(owner));
+        SkyHost::File host;
+        if (!impl_->open_path(reinterpret_cast<const char*>(a[0]),flags,host,&owner)) return error(errno);
+        auto file = std::make_shared<Impl::Descriptor>(std::move(host),std::move(owner));
         const int id = impl_->next++;
         impl_->descriptors.emplace(id, std::move(file));
-        dprintf(STDERR_FILENO, "{\"event\":\"game-file-open\",\"descriptor\":%d}\n", id);
+        std::fprintf(stderr, "{\"event\":\"game-file-open\",\"descriptor\":%d}\n", id);
         return static_cast<U>(id);
     }
     if (operation == 6) {
         if (!a[1]) return error(EFAULT);
-        int fd;
+        SkyHost::File host;
         {
             std::lock_guard lock(impl_->lock);
-            fd = impl_->open_path(reinterpret_cast<const char*>(a[0]), O_RDONLY);
+            if (!impl_->open_path(reinterpret_cast<const char*>(a[0]),{},host)) return error(errno);
         }
-        if (fd < 0) return error(errno);
-        struct stat info{};
-        const int status = fstat(fd, &info), saved = errno;
-        close(fd);
-        if (status) return error(saved);
+        SkyHost::FileInfo info{};
+        if (!host.stat(info)) return error(errno);
         convert(info, reinterpret_cast<GuestStat*>(a[1]));
         return 0;
     }
@@ -200,45 +190,44 @@ U KernelFile::call(std::string_view identity, const U* a) {
         file = found->second;
         if (operation == 1) impl_->descriptors.erase(found);
     }
-    const int fd = file->fd;
+    auto& host = file->host;
     const bool writable = !file->owner.empty();
     if (operation == 1) {
-        const int sync_status=file->dirty ? fsync(fd) : 0;
+        const int sync_status=file->dirty ? host.sync() : 0;
         const int sync_error=errno;
         if(sync_status)return error(sync_error);
         // Another thread is still in a call on this descriptor; the last user
         // closes it. Otherwise close here so its status reaches the guest.
         if(file.use_count()>1)return 0;
-        const int status = close(fd), saved = errno;
-        file->fd = -1;
+        const int status = host.close(), saved = errno;
         return status ? error(saved) : 0;
     }
     if (operation == 2 || operation == 3) {
         if (a[2] > 1024ull * 1024 * 1024) return error(EINVAL);
         if (!a[1] && a[2]) return error(EFAULT);
-        const auto count = operation == 2 ? read(fd, reinterpret_cast<void*>(a[1]), a[2]) :
-            pread(fd, reinterpret_cast<void*>(a[1]), a[2], static_cast<off_t>(a[3]));
+        const auto count = operation == 2 ? host.read(reinterpret_cast<void*>(a[1]), a[2]) :
+            host.read_at(reinterpret_cast<void*>(a[1]), a[2], static_cast<std::int64_t>(a[3]));
         return count < 0 ? error(errno) : static_cast<U>(count);
     }
     if (operation == 4) {
         if (a[2] > 2) return error(EINVAL);
-        const auto position = lseek(fd, static_cast<off_t>(a[1]), static_cast<int>(a[2]));
+        const auto position = host.seek(static_cast<std::int64_t>(a[1]),static_cast<int>(a[2]));
         return position < 0 ? error(errno) : static_cast<U>(position);
     }
     if (operation == 5) {
         if (!a[1]) return error(EFAULT);
-        struct stat info{};
-        if (fstat(fd, &info)) return error(errno);
+        SkyHost::FileInfo info{};
+        if (!host.stat(info)) return error(errno);
         convert(info, reinterpret_cast<GuestStat*>(a[1])); return 0;
     }
     if(operation==9){
-        if(fsync(fd))return error(errno);
+        if(host.sync())return error(errno);
         file->dirty=false;return 0;
     }
     if(operation==10){
         if(!writable)return error(EROFS);
         if(a[1]>1024ull*1024*1024)return error(EINVAL);
-        if(ftruncate(fd,static_cast<off_t>(a[1])))return error(errno);
+        if(host.truncate(static_cast<std::int64_t>(a[1])))return error(errno);
         file->dirty=true;return 0;
     }
     if (operation == 7 || operation == 8) {
@@ -246,8 +235,8 @@ U KernelFile::call(std::string_view identity, const U* a) {
         if(!a[1]&&a[2])return error(EFAULT);
         if(a[2]>1024ull*1024*1024)return error(EINVAL);
         if(operation==8 && static_cast<std::int64_t>(a[3])<0)return error(EINVAL);
-        const auto count=operation==7 ? write(fd,reinterpret_cast<const void*>(a[1]),a[2]):
-            pwrite(fd,reinterpret_cast<const void*>(a[1]),a[2],static_cast<off_t>(a[3]));
+        const auto count=operation==7 ? host.write(reinterpret_cast<const void*>(a[1]),a[2]):
+            host.write_at(reinterpret_cast<const void*>(a[1]),a[2],static_cast<std::int64_t>(a[3]));
         if(count>0)file->dirty=true;
         return count<0?error(errno):static_cast<U>(count);
     }

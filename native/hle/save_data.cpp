@@ -140,7 +140,7 @@ U SaveData::call(std::string_view identity,const U* a) {
         unsigned index=0;std::string point;
         for(;index<16;++index){point="/savedata"+std::to_string(index);if(!impl_->slots.contains(point))break;}
         if(index==16)return 0x809f000c;
-        if(!impl_->files.mount_save(point,data.string(),read_only))return 0x809f000b;
+        if(!impl_->files.mount_save(point,data,read_only))return 0x809f000b;
         impl_->slots.emplace(point,Impl::Slot{data,meta,read_only});
         auto& out=*reinterpret_cast<MountResult*>(a[1]);out={};std::memcpy(out.point,point.c_str(),point.size());out.status=exists?0:1;
         return 0;
