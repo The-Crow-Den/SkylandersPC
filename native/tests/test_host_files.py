@@ -64,8 +64,10 @@ class HostFilesTests(unittest.TestCase):
         os.link(root / 'outside.bin', root / 'save/hardlink')
         if os.name != 'nt':
             (root / 'game/link.bin').symlink_to(root / 'outside.bin')
+            os.mkfifo(root / 'game/fifo')
         directory_link(root / 'game/escape', root / 'outside')
         directory_link(root / 'game_alias', root / 'game')
+        directory_link(root / 'create_escape', root / 'outside')
         return root
 
     def run_native(self, root, *args):
@@ -83,6 +85,8 @@ class HostFilesTests(unittest.TestCase):
             self.assertEqual((root / 'game/data.bin').read_bytes(), b'abcdef')
             self.assertEqual((root / 'save/progress').read_bytes(), b'proXendz')
             self.assertEqual((root / 'save/guest.bin').read_bytes(), b'proXress')
+            self.assertEqual((root / 'created/nested/held/inside/marker').read_bytes(), b'held')
+            self.assertFalse((root / 'outside/inside').exists())
 
     def test_directory_replacement_never_reaches_outside_target(self):
         with tempfile.TemporaryDirectory() as temporary:

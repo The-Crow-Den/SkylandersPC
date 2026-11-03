@@ -128,10 +128,15 @@ struct KernelFile::Impl {
 KernelFile::KernelFile() : impl_(std::make_unique<Impl>()) {}
 KernelFile::~KernelFile() = default;
 bool KernelFile::mount_save(const std::string& guest,const std::filesystem::path& host,bool read_only) {
+    SkyHost::File directory;
+    if (!directory.open_directory(host)) return false;
+    return mount_save(guest,directory,read_only);
+}
+bool KernelFile::mount_save(const std::string& guest,const SkyHost::File& host,bool read_only) {
     std::lock_guard lock(impl_->lock);
     if(impl_->mounts.contains(guest))return false;
     SkyHost::File directory;
-    if (!directory.open_directory(host)) return false;
+    if (!host.duplicate_directory(directory)) return false;
     impl_->mounts.emplace(guest,Impl::SaveMount{std::move(directory),read_only});return true;
 }
 bool KernelFile::unmount_save(const std::string& guest) {

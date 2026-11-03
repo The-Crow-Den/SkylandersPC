@@ -7,6 +7,30 @@
 #include <unistd.h>
 #include <utility>
 namespace SkyHost {
+namespace {
+bool component_name(std::string_view name) {
+    if (name.empty() || name == "." || name == ".." || name.find('/') != name.npos || name.find('\0') != name.npos) {
+        errno=EACCES; return false;
+    }
+    return true;
+}
+bool project(const struct ::stat& info, FileInfo& output) {
+    FileInfo next{};
+    next.device = static_cast<std::uint32_t>(info.st_dev);
+    next.inode = static_cast<std::uint32_t>(info.st_ino);
+    next.mode = static_cast<std::uint16_t>(info.st_mode);
+    next.links = static_cast<std::uint64_t>(info.st_nlink);
+    next.size = info.st_size; next.blocks = info.st_blocks;
+    next.block_size = static_cast<std::uint32_t>(info.st_blksize);
+    next.atime = {info.st_atim.tv_sec,info.st_atim.tv_nsec};
+    next.mtime = {info.st_mtim.tv_sec,info.st_mtim.tv_nsec};
+    next.ctime = {info.st_ctim.tv_sec,info.st_ctim.tv_nsec};
+    next.birthtime = next.ctime; // Existing Linux guest-stat contract.
+    next.directory = S_ISDIR(info.st_mode); next.regular = S_ISREG(info.st_mode);
+    output = next;
+    return true;
+}
+}
 struct File::Impl {
     int fd = -1;
     ~Impl() { const auto saved = errno; if (fd >= 0) ::close(fd); errno = saved; }
@@ -16,7 +40,8 @@ File::~File() = default;
 File::File(File&&) noexcept = default;
 File& File::operator=(File&&) noexcept = default;
 bool File::valid() const noexcept { return impl_ && impl_->fd >= 0; }
-bool File::open_directory(const std::filesystem::path& path, bool allow_root_links) {
+bool File::open_directory(const std::filesystem::path& path, bool allow_root_links, bool create) {
+    if (allow_root_links && create) { errno=EINVAL; return false; }
     if (path.empty()) { errno=ENOENT; return false; }
     if (path.native().find('\0') != std::string::npos) { errno = EINVAL; return false; }
     if (allow_root_links) {
@@ -37,7 +62,7 @@ bool File::open_directory(const std::filesystem::path& path, bool allow_root_lin
         const auto& name = component.native();
         if (name.empty() || name == ".") continue;
         File next;
-        if (!current.open_child(name,options,false,next)) return false;
+        if (create ? !current.ensure_directory(name,next) : !current.open_child(name,options,false,next)) return false;
         current = std::move(next);
     }
     impl_ = std::move(current.impl_);
@@ -55,12 +80,41 @@ bool File::duplicate_directory(File& output) const {
     output.impl_ = std::move(next);
     return true;
 }
+bool File::ensure_directory(std::string_view name, File& output) const {
+    if (&output == this) { errno=EINVAL; return false; }
+    if (!valid()) { errno=EBADF; return false; }
+    if (!component_name(name)) return false;
+    FileOpen options;
+    options.directory = true;
+    File next;
+    if (!open_child(name,options,false,next)) {
+        if (errno != ENOENT) return false;
+        const std::string component(name);
+        if (::mkdirat(impl_->fd,component.c_str(),0777) && errno != EEXIST) return false;
+        if (!open_child(name,options,false,next)) return false;
+    }
+    output = std::move(next);
+    return true;
+}
+bool File::child_info(std::string_view name, FileInfo& output, bool& exists) const {
+    if (!valid()) { errno=EBADF; return false; }
+    if (!component_name(name)) return false;
+    struct ::stat info{};
+    const std::string component(name);
+    if (::fstatat(impl_->fd,component.c_str(),&info,AT_SYMLINK_NOFOLLOW)) {
+        if (errno != ENOENT) return false;
+        exists = false;
+        return true;
+    }
+    if (S_ISLNK(info.st_mode)) { errno=ELOOP; return false; }
+    if (!project(info,output)) return false;
+    exists = true;
+    return true;
+}
 bool File::open_child(std::string_view name, const FileOpen& options, bool single_link, File& output) const {
     if (&output == this) { errno=EINVAL; return false; }
     if (!valid()) { errno = EBADF; return false; }
-    if (name.empty() || name == "." || name == ".." || name.find('/') != name.npos || name.find('\0') != name.npos) {
-        errno = EACCES; return false;
-    }
+    if (!component_name(name)) return false;
     int flags = O_NOFOLLOW | O_CLOEXEC;
     switch (options.access) {
     case FileAccess::Read: flags |= O_RDONLY; break;
@@ -91,20 +145,7 @@ bool File::stat(FileInfo& output) const {
     if (!valid()) { errno = EBADF; return false; }
     struct ::stat info{};
     if (::fstat(impl_->fd,&info)) return false;
-    FileInfo next{};
-    next.device = static_cast<std::uint32_t>(info.st_dev);
-    next.inode = static_cast<std::uint32_t>(info.st_ino);
-    next.mode = static_cast<std::uint16_t>(info.st_mode);
-    next.links = static_cast<std::uint64_t>(info.st_nlink);
-    next.size = info.st_size; next.blocks = info.st_blocks;
-    next.block_size = static_cast<std::uint32_t>(info.st_blksize);
-    next.atime = {info.st_atim.tv_sec,info.st_atim.tv_nsec};
-    next.mtime = {info.st_mtim.tv_sec,info.st_mtim.tv_nsec};
-    next.ctime = {info.st_ctim.tv_sec,info.st_ctim.tv_nsec};
-    next.birthtime = next.ctime; // Existing Linux guest-stat contract.
-    next.directory = S_ISDIR(info.st_mode); next.regular = S_ISREG(info.st_mode);
-    output = next;
-    return true;
+    return project(info,output);
 }
 std::int64_t File::read(void* data, std::size_t size) { if (!valid()) { errno=EBADF; return -1; } return ::read(impl_->fd,data,size); }
 std::int64_t File::read_at(void* data, std::size_t size, std::int64_t offset) { if (!valid()) { errno=EBADF; return -1; } return ::pread(impl_->fd,data,size,offset); }

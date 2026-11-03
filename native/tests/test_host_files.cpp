@@ -100,6 +100,73 @@ void capability_tests(const std::filesystem::path& root) {
     writable.exclusive = true;
     require(!saves.open_child("progress",writable,true,denied) && errno == EEXIST);
 }
+void directory_tests(const std::filesystem::path& root) {
+    using namespace SkyHost;
+    File parent, child, nested;
+    require(parent.open_directory(root/"created"/"nested",false,true));
+    require(parent.ensure_directory("slot",child));
+    require(parent.ensure_directory("slot",nested)); // Existing directory is retained.
+    FileInfo info{};
+    bool exists = false;
+    require(parent.child_info("slot",info,exists) && exists && info.directory);
+    info.size = 12345;
+    exists = true;
+    require(parent.child_info("missing",info,exists) && !exists && info.size == 12345);
+    require(!parent.ensure_directory("slot",parent) && errno == EINVAL && parent.valid());
+    require(!parent.ensure_directory("..",nested) && nested.valid());
+    require(!parent.child_info("../outside",info,exists));
+    File invalid;
+    require(!invalid.child_info("missing",info,exists) && errno == EBADF);
+    require(!invalid.ensure_directory("missing",nested) && errno == EBADF && nested.valid());
+    File conflict;
+    require(!conflict.open_directory(root/"save"/"hardlink"/"child",false,true));
+    require(!conflict.open_directory(root/"created",true,true) && errno == EINVAL);
+    File game;
+    require(game.open_directory(root/"game"));
+    require(!game.ensure_directory("data.bin",nested) && nested.valid());
+    exists = true;
+    info.size = 12345;
+    require(!game.child_info("escape",info,exists) && exists && info.size == 12345);
+    require(!game.ensure_directory("escape",nested) && nested.valid());
+    require(!conflict.open_directory(root/"game_alias"/"new",false,true));
+    require(!std::filesystem::exists(root/"game"/"new"));
+    File saves;
+    require(saves.open_directory(root/"save"));
+    require(saves.child_info("hardlink",info,exists) && exists && info.regular && info.links >= 2);
+#ifndef _WIN32
+    require(game.child_info("fifo",info,exists) && exists && !info.regular && !info.directory);
+    require(!game.child_info("link.bin",info,exists));
+#endif
+    // Keep a directory capability, then put a real junction/symlink at its
+    // original name. Operations on the held directory must stay on its inode.
+    std::filesystem::rename(root/"created"/"nested"/"slot",root/"created"/"nested"/"held");
+    std::filesystem::rename(root/"create_escape",root/"created"/"nested"/"slot");
+    require(!parent.ensure_directory("slot",nested));
+    require(!parent.child_info("slot",info,exists));
+    require(child.ensure_directory("inside",nested));
+    File marker;
+    FileOpen writable;
+    writable.access = FileAccess::Write;
+    writable.create = writable.exclusive = true;
+    require(nested.open_child("marker",writable,true,marker));
+    require(marker.write("held",4) == 4 && marker.sync() == 0 && marker.close() == 0);
+    require(!std::filesystem::exists(root/"outside"/"inside"));
+    KernelFile files;
+    require(files.mount_save("/savedata0",child,false));
+    require(!files.mount_save("/savedata0",child,false));
+    File invalid_mount;
+    require(!files.mount_save("/savedata1",invalid_mount,false));
+    const std::array<std::uint64_t,6> args{
+        reinterpret_cast<std::uintptr_t>("/savedata0/inside/marker"),0};
+    const auto fd = files.call("1G3lF1Gg1k8#libkernel#libkernel",args.data());
+    require(fd >= 3 && fd < 1024);
+    std::array<char,4> bytes{};
+    const std::array<std::uint64_t,6> read{fd,reinterpret_cast<std::uintptr_t>(bytes.data()),bytes.size()};
+    require(files.call("Cg4srZ6TKbU#libkernel#libkernel",read.data()) == 4 && std::string(bytes.data(),4) == "held");
+    const std::array<std::uint64_t,6> close{fd};
+    require(files.call("UK2Tl2DWUns#libkernel#libkernel",close.data()) == 0);
+    require(files.unmount_save("/savedata0"));
+}
 void guest_tests(const std::filesystem::path& root) {
     using U = std::uint64_t;
     const auto pointer = [](auto* value) { return reinterpret_cast<std::uintptr_t>(value); };
@@ -173,7 +240,7 @@ int main(int argc, char** argv) {
         require(argc == 2 || argc == 3);
         const auto root = decode_path(argv[1]);
         if (argc == 3 && std::string_view(argv[2]) == "race") race_tests(root);
-        else { capability_tests(root); guest_tests(root); }
+        else { capability_tests(root); directory_tests(root); guest_tests(root); }
         std::cout << "file capability tests passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

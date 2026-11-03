@@ -116,11 +116,11 @@ struct File::Impl {
     mutable std::mutex mutex;
     ~Impl() { const auto saved=errno; if (handle) CloseHandle(handle); errno=saved; }
     static std::unique_ptr<Impl> open(HANDLE parent, std::wstring_view name, const FileOpen& options,
-                                      bool single_link, bool insensitive) {
+                                      bool single_link, bool insensitive, bool directory_creation = false, bool metadata_only = false) {
         if (name.empty() || name.size() > 32767) { errno=ENAMETOOLONG; return {}; }
-        if (options.directory && options.create) { errno=EINVAL; return {}; }
+        if (options.directory && options.create && !directory_creation) { errno=EINVAL; return {}; }
         ACCESS_MASK desired = SYNCHRONIZE | FILE_READ_ATTRIBUTES;
-        switch (options.access) {
+        if (!metadata_only) switch (options.access) {
         case FileAccess::Read: desired |= FILE_READ_DATA; break;
         case FileAccess::Write: desired |= FILE_WRITE_DATA | FILE_APPEND_DATA; break;
         case FileAccess::ReadWrite: desired |= FILE_READ_DATA | FILE_WRITE_DATA | FILE_APPEND_DATA; break;
@@ -205,7 +205,8 @@ File::~File() = default;
 File::File(File&&) noexcept = default;
 File& File::operator=(File&&) noexcept = default;
 bool File::valid() const noexcept { if (!impl_) return false; std::lock_guard lock(impl_->mutex); return impl_->handle != nullptr; }
-bool File::open_directory(const std::filesystem::path& input, bool allow_root_links) {
+bool File::open_directory(const std::filesystem::path& input, bool allow_root_links, bool create) {
+    if (allow_root_links && create) { errno=EINVAL; return false; }
     (void)allow_root_links; // Windows never follows a reparse point in a root.
     if (input.empty()) { errno=ENOENT; return false; }
     const auto path = std::filesystem::absolute(input);
@@ -226,11 +227,12 @@ bool File::open_directory(const std::filesystem::path& input, bool allow_root_li
     options.directory = true;
     auto current = Impl::open(nullptr,target + L"\\",options,false,true);
     if (!current) return false;
+    options.create = create;
     for (const auto& part : path.relative_path()) {
         const auto& name = part.native();
         if (name.empty() || name == L".") continue;
         if (name == L".." || name.find_first_of(L"/\\:\0",0,4) != name.npos) { errno=EACCES; return false; }
-        current = Impl::open(current->handle,name,options,false,true);
+        current = Impl::open(current->handle,name,options,false,true,create);
         if (!current) return false;
     }
     impl_ = std::move(current);
@@ -248,6 +250,39 @@ bool File::duplicate_directory(File& output) const {
     }
     next->directory = true;
     output.impl_ = std::move(next);
+    return true;
+}
+bool File::ensure_directory(std::string_view name, File& output) const {
+    if (&output == this) { errno=EINVAL; return false; }
+    std::wstring wide;
+    if (!component_name(name,wide)) return false;
+    if (!impl_) { errno=EBADF; return false; }
+    std::lock_guard lock(impl_->mutex);
+    if (!impl_->handle) { errno=EBADF; return false; }
+    if (!impl_->directory) { errno=ENOTDIR; return false; }
+    FileOpen options;
+    options.directory = options.create = true;
+    auto next = Impl::open(impl_->handle,wide,options,false,false,true);
+    if (!next) return false;
+    output.impl_ = std::move(next);
+    return true;
+}
+bool File::child_info(std::string_view name, FileInfo& output, bool& exists) const {
+    std::wstring wide;
+    if (!component_name(name,wide)) return false;
+    if (!impl_) { errno=EBADF; return false; }
+    std::lock_guard lock(impl_->mutex);
+    if (!impl_->handle) { errno=EBADF; return false; }
+    if (!impl_->directory) { errno=ENOTDIR; return false; }
+    // Query rights only: inspecting an entry must not require data access.
+    auto child = Impl::open(impl_->handle,wide,{},false,false,false,true);
+    if (!child) {
+        if (errno != ENOENT) return false;
+        exists = false;
+        return true;
+    }
+    if (!information(child->handle,output)) return false;
+    exists = true;
     return true;
 }
 bool File::open_child(std::string_view name, const FileOpen& options, bool single_link, File& output) const {

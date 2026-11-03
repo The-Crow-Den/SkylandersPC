@@ -38,8 +38,14 @@ public:
     // policy only. Windows refuses reparse points even in the selected root;
     // currently only local volume drive roots are supported (not UNC/SUBST).
     // Output arguments to child/duplicate operations must not alias this File.
-    bool open_directory(const std::filesystem::path& path, bool allow_root_links = false);
+    // create walks/creates missing components through held parents. It cannot
+    // be combined with the trusted-root link exception.
+    bool open_directory(const std::filesystem::path& path, bool allow_root_links = false, bool create = false);
     bool duplicate_directory(File& output) const;
+    bool ensure_directory(std::string_view name, File& output) const;
+    // Missing entries succeed with exists=false; unsafe links are failures.
+    // Does not open file data (and therefore cannot block on a FIFO).
+    bool child_info(std::string_view name, FileInfo& output, bool& exists) const;
     // single_link requires a directory or regular file with exactly one link;
     // validate that before truncation so save hard links cannot modify outside data.
     bool open_child(std::string_view name, const FileOpen& options, bool single_link, File& output) const;

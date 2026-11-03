@@ -32,6 +32,17 @@ int main(){
         alignas(8) std::array<char,64> result{};
         check(save("ZkZhskCPXFw")==0);
         check(save("32HQAQdwM2o",{ptr(&mount),ptr(result.data())})==0x809f0008);
+        // Slot and metadata directory creation must reject redirected names.
+        const auto user_root=root/"saves/CUSA00697/user-4096";
+        std::filesystem::create_directory_symlink(root/"game",user_root/"redirected");
+        std::filesystem::create_directory(user_root/"badmeta");
+        std::filesystem::create_directory_symlink(root/"game",user_root/"badmeta.sce_sys");
+        Mount unsafe=mount;unsafe.mode=34;
+        unsafe.dir=ptr("redirected");
+        check(save("32HQAQdwM2o",{ptr(&unsafe),ptr(result.data())})==0x809f000b);
+        unsafe.dir=ptr("badmeta");
+        check(save("32HQAQdwM2o",{ptr(&unsafe),ptr(result.data())})==0x809f000b);
+        check(!std::filesystem::exists(root/"game"/"param.bin"));
         mount.mode=6;
         check(save("32HQAQdwM2o",{ptr(&mount),ptr(result.data())})==0);
         check(std::string(result.data())=="/savedata0");

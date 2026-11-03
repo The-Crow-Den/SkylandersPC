@@ -2,6 +2,7 @@
 #include "save_data.hpp"
 #include "kernel_file.hpp"
 #include "local_players.hpp"
+#include "../platform/host_files.hpp"
 #include <array>
 #include <cerrno>
 #include <cstdlib>
@@ -126,21 +127,26 @@ U SaveData::call(std::string_view identity,const U* a) {
         if(length==32||!safe({raw,length}))return 0x809f0000;
         if(m.mode&16)throw std::runtime_error("SaveData mount COPY_ICON is unsupported");
         const auto user_root=impl_->root/impl_->title/("user-"+std::to_string(m.user));
-        if(!directory(user_root))return 0x809f000b;
-        const auto data=user_root/std::string(raw,length);
-        const auto meta=user_root/(std::string(raw,length)+".sce_sys");
-        std::error_code ec;const bool exists=std::filesystem::exists(data,ec);
-        if(ec)return 0x809f000b;
+        SkyHost::File parent;
+        if(!parent.open_directory(user_root,false,true))return 0x809f000b;
+        const std::string name(raw,length);
+        const auto data=user_root/name;
+        const auto meta=user_root/(name+".sce_sys");
+        SkyHost::FileInfo info{};
+        bool exists=false;
+        if(!parent.child_info(name,info,exists))return 0x809f000b;
+        if(exists&&!info.directory)return 0x809f000b;
         const bool create=m.mode&(4|32),read_only=m.mode&1;
         std::printf("SaveData: mount mode=0x%x existing=%d\n",m.mode,exists);
         if(!exists&&!create)return 0x809f0008;
         if(exists&&(m.mode&4))return 0x809f0007;
-        if(!directory(data)||!directory(meta))return 0x809f000b;
+        SkyHost::File data_directory,meta_directory;
+        if(!parent.ensure_directory(name,data_directory)||!parent.ensure_directory(name+".sce_sys",meta_directory))return 0x809f000b;
         for(const auto& [point,slot]:impl_->slots)if(slot.data==data)return 0x809f0003;
         unsigned index=0;std::string point;
         for(;index<16;++index){point="/savedata"+std::to_string(index);if(!impl_->slots.contains(point))break;}
         if(index==16)return 0x809f000c;
-        if(!impl_->files.mount_save(point,data,read_only))return 0x809f000b;
+        if(!impl_->files.mount_save(point,data_directory,read_only))return 0x809f000b;
         impl_->slots.emplace(point,Impl::Slot{data,meta,read_only});
         auto& out=*reinterpret_cast<MountResult*>(a[1]);out={};std::memcpy(out.point,point.c_str(),point.size());out.status=exists?0:1;
         return 0;
