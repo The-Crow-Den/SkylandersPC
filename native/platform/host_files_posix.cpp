@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
+#include <sys/mman.h>
+#include <limits>
 #include <unistd.h>
 #include <utility>
 namespace SkyHost {
@@ -36,6 +38,28 @@ struct File::Impl {
     int fd = -1;
     ~Impl() { const auto saved = errno; if (fd >= 0) ::close(fd); errno = saved; }
 };
+PrivateFileMapping::~PrivateFileMapping() {
+    const auto saved = errno;
+    if (memory_) ::munmap(const_cast<void*>(memory_),size_);
+    errno = saved;
+}
+bool PrivateFileMapping::open(const std::filesystem::path& path, std::size_t size) {
+    if (!size || size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()) ||
+        path.native().find('\0') != std::string::npos) { errno=EINVAL; return false; }
+    File file;
+    file.impl_ = std::make_unique<File::Impl>();
+    file.impl_->fd = ::open(path.c_str(),O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+    if (file.impl_->fd < 0) return false;
+    struct ::stat info{};
+    if (::fstat(file.impl_->fd,&info)) return false;
+    if (!S_ISREG(info.st_mode) || info.st_uid != getuid() || (info.st_mode & 077) ||
+        info.st_size != static_cast<std::int64_t>(size)) { errno=EACCES; return false; }
+    const auto* view = ::mmap(nullptr,size,PROT_READ,MAP_SHARED,file.impl_->fd,0);
+    if (view == MAP_FAILED) return false;
+    if (memory_) ::munmap(const_cast<void*>(memory_),size_);
+    memory_ = view; size_ = size;
+    return true;
+}
 File::File() = default;
 File::~File() = default;
 File::File(File&&) noexcept = default;

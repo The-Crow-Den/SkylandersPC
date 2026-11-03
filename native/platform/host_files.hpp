@@ -6,6 +6,23 @@
 #include <memory>
 #include <string_view>
 namespace SkyHost {
+// Read-only shared view for the overlay mailbox. Exact size and current-user
+// ownership are checked before mapping. POSIX preserves the existing leaf-only
+// O_NOFOLLOW + mode 077 check. Windows walks/rejects reparse points and accepts
+// DACL grants only to this user, SYSTEM and Administrators; other ACL forms or
+// owners are refused. No mapping owns or changes the writer's file contents.
+class PrivateFileMapping {
+public:
+    PrivateFileMapping() = default;
+    ~PrivateFileMapping();
+    PrivateFileMapping(const PrivateFileMapping&) = delete;
+    PrivateFileMapping& operator=(const PrivateFileMapping&) = delete;
+    bool open(const std::filesystem::path& path, std::size_t size);
+    const void* data() const noexcept { return memory_; }
+private:
+    const void* memory_ = nullptr;
+    std::size_t size_ = 0;
+};
 enum class FileAccess { Read, Write, ReadWrite };
 struct FileOpen {
     FileAccess access = FileAccess::Read;
@@ -68,6 +85,7 @@ public:
     int truncate(std::int64_t size);
     int close();
 private:
+    friend class PrivateFileMapping;
     bool create_temporary(std::string_view name, File& output) const;
     bool publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const;
     bool discard_temporary(File& temporary, std::string_view name) const;

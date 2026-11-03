@@ -2,32 +2,21 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <string>
+#include "platform/host_files.hpp"
 
 namespace PcOverlay {
 class FrameReader {
     static constexpr std::size_t header=64,capacity=3840*2160*4,total=header+capacity;
-    const std::uint32_t* memory=nullptr;
+    SkyHost::PrivateFileMapping mapping;
 public:
     explicit FrameReader(const char* path) {
-        if(!path)return;
-        const int fd=open(path,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
-        if(fd<0)return;
-        struct stat info{};
-        if(fstat(fd,&info)==0&&S_ISREG(info.st_mode)&&info.st_uid==getuid()&&
-           (info.st_mode&077)==0&&info.st_size==total) {
-            const auto* address=mmap(nullptr,total,PROT_READ,MAP_SHARED,fd,0);
-            if(address!=MAP_FAILED)memory=static_cast<const std::uint32_t*>(address);
-        }
-        close(fd);
+        if(path)mapping.open(std::filesystem::path(std::u8string(path,path+std::strlen(path))),total);
     }
-    ~FrameReader(){if(memory)munmap(const_cast<std::uint32_t*>(memory),total);}
     FrameReader(const FrameReader&)=delete;
     FrameReader& operator=(const FrameReader&)=delete;
     bool copy(void* pixels,int size,int* width,int* height,unsigned* generation) const {
+        const auto* memory=static_cast<const std::uint32_t*>(mapping.data());
         if(!memory||!pixels||!width||!height||!generation||memory[0]!=0x534b594d)return false;
         const auto before=__atomic_load_n(memory+1,__ATOMIC_ACQUIRE);
         if(!before||(before&1)||before==*generation)return false;
@@ -36,7 +25,7 @@ public:
         std::memcpy(pixels,reinterpret_cast<const unsigned char*>(memory)+header,bytes);
         __atomic_thread_fence(__ATOMIC_ACQUIRE);
         if(before!=__atomic_load_n(memory+1,__ATOMIC_ACQUIRE))return false;
-        *width=w;*height=h;*generation=before;return true;
+        *width=static_cast<int>(w);*height=static_cast<int>(h);*generation=before;return true;
     }
 };
 }

@@ -8,6 +8,7 @@
 #endif
 #include <windows.h>
 #include <winternl.h>
+#include <aclapi.h>
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -112,6 +113,42 @@ bool component_name(std::string_view name, std::wstring& output) {
     }
     return true;
 }
+bool private_owner(HANDLE handle) {
+    HANDLE raw_token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&raw_token)) { failure(GetLastError()); return false; }
+    const std::unique_ptr<void,decltype(&CloseHandle)> token(raw_token,&CloseHandle);
+    alignas(TOKEN_USER) std::array<std::byte,sizeof(TOKEN_USER)+SECURITY_MAX_SID_SIZE> identity{};
+    DWORD used = 0;
+    if (!GetTokenInformation(token.get(),TokenUser,identity.data(),static_cast<DWORD>(identity.size()),&used)) {
+        failure(GetLastError()); return false;
+    }
+    const auto* user = reinterpret_cast<const TOKEN_USER*>(identity.data());
+    PSID owner = nullptr;
+    PACL dacl = nullptr;
+    PSECURITY_DESCRIPTOR raw_descriptor = nullptr;
+    const auto status = GetSecurityInfo(handle,SE_FILE_OBJECT,OWNER_SECURITY_INFORMATION|DACL_SECURITY_INFORMATION,
+        &owner,nullptr,&dacl,nullptr,&raw_descriptor);
+    const std::unique_ptr<void,decltype(&LocalFree)> descriptor(raw_descriptor,&LocalFree);
+    if (status != ERROR_SUCCESS) { failure(status); return false; }
+    if (!raw_descriptor || !IsValidSecurityDescriptor(raw_descriptor) || !owner || !IsValidSid(owner) ||
+        !EqualSid(owner,user->User.Sid) || !dacl || !IsValidAcl(dacl)) { errno=EACCES; return false; }
+    for (DWORD i = 0; i < dacl->AceCount; ++i) {
+        void* raw = nullptr;
+        if (!GetAce(dacl,i,&raw)) { failure(GetLastError()); return false; }
+        const auto* header = static_cast<const ACE_HEADER*>(raw);
+        if (header->AceFlags & INHERIT_ONLY_ACE) continue; // Does not apply to this object.
+        if (header->AceType == ACCESS_DENIED_ACE_TYPE) continue;
+        if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) { errno=ENOTSUP; return false; }
+        const auto* ace = static_cast<const ACCESS_ALLOWED_ACE*>(raw);
+        constexpr auto offset = offsetof(ACCESS_ALLOWED_ACE,SidStart);
+        if (header->AceSize < offset + 8) { errno=EACCES; return false; }
+        auto* sid = const_cast<DWORD*>(&ace->SidStart);
+        if (!IsValidSid(sid) || GetLengthSid(sid) > header->AceSize - offset) { errno=EACCES; return false; }
+        if (ace->Mask && !EqualSid(sid,user->User.Sid) && !IsWellKnownSid(sid,WinLocalSystemSid) &&
+            !IsWellKnownSid(sid,WinBuiltinAdministratorsSid)) { errno=EACCES; return false; }
+    }
+    return true;
+}
 bool rename_handle(HANDLE source, HANDLE parent, std::wstring_view name, bool replace, bool& published) {
     const auto bytes = name.size() * sizeof(wchar_t);
     const auto length = sizeof(FILE_RENAME_INFORMATION) + bytes;
@@ -144,6 +181,11 @@ bool rename_handle(HANDLE source, HANDLE parent, std::wstring_view name, bool re
     return true;
 }
 
+struct OpenPolicy {
+    bool single_link = false, insensitive = false, directory_creation = false,
+         metadata_only = false, delete_access = false, security_query = false;
+};
+
 }
 struct File::Impl {
     HANDLE handle = nullptr;
@@ -152,18 +194,19 @@ struct File::Impl {
     mutable std::mutex mutex;
     ~Impl() { const auto saved=errno; if (handle) CloseHandle(handle); errno=saved; }
     static std::unique_ptr<Impl> open(HANDLE parent, std::wstring_view name, const FileOpen& options,
-                                      bool single_link, bool insensitive, bool directory_creation = false, bool metadata_only = false, bool delete_access = false) {
+                                      OpenPolicy policy) {
         if (name.empty() || name.size() > 32767) { errno=ENAMETOOLONG; return {}; }
-        if (options.directory && options.create && !directory_creation) { errno=EINVAL; return {}; }
+        if (options.directory && options.create && !policy.directory_creation) { errno=EINVAL; return {}; }
         ACCESS_MASK desired = SYNCHRONIZE | FILE_READ_ATTRIBUTES;
-        if (!metadata_only) switch (options.access) {
+        if (!policy.metadata_only) switch (options.access) {
         case FileAccess::Read: desired |= FILE_READ_DATA; break;
         case FileAccess::Write: desired |= FILE_WRITE_DATA | FILE_APPEND_DATA; break;
         case FileAccess::ReadWrite: desired |= FILE_READ_DATA | FILE_WRITE_DATA | FILE_APPEND_DATA; break;
         default: errno=EINVAL; return {};
         }
         if (options.directory) desired |= FILE_TRAVERSE;
-        if (delete_access) desired |= DELETE;
+        if (policy.delete_access) desired |= DELETE;
+        if (policy.security_query) desired |= READ_CONTROL;
         UNICODE_STRING text{};
         text.Length = static_cast<USHORT>(name.size() * sizeof(wchar_t));
         text.MaximumLength = text.Length;
@@ -172,7 +215,7 @@ struct File::Impl {
         attributes.Length = sizeof(attributes);
         attributes.RootDirectory = parent;
         attributes.ObjectName = &text;
-        attributes.Attributes = no_reparse | (insensitive ? OBJ_CASE_INSENSITIVE : 0);
+        attributes.Attributes = no_reparse | (policy.insensitive ? OBJ_CASE_INSENSITIVE : 0);
         auto next = std::make_unique<Impl>();
         IO_STATUS_BLOCK io{};
         const auto disposition = options.create ? (options.exclusive ? disposition_create : disposition_open_if) : disposition_open;
@@ -186,7 +229,7 @@ struct File::Impl {
         if (GetFileType(next->handle) != FILE_TYPE_DISK) { errno=ENOTSUP; return {}; }
         FileInfo info{};
         if (!information(next->handle,info)) return {};
-        if (single_link && !info.directory && (!info.regular || info.links != 1)) { errno=EACCES; return {}; }
+        if (policy.single_link && !info.directory && (!info.regular || info.links != 1)) { errno=EACCES; return {}; }
         next->directory = info.directory;
         next->access = options.access;
         next->append = options.append;
@@ -237,6 +280,44 @@ struct File::Impl {
         return done;
     }
 };
+PrivateFileMapping::~PrivateFileMapping() {
+    const auto saved = errno;
+    if (memory_) UnmapViewOfFile(memory_);
+    errno = saved;
+}
+bool PrivateFileMapping::open(const std::filesystem::path& path, std::size_t size) {
+    if (!size || size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()) || path.empty()) {
+        errno=EINVAL; return false;
+    }
+    if (path.native().find(L'\0') != std::wstring::npos) { errno=EINVAL; return false; }
+    for (const auto& component : path)
+        if (component == L"..") { errno=EACCES; return false; }
+    File parent, file;
+    const auto absolute = std::filesystem::absolute(path);
+    if (!parent.open_directory(absolute.parent_path())) return false;
+    const auto name = absolute.filename().u8string();
+    std::wstring wide;
+    if (!component_name({reinterpret_cast<const char*>(name.data()),name.size()},wide)) return false;
+    file.impl_ = File::Impl::open(parent.impl_->handle,wide,{},{.security_query=true});
+    if (!file.impl_) return false;
+    FileInfo info{};
+    if (!information(file.impl_->handle,info)) return false;
+    if (!info.regular || info.size != static_cast<std::int64_t>(size)) { errno=EACCES; return false; }
+    if (!private_owner(file.impl_->handle)) return false;
+    const auto section = CreateFileMappingW(file.impl_->handle,nullptr,PAGE_READONLY,0,0,nullptr);
+    if (!section) { failure(GetLastError()); return false; }
+    const auto* view = MapViewOfFile(section,FILE_MAP_READ,0,0,size);
+    const auto error = view ? ERROR_SUCCESS : GetLastError();
+    if (!CloseHandle(section)) {
+        const auto close_error = GetLastError();
+        if (view) UnmapViewOfFile(view);
+        failure(close_error); return false;
+    }
+    if (!view) { failure(error); return false; }
+    if (memory_) UnmapViewOfFile(memory_);
+    memory_ = view; size_ = size;
+    return true;
+}
 File::File() = default;
 File::~File() = default;
 File::File(File&&) noexcept = default;
@@ -246,6 +327,9 @@ bool File::open_directory(const std::filesystem::path& input, bool allow_root_li
     if (allow_root_links && create) { errno=EINVAL; return false; }
     (void)allow_root_links; // Windows never follows a reparse point in a root.
     if (input.empty()) { errno=ENOENT; return false; }
+    if (input.native().find(L'\0') != std::wstring::npos) { errno=EINVAL; return false; }
+    for (const auto& component : input)
+        if (component == L"..") { errno=EACCES; return false; }
     const auto path = std::filesystem::absolute(input);
     const auto drive = path.root_name().native();
     if (drive.size() != 2 || drive[1] != L':' || !((drive[0] >= L'A' && drive[0] <= L'Z') || (drive[0] >= L'a' && drive[0] <= L'z'))) {
@@ -262,14 +346,14 @@ bool File::open_directory(const std::filesystem::path& input, bool allow_root_li
     }
     FileOpen options;
     options.directory = true;
-    auto current = Impl::open(nullptr,target + L"\\",options,false,true);
+    auto current = Impl::open(nullptr,target + L"\\",options,{.insensitive=true});
     if (!current) return false;
     options.create = create;
     for (const auto& part : path.relative_path()) {
         const auto& name = part.native();
         if (name.empty() || name == L".") continue;
         if (name == L".." || name.find_first_of(L"/\\:\0",0,4) != name.npos) { errno=EACCES; return false; }
-        current = Impl::open(current->handle,name,options,false,true,create);
+        current = Impl::open(current->handle,name,options,{.insensitive=true,.directory_creation=create});
         if (!current) return false;
     }
     impl_ = std::move(current);
@@ -299,7 +383,7 @@ bool File::ensure_directory(std::string_view name, File& output) const {
     if (!impl_->directory) { errno=ENOTDIR; return false; }
     FileOpen options;
     options.directory = options.create = true;
-    auto next = Impl::open(impl_->handle,wide,options,false,false,true);
+    auto next = Impl::open(impl_->handle,wide,options,{.directory_creation=true});
     if (!next) return false;
     output.impl_ = std::move(next);
     return true;
@@ -312,7 +396,7 @@ bool File::child_info(std::string_view name, FileInfo& output, bool& exists) con
     if (!impl_->handle) { errno=EBADF; return false; }
     if (!impl_->directory) { errno=ENOTDIR; return false; }
     // Query rights only: inspecting an entry must not require data access.
-    auto child = Impl::open(impl_->handle,wide,{},false,false,false,true);
+    auto child = Impl::open(impl_->handle,wide,{},{.metadata_only=true});
     if (!child) {
         if (errno != ENOENT) return false;
         exists = false;
@@ -330,7 +414,7 @@ bool File::open_child(std::string_view name, const FileOpen& options, bool singl
     std::lock_guard lock(impl_->mutex);
     if (!impl_->handle) { errno=EBADF; return false; }
     if (!impl_->directory) { errno=ENOTDIR; return false; }
-    auto next = Impl::open(impl_->handle,wide,options,single_link,false);
+    auto next = Impl::open(impl_->handle,wide,options,{.single_link=single_link});
     if (!next) return false;
     output.impl_ = std::move(next);
     return true;
@@ -346,7 +430,7 @@ bool File::move_directory(std::string_view name, const File& target, std::string
     if (exists) { errno=EEXIST; return false; }
     FileOpen options;
     options.directory = true;
-    auto directory = Impl::open(from.impl_->handle,source,options,false,false,false,true,true);
+    auto directory = Impl::open(from.impl_->handle,source,options,{.metadata_only=true,.delete_access=true});
     if (!directory) return false;
     bool published = false;
     return rename_handle(directory->handle,to.impl_->handle,destination,false,published);
@@ -362,7 +446,7 @@ bool File::create_temporary(std::string_view name, File& output) const {
     FileOpen options;
     options.access = FileAccess::Write;
     options.create = options.exclusive = true;
-    auto next = Impl::open(impl_->handle,wide,options,true,false,false,false,true);
+    auto next = Impl::open(impl_->handle,wide,options,{.single_link=true,.delete_access=true});
     if (!next) return false;
     output.impl_ = std::move(next);
     return true;

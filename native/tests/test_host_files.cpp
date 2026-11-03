@@ -2,6 +2,7 @@
 #include "../platform/host_files.hpp"
 #include "../hle/kernel_file.hpp"
 #include "../hle/save_data.hpp"
+#include "../pc_menu_frame.hpp"
 #include <array>
 #include <cerrno>
 #include <cstring>
@@ -27,6 +28,72 @@ std::filesystem::path decode_path(std::string_view hex) {
     for (std::size_t i = 0; i < hex.size(); i += 2)
         value.push_back(static_cast<char8_t>(16 * digit(hex[i]) + digit(hex[i+1])));
     return std::filesystem::path(value);
+}
+std::string frame_path(const std::filesystem::path& path) {
+    const auto bytes = path.u8string();
+    return {reinterpret_cast<const char*>(bytes.data()),bytes.size()};
+}
+void frame_tests(const std::filesystem::path& root) {
+    constexpr std::size_t size = 64+3840*2160*4;
+    SkyHost::PrivateFileMapping mapping;
+    require(mapping.open(root/"frame.rgba",size) && mapping.data());
+    const auto* address = mapping.data();
+    require(!mapping.open(root/"frame.rgba",size-1) && mapping.data() == address);
+    require(!mapping.open(root/"frame.rgba",0) && mapping.data() == address);
+    auto invalid_path = (root/"frame.rgba").native();
+    invalid_path.push_back(0);
+    invalid_path += std::filesystem::path("suffix").native();
+    require(!mapping.open(std::filesystem::path(invalid_path),size) && mapping.data() == address);
+    require(!mapping.open(root/"frame-public.rgba",size) && mapping.data() == address);
+    require(!mapping.open(root/"frame-link.rgba",size) && mapping.data() == address);
+    require(!mapping.open(root/"outside",size) && mapping.data() == address);
+    require(!mapping.open(root/"frame-short.rgba",size) && mapping.data() == address);
+    PcOverlay::FrameReader reader(frame_path(root/"frame.rgba").c_str());
+    std::array<char,8> pixels{};
+    int width = 0, height = 0;
+    unsigned generation = 0;
+    require(reader.copy(pixels.data(),8,&width,&height,&generation));
+    require(width == 2 && height == 1 && generation == 2 && std::string(pixels.data(),8) == "RGBAdata");
+    require(!reader.copy(pixels.data(),8,&width,&height,&generation));
+    generation = 0;
+    require(!reader.copy(pixels.data(),7,&width,&height,&generation) && generation == 0);
+    require(!reader.copy(pixels.data(),-1,&width,&height,&generation));
+    require(!reader.copy(nullptr,8,&width,&height,&generation));
+    require(!reader.copy(pixels.data(),8,nullptr,&height,&generation));
+    require(!reader.copy(pixels.data(),8,&width,nullptr,&generation));
+    require(!reader.copy(pixels.data(),8,&width,&height,nullptr));
+    for (const auto* name : {"frame-public.rgba","frame-link.rgba","frame-short.rgba","frame-odd.rgba","frame-bad.rgba"}) {
+        PcOverlay::FrameReader denied(frame_path(root/name).c_str());
+        require(!denied.copy(pixels.data(),8,&width,&height,&generation));
+    }
+#ifndef _WIN32
+    // Preserve the old Linux policy: parent symlinks are allowed, leaf links
+    // are not; privacy is checked on the opened file.
+    PcOverlay::FrameReader parent_link(frame_path(root/"frame-parent"/"frame.rgba").c_str());
+    require(parent_link.copy(pixels.data(),8,&width,&height,&generation));
+#else
+    SkyHost::PrivateFileMapping denied;
+    require(!denied.open(root/"frame-parent"/"frame.rgba",size));
+    require(!denied.open(root/"frame-null-dacl.rgba",size));
+#endif
+}
+void live_frame_test(const std::filesystem::path& root) {
+    PcOverlay::FrameReader reader(frame_path(root/"frame.rgba").c_str());
+    unsigned generation = 0;
+    std::array<char,8> pixels{};
+    int width = 0, height = 0;
+    std::cout << "ready" << std::endl;
+    for (std::string command; std::getline(std::cin,command) && command != "quit";) {
+        require(command == "read");
+        const bool copied = reader.copy(pixels.data(),8,&width,&height,&generation);
+        std::cout << copied << ' ' << generation << ' ' << width << ' ' << height << ' ';
+        for (const char byte : pixels) {
+            const auto value = static_cast<unsigned char>(byte);
+            constexpr char hex[] = "0123456789abcdef";
+            std::cout << hex[value >> 4] << hex[value & 15];
+        }
+        std::cout << std::endl;
+    }
 }
 void capability_tests(const std::filesystem::path& root) {
     using namespace SkyHost;
@@ -371,7 +438,8 @@ int main(int argc, char** argv) {
         require(argc == 2 || argc == 3);
         const auto root = decode_path(argv[1]);
         if (argc == 3 && std::string_view(argv[2]) == "race") race_tests(root);
-        else { capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
+        else if (argc == 3 && std::string_view(argv[2]) == "frame") live_frame_test(root);
+        else { frame_tests(root); capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
         std::cout << "file capability tests passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
