@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "renderer_adapter.hpp"
+#include "guest_abi.hpp"
 #include "skyrender.h"
 #include "platform/host_fault.hpp"
 #include <algorithm>
@@ -8,7 +9,7 @@
 
 extern "C" void skyrender_pc_menu_toggle() __attribute__((weak));
 namespace SkyGnm {
-std::uint32_t sceGnmDrawInitDefaultHardwareState(std::uint32_t*, std::uint32_t);
+SKY_SYSV_ABI std::uint32_t sceGnmDrawInitDefaultHardwareState(std::uint32_t*, std::uint32_t);
 }
 
 namespace {

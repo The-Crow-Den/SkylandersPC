@@ -519,6 +519,44 @@ sky_host_call_integer:
 #ifdef __ELF__
     .size sky_host_call_integer, .-sky_host_call_integer
 #endif
+#ifndef _WIN32
+    /* Native providers and PS4 providers share SysV on Linux. An alias keeps
+       the original .text bytes unchanged. */
+    .globl sky_sysv_call_integer
+    .set sky_sysv_call_integer, sky_host_call_integer
+#else
+    .globl sky_sysv_call_integer
+sky_sysv_call_integer:
+    /* Host TLS stays selected. This target uses SysV even on Win64. */
+    pushq %r12
+    pushq %r13
+    subq $56, %rsp
+    movq %rdi, %r12
+    movq %rsi, %r13
+    movq 48(%r13), %rax
+    movq %rax, 0(%rsp)
+    movq 56(%r13), %rax
+    movq %rax, 8(%rsp)
+    movq 64(%r13), %rax
+    movq %rax, 16(%rsp)
+    movq 72(%r13), %rax
+    movq %rax, 24(%rsp)
+    movq 80(%r13), %rax
+    movq %rax, 32(%rsp)
+    movq 88(%r13), %rax
+    movq %rax, 40(%rsp)
+    movq 0(%r13), %rdi
+    movq 8(%r13), %rsi
+    movq 16(%r13), %rdx
+    movq 24(%r13), %rcx
+    movq 32(%r13), %r8
+    movq 40(%r13), %r9
+    call *%r12
+    addq $56, %rsp
+    popq %r13
+    popq %r12
+    ret
+#endif
     .bss
     .p2align 3
 .Ltrap_handler: .quad 0

@@ -87,3 +87,8 @@ extern "C" [[noreturn]] SKY_SYSV_ABI void sky_guest_thread_exit(std::uint64_t re
 // words (unused slots zeroed); function uses the native host ABI.
 // Never pass floating/vector/aggregate signatures.
 extern "C" SKY_SYSV_ABI std::uint64_t sky_host_call_integer(void* function, const std::uint64_t* arguments) noexcept;
+
+// Host-only call to a verified SysV scalar integer/pointer provider, including
+// renderer and runtime C exports on Windows. Host TLS stays selected. The same
+// 12-word/no-float/no-unwind contract applies; this does not enter a guest TCB.
+extern "C" SKY_SYSV_ABI std::uint64_t sky_sysv_call_integer(void* function, const std::uint64_t* arguments) noexcept;

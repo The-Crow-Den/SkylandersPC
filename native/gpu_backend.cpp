@@ -566,7 +566,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
         if (function) cached.store(function, std::memory_order_relaxed);
     }
     if (!function) throw std::runtime_error("scoped GPU provider is missing");
-    const auto result = sky_host_call_integer(reinterpret_cast<void*>(function), a);
+    const auto result = sky_sysv_call_integer(reinterpret_cast<void*>(function), a);
     return item->returns_void ? 0 : result;
 #else
     (void)identity; (void)a;
@@ -584,21 +584,21 @@ std::uint64_t memory_call(std::string_view identity, const std::uint64_t* a) {
     using U = std::uint64_t;
     using I = std::int32_t;
     switch (operation) {
-    case 0: return reinterpret_cast<U(*)()>(address)();
-    case 1: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(std::int64_t, std::int64_t, U, U, I, std::int64_t*)>(address)(
+    case 0: return reinterpret_cast<U(SKY_SYSV_ABI *)()>(address)();
+    case 1: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(std::int64_t, std::int64_t, U, U, I, std::int64_t*)>(address)(
         static_cast<std::int64_t>(a[0]), static_cast<std::int64_t>(a[1]), a[2], a[3], static_cast<I>(a[4]), reinterpret_cast<std::int64_t*>(a[5])));
     case 2: {
         auto** out = reinterpret_cast<void**>(a[0]);
         if (out && (a[3] & 0x10) && (reinterpret_cast<std::uintptr_t>(*out) < 0x1000000000 ||
             reinterpret_cast<std::uintptr_t>(*out) >= 0xfc00000000 || a[1] > 0xfc00000000 - reinterpret_cast<std::uintptr_t>(*out)))
             return 0x80020016;
-        return static_cast<std::uint32_t>(reinterpret_cast<I(*)(void**, U, I, I, std::int64_t, U)>(address)(out,
+        return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(void**, U, I, I, std::int64_t, U)>(address)(out,
             a[1], static_cast<I>(a[2]), static_cast<I>(a[3]), static_cast<std::int64_t>(a[4]), a[5]));
     }
-    case 3: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(std::int64_t, U)>(address)(static_cast<std::int64_t>(a[0]), a[1]));
-    case 4: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(void*, U)>(address)(reinterpret_cast<void*>(a[0]), a[1]));
-    case 5: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(void**, U, I, I)>(address)(reinterpret_cast<void**>(a[0]), a[1], static_cast<I>(a[2]), static_cast<I>(a[3])));
-    case 6: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(const void*, I, void*, U)>(address)(reinterpret_cast<const void*>(a[0]), static_cast<I>(a[1]), reinterpret_cast<void*>(a[2]), a[3]));
+    case 3: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(std::int64_t, U)>(address)(static_cast<std::int64_t>(a[0]), a[1]));
+    case 4: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(void*, U)>(address)(reinterpret_cast<void*>(a[0]), a[1]));
+    case 5: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(void**, U, I, I)>(address)(reinterpret_cast<void**>(a[0]), a[1], static_cast<I>(a[2]), static_cast<I>(a[3])));
+    case 6: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(const void*, I, void*, U)>(address)(reinterpret_cast<const void*>(a[0]), static_cast<I>(a[1]), reinterpret_cast<void*>(a[2]), a[3]));
     }
 #else
     (void)identity; (void)a;

@@ -262,6 +262,17 @@ std::uint64_t twelve_integer_arguments(std::uint64_t a, std::uint64_t b, std::ui
     for (std::size_t index = 0; index < values.size(); ++index) result += (index + 1) * values[index];
     return result;
 }
+SKY_SYSV_ABI std::uint64_t twelve_sysv_arguments(std::uint64_t a, std::uint64_t b, std::uint64_t c, std::uint64_t d,
+    std::uint64_t e, std::uint64_t f, std::uint64_t g, std::uint64_t h, std::uint64_t i,
+    std::uint64_t j, std::uint64_t k, std::uint64_t l) {
+    return twelve_integer_arguments(a,b,c,d,e,f,g,h,i,j,k,l);
+}
+SKY_SYSV_ABI std::uint64_t sysv_pointer_arguments(std::uint64_t a, std::uint64_t b, std::uint64_t c, std::uint64_t d,
+    std::uint64_t e, std::uint64_t f, std::uint64_t g, std::uint64_t h, std::uint64_t i,
+    std::uint64_t j, std::uint64_t k, std::uint64_t* output) {
+    *output = twelve_integer_arguments(a,b,c,d,e,f,g,h,i,j,k,12);
+    return 0xfeedface12345678ULL;
+}
 #ifndef _WIN32
 int trap_pipe = -1;
 #endif
@@ -702,6 +713,13 @@ int main(int argc, char** argv) {
         const std::array<std::uint64_t, 12> arguments{1,2,3,4,5,6,7,8,9,10,11,12};
         require(sky_host_call_integer(reinterpret_cast<void*>(&twelve_integer_arguments), arguments.data()) == 650,
                 "host call lost register or stack arguments");
+        require(sky_sysv_call_integer(reinterpret_cast<void*>(&twelve_sysv_arguments),arguments.data()) == 650,
+                "SysV provider call lost register or stack arguments");
+        auto pointer_arguments = arguments;
+        std::uint64_t stored = 0;
+        pointer_arguments[11] = reinterpret_cast<std::uintptr_t>(&stored);
+        require(sky_sysv_call_integer(reinterpret_cast<void*>(&sysv_pointer_arguments),pointer_arguments.data()) == 0xfeedface12345678ULL &&
+                stored == 650,"SysV provider call lost its stack pointer or full-width result");
         run_probes();
 #ifndef _WIN32
         run_trap_probe();
