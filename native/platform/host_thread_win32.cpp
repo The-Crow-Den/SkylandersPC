@@ -11,8 +11,19 @@
 #include <cstdlib>
 #include <cstdint>
 #include <limits>
+#include <string>
 
 namespace SkyHost {
+bool set_current_thread_name(const char* name) noexcept {
+    if (!name) return false;
+    const auto size = MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,name,-1,nullptr,0);
+    if (!size) return false;
+    try {
+        std::wstring wide(static_cast<std::size_t>(size),L'\0');
+        if (MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,name,-1,wide.data(),size) != size) return false;
+        return SUCCEEDED(SetThreadDescription(GetCurrentThread(),wide.c_str()));
+    } catch (...) { return false; }
+}
 std::size_t thread_page_size() noexcept {
     SYSTEM_INFO info{};
     GetSystemInfo(&info);

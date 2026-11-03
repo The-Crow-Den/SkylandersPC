@@ -72,7 +72,7 @@ jobs:
           msystem: CLANG64
           update: true
           pacboy: >-
-            toolchain:p cmake:p ninja:p python:p openssl:p zydis:p fmt:p boost:p glm:p
+            toolchain:p cmake:p ninja:p python:p pkgconf:p openssl:p zydis:p fmt:p boost:p glm:p sdl3:p
       - uses: actions/checkout@v7
         with:
           persist-credentials: false

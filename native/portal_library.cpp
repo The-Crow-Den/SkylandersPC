@@ -11,7 +11,8 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
-#include <unistd.h>
+#include "platform/host_runtime.hpp"
+#include "platform/host_files.hpp"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -126,14 +127,14 @@ bool import_character(const char* path,bool select_after,unsigned player) {
     {
         std::lock_guard lock(library_mutex);
         std::array<unsigned char,1024> bytes{};
-        if(!path || !ready() || !read_figure(path,bytes)){feedback="Choose a regular 1024-byte Skylander dump.";return false;}
+        if(!path || !ready() || !read_figure(SkyHost::path_from_utf8(path),bytes)){feedback="Choose a regular 1024-byte Skylander dump.";return false;}
         const auto id=word(bytes,0x10);
         kind=VirtualPortal::is_vehicle(id)?vehicle_kind:is_item(id)?2:0;
         auto& collection=kind==vehicle_kind?vehicles:kind==2?items:characters;
         if(id>=210&&id<=220){feedback="This is a trap. Use the villain collection for dedicated traps.";return false;}
         // A tag already in the collection (e.g. a created figure chosen as the
         // starting Skylander) is used in place, never imported a second time.
-        std::error_code source_error;const auto source=fs::weakly_canonical(path,source_error);
+        std::error_code source_error;const auto source=fs::weakly_canonical(SkyHost::path_from_utf8(path),source_error);
         if(!source_error&&source.parent_path()==root/"characters")
             for(unsigned i=0;i<collection.size();++i)if(collection[i].file==source)index=static_cast<int>(i);
         if(index>=0){if(!select_after){mark_starting(kind,index);return true;}}
@@ -144,7 +145,7 @@ bool import_character(const char* path,bool select_after,unsigned player) {
         const auto destination=root/"characters"/filename.str();
         std::error_code ec;
         if(fs::is_symlink(destination,ec)){feedback="Cannot import into a redirected library file.";return false;}
-        ec.clear();fs::copy_file(path,destination,fs::copy_options::skip_existing,ec);
+        ec.clear();fs::copy_file(SkyHost::path_from_utf8(path),destination,fs::copy_options::skip_existing,ec);
         if(ec){feedback="Could not import this Skylander.";return false;}
         for(unsigned i=0;i<collection.size();++i)if(collection[i].file==destination)index=static_cast<int>(i);
         if(index<0){if(characters.size()+items.size()+vehicles.size()>=512)return false;add_character(destination);index=static_cast<int>(collection.size())-1;}
@@ -172,7 +173,7 @@ bool create_character(int choice,bool select_after,unsigned player) {
         const fs::path temporary=fs::path(directory)/"figure.sky";
         const auto destination=root/"characters"/(std::string("created-")+fs::path(directory).filename().string().substr(5)+".sky");
         std::error_code ec;
-        bool made=VirtualPortal::create_blank(temporary.c_str(),id,variant);
+        bool made=VirtualPortal::create_blank(SkyHost::path_to_utf8(temporary).c_str(),id,variant);
         if(made){fs::create_hard_link(temporary,destination,ec);made=!ec;}
         fs::remove_all(directory,ec);
         if(!made){feedback="Could not create this Skylander. Existing figures are unchanged.";return false;}
@@ -190,13 +191,13 @@ bool select(int kind,int index) {
     if(kind==vehicle_kind) {
         if(static_cast<unsigned>(index)>=vehicles.size())return false;
         if(selected_vehicle==index)return true;
-        if(!VirtualPortal::replace_vehicle(vehicles[static_cast<unsigned>(index)].file.c_str())){feedback="Could not place this vehicle.";return false;}
+        if(!VirtualPortal::replace_vehicle(SkyHost::path_to_utf8(vehicles[static_cast<unsigned>(index)].file).c_str())){feedback="Could not place this vehicle.";return false;}
         selected_vehicle=index;feedback=vehicles[static_cast<unsigned>(index)].name+" placed in the vehicle slot.";return true;
     }
     if(kind==2) {
         if(static_cast<unsigned>(index)>=items.size())return false;
         if(selected_item==index)return true;
-        if(!VirtualPortal::replace_item(items[static_cast<unsigned>(index)].file.c_str()))return false;
+        if(!VirtualPortal::replace_item(SkyHost::path_to_utf8(items[static_cast<unsigned>(index)].file).c_str()))return false;
         selected_item=index;feedback=items[static_cast<unsigned>(index)].name+" placed in the item slot.";return true;
     }
     if(kind==0 || kind==3) {
@@ -208,7 +209,7 @@ bool select(int kind,int index) {
         if(other==index || selected_bottom[1-player]==index){feedback="This figure is already placed for the other player. Create another copy to use two of the same Skylander.";return false;}
         const auto half=half_of(index);
         if(selected==index || bottom==index){feedback=characters[static_cast<unsigned>(index)].name+" is on the portal.";return true;}
-        if(!VirtualPortal::replace_player(characters[static_cast<unsigned>(index)].file.c_str(),player)){feedback="Could not place this Skylander.";return false;}
+        if(!VirtualPortal::replace_player(SkyHost::path_to_utf8(characters[static_cast<unsigned>(index)].file).c_str(),player)){feedback="Could not place this Skylander.";return false;}
         const auto& name=characters[static_cast<unsigned>(index)].name;
         if(half==VirtualPortal::SwapperHalf::bottom) {
             bottom=index;
@@ -227,13 +228,13 @@ bool select(int kind,int index) {
     if(selected_trap==index){feedback="This trap is already inserted.";return true;}
     const auto file=trap_path(index);std::error_code ec;
     if(!fs::exists(file,ec)) {
-        const auto temporary=file.string()+".new-"+std::to_string(getpid());
-        if(fs::exists(temporary,ec)||fs::is_symlink(temporary,ec)||!VirtualPortal::create_blank(temporary.c_str(),trap.id,trap.variant)){feedback="Could not create this empty trap.";return false;}
+        auto temporary=file;temporary+=".new-"+std::to_string(SkyHost::process_id());
+        if(fs::exists(temporary,ec)||fs::is_symlink(temporary,ec)||!VirtualPortal::create_blank(SkyHost::path_to_utf8(temporary).c_str(),trap.id,trap.variant)){feedback="Could not create this empty trap.";return false;}
         fs::create_hard_link(temporary,file,ec);fs::remove(temporary);if(ec){feedback="Could not store this trap.";return false;}
     }
     std::array<unsigned char,1024> bytes{};
     if(!read_figure(file,bytes)||word(bytes,0x10)!=trap.id||word(bytes,0x1c)!=trap.variant){feedback="This saved trap has unexpected identity data.";return false;}
-    if(!VirtualPortal::load_trap(file.c_str())){feedback="Could not insert the selected trap.";return false;}
+    if(!VirtualPortal::load_trap(SkyHost::path_to_utf8(file).c_str())){feedback="Could not insert the selected trap.";return false;}
     selected_trap=index;refresh_traps(true);
     const auto elapsed=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-started).count();
     std::printf("{\"event\":\"portal-trap-selected\",\"index\":%d,\"host_time_us\":%lld}\n",index,static_cast<long long>(elapsed));
@@ -249,7 +250,7 @@ bool select_empty_trap(int element) {
         if(choice<0){if(traps.size()>=1024)return false;const auto& type=elements[static_cast<unsigned>(element)];
             auto pattern=(root/"traps"/".element-XXXXXX").string();std::vector<char> buffer(pattern.begin(),pattern.end());buffer.push_back(0);const auto* temp=mkdtemp(buffer.data());if(!temp)return false;
             const fs::path temporary=fs::path(temp)/"trap.sky";const auto destination=root/"traps"/(std::string("element-")+std::to_string(type.id)+"-"+fs::path(temp).filename().string().substr(9)+".sky");std::error_code ec;
-            bool made=VirtualPortal::create_blank(temporary.c_str(),type.id,type.variant);if(made){fs::create_hard_link(temporary,destination,ec);made=!ec;}fs::remove_all(temp,ec);
+            bool made=VirtualPortal::create_blank(SkyHost::path_to_utf8(temporary).c_str(),type.id,type.variant);if(made){fs::create_hard_link(temporary,destination,ec);made=!ec;}fs::remove_all(temp,ec);
             if(!made){feedback="Could not prepare an empty trap. Existing captures were kept.";return false;}
             choice=static_cast<int>(traps.size());traps.push_back({destination,type.id,type.variant,element,0,true});
         }
@@ -317,7 +318,7 @@ extern "C" int sky_portal_portrait(int kind,int index){
     return -1;
 }
 extern "C" const char* sky_portal_status(){thread_local std::string text;text=PortalLibrary::status();return text.c_str();}
-extern "C" const char* sky_portal_atlas(){static const auto path=(fs::current_path()/".local/portal-assets/portraits.rgba").string();return path.c_str();}
+extern "C" const char* sky_portal_atlas(){static const auto path=SkyHost::path_to_utf8(fs::current_path()/".local/portal-assets/portraits.rgba");return path.c_str();}
 extern "C" int sky_portal_creation_count(){return static_cast<int>(VirtualPortal::creation_count());}
 extern "C" const char* sky_portal_creation_name(int index){return index<0?"":VirtualPortal::creation_name(static_cast<unsigned>(index));}
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../platform/host_runtime.hpp"
 #include "../platform/host_thread.hpp"
+#include "../platform/host_compat.hpp"
 #include "../thread_context.hpp"
 #include "../guest_abi.hpp"
 #include <array>
@@ -13,7 +14,14 @@
 #include <source_location>
 #include <string_view>
 #include <thread>
-#ifndef _WIN32
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <pthread.h>
+#include <unistd.h>
 #include <csignal>
 #include <ucontext.h>
 #endif
@@ -72,6 +80,39 @@ void basic() {
     using namespace SkyHost;
     const auto main_id = current_thread_id();
     require(main_id && current_thread_id() == main_id);
+    const auto pid = process_id();
+#ifdef _WIN32
+    require(pid == GetCurrentProcessId());
+    wchar_t* original = nullptr;
+    require(SUCCEEDED(GetThreadDescription(GetCurrentThread(),&original)) && original);
+    const std::wstring previous_name(original);
+    LocalFree(original);
+    require(set_current_thread_name("sky-host-\xce\xbb"));
+    wchar_t* changed = nullptr;
+    require(SUCCEEDED(GetThreadDescription(GetCurrentThread(),&changed)) && changed);
+    require(std::wstring(changed) == L"sky-host-\u03bb");
+    LocalFree(changed);
+    require(!set_current_thread_name(nullptr) && !set_current_thread_name("\xff"));
+    require(SUCCEEDED(SetThreadDescription(GetCurrentThread(),previous_name.c_str())));
+#else
+    require(pid == static_cast<std::uint64_t>(getpid()));
+    std::array<char,16> previous_name{}, changed{};
+    require(pthread_getname_np(pthread_self(),previous_name.data(),previous_name.size()) == 0);
+    require(set_current_thread_name("sky-host-\xce\xbb"));
+    require(pthread_getname_np(pthread_self(),changed.data(),changed.size()) == 0 &&
+            std::string_view(changed.data()) == "sky-host-\xce\xbb");
+    require(!set_current_thread_name(nullptr) && !set_current_thread_name("host-name-far-over-pthread-limit"));
+    require(set_current_thread_name(previous_name.data()));
+#endif
+    const auto* before = std::getenv("SKY_HOST_ENV_PROBE");
+    const bool existed = before != nullptr;
+    const std::string saved = before ? before : "";
+    require(set_environment("SKY_HOST_ENV_PROBE","first") == 0);
+    require(set_environment("SKY_HOST_ENV_PROBE","second",false) == 0 &&
+            std::string_view(std::getenv("SKY_HOST_ENV_PROBE")) == "first");
+    require(set_environment("SKY_HOST_ENV_PROBE","second") == 0 &&
+            std::string_view(std::getenv("SKY_HOST_ENV_PROBE")) == "second");
+    require((existed ? set_environment("SKY_HOST_ENV_PROBE",saved.c_str()) : unset_environment("SKY_HOST_ENV_PROBE")) == 0);
     std::array<std::uint64_t,4> ids{};
     std::array<std::thread,4> threads;
     std::atomic<unsigned> ready = 0;
@@ -79,7 +120,7 @@ void basic() {
         ids[i] = current_thread_id();
         ready.fetch_add(1);
         while (ready.load() != threads.size()) std::this_thread::yield();
-        if (!ids[i] || current_thread_id() != ids[i]) std::terminate();
+        if (!ids[i] || current_thread_id() != ids[i] || process_id() != pid) std::terminate();
     });
     for (auto& thread : threads) thread.join();
     for (unsigned i = 0; i < ids.size(); ++i) {

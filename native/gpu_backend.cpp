@@ -6,6 +6,9 @@
 #include "thread_context.hpp"
 #include "guest_start.hpp"
 #include "platform/host_fault.hpp"
+#include "platform/host_runtime.hpp"
+#include "platform/host_thread.hpp"
+#include "platform/host_compat.hpp"
 #include "hle/kernel_clock.hpp"
 #include "hle/keyboard_pad.hpp"
 #include "game_hooks.hpp"
@@ -20,7 +23,6 @@
 #include <cstring>
 #include <cstdlib>
 #include <stdexcept>
-#include <unistd.h>
 #include <atomic>
 #include <filesystem>
 #include <mutex>
@@ -34,7 +36,6 @@ std::atomic<std::uint64_t> guest_image_base = 0, guest_image_size = 0;
 
 #ifdef SKY_RENDERER
 #include <csetjmp>
-#include <pthread.h>
 #include "renderer_adapter.hpp"
 #include <SDL3/SDL.h>
 extern "C" {
@@ -309,7 +310,7 @@ void runtime_guest_image(uint64_t* base, uint64_t* size) {
     *base = guest_image_base.load(std::memory_order_acquire);
     *size = guest_image_size.load(std::memory_order_acquire);
 }
-void runtime_restart() { dprintf(STDERR_FILENO, "custom runtime restart is unsupported\n"); _exit(75); }
+void runtime_restart() { SkyHost::diagnostic_printf("custom runtime restart is unsupported\n"); std::_Exit(75); }
 int runtime_file_translate(const char*, char*, size_t) { return -1; }
 int runtime_file_host_path(const char*, char*, size_t) { return -1; }
 int runtime_pad_mouse_look() { return 0; }
@@ -317,8 +318,8 @@ int runtime_pad_prompt_device() { return 0; }
 unsigned runtime_pad_prompt_generation() { return 0; }
 int runtime_pad_prompt(const char*, int, char* label, int size) { if (label && size > 0) label[0] = 0; return 0; }
 void runtime_re_watch(uint64_t) {} // Optional Bloodborne reverse-engineering watch is disabled.
-void runtime_thread_attach_host(const char* name) { if (name) pthread_setname_np(pthread_self(), name); }
-void runtime_wait_report(double) { dprintf(STDERR_FILENO, "GPU wait profiling is disabled\n"); }
+void runtime_thread_attach_host(const char* name) { if (name) (void)SkyHost::set_current_thread_name(name); }
+void runtime_wait_report(double) { SkyHost::diagnostic_printf("GPU wait profiling is disabled\n"); }
 void runtime_sleep_stats(uint64_t* calls, uint64_t* ns) { *calls = *ns = 0; } // GPU-library-specific profiler is disabled.
 uint64_t runtime_process_time_us() {
     const std::array<U, 6> args{};
@@ -422,7 +423,7 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
     Renderer::set_option("GPU_USER_DIR", gpu_user_directory.c_str(), true);
     Renderer::set_option("CONFIG", (gpu_user_directory + "/" + Renderer::settings_file).c_str(), true);
     Renderer::set_option("GAME_PROFILE", "none", true);
-    setenv("SKY_PC_MENU", "1", 1);
+    if(SkyHost::set_environment("SKY_PC_MENU","1")!=0)throw std::runtime_error("cannot enable PC menu");
     Renderer::set_option("FREE_MOUSE", "1", true);
     Renderer::set_option("SUBMIT_LOCK", "gpu", true);
     // The renderer defaults to forced 16x filtering, which this title does not

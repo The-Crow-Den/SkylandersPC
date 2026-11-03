@@ -35,6 +35,15 @@ std::string frame_path(const std::filesystem::path& path) {
 }
 void frame_tests(const std::filesystem::path& root) {
     constexpr std::size_t size = 64+3840*2160*4;
+    const auto unicode_name = root/std::filesystem::path(u8"unicode_\u03bb.bin");
+    const auto encoded = SkyHost::path_to_utf8(unicode_name);
+    require(encoded.ends_with("unicode_\xce\xbb.bin") && SkyHost::path_from_utf8(encoded) == unicode_name);
+    require(SkyHost::private_directory(root/"private-ipc"));
+    require(!SkyHost::private_directory(root/"public-ipc"));
+    require(!SkyHost::private_directory(root/"ipc-alias"));
+    require(!SkyHost::private_directory(root/"private-ipc"/".."));
+    require(!SkyHost::private_directory(root/"missing-ipc"));
+    require(!SkyHost::private_directory(root/"frame.rgba"));
     SkyHost::PrivateFileMapping mapping;
     require(mapping.open(root/"frame.rgba",size) && mapping.data());
     const auto* address = mapping.data();

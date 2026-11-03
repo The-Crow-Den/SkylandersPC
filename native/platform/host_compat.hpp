@@ -19,11 +19,12 @@ inline bool sync_file(std::FILE* file) noexcept {
     return fsync(fileno(file)) == 0;
 #endif
 }
-inline int set_environment(const char* name, const char* value) noexcept {
+inline int set_environment(const char* name, const char* value, bool overwrite = true) noexcept {
 #ifdef _WIN32
+    if (!overwrite && std::getenv(name)) return 0;
     return _putenv_s(name, value);
 #else
-    return setenv(name, value, 1);
+    return setenv(name, value, overwrite ? 1 : 0);
 #endif
 }
 inline int unset_environment(const char* name) noexcept {

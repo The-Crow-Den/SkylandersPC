@@ -21,7 +21,7 @@ BINARY = Path(sys.argv.pop(1)).resolve()
 
 def frame_permissions(path, public=False, null_dacl=False):
     if os.name != 'nt':
-        path.chmod(0o644 if public else 0o600)
+        path.chmod((0o755 if public else 0o700) if path.is_dir() else (0o644 if public else 0o600))
         return
     kernel = ctypes.WinDLL('kernel32', use_last_error=True)
     security = ctypes.WinDLL('advapi32', use_last_error=True)
@@ -145,6 +145,11 @@ class HostFilesTests(unittest.TestCase):
         else:
             (root / 'frame-link.rgba').symlink_to(root / 'frame.rgba')
         directory_link(root / 'frame-parent', root)
+        (root / 'private-ipc').mkdir()
+        frame_permissions(root / 'private-ipc')
+        (root / 'public-ipc').mkdir()
+        frame_permissions(root / 'public-ipc', public=True)
+        directory_link(root / 'ipc-alias', root / 'private-ipc')
         return root
 
     def run_native(self, root, *args):

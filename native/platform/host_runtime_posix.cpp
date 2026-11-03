@@ -13,6 +13,7 @@
 #include <ucontext.h>
 #include <unistd.h>
 namespace SkyHost {
+std::uint64_t process_id() noexcept { return static_cast<std::uint64_t>(getpid()); }
 std::uint64_t current_thread_id() noexcept { return static_cast<std::uint64_t>(syscall(SYS_gettid)); }
 [[noreturn]] void suspend_diagnostic_worker() noexcept { for (;;) pause(); }
 int diagnostic_printf(const char* format, ...) noexcept {

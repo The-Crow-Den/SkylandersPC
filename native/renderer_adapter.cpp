@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "renderer_adapter.hpp"
 #include "guest_abi.hpp"
+#include "platform/host_compat.hpp"
+#include <stdexcept>
 #include "skyrender.h"
 #include "platform/host_fault.hpp"
 #include <algorithm>
@@ -56,7 +58,7 @@ std::uint32_t draw_init_default_hardware_state(std::uint32_t* command_buffer, st
 // The library takes over deprecated BB_<name> spellings when it loads, before
 // the host sets anything here.
 void set_option(const char* name, const char* value, bool overwrite) {
-    setenv(option_name(name).c_str(), value, overwrite ? 1 : 0);
+    if(SkyHost::set_environment(option_name(name).c_str(),value,overwrite)!=0)throw std::runtime_error("cannot set renderer option "+option_name(name));
 }
 const char* option(const char* name) { return std::getenv(option_name(name).c_str()); }
 }

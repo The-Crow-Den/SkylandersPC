@@ -38,6 +38,12 @@ struct File::Impl {
     int fd = -1;
     ~Impl() { const auto saved = errno; if (fd >= 0) ::close(fd); errno = saved; }
 };
+bool private_directory(const std::filesystem::path& path) {
+    struct ::stat info{};
+    std::error_code ec;
+    return std::filesystem::weakly_canonical(path,ec)==path && !ec && ::lstat(path.c_str(),&info)==0 &&
+        S_ISDIR(info.st_mode) && info.st_uid==getuid() && (info.st_mode&077)==0;
+}
 PrivateFileMapping::~PrivateFileMapping() {
     const auto saved = errno;
     if (memory_) ::munmap(const_cast<void*>(memory_),size_);

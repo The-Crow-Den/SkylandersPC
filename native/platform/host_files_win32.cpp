@@ -280,6 +280,20 @@ struct File::Impl {
         return done;
     }
 };
+bool private_directory(const std::filesystem::path& path) {
+    if (!path.is_absolute() || path.native().find(L'\0') != std::wstring::npos) { errno=EINVAL; return false; }
+    for (const auto& component : path)
+        if (component == L".." || component == L".") { errno=EACCES; return false; }
+    File parent;
+    if (!parent.open_directory(path.parent_path())) return false;
+    const auto name = path.filename().u8string();
+    std::wstring wide;
+    if (!component_name({reinterpret_cast<const char*>(name.data()),name.size()},wide)) return false;
+    FileOpen options;
+    options.directory = true;
+    const auto directory = File::Impl::open(parent.impl_->handle,wide,options,{.metadata_only=true,.security_query=true});
+    return directory && private_owner(directory->handle);
+}
 PrivateFileMapping::~PrivateFileMapping() {
     const auto saved = errno;
     if (memory_) UnmapViewOfFile(memory_);

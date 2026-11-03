@@ -8,6 +8,9 @@
 #include <unistd.h>
 
 namespace SkyHost {
+bool set_current_thread_name(const char* name) noexcept {
+    return name && pthread_setname_np(pthread_self(),name) == 0;
+}
 std::size_t thread_page_size() noexcept {
     const auto size = sysconf(_SC_PAGESIZE);
     return size > 0 ? static_cast<std::size_t>(size) : 0;

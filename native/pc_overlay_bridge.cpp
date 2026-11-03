@@ -15,8 +15,8 @@
 #include <thread>
 #include <vector>
 #include <algorithm>
-#include <sys/stat.h>
-#include <unistd.h>
+#include "platform/host_files.hpp"
+#include "platform/host_runtime.hpp"
 extern "C" int sky_portal_action(int,int);
 extern "C" int sky_portal_volume();
 extern "C" void sky_portal_set_volume(int);
@@ -32,10 +32,10 @@ bool embedded(){const auto* mode=std::getenv("SKY_PC_MENU_EMBEDDED");return mode
 std::string quote(const char* text){std::ostringstream out;out<<'"';for(const unsigned char ch:std::string(text?text:"")){if(ch=='"'||ch=='\\')out<<'\\'<<char(ch);else if(ch<32)out<<"\\u"<<std::hex<<std::setw(4)<<std::setfill('0')<<unsigned(ch)<<std::dec;else out<<char(ch);}out<<'"';return out.str();}
 bool regular(const fs::path& path,std::uintmax_t limit){std::error_code ec;return !fs::is_symlink(path,ec)&&fs::is_regular_file(path,ec)&&fs::file_size(path,ec)<=limit&&!ec;}
 std::string read(const fs::path& path,std::uintmax_t limit){if(!regular(path,limit))return {};std::ifstream file(path,std::ios::binary);return {(std::istreambuf_iterator<char>(file)),{}};}
-bool owner_directory(const fs::path& path){struct stat info{};std::error_code ec;return fs::weakly_canonical(path,ec)==path&&!ec&&lstat(path.c_str(),&info)==0&&S_ISDIR(info.st_mode)&&info.st_uid==getuid()&&(info.st_mode&077)==0;}
+bool owner_directory(const fs::path& path){return SkyHost::private_directory(path);}
 std::string snapshot(unsigned long long sequence,const std::vector<int>& keys){
     std::array<int,4> geometry;{std::lock_guard lock(geometry_mutex);geometry=window_geometry;}
-    std::ostringstream out;out<<"{\"version\":1,\"pid\":"<<getpid()<<",\"visible\":"<<(visible?"true":"false")<<",\"geometry\":["<<geometry[0]<<','<<geometry[1]<<','<<geometry[2]<<','<<geometry[3]<<"],\"inputSequence\":"<<sequence<<",\"keys\":[";
+    std::ostringstream out;out<<"{\"version\":1,\"pid\":"<<SkyHost::process_id()<<",\"visible\":"<<(visible?"true":"false")<<",\"geometry\":["<<geometry[0]<<','<<geometry[1]<<','<<geometry[2]<<','<<geometry[3]<<"],\"inputSequence\":"<<sequence<<",\"keys\":[";
     for(unsigned i=0;i<keys.size();++i){if(i)out<<',';out<<keys[i];}out<<']';
     out<<",\"title\":"<<quote(std::getenv("SKY_PORTAL_TITLE")?std::getenv("SKY_PORTAL_TITLE"):"trap-team");
     out<<",\"embedded\":"<<(embedded()?"true":"false")<<",\"events\":[";

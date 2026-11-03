@@ -5,7 +5,21 @@
 #include <filesystem>
 #include <memory>
 #include <string_view>
+#include <string>
 namespace SkyHost {
+// Explicit UTF-8 boundary for C interfaces on both hosts. Filesystem storage
+// remains native (UTF-16 on Windows); no locale/code-page conversion is implied.
+inline std::filesystem::path path_from_utf8(std::string_view text) {
+    return std::filesystem::path(std::u8string(text.begin(),text.end()));
+}
+inline std::string path_to_utf8(const std::filesystem::path& path) {
+    const auto text = path.u8string();
+    return {reinterpret_cast<const char*>(text.data()),text.size()};
+}
+// Owner/private directory check for host overlay IPC. POSIX preserves the
+// original canonical-path/current-uid/mode077 policy; Windows inspects the
+// actual no-reparse directory's current-user owner and restricted DACL.
+bool private_directory(const std::filesystem::path& path);
 // Read-only shared view for the overlay mailbox. Exact size and current-user
 // ownership are checked before mapping. POSIX preserves the existing leaf-only
 // O_NOFOLLOW + mode 077 check. Windows walks/rejects reparse points and accepts
@@ -86,6 +100,7 @@ public:
     int close();
 private:
     friend class PrivateFileMapping;
+    friend bool private_directory(const std::filesystem::path& path);
     bool create_temporary(std::string_view name, File& output) const;
     bool publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const;
     bool discard_temporary(File& temporary, std::string_view name) const;

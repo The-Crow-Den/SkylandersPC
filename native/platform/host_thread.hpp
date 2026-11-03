@@ -5,6 +5,9 @@
 
 namespace SkyHost {
 std::size_t thread_page_size() noexcept;
+// Diagnostic host name only; no guest scheduling state changes. POSIX retains
+// pthread's native name length limit; Windows accepts valid UTF-8 descriptions.
+bool set_current_thread_name(const char* name) noexcept;
 
 // Zeroed, private RW storage for guest stacks, thread blocks and data. Low placement
 // retains the existing below-2-GiB guest-thread policy. This is an anywhere
