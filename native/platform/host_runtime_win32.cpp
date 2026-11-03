@@ -62,12 +62,12 @@ bool install_runtime_faults(RuntimeFaultReport report, LegacyFaultRecovery legac
     (void)legacy;
     if (!report || !legacy || !portable || reporter) return false;
     reporter = report; recovery = portable;
-    if (install_fault_handler(&dispatch)) return true;
+    if (install_runtime_fault_handler(&dispatch)) return true;
     reporter = nullptr; recovery = nullptr;
     return false;
 }
 bool remove_runtime_faults() noexcept {
-    if (!reporter || !remove_fault_handler()) return false;
+    if (!reporter || !remove_runtime_fault_handler()) return false;
     reporter = nullptr; recovery = nullptr;
     return true;
 }

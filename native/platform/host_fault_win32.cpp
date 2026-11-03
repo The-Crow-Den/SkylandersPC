@@ -9,6 +9,8 @@ namespace {
 std::atomic<FaultHandler> handler{nullptr};
 static_assert(decltype(handler)::is_always_lock_free);
 void* registration = nullptr;
+enum class Owner { None, Generic, Runtime };
+Owner owner = Owner::None;
 LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     const auto* record = info->ExceptionRecord;
     if (record->ExceptionFlags & EXCEPTION_NONCONTINUABLE) return EXCEPTION_CONTINUE_SEARCH;
@@ -57,19 +59,28 @@ LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     c->EFlags=static_cast<DWORD>(fault.cpu.flags);
     return EXCEPTION_CONTINUE_EXECUTION;
 }
-}
-bool install_fault_handler(FaultHandler callback) noexcept {
+bool install_owned(FaultHandler callback, Owner requested) noexcept {
     if (!callback || registration) return false;
     handler.store(callback, std::memory_order_release);
     registration = AddVectoredExceptionHandler(1, &dispatch);
-    if (!registration) handler.store(nullptr, std::memory_order_release);
-    return registration != nullptr;
+    if (!registration) {
+        handler.store(nullptr, std::memory_order_release);
+        return false;
+    }
+    owner = requested;
+    return true;
 }
-bool remove_fault_handler() noexcept {
-    if (!registration) return false;
+bool remove_owned(Owner requested) noexcept {
+    if (!registration || owner != requested) return false;
     if (!RemoveVectoredExceptionHandler(registration)) return false;
     registration = nullptr;
+    owner = Owner::None;
     handler.store(nullptr, std::memory_order_release);
     return true;
 }
+}
+bool install_fault_handler(FaultHandler callback) noexcept { return install_owned(callback,Owner::Generic); }
+bool remove_fault_handler() noexcept { return remove_owned(Owner::Generic); }
+bool install_runtime_fault_handler(FaultHandler callback) noexcept { return install_owned(callback,Owner::Runtime); }
+bool remove_runtime_fault_handler() noexcept { return remove_owned(Owner::Runtime); }
 }

@@ -10,6 +10,7 @@
 #include <exception>
 #include <iostream>
 #include <stdexcept>
+#include <source_location>
 #include <string_view>
 #include <thread>
 #ifndef _WIN32
@@ -29,7 +30,10 @@ sky_runtime_ud2:
     ret
 )");
 namespace {
-void require(bool value) { if (!value) throw std::runtime_error("host runtime assertion failed"); }
+void require(bool value, const std::source_location where = std::source_location::current()) {
+    if (!value) throw std::runtime_error(std::string("host runtime assertion failed at ") +
+        where.file_name() + ":" + std::to_string(where.line()));
+}
 thread_local unsigned marker = 123;
 bool recover = false, reporter_returns = false;
 unsigned recovered = 0;

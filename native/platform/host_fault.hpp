@@ -45,5 +45,9 @@ bool remove_fault_handler() noexcept;
 using LegacyFaultHandler = int (SKY_SYSV_ABI *)(int, void*, void*);
 bool install_legacy_fault_handler(LegacyFaultHandler handler) noexcept;
 bool remove_legacy_fault_handler() noexcept;
+#else
+// The runtime owns a distinct registration; generic removal must not remove it.
+bool install_runtime_fault_handler(FaultHandler handler) noexcept;
+bool remove_runtime_fault_handler() noexcept;
 #endif
 }
