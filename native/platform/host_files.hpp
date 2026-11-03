@@ -52,6 +52,9 @@ public:
     // the parent; Windows flushes the renamed file, without claiming directory
     // fsync/power-loss equivalence.
     bool write_atomic(std::string_view name, const void* data, std::size_t size) const;
+    // Move one directory entry between held parents, refusing links and any
+    // existing destination. This does not recursively copy or delete contents.
+    bool move_directory(std::string_view name, const File& target, std::string_view target_name) const;
     // single_link requires a directory or regular file with exactly one link;
     // validate that before truncation so save hard links cannot modify outside data.
     bool open_child(std::string_view name, const FileOpen& options, bool single_link, File& output) const;

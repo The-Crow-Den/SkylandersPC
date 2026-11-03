@@ -95,6 +95,7 @@ class HostFilesTests(unittest.TestCase):
         directory_link(root / 'create_escape', root / 'outside')
         directory_link(root / 'metadata_escape', root / 'outside')
         directory_link(root / 'metadata_file_escape', root / 'outside')
+        directory_link(root / 'move_escape', root / 'outside')
         return root
 
     def run_native(self, root, *args):
@@ -117,7 +118,11 @@ class HostFilesTests(unittest.TestCase):
             self.assertEqual((root / 'created/nested/held/inside/marker').read_bytes(), b'held')
             self.assertFalse((root / 'outside/inside').exists())
             self.assertFalse((root / 'outside/param.bin').exists())
-            self.assertEqual((root / 'metadata-saves/CUSA00697/user-4096/held/icon0.png').read_bytes(), b'icon')
+            quarantined = list((root / 'metadata-saves/CUSA00697/user-4096/.deleted').glob('*.sce_sys'))
+            self.assertEqual(len(quarantined), 1)
+            self.assertEqual((quarantined[0] / 'icon0.png').read_bytes(), b'icon')
+            self.assertEqual((root / 'moves/trash/renamed/marker').read_bytes(), b'retained')
+            self.assertEqual((root / 'moves/trash/existing/marker').read_bytes(), b'untouched')
 
     def test_directory_replacement_never_reaches_outside_target(self):
         with tempfile.TemporaryDirectory() as temporary:

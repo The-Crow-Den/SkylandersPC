@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "host_files.hpp"
 #include <cerrno>
+#include <cstdio>
 #include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
@@ -143,6 +144,19 @@ bool File::open_child(std::string_view name, const FileOpen& options, bool singl
     }
     output.impl_ = std::move(next);
     return true;
+}
+bool File::move_directory(std::string_view name, const File& target, std::string_view target_name) const {
+    if (!valid() || !target.valid()) { errno=EBADF; return false; }
+    if (!component_name(name) || !component_name(target_name)) return false;
+    FileOpen options;
+    options.directory = true;
+    File directory;
+    if (!open_child(name,options,false,directory)) return false;
+    // renameat2 never follows the final source/destination entry. If another
+    // process substitutes the source name after validation, it can only move
+    // that entry itself, never operate through its target.
+    const std::string source(name), destination(target_name);
+    return ::renameat2(impl_->fd,source.c_str(),target.impl_->fd,destination.c_str(),RENAME_NOREPLACE) == 0;
 }
 bool File::create_temporary(std::string_view name, File& output) const {
     FileOpen options;

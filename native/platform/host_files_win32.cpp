@@ -41,6 +41,8 @@ int failure(DWORD code) {
     case ERROR_DISK_FULL: case ERROR_HANDLE_DISK_FULL: errno=ENOSPC; break;
     case ERROR_WRITE_PROTECT: errno=EROFS; break;
     case ERROR_DIRECTORY: errno=ENOTDIR; break;
+    case ERROR_NOT_SAME_DEVICE: errno=EXDEV; break;
+    case ERROR_DIR_NOT_EMPTY: errno=ENOTEMPTY; break;
     case ERROR_CANT_ACCESS_FILE: case ERROR_STOPPED_ON_SYMLINK: case ERROR_REPARSE_TAG_INVALID:
     case ERROR_REPARSE_TAG_MISMATCH: case ERROR_CANT_RESOLVE_FILENAME: errno=ELOOP; break;
     case ERROR_FILENAME_EXCED_RANGE: case ERROR_BUFFER_OVERFLOW: errno=ENAMETOOLONG; break;
@@ -110,6 +112,38 @@ bool component_name(std::string_view name, std::wstring& output) {
     }
     return true;
 }
+bool rename_handle(HANDLE source, HANDLE parent, std::wstring_view name, bool replace, bool& published) {
+    const auto bytes = name.size() * sizeof(wchar_t);
+    const auto length = sizeof(FILE_RENAME_INFORMATION) + bytes;
+    std::vector<std::max_align_t> storage((length + sizeof(std::max_align_t)-1) / sizeof(std::max_align_t));
+    FILE_RENAME_INFORMATION header{};
+    header.ReplaceIfExists = replace ? TRUE : FALSE;
+    header.RootDirectory = parent;
+    header.FileNameLength = static_cast<ULONG>(bytes);
+    std::memcpy(storage.data(),&header,sizeof(header));
+    std::memcpy(reinterpret_cast<unsigned char*>(storage.data()) + offsetof(FILE_RENAME_INFORMATION,FileName),name.data(),bytes);
+    IO_STATUS_BLOCK io{};
+    auto status = NtSetInformationFile(source,&io,storage.data(),static_cast<ULONG>(length),FileRenameInformation);
+    if (status == 0x103) {
+        const auto wait = WaitForSingleObject(source,INFINITE);
+        if (wait != WAIT_OBJECT_0) {
+            // Completion is uncertain; never delete a potentially published
+            // file while trying to clean up the temporary.
+            published = true;
+            failure(wait == WAIT_FAILED ? GetLastError() : ERROR_GEN_FAILURE);
+            return false;
+        }
+        status = io.Status;
+    }
+    if (status < 0) { status_failure(status); return false; }
+    if (status != 0) {
+        published = true;
+        throw std::runtime_error("unexpected Windows rename completion status " + std::to_string(status));
+    }
+    published = true;
+    return true;
+}
+
 }
 struct File::Impl {
     HANDLE handle = nullptr;
@@ -301,6 +335,22 @@ bool File::open_child(std::string_view name, const FileOpen& options, bool singl
     output.impl_ = std::move(next);
     return true;
 }
+bool File::move_directory(std::string_view name, const File& target, std::string_view target_name) const {
+    std::wstring source, destination;
+    if (!component_name(name,source) || !component_name(target_name,destination)) return false;
+    File from, to;
+    if (!duplicate_directory(from) || !target.duplicate_directory(to)) return false;
+    FileInfo info{};
+    bool exists = false;
+    if (!to.child_info(target_name,info,exists)) return false;
+    if (exists) { errno=EEXIST; return false; }
+    FileOpen options;
+    options.directory = true;
+    auto directory = Impl::open(from.impl_->handle,source,options,false,false,false,true,true);
+    if (!directory) return false;
+    bool published = false;
+    return rename_handle(directory->handle,to.impl_->handle,destination,false,published);
+}
 bool File::create_temporary(std::string_view name, File& output) const {
     if (&output == this) { errno=EINVAL; return false; }
     std::wstring wide;
@@ -324,36 +374,8 @@ bool File::publish_temporary(File& temporary, std::string_view source, std::stri
     if (!impl_ || !temporary.impl_ || &temporary == this) { errno=EBADF; return false; }
     std::scoped_lock lock(impl_->mutex,temporary.impl_->mutex);
     if (!impl_->handle || !temporary.impl_->handle) { errno=EBADF; return false; }
-    const auto bytes = wide.size() * sizeof(wchar_t);
-    const auto length = sizeof(FILE_RENAME_INFORMATION) + bytes;
-    std::vector<std::max_align_t> storage((length + sizeof(std::max_align_t)-1) / sizeof(std::max_align_t));
-    FILE_RENAME_INFORMATION header{};
-    header.ReplaceIfExists = TRUE;
-    header.RootDirectory = impl_->handle;
-    header.FileNameLength = static_cast<ULONG>(bytes);
-    std::memcpy(storage.data(),&header,sizeof(header));
-    std::memcpy(reinterpret_cast<unsigned char*>(storage.data()) + offsetof(FILE_RENAME_INFORMATION,FileName),wide.data(),bytes);
-    IO_STATUS_BLOCK io{};
-    auto status = NtSetInformationFile(temporary.impl_->handle,&io,storage.data(),static_cast<ULONG>(length),FileRenameInformation);
-    if (status == 0x103) {
-        const auto wait = WaitForSingleObject(temporary.impl_->handle,INFINITE);
-        if (wait != WAIT_OBJECT_0) {
-            // Completion is uncertain; never delete a potentially published
-            // file while trying to clean up the temporary.
-            published = true;
-            failure(wait == WAIT_FAILED ? GetLastError() : ERROR_GEN_FAILURE);
-            return false;
-        }
-        status = io.Status;
-    }
-    if (status < 0) { status_failure(status); return false; }
-    if (status != 0) {
-        published = true;
-        throw std::runtime_error("unexpected Windows rename completion status " + std::to_string(status));
-    }
-    // From here cleanup must never mark this handle for deletion: it now owns
-    // the published file, including if the post-rename flush or close fails.
-    published = true;
+    if (!rename_handle(temporary.impl_->handle,impl_->handle,wide,true,published)) return false;
+    // Cleanup must never delete the installed target after a flush failure.
     if (!FlushFileBuffers(temporary.impl_->handle)) { failure(GetLastError()); return false; }
     const auto handle = std::exchange(temporary.impl_->handle,nullptr);
     if (!CloseHandle(handle)) { failure(GetLastError()); return false; }

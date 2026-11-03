@@ -32,12 +32,6 @@ bool safe(std::string_view name) {
     return !name.empty() && name!="." && name!=".." && std::all_of(name.begin(),name.end(),[](unsigned char c){
         return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='_'||c=='-'||c=='.';});
 }
-bool directory(const std::filesystem::path& path) {
-    std::error_code ec;
-    if(std::filesystem::weakly_canonical(path,ec)!=std::filesystem::absolute(path).lexically_normal()||ec)return false;
-    std::filesystem::create_directories(path,ec);
-    return !ec && std::filesystem::canonical(path,ec)==std::filesystem::absolute(path).lexically_normal() && !ec;
-}
 }
 struct SaveData::Impl {
     KernelFile& files;
@@ -73,16 +67,23 @@ U SaveData::call(std::string_view identity,const U* a) {
         const auto* raw=reinterpret_cast<const char*>(request.dir);const auto length=strnlen(raw,32);
         if(length==32||!safe({raw,length}))return 0x809f0000;
         const auto parent=impl_->root/impl_->title/("user-"+std::to_string(request.user));
-        const auto data=parent/std::string(raw,length),meta=parent/(std::string(raw,length)+".sce_sys");
+        const auto data=parent/std::string(raw,length);
         for(const auto& [point,slot]:impl_->slots)if(slot.data==data)return 0x809f0003;
-        std::error_code ec;
-        if(!std::filesystem::exists(data,ec))return ec?0x809f000b:0x809f0008;
-        if(std::filesystem::canonical(data,ec)!=data||ec)return 0x809f000b;
-        const auto trash=parent/".deleted";
-        if(!directory(trash))return 0x809f000b;
-        const auto target=trash/(std::string(raw,length)+"-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-        std::filesystem::rename(data,target,ec);if(ec)return 0x809f000b;
-        if(std::filesystem::exists(meta,ec)){std::filesystem::rename(meta,target.string()+".sce_sys",ec);if(ec)return 0x809f000b;}
+        SkyHost::File user_root;
+        if(!user_root.open_directory(parent))return errno==ENOENT?0x809f0008:0x809f000b;
+        const std::string name(raw,length);
+        SkyHost::FileInfo info{};
+        bool exists=false;
+        if(!user_root.child_info(name,info,exists))return 0x809f000b;
+        if(!exists)return 0x809f0008;
+        if(!info.directory)return 0x809f000b;
+        bool has_meta=false;
+        if(!user_root.child_info(name+".sce_sys",info,has_meta)||(has_meta&&!info.directory))return 0x809f000b;
+        SkyHost::File trash;
+        if(!user_root.ensure_directory(".deleted",trash))return 0x809f000b;
+        const auto target=name+"-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        if(!user_root.move_directory(name,trash,target))return 0x809f000b;
+        if(has_meta&&!user_root.move_directory(name+".sce_sys",trash,target+".sce_sys"))return 0x809f000b;
         return 0;
     }
     if(op==1){

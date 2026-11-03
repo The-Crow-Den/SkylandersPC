@@ -123,13 +123,13 @@ if(WIN32)
 
   add_library(sky-host-portable STATIC hle/pure_libc.cpp hle/kernel_sync.cpp
     hle/kernel_memory.cpp hle/offline_network.cpp hle/keyboard_pad.cpp frame_profile.cpp game_hooks.cpp
-    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp hle/kernel_data.cpp hle/kernel_clock.cpp hle/kernel_semaphore.cpp hle/user_service.cpp hle/local_np.cpp hle/kernel_file.cpp)
+    trap_team_hooks.cpp thread_context.cpp hle/kernel_thread.cpp hle/kernel_data.cpp hle/kernel_clock.cpp hle/kernel_semaphore.cpp hle/user_service.cpp hle/local_np.cpp hle/kernel_file.cpp hle/save_data.cpp)
   target_compile_features(sky-host-portable PUBLIC cxx_std_20)
   target_compile_options(sky-host-portable PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(sky-host-portable PUBLIC sky-host-platform Threads::Threads OpenSSL::Crypto ws2_32)
 
   # Compile the real pack loader now; linking the executable still depends on
-  # the runtime/file/renderer ports and admitted guest TLS. No stub runtime.
+  # the remaining runtime/renderer ports and admitted guest TLS. No stub runtime.
   add_library(sky-guest-runtime OBJECT guest_runtime.cpp)
   target_compile_features(sky-guest-runtime PRIVATE cxx_std_20)
   target_compile_options(sky-guest-runtime PRIVATE -Wall -Wextra -Wconversion -Wshadow)

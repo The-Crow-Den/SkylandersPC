@@ -168,6 +168,37 @@ void directory_tests(const std::filesystem::path& root) {
     require(files.call("UK2Tl2DWUns#libkernel#libkernel",close.data()) == 0);
     require(files.unmount_save("/savedata0"));
 }
+void move_tests(const std::filesystem::path& root) {
+    using namespace SkyHost;
+    File parent, trash, slot, existing;
+    require(parent.open_directory(root/"moves",false,true));
+    require(parent.ensure_directory("trash",trash));
+    require(parent.ensure_directory("slot",slot));
+    require(slot.write_atomic("marker","retained",8));
+    require(slot.close() == 0);
+    require(trash.ensure_directory("existing",existing));
+    require(existing.write_atomic("marker","untouched",9));
+    require(existing.close() == 0);
+    require(!parent.move_directory("slot",trash,"existing") && errno == EEXIST);
+    require(parent.move_directory("slot",trash,"moved"));
+    require(!parent.move_directory("slot",trash,"missing") && errno == ENOENT);
+    require(trash.move_directory("moved",trash,"renamed")); // Same parent capability.
+    require(!trash.move_directory("renamed",trash,"renamed") && errno == EEXIST);
+    require(!trash.move_directory("../outside",trash,"denied"));
+    require(!trash.move_directory("renamed",trash,"../denied"));
+    std::filesystem::rename(root/"move_escape",root/"moves"/"escape");
+    require(!parent.move_directory("escape",trash,"denied"));
+    File wrong;
+    require(!wrong.move_directory("missing",trash,"denied"));
+    require(!trash.move_directory("renamed",wrong,"denied"));
+    File directory, marker;
+    FileOpen options;
+    options.directory = true;
+    require(trash.open_child("renamed",options,false,directory));
+    require(directory.open_child("marker",{},true,marker));
+    std::array<char,8> data{};
+    require(marker.read(data.data(),data.size()) == 8 && std::string(data.data(),8) == "retained");
+}
 void atomic_tests(const std::filesystem::path& root) {
     using namespace SkyHost;
     File directory;
@@ -247,7 +278,23 @@ void save_metadata_tests(const std::filesystem::path& root) {
     std::filesystem::rename(root/"metadata_file_escape",parent/"held"/"param.bin");
     require(save("XgvSuIdnMlw",{pointer(result.data()),1,pointer(title.data()),title.size()}) == 0x809f000b);
     require(save("85zul--eGXs",{pointer(result.data()),1,pointer(initial),sizeof(initial)}) == 0x809f000b);
+    require(save("S1GkePI17zQ",{pointer(&mount)}) == 0x809f0003);
     require(save("BMR4F-Uek3E",{pointer(result.data())}) == 0);
+    require(save("S1GkePI17zQ",{pointer(&mount)}) == 0x809f000b); // Redirected metadata directory.
+    require(std::filesystem::is_directory(parent/"synthetic"));
+    require(meta.close() == 0);
+    std::filesystem::remove(metadata); // Unlink the fixture junction itself.
+    std::filesystem::rename(parent/"held",metadata);
+    require(save("S1GkePI17zQ",{pointer(&mount)}) == 0);
+    require(!std::filesystem::exists(parent/"synthetic"));
+    require(!std::filesystem::exists(metadata));
+    require(save("S1GkePI17zQ",{pointer(&mount)}) == 0x809f0008);
+    unsigned quarantined = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(parent/".deleted")) {
+        require(entry.is_directory());
+        ++quarantined;
+    }
+    require(quarantined == 2);
     require(!std::filesystem::exists(root/"outside"/"param.bin"));
     require(!std::filesystem::exists(root/"outside"/"icon0.png"));
 }
@@ -324,7 +371,7 @@ int main(int argc, char** argv) {
         require(argc == 2 || argc == 3);
         const auto root = decode_path(argv[1]);
         if (argc == 3 && std::string_view(argv[2]) == "race") race_tests(root);
-        else { capability_tests(root); directory_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
+        else { capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
         std::cout << "file capability tests passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
