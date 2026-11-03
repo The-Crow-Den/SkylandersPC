@@ -34,7 +34,9 @@ int madvise(void* address, size_t size, int advice);
 
 /// Guest memory (posix_memory.cpp): a pagefile-backed section standing for a memfd (mmap maps
 /// views of it, fallocate zeroes), and the placeholder reservation MAP_FIXED maps replace in.
+enum { SKY_SECTION_FD_BASE = 0x50000000 };
 int sky_section_create(unsigned long long size);
+int sky_section_close(int fd);
 int sky_reserve_arena(unsigned long long begin, unsigned long long end);
 #define FALLOC_FL_KEEP_SIZE 1
 #define FALLOC_FL_PUNCH_HOLE 2

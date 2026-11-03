@@ -409,6 +409,7 @@ void note_cpu_write(std::uint64_t address, std::uint64_t size) {
 }
 void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attributes) {
 #ifdef SKY_RENDERER
+    runtime_memory_reserve(); // Exact Windows placeholder arena; no-op on Linux.
     game_serial = serial; sdk_version = sdk; psf_attributes = attributes;
     PortalLibrary::initialize(std::getenv("SKY_PORTAL_FIGURE"),std::getenv("SKY_PORTAL_FIGURE_BOTTOM"));
     VirtualPortal::bind_audio(&portal_speaker);

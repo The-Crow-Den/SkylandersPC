@@ -177,6 +177,7 @@ set_source_files_properties(shim/renderer_overlay.cpp PROPERTIES
 target_include_directories(skyrender PRIVATE . shim layer games cp ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
 if (WIN32)
     target_include_directories(skyrender PUBLIC platform/win32/include)
+    target_link_libraries(skyrender PUBLIC onecore) # VirtualAlloc2/MapViewOfFile3 imports.
 endif()
 target_compile_definitions(skyrender PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
 target_compile_options(skyrender PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)

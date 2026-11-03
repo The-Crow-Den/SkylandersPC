@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // renderer Windows: the file calls of renderer_posix_c.h (the runtime's) with Linux semantics.
 #include <windows.h>
+#include <sys/mman.h>
 
 #include <cerrno>
 #include <cstdarg>
@@ -240,6 +241,7 @@ int sky_openat(int dir, const char* path, int flags, ...) {
 }
 
 int sky_close(int fd) {
+    if (fd >= SKY_SECTION_FD_BASE) return sky_section_close(fd);
     if (IsDirectoryFd(fd)) {
         std::scoped_lock lock{directories_mutex};
         return directories.erase(fd) ? 0 : (errno = EBADF, -1);

@@ -140,6 +140,16 @@ function(sky_add_portal_core)
 endfunction()
 
 if(WIN32)
+  enable_language(C)
+  set(SKY_WIN32_RENDERER_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/../renderer/gpu/platform/win32/include")
+  # Compile the production C memory runtime too; full static renderer/host
+  # linkage remains separate. No replacement memory runtime is used for tests.
+  add_library(sky-renderer-runtime-memory OBJECT ../renderer/src/runtime_memory.c)
+  target_compile_features(sky-renderer-runtime-memory PRIVATE c_std_11)
+  target_include_directories(sky-renderer-runtime-memory BEFORE PRIVATE "${SKY_WIN32_RENDERER_INCLUDE}")
+  target_compile_options(sky-renderer-runtime-memory PRIVATE
+    -include "${SKY_WIN32_RENDERER_INCLUDE}/renderer_win32.h"
+    -include "${SKY_WIN32_RENDERER_INCLUDE}/renderer_posix_c.h")
   # Windows port in progress: compile the real portable providers and loader.
   # Full executable/renderer linking and real-game TLS admission remain gated.
   include(CTest)
@@ -163,6 +173,14 @@ if(WIN32)
   target_compile_options(sky-pack-loader PRIVATE -Wall -Wextra -Wconversion -Wshadow)
 
   if(BUILD_TESTING)
+    add_executable(renderer-memory-test ../renderer/tests/test_win32_memory.cpp
+      ../renderer/gpu/platform/win32/posix_memory.cpp)
+    target_compile_features(renderer-memory-test PRIVATE cxx_std_20)
+    target_include_directories(renderer-memory-test BEFORE PRIVATE "${SKY_WIN32_RENDERER_INCLUDE}")
+    target_compile_options(renderer-memory-test PRIVATE
+      -include "${SKY_WIN32_RENDERER_INCLUDE}/renderer_win32.h")
+    target_link_libraries(renderer-memory-test PRIVATE onecore)
+    add_test(NAME synthetic-renderer-memory COMMAND renderer-memory-test)
     if(TARGET sky-portal-core)
       add_executable(portal-figure-copy-test "${SKY_PORTAL_SOURCE_ROOT}/tools/cemu_portal_core_test.cpp")
       target_compile_features(portal-figure-copy-test PRIVATE cxx_std_20)
