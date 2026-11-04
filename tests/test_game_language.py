@@ -17,8 +17,9 @@ class GameLanguageTests(unittest.TestCase):
         self.assertIn('not offered', note)
         with self.assertRaises(ValueError):
             game_language.choose(ROOT, 'trap-team', 'xx-YY')
-        self.assertTrue(game_language.is_english('en-GB'))
-        self.assertFalse(game_language.is_english('fr-FR'))
+        self.assertEqual(game_language.narration('en-GB'), 'English')
+        self.assertEqual(game_language.narration('es-419'), 'Spanish')
+        self.assertIsNone(game_language.narration('ja-JP'))
 
     def test_invalid_profile_list_is_refused(self):
         with tempfile.TemporaryDirectory() as directory:

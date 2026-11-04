@@ -1,19 +1,22 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "title_id": "CUSA00626",
   "app_version": "01.01",
   "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
-  "language": "English",
-  "keep_tracks": [
-    7,
+  "narration_tracks": {
+    "English": 7,
+    "Spanish": 1,
+    "French": 9,
+    "Portuguese": 20
+  },
+  "shared_tracks": [
     0
   ],
-  "status": "English track 7 confirmed by user; Sunscraper English playback confirmed; other 12 movies have identical track IDs and verified encoded-payload preservation",
+  "status": "Narration tracks identified by the user from fmv1: 7 English, 1 Spanish (Spain), 9 French, 20 Portuguese; English playback confirmed in game; every output verified to preserve video and retained encoded audio packets",
   "assets": [
     {
       "asset": "movies/darkexp.mov",
       "source_sha256": "98246147b9fe1b7199980eed14de6d45ed1bc48be6f8389b6b79aee475be4b06",
-      "output_sha256": "20e80fce19c5f8949c58a9a8d62a8d602c399f609ab8e5018ed9d3d59f23d09a",
       "source_tracks": [
         1,
         7,
@@ -21,12 +24,17 @@
         20,
         0
       ],
-      "frames": 1558
+      "frames": 1558,
+      "outputs": {
+        "English": "20e80fce19c5f8949c58a9a8d62a8d602c399f609ab8e5018ed9d3d59f23d09a",
+        "Spanish": "879292cf3a90c7d7f0f5481e45341280c3c256a0f3211833ae4a3d198fa87f5f",
+        "French": "0c2d22e0cd1248e9de958978195de0502a324b7c0ee8d97a60431e86bb4cfde1",
+        "Portuguese": "e0854f1fe685f29c54ade927da06d52e82f236cb6ae2758dfb2108eee7a5bf12"
+      }
     },
     {
       "asset": "movies/flynnexp.mov",
       "source_sha256": "4908896a3be52d6f96c1128949ff2668dbba4619c446f636355f34f2d714a229",
-      "output_sha256": "834e01c27b0f60baab28cf2e89a89e5fe0821753d5f7c04242816e1f32520b6a",
       "source_tracks": [
         6,
         1,
@@ -35,12 +43,17 @@
         20,
         0
       ],
-      "frames": 679
+      "frames": 679,
+      "outputs": {
+        "English": "834e01c27b0f60baab28cf2e89a89e5fe0821753d5f7c04242816e1f32520b6a",
+        "Spanish": "079c0b220ee455dc0e6af98c22d7c1ef77e6199b45dee742fbb7b0c0916db930",
+        "French": "317b938e599fb99ae29b9c0bbc602f28cb1172f4f12d50ce084ae25743bfbf08",
+        "Portuguese": "c4bb68ec6edce0ae3fcffc13bb08b0a102091921cf1cf9d3ecf96071daa7b846"
+      }
     },
     {
       "asset": "movies/fmv1.mov",
       "source_sha256": "c6669f416bb8287c293c15f568fb036bb679464670ba30c69ea60e8b91e75eaf",
-      "output_sha256": "2b317b2b3b52f1275c3906313e2480b5a6ecc492c77e1787f52f5ad32954a495",
       "source_tracks": [
         6,
         1,
@@ -49,12 +62,17 @@
         20,
         0
       ],
-      "frames": 6941
+      "frames": 6941,
+      "outputs": {
+        "English": "2b317b2b3b52f1275c3906313e2480b5a6ecc492c77e1787f52f5ad32954a495",
+        "Spanish": "a7186517a51d900a0557ece4495e6db2951be68d4b1b77d1a7446f36f4b6145f",
+        "French": "bdaf00d66c5af8b880a9069c10c4e91940872f0437e0b0832cb91d408a638013",
+        "Portuguese": "677032e0392f7fa8b4e402fa9a7071f6024a1579b2a745e5a99c0ce18559bce2"
+      }
     },
     {
       "asset": "movies/fmv10.mov",
       "source_sha256": "38f46b3f1545881e9dee791490b02293c39b7fc220ca4a87b108f91723beb944",
-      "output_sha256": "407704c9c00380e22e44a9244e1aa30101a2e0eb494fe80ee281d6aa7b7cfa7e",
       "source_tracks": [
         6,
         1,
@@ -63,12 +81,17 @@
         20,
         0
       ],
-      "frames": 4789
+      "frames": 4789,
+      "outputs": {
+        "English": "407704c9c00380e22e44a9244e1aa30101a2e0eb494fe80ee281d6aa7b7cfa7e",
+        "Spanish": "379a6c477625e351018f6628b290eebb315045353325606c7faab45645ed44e8",
+        "French": "ef687867fa9c23999a60ccd5258c6b13a8a0afd335d504108d5ae54cc1f231ba",
+        "Portuguese": "c0b86ec76e76de5e67d5cf535094007a4949577eb918aba14442db02bbf32829"
+      }
     },
     {
       "asset": "movies/fmv2.mov",
       "source_sha256": "5a15a73022e60273c2ae8399af924f78f595cbe92dcfeb3a1fb26f1fb2b5db67",
-      "output_sha256": "2ff5e41b6ed2a15e52094285bcc1411c69d02c42420241a475feef1e8b3a379e",
       "source_tracks": [
         6,
         1,
@@ -77,12 +100,17 @@
         20,
         0
       ],
-      "frames": 5654
+      "frames": 5654,
+      "outputs": {
+        "English": "2ff5e41b6ed2a15e52094285bcc1411c69d02c42420241a475feef1e8b3a379e",
+        "Spanish": "187130ddb69c97aa8be320064eb44848cd15a900962d04243d1b4ed71ac3b238",
+        "French": "8f17ab779c8d1349102160dee14cb1cc818659d600998dde2cb5d579eb177a9a",
+        "Portuguese": "53c74d4f76e64b64d243ebbbd58965232f14f2b54baec1ab73e6bcd785638211"
+      }
     },
     {
       "asset": "movies/fmv3.mov",
       "source_sha256": "db7d7a14b269cedb3896ace0d9fbcc82f8dca8814f0e5a9618e5f2e03ac3a2e3",
-      "output_sha256": "f49902dd46d8e845b1b0dc226c225ee58a6d62d224027fd42bc6ee9c2d688d00",
       "source_tracks": [
         6,
         1,
@@ -91,12 +119,17 @@
         20,
         0
       ],
-      "frames": 3345
+      "frames": 3345,
+      "outputs": {
+        "English": "f49902dd46d8e845b1b0dc226c225ee58a6d62d224027fd42bc6ee9c2d688d00",
+        "Spanish": "092a959d61a882c60df54212cd82fd332c0d43e6c4a7b33a943e06e712e8468e",
+        "French": "2dc160a404056ac1054e7e4bc3cacb0684167cd253236b768a091e58301355b2",
+        "Portuguese": "7623b77f99a617a208acf11773be832f26abd759e25de990074444c55532e8c0"
+      }
     },
     {
       "asset": "movies/fmv4.mov",
       "source_sha256": "0fd3eed4a57855c9735a3810436e3ca2bf4e8890f9656b2076bfac56fd45c0f5",
-      "output_sha256": "8cc637af0b993b06446753f76cf0ff59d549284d055adba09ad41b0e8ee46b6b",
       "source_tracks": [
         6,
         1,
@@ -105,12 +138,17 @@
         20,
         0
       ],
-      "frames": 4758
+      "frames": 4758,
+      "outputs": {
+        "English": "8cc637af0b993b06446753f76cf0ff59d549284d055adba09ad41b0e8ee46b6b",
+        "Spanish": "3212988a18561cae4a54d76a084190b73496873c83bfd7497ad32754c42fb4a7",
+        "French": "5ff2474bbb03e971b446eb9b3376b67b9c8109c8535a6768a57a744823480cda",
+        "Portuguese": "e8d26a0e943e7fe5c22330799a8fa31cfdc2b873d271a5b3ef1185725fdbce1b"
+      }
     },
     {
       "asset": "movies/fmv5.mov",
       "source_sha256": "3873170152ca131cb7ba3d25c5e801360452bd8142944416c1635d6d6385fd79",
-      "output_sha256": "53e399ae82fdc5b0c40eca7f474e7b5035abc5bf6058c8a02e3d7064d84c845d",
       "source_tracks": [
         6,
         1,
@@ -119,12 +157,17 @@
         20,
         0
       ],
-      "frames": 3185
+      "frames": 3185,
+      "outputs": {
+        "English": "53e399ae82fdc5b0c40eca7f474e7b5035abc5bf6058c8a02e3d7064d84c845d",
+        "Spanish": "097040cdd60eb85d7d5f0e5c8392c970403815e5c8a5a7fc12d24a49aa840153",
+        "French": "5fba20360eb98c9c5a9701a52c8c10c4d9de571716dca88084b4d94e85e14617",
+        "Portuguese": "35fd30949574aa3484300019a8ade36fc930eb3695b320b79a5e3dcb35fbfcb1"
+      }
     },
     {
       "asset": "movies/fmv6.mov",
       "source_sha256": "17b00f731cef568657c67b413bcbad8917d0fb61551dcbd78979747046bae0c3",
-      "output_sha256": "eee373ce7d15f9c1ea2f94c8b111169e8f0368c8465c2f7f3b22e9f894fe9a26",
       "source_tracks": [
         6,
         1,
@@ -133,12 +176,17 @@
         20,
         0
       ],
-      "frames": 4169
+      "frames": 4169,
+      "outputs": {
+        "English": "eee373ce7d15f9c1ea2f94c8b111169e8f0368c8465c2f7f3b22e9f894fe9a26",
+        "Spanish": "52035397d85afae66063c670e76f83db153d8b86b838c49e17d8017d39b43181",
+        "French": "6fb61f0a5b26810c6a7d72a0054943b8ec0cb5720ce03638098a3905d458cd2a",
+        "Portuguese": "33af7de52fa9f96ba68aaa03b2631b553bdae57cdb61c16aec0704965006637c"
+      }
     },
     {
       "asset": "movies/fmv8.mov",
       "source_sha256": "8be4209eed30eacc30e46ebfd56dcad15ea99e412a287c603fb87a50e14fd525",
-      "output_sha256": "7d7b899db764afb6b3c50940b19f34b86bc17c00f1204c23e4f6c2eb71eb02ab",
       "source_tracks": [
         6,
         1,
@@ -147,12 +195,17 @@
         20,
         0
       ],
-      "frames": 1937
+      "frames": 1937,
+      "outputs": {
+        "English": "7d7b899db764afb6b3c50940b19f34b86bc17c00f1204c23e4f6c2eb71eb02ab",
+        "Spanish": "5f605ee445e9732d5bf0014c4b3e8f1a00fd49d993ad68dc096eb3ed656be5e0",
+        "French": "6970c32343f82c755e1d822991fb938774063466b939c2362c0a9669066413cd",
+        "Portuguese": "ef721becbf72e47f3bb866c6928fca6d71e7a625fe50e1e77d8113afaa0fe2ec"
+      }
     },
     {
       "asset": "movies/fmv9.mov",
       "source_sha256": "377ea8ddf4869beb9d95b88df4d375c9a842adc7c28a84c46768cee20e62def0",
-      "output_sha256": "bf1f61d8b5801f8681ec5467db2dc312679dc1aee08a8b2dda8b73c1c2630c21",
       "source_tracks": [
         6,
         1,
@@ -161,12 +214,17 @@
         20,
         0
       ],
-      "frames": 4693
+      "frames": 4693,
+      "outputs": {
+        "English": "bf1f61d8b5801f8681ec5467db2dc312679dc1aee08a8b2dda8b73c1c2630c21",
+        "Spanish": "7b3290693b4e7bb81836dd630c5c28fa23517f8e7da6f3cec45b536e9a8448df",
+        "French": "b2ac39d261185022f631a22fea40ac41befd0c12d90578aedd478d1febbf5c00",
+        "Portuguese": "271d09188108187477e86b79fe288a6978f89f211341f3c806a19d38c0712402"
+      }
     },
     {
       "asset": "movies/lightexp.mov",
       "source_sha256": "38d3d30b981e54c7a3b7caa507579363538f0223e0546125677305179f4956b5",
-      "output_sha256": "1720eb2f4126ec7018ff1b55c167c22022bfab6d43fcf66ee260450b33d19837",
       "source_tracks": [
         1,
         7,
@@ -174,12 +232,17 @@
         20,
         0
       ],
-      "frames": 1256
+      "frames": 1256,
+      "outputs": {
+        "English": "1720eb2f4126ec7018ff1b55c167c22022bfab6d43fcf66ee260450b33d19837",
+        "Spanish": "80da5bff837d710ec574f9ad4edeed1fab42328e1fd82ab61a37644aca2bf5ca",
+        "French": "33a481829a10e48bc3c5233d2f31bf4e4d9ca45a20a9bdb146758d6d5dd43b3f",
+        "Portuguese": "0d075539012b7683a89d3c88fcb89f2b19c6484c68038fe6fad7700a4895a668"
+      }
     },
     {
       "asset": "movies/mirrorexp.mov",
       "source_sha256": "40acaba8a555ff5435aa3d7519cdb2cc3f913d2f57f99e000736ab0b9af90f8c",
-      "output_sha256": "e370bf39555f62bd08958217a05afc6b19debc6bfb4ede96d13cd6891397c7fb",
       "source_tracks": [
         1,
         7,
@@ -187,7 +250,13 @@
         20,
         0
       ],
-      "frames": 975
+      "frames": 975,
+      "outputs": {
+        "English": "e370bf39555f62bd08958217a05afc6b19debc6bfb4ede96d13cd6891397c7fb",
+        "Spanish": "59beb3062836e7284ead266c58370a92e529d186328c9b9ed22f715f0d18e1ae",
+        "French": "ded18c804fa0dd266f1a9e8d21a330cbb6a9ac5936a7a4975f8ea8a7dac36ac8",
+        "Portuguese": "6b96244395d8951592d1c838519372aef985c9f680dd904e7e5067029d5a4970"
+      }
     }
   ]
 }

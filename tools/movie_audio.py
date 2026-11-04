@@ -100,14 +100,21 @@ def rewrite(data, keep):
     return bytes(output)
 
 
-def prepare(original_game, session_game, session, profile_path):
+def prepare(original_game, session_game, session, profile_path, narration='English'):
+    """Keep one narration track (by language name in the profile) plus the shared tracks."""
     try:from .file_integrity import VerifiedDigests
     except ImportError:from file_integrity import VerifiedDigests
     checked_digest=VerifiedDigests(file_digest)
     profile=json.loads(Path(profile_path).read_text())
-    if (type(profile.get('schema_version')) is not int or profile['schema_version']!=1 or
-            profile.get('keep_tracks')!=[7,0] or profile.get('language')!='English'):
+    if type(profile.get('schema_version')) is not int or profile['schema_version']!=2:
         raise ValueError('unsupported movie localization profile')
+    tracks,shared=profile.get('narration_tracks'),profile.get('shared_tracks')
+    if (not isinstance(tracks,dict) or not isinstance(shared,list) or
+            any(type(track) is not int for track in [*tracks.values(),*shared])):
+        raise ValueError('invalid movie narration tracks')
+    if narration not in tracks:
+        raise ValueError(f'no {narration} narration track in this movie profile')
+    keep=[tracks[narration],*shared]
     if checked_digest(original_game/'eboot.bin')!=profile['executable_sha256']:
         raise ValueError('movie localization refuses unknown executable')
     if session_game.resolve()!=(session/'game').resolve() or session_game.resolve()==original_game.resolve():
@@ -124,7 +131,8 @@ def prepare(original_game, session_game, session, profile_path):
         relative=Path(recipe['asset'])
         if relative.is_absolute() or len(relative.parts)!=2 or relative.parts[0]!='movies' or relative.suffix!='.mov' or '..' in relative.parts:
             raise ValueError('invalid movie asset path')
-        if any(not isinstance(recipe.get(key),str) or not re.fullmatch(r'[0-9a-f]{64}',recipe[key]) for key in ('source_sha256','output_sha256')):
+        output=(recipe.get('outputs') or {}).get(narration) if isinstance(recipe.get('outputs'),dict) else None
+        if any(not isinstance(value,str) or not re.fullmatch(r'[0-9a-f]{64}',value) for value in (recipe.get('source_sha256'),output)):
             raise ValueError('invalid movie digest recipe')
         source=original_game/relative;target=session_game/relative
         if source.is_symlink() or source.resolve()!=original_game.resolve()/relative or target.is_symlink() or target.resolve()!=session_game.resolve()/relative:
@@ -133,25 +141,25 @@ def prepare(original_game, session_game, session, profile_path):
             raise ValueError('movie exceeds bounded preparation size')
         if checked_digest(source)!=recipe['source_sha256'] or checked_digest(target)!=recipe['source_sha256']:
             raise ValueError('movie localization refuses unexpected source/session asset')
-        cached=cache/(recipe['output_sha256']+'.mov')
+        cached=cache/(output+'.mov')
         if cached.is_symlink():raise ValueError('redirected cached movie')
         if cached.exists():
-            if checked_digest(cached)!=recipe['output_sha256']:
+            if checked_digest(cached)!=output:
                 raise ValueError('cached movie failed integrity check')
         else:
             data=source.read_bytes()
             if digest(data)!=recipe['source_sha256']:raise ValueError('movie changed during preparation')
             if _layout(data)[0]!=recipe['source_tracks']:
                 raise ValueError('movie source track layout mismatch')
-            modified=rewrite(data,profile['keep_tracks'])
-            if digest(modified)!=recipe['output_sha256']:
+            modified=rewrite(data,keep)
+            if digest(modified)!=output:
                 raise ValueError('movie localization output mismatch')
             with tempfile.NamedTemporaryFile(dir=cache,delete=False) as stream:
                 temporary=Path(stream.name);stream.write(modified)
             try:
                 os.link(temporary,cached)  # Never replace another writer's output.
             except FileExistsError:
-                if checked_digest(cached)!=recipe['output_sha256']:raise ValueError('conflicting cached movie')
+                if checked_digest(cached)!=output:raise ValueError('conflicting cached movie')
             finally:
                 temporary.unlink(missing_ok=True)
             del modified,data
@@ -162,5 +170,5 @@ def prepare(original_game, session_game, session, profile_path):
             temporary=Path(directory)/'localized.mov'
             os.link(cached,temporary)
             os.replace(temporary,target)
-        report.append({'asset':str(relative),'source_sha256':recipe['source_sha256'],'output_sha256':recipe['output_sha256']})
-    return {'language':'English','narration_track':7,'shared_track':0,'video_reencoded':False,'assets':report}
+        report.append({'asset':str(relative),'source_sha256':recipe['source_sha256'],'output_sha256':output})
+    return {'language':narration,'narration_track':tracks[narration],'shared_tracks':shared,'video_reencoded':False,'assets':report}

@@ -362,10 +362,12 @@ def run(argv,sessions):
         movie_profile=ROOT/movie_recipe if movie_recipe else None
         if args.movie_audio=='english' and movie_profile is None:
             raise ValueError('English movie localization requires the verified US update')
-        # Only the English narration track is identified; other languages keep
-        # the movies as shipped until their tracks are confirmed.
-        selected_movie_audio=('english' if movie_profile and (args.movie_audio=='english' or
-                              (args.movie_audio=='auto' and game_language.is_english(language))) else 'original')
+        # Keep one narration track: the chosen language's when the profile
+        # identifies it, otherwise the movies stay as shipped.
+        narration='English' if args.movie_audio=='english' else game_language.narration(language) if args.movie_audio=='auto' else None
+        if movie_profile is None or narration not in json.loads(movie_profile.read_text()).get('narration_tracks',{}):
+            narration=None
+        selected_movie_audio=narration.lower() if narration else 'original'
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
         if glyph_mode!='playstation' and not controller_art.available():
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
@@ -451,7 +453,7 @@ def run(argv,sessions):
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
-    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or selected_movie_audio=='english' or 'controller-glyphs' in mod_handlers:
+    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or narration or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
                 PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
@@ -459,9 +461,9 @@ def run(argv,sessions):
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
     movie_metadata=None
-    if selected_movie_audio=='english':
+    if narration:
         try:
-            movie_metadata=movie_audio.prepare(original_game,game_root,session,movie_profile)
+            movie_metadata=movie_audio.prepare(original_game,game_root,session,movie_profile,narration)
         except (OSError,ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('movie_localization')

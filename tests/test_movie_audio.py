@@ -48,8 +48,17 @@ class MovieAudioTests(unittest.TestCase):
             (source/'eboot.bin').write_bytes(b'executable')
             (source/'movies/test.mov').write_bytes(data);(target/'movies/test.mov').write_bytes(data)
             profile=root/'profiles/patches/audio.json';profile.parent.mkdir(parents=True)
-            recipe=dict(schema_version=1,language='English',keep_tracks=[7,0],executable_sha256=movie_audio.digest(b'executable'),assets=[dict(asset='movies/test.mov',source_sha256=movie_audio.digest(data),output_sha256=movie_audio.digest(after),source_tracks=[1,7,0])])
+            spanish=movie_audio.rewrite(data,[1,0])
+            recipe=dict(schema_version=2,narration_tracks={'English':7,'Spanish':1},shared_tracks=[0],executable_sha256=movie_audio.digest(b'executable'),
+                        assets=[dict(asset='movies/test.mov',source_sha256=movie_audio.digest(data),source_tracks=[1,7,0],
+                                     outputs={'English':movie_audio.digest(after),'Spanish':movie_audio.digest(spanish)})])
             profile.write_text(json.dumps(recipe))
+            with self.assertRaisesRegex(ValueError,'no French narration'):
+                movie_audio.prepare(source,target,session,profile,'French')
+            report=movie_audio.prepare(source,target,session,profile,'Spanish')
+            self.assertEqual(report['narration_track'],1)
+            self.assertEqual((target/'movies/test.mov').read_bytes(),spanish)
+            (target/'movies/test.mov').unlink();(target/'movies/test.mov').write_bytes(data)
             report=movie_audio.prepare(source,target,session,profile)
             self.assertEqual(report['narration_track'],7)
             self.assertEqual((source/'movies/test.mov').read_bytes(),data)

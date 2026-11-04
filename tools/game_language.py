@@ -46,5 +46,7 @@ def choose(root, profile_id, requested):
     return DEFAULT, f'{NAMES[requested]} is not offered for this game; using {NAMES[DEFAULT]}'
 
 
-def is_english(language):
-    return language in ('en-US', 'en-GB')
+def narration(language):
+    """Movie narration language name for a system language, matched by its base language."""
+    return {'en': 'English', 'es': 'Spanish', 'fr': 'French', 'pt': 'Portuguese', 'de': 'German',
+            'it': 'Italian', 'nl': 'Dutch'}.get(language.split('-')[0])

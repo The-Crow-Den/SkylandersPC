@@ -71,7 +71,7 @@ class SettingsPage(QWidget):
         navigation=QHBoxLayout();navigation.setSpacing(6);layout.addLayout(navigation)
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
-            'language':'Text and voices, when the game has them. Movie narration follows it in English only for now.',
+            'language':'Text and voices, when the game has them. Movies follow it in English, Spanish, French and Portuguese.',
             'resolution':'Internal rendering resolution.', 'quality':'Detail and definition of game shadows.',
             'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
             'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
