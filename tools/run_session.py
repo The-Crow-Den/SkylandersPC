@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run a prepared local build with persistent logs and explicit exit reporting."""
 import argparse
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import datetime
-import fcntl
 import hashlib
 import json
 import lzma
@@ -20,6 +19,7 @@ import sys
 import shutil
 try:
     from .overlay_session import html_overlay
+    from . import host_process
     from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
@@ -27,6 +27,7 @@ try:
     from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 except ImportError:
     from overlay_session import html_overlay
+    import host_process
     from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
@@ -84,11 +85,9 @@ def finish_session(session, protected=(), last=None):
 @contextmanager
 def exclusive_session(path):
     """Do not let two launched games write the same save/portal library."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open('a') as guard:
+    with ExitStack() as stack:
         try:
-            fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            stack.enter_context(host_process.exclusive_lock(path))
         except BlockingIOError:
             raise ValueError('Another Trap Team session is running. Close it before starting a new one.') from None
         # The file stays in place: deleting it could create two independent locks.
@@ -199,7 +198,7 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
     reason = 'process-exit'
     with (directory / 'runtime.log').open('xb') as output, html_overlay(directory,cwd,env) as runtime_environment:
         process = subprocess.Popen(command, cwd=cwd, env=runtime_environment, stdout=output,
-                                   stderr=subprocess.STDOUT, start_new_session=True)
+                                   stderr=subprocess.STDOUT, **host_process.group_options())
         try:
             print('SKYLANDERS_RUNTIME_LAUNCHED', flush=True)
             threading.Thread(target=announce_window, args=(directory / 'runtime.log', process), daemon=True).start()
@@ -207,14 +206,12 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
             code = process.wait(timeout=seconds if seconds else None)
         except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
             reason = 'requested-time-limit' if isinstance(error, subprocess.TimeoutExpired) else 'user-interrupt'
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass  # The child may finish between wait timing out and signaling.
+            # The child may finish between wait timing out and signaling.
+            host_process.stop_group(process.pid)
             try:
                 code = process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
+                host_process.stop_group(process.pid, force=True)
                 code = process.wait()
         result = {'returncode': code, 'stop_reason': reason,
                   'elapsed_seconds': round(time.monotonic() - started, 3),
@@ -352,7 +349,7 @@ def run(argv,sessions):
     except (OSError,ValueError) as error:
         parser.error(str(error))
     pack = build['pack']
-    host = ROOT / '.local/native-gpu-build/skylanders-native-host'
+    host = game_prepare.runtime_paths(ROOT)[0]
     files = [pack / name for name in ('image.pack', 'imports.types', 'boot.plan')]
     if not host.is_file() or not all(path.is_file() for path in files):
         parser.error('Game setup needs pack.'+args.variant+' or runtime. Choose Repair in the launcher to finish setup.')

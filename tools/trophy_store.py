@@ -84,7 +84,7 @@ def prepare(root,install,session,*,store=None,key_config=None):
     if len(identifiers)!=1:raise ValueError('no unique trophy communication ID')
     npwr=identifiers.pop().decode();table=entries(trp)
     title_id=install.title_id
-    store=Path(store).absolute() if store else Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'skylanders-pc/trophies'/title_id
+    store=Path(store).absolute() if store else launcher_trophies.host_process.data_home()/'skylanders-pc/trophies'/title_id
     if store.resolve()!=store.absolute() or store.is_symlink():raise ValueError('redirected native trophy store')
     cache=store/'catalogues'
     if cache.resolve()!=cache or cache.is_symlink():raise ValueError('redirected trophy catalogue cache')

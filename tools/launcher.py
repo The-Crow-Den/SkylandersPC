@@ -16,11 +16,13 @@ except ImportError:
 
 try:
     from . import launcher_model as model
+    from . import host_process
     from .launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
     from .pc_settings import load_settings, save_settings
     from .resolution import PRESETS
 except ImportError:
     import launcher_model as model
+    import host_process
     from launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
     from pc_settings import load_settings, save_settings
     from resolution import PRESETS
@@ -310,11 +312,8 @@ class Launcher(QMainWindow):
         if pid<=0:
             self.process.started.connect(self.interrupt_runner)
             return
-        try:
-            # The runner owns cleanup of its separately grouped game process.
-            os.kill(pid,signal.SIGINT)
-        except ProcessLookupError:
-            pass
+        # The runner owns cleanup of its separately grouped game process.
+        host_process.interrupt(pid)
 
     def closeEvent(self, event):
         if self.process is not None:

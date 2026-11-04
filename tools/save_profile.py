@@ -11,6 +11,12 @@ import re
 
 def home_root(environment=None):
     environment = os.environ if environment is None else environment
+    if os.name == 'nt':
+        # Matches the native host's default_save_root (host_runtime_win32.cpp).
+        local = environment.get('LOCALAPPDATA')
+        if not local or not Path(local).is_absolute():
+            raise OSError('an absolute LOCALAPPDATA is required for saves')
+        return Path(local)/'skylanders-pc/saves'
     data = environment.get('XDG_DATA_HOME')
     base = Path(data) if data and Path(data).is_absolute() else Path(environment.get('HOME', str(Path.home())))/'.local/share'
     return base/'skylanders-pc/saves'

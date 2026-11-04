@@ -6,6 +6,10 @@ from pathlib import Path
 import signal
 import sys
 from PyQt6.QtCore import QObject, QProcess, QTimer, pyqtSignal
+try:
+    from . import host_process
+except ImportError:
+    import host_process
 
 PREPARER = Path(__file__).with_name('game_prepare.py')
 
@@ -71,6 +75,6 @@ class PreparationProcess(QObject):
         process = self.process;pid = int(process.processId());process.terminate()
         def force():
             if self.process is not process:return
-            try:os.killpg(pid,signal.SIGKILL)
-            except ProcessLookupError:process.kill()
+            host_process.stop_group(pid,force=True)
+            if self.process is process:process.kill()
         QTimer.singleShot(5000,force)

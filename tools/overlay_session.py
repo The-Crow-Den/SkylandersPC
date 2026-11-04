@@ -10,6 +10,10 @@ import shutil
 import subprocess
 import sys
 import time
+try:
+    from . import host_process
+except ImportError:
+    import host_process
 
 
 # The launcher AppImage pins its own interpreter with these; a system Python
@@ -74,7 +78,7 @@ def html_overlay(directory,root,environment):
         with (directory/'pc-overlay.log').open('x') as output:
             command=[python,str(root/'tools/pc_overlay.py'),'--directory',str(private)]
             if embedded:command.append('--embedded')
-            process=subprocess.Popen(command,cwd=root,env=ui_env,stdout=output,stderr=subprocess.STDOUT,start_new_session=True)
+            process=subprocess.Popen(command,cwd=root,env=ui_env,stdout=output,stderr=subprocess.STDOUT,**host_process.group_options())
         deadline=time.monotonic()+12
         while process.poll() is None and time.monotonic()<deadline:
             if (private/'ready').is_file() and (private/'heartbeat').is_file():
@@ -90,10 +94,8 @@ def html_overlay(directory,root,environment):
         yield runtime
     finally:
         if process is not None and process.poll() is None:
-            try:os.killpg(process.pid,signal.SIGTERM)
-            except ProcessLookupError:pass
+            host_process.stop_group(process.pid)
             try:process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                try:os.killpg(process.pid,signal.SIGKILL)
-                except ProcessLookupError:pass
+                host_process.stop_group(process.pid,force=True)
                 process.wait()

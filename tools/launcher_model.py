@@ -102,9 +102,9 @@ def missing_files(root, game=None):
         pack = game_build.configuration(root,installation,'60-delta')['pack']
         executable = installation.source('eboot.bin')
     except (OSError,ValueError) as error:
-        return [str(error), '.local/native-gpu-build/skylanders-native-host',
+        return [str(error), str(game_prepare.runtime_paths(root)[0].relative_to(root)),
                 'prepared game image.pack', 'prepared imports.types', 'prepared boot.plan']
-    paths = [root / '.local/native-gpu-build/skylanders-native-host',
+    paths = [game_prepare.runtime_paths(root)[0],
              executable,
              *(pack / name for name in ('image.pack', 'imports.types', 'boot.plan'))]
     return [str(path.relative_to(root)) for path in paths if not path.is_file()]

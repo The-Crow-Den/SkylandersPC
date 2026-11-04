@@ -158,7 +158,12 @@ def source_files(folder):
     return sorted(p for p in Path(folder).rglob('*') if p.is_file() and (p.suffix in suffixes or p.name=='CMakeLists.txt'))
 
 
+WINDOWS = os.name=='nt'
+
+
 def runtime_paths(root):
+    """(host, renderer library). Windows links the renderer into the host executable."""
+    if WINDOWS:return (root/'.local/native-gpu-build/skylanders-native-host.exe',None)
     return (root/'.local/native-gpu-build/skylanders-native-host',root/'out/dependency-build/renderer/libskyrender.so')
 
 
@@ -197,6 +202,13 @@ def portal_source(root):
 def runtime_step(pipeline):
     root = pipeline.root;host,library = runtime_paths(root);build_dir = host.parent
     def build(key):
+        if WINDOWS:
+            # Players have no MSYS2 toolchain: the release ships the built host
+            # with its DLLs beside it, and setup only checks it is present.
+            if not host.is_file():raise PreparationError('Native runtime is missing. Restore the runtime files supplied with this release, then choose Repair.')
+            with host.open('rb') as stream:
+                if stream.read(2)!=b'MZ':raise PreparationError('Native runtime is missing or invalid')
+            return [host]
         if not host.is_file() or 'runtime' in pipeline.record['steps']:
             if not (root/'native/CMakeLists.txt').is_file():raise PreparationError('Native runtime source is missing. Restore the runtime files, then choose Repair.')
             args = ['cmake','-S',root/'native','-B',build_dir,'-DCMAKE_BUILD_TYPE=RelWithDebInfo',
@@ -213,6 +225,7 @@ def runtime_step(pipeline):
         check_dependencies(host)
         return [host]
     def inputs():
+        if WINDOWS:return dict(files=[host] if host.is_file() else [],values={'prebuilt':True})
         portal = portal_source(root)
         portal_files = [portal/p for p in ('src/runtime/cemu_portal.cpp','Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp','Cemu-main/src/Common/unix/FileStream_unix.cpp')] if portal else []
         return dict(files=[*source_files(root/'native'),*source_files(root/'.local/skyrender/src'),*portal_files,library],values={'source_available':(root/'native').exists(),'portal':str(portal) if portal else None})
@@ -220,6 +233,8 @@ def runtime_step(pipeline):
 
 
 def check_dependencies(host):
+    # Windows resolves the shipped DLLs beside the executable at launch.
+    if WINDOWS:return
     try:dependencies = subprocess.run(['ldd',str(host)],capture_output=True,text=True)
     except OSError as error:raise PreparationError('runtime: The runtime checker is unavailable. Restore the runtime tools, then choose Repair.') from error
     if dependencies.returncode or 'not found' in dependencies.stdout:
@@ -282,7 +297,7 @@ def plan(pipeline, install, config):
                 if 'asset' in record:files.append(install.source(record['asset']))
         return dict(files=files,values={'executable':digest})
     steps.append(Step('recipes',recipe_inputs,validate,'Checking graphics and game options…'))
-    steps += [renderer_step(pipeline),runtime_step(pipeline)]
+    steps += [runtime_step(pipeline)] if WINDOWS else [renderer_step(pipeline),runtime_step(pipeline)]
     for variant,record in prep['variants'].items():
         patch_path = game_build.relative(root,record['patch']) if record.get('patch') else None
         def build(key,variant=variant,patch_path=patch_path):
@@ -490,8 +505,10 @@ def main(argv=None):
 
 if __name__=='__main__':
     # QProcess cancellation must also stop any compiler children.
-    if os.getpgrp()!=os.getpid():os.setsid()
-    def stop(signum,frame):
-        signal.signal(signum,signal.SIG_DFL);os.killpg(os.getpgrp(),signum)
-    signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
+    # Windows: the launcher stops this process and its children as a tree.
+    if os.name!='nt':
+        if os.getpgrp()!=os.getpid():os.setsid()
+        def stop(signum,frame):
+            signal.signal(signum,signal.SIG_DFL);os.killpg(os.getpgrp(),signum)
+        signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
     sys.exit(main())
