@@ -16,6 +16,7 @@ public:
         float gamma = 1.0f;
         u32 hdr = 0;
         u32 srgb_input = 0;
+        u32 anti_alias = 0;
     };
 
     EncodePass(vk::Device device, vk::Format output_format);
