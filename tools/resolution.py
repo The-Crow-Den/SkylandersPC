@@ -81,7 +81,11 @@ def prepare_assets(game, session, dimensions=None, shadows='native', motion_blur
     def link_file(src, dst):
         if Path(src).is_symlink() or not Path(src).is_file():
             raise ValueError('asset preparation refuses non-regular files')
-        return os.link(src, dst)
+        try:
+            return os.link(src, dst)
+        except OSError:
+            # Another drive, or a filesystem without hard links: copy instead.
+            return shutil.copy2(src, dst)
     # Reject directory links as well: never traverse outside the supplied dump.
     if any(p.is_symlink() for p in game.rglob('*')):
         raise ValueError('asset preparation refuses symlinks')
