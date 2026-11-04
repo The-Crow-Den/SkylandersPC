@@ -71,6 +71,21 @@ File::~File() = default;
 File::File(File&&) noexcept = default;
 File& File::operator=(File&&) noexcept = default;
 bool File::valid() const noexcept { return impl_ && impl_->fd >= 0; }
+bool File::open_private_directory(const std::filesystem::path& path) {
+    std::error_code error;
+    if (!path.is_absolute() || std::filesystem::weakly_canonical(path,error) != path || error) {
+        errno=EACCES; return false;
+    }
+    File next;
+    if (!next.open_directory(path)) return false;
+    struct ::stat info{};
+    if (::fstat(next.impl_->fd,&info)) return false;
+    if (!S_ISDIR(info.st_mode) || info.st_uid != getuid() || (info.st_mode & 077)) {
+        errno=EACCES; return false;
+    }
+    impl_ = std::move(next.impl_);
+    return true;
+}
 bool File::open_directory(const std::filesystem::path& path, bool allow_root_links, bool create) {
     if (allow_root_links && create) { errno=EINVAL; return false; }
     if (path.empty()) { errno=ENOENT; return false; }
@@ -194,13 +209,14 @@ bool File::create_temporary(std::string_view name, File& output) const {
     options.create = options.exclusive = true;
     return open_child(name,options,true,output);
 }
-bool File::publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const {
+bool File::publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published, bool durable) const {
     if (!valid() || !temporary.valid()) { errno=EBADF; return false; }
     if (!component_name(source) || !component_name(target)) return false;
     if (temporary.close()) return false;
     const std::string from(source), to(target);
     if (::renameat(impl_->fd,from.c_str(),impl_->fd,to.c_str())) return false;
     published = true;
+    if (!durable) return true;
     int result;
     do { result = ::fsync(impl_->fd); } while (result < 0 && errno == EINTR);
     return result == 0;

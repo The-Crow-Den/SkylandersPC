@@ -72,6 +72,9 @@ public:
     // create walks/creates missing components through held parents. It cannot
     // be combined with the trusted-root link exception.
     bool open_directory(const std::filesystem::path& path, bool allow_root_links = false, bool create = false);
+    // Open and validate privacy on the held directory itself; failure retains
+    // any previously held capability. No path/name check substitutes for this.
+    bool open_private_directory(const std::filesystem::path& path);
     bool duplicate_directory(File& output) const;
     bool ensure_directory(std::string_view name, File& output) const;
     // Missing entries succeed with exists=false; unsafe links are failures.
@@ -82,7 +85,9 @@ public:
     // it never rolls back by deleting that installed file. POSIX also fsyncs
     // the parent; Windows flushes the renamed file, without claiming directory
     // fsync/power-loss equivalence.
-    bool write_atomic(std::string_view name, const void* data, std::size_t size) const;
+    // durable=false is for replaceable IPC snapshots: complete/atomic visibility
+    // still applies, but no crash/power-loss durability is requested.
+    bool write_atomic(std::string_view name, const void* data, std::size_t size, bool durable = true) const;
     // Move one directory entry between held parents, refusing links and any
     // existing destination. This does not recursively copy or delete contents.
     bool move_directory(std::string_view name, const File& target, std::string_view target_name) const;
@@ -102,7 +107,7 @@ private:
     friend class PrivateFileMapping;
     friend bool private_directory(const std::filesystem::path& path);
     bool create_temporary(std::string_view name, File& output) const;
-    bool publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const;
+    bool publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published, bool durable) const;
     bool discard_temporary(File& temporary, std::string_view name) const;
     struct Impl;
     std::unique_ptr<Impl> impl_;

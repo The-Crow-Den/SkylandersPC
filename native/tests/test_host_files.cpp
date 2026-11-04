@@ -86,6 +86,35 @@ void frame_tests(const std::filesystem::path& root) {
     require(!denied.open(root/"frame-null-dacl.rgba",size));
 #endif
 }
+void private_state_tests(const std::filesystem::path& root) {
+    using namespace SkyHost;
+    File directory;
+    require(directory.open_private_directory(root/"private-ipc"));
+    for (const auto* name : {"public-ipc","ipc-alias","missing-ipc","frame.rgba"})
+        require(!directory.open_private_directory(root/name) && directory.valid());
+    require(!directory.open_private_directory(root/"private-ipc"/"..") && directory.valid());
+    require(directory.write_atomic("state.json","first",5,false));
+    File old;
+    require(directory.open_child("state.json",{},true,old));
+    require(directory.write_atomic("state.json","second",6,false));
+    std::array<char,8> data{};
+    require(old.read(data.data(),data.size()) == 5 && std::string(data.data(),5) == "first");
+    require(old.close() == 0);
+    File latest;
+    require(directory.open_child("state.json",{},true,latest));
+    require(latest.read(data.data(),data.size()) == 6 && std::string(data.data(),6) == "second");
+    require(latest.close() == 0);
+    require(!directory.write_atomic("../outside.bin","BAD",3,false));
+    require(!directory.write_atomic("state.json",nullptr,1,false));
+    std::filesystem::rename(root/"private-ipc",root/"held-ipc");
+    std::filesystem::rename(root/"publish-escape",root/"private-ipc");
+    require(!directory.open_private_directory(root/"private-ipc") && directory.valid());
+    require(directory.write_atomic("state.json","held",4,false));
+    require(!std::filesystem::exists(root/"outside"/"state.json"));
+    require(std::filesystem::file_size(root/"held-ipc"/"state.json") == 4);
+    for (const auto& item : std::filesystem::directory_iterator(root/"held-ipc"))
+        require(!item.path().filename().string().starts_with(".pending-"));
+}
 void live_frame_test(const std::filesystem::path& root) {
     PcOverlay::FrameReader reader(frame_path(root/"frame.rgba").c_str());
     unsigned generation = 0;
@@ -287,10 +316,12 @@ void atomic_tests(const std::filesystem::path& root) {
     require(read.read(data.data(),data.size()) == 6 && std::string(data.data(),6) == "second");
     require(read.close() == 0);
     require(!directory.write_atomic("hardlink","BAD",3));
+    require(!directory.write_atomic("hardlink","BAD",3,false));
 #ifdef _WIN32
     // Python holds the destination without delete sharing: publication must
     // fail, remove the owned sibling, and preserve the previous contents.
     require(!directory.write_atomic("locked","BAD",3) && errno == EACCES);
+    require(!directory.write_atomic("locked","BAD",3,false) && errno == EACCES);
 #endif
     require(!directory.write_atomic("../outside.bin","BAD",3));
     require(!directory.write_atomic("progress",nullptr,1) && errno == EINVAL);
@@ -448,7 +479,7 @@ int main(int argc, char** argv) {
         const auto root = decode_path(argv[1]);
         if (argc == 3 && std::string_view(argv[2]) == "race") race_tests(root);
         else if (argc == 3 && std::string_view(argv[2]) == "frame") live_frame_test(root);
-        else { frame_tests(root); capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
+        else { frame_tests(root); private_state_tests(root); capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
         std::cout << "file capability tests passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

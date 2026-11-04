@@ -337,6 +337,22 @@ File::~File() = default;
 File::File(File&&) noexcept = default;
 File& File::operator=(File&&) noexcept = default;
 bool File::valid() const noexcept { if (!impl_) return false; std::lock_guard lock(impl_->mutex); return impl_->handle != nullptr; }
+bool File::open_private_directory(const std::filesystem::path& path) {
+    if (!path.is_absolute() || path.native().find(L'\0') != std::wstring::npos) { errno=EINVAL; return false; }
+    for (const auto& component : path)
+        if (component == L".." || component == L".") { errno=EACCES; return false; }
+    File parent;
+    if (!parent.open_directory(path.parent_path())) return false;
+    const auto name = path.filename().u8string();
+    std::wstring wide;
+    if (!component_name({reinterpret_cast<const char*>(name.data()),name.size()},wide)) return false;
+    FileOpen options;
+    options.directory = true;
+    auto next = Impl::open(parent.impl_->handle,wide,options,{.security_query=true});
+    if (!next || !private_owner(next->handle)) return false;
+    impl_ = std::move(next);
+    return true;
+}
 bool File::open_directory(const std::filesystem::path& input, bool allow_root_links, bool create) {
     if (allow_root_links && create) { errno=EINVAL; return false; }
     (void)allow_root_links; // Windows never follows a reparse point in a root.
@@ -465,7 +481,7 @@ bool File::create_temporary(std::string_view name, File& output) const {
     output.impl_ = std::move(next);
     return true;
 }
-bool File::publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published) const {
+bool File::publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published, bool durable) const {
     (void)source; // Rename the owned handle, never reopen the temporary name.
     std::wstring wide;
     if (!component_name(target,wide)) return false;
@@ -474,7 +490,7 @@ bool File::publish_temporary(File& temporary, std::string_view source, std::stri
     if (!impl_->handle || !temporary.impl_->handle) { errno=EBADF; return false; }
     if (!rename_handle(temporary.impl_->handle,impl_->handle,wide,true,published)) return false;
     // Cleanup must never delete the installed target after a flush failure.
-    if (!FlushFileBuffers(temporary.impl_->handle)) { failure(GetLastError()); return false; }
+    if (durable && !FlushFileBuffers(temporary.impl_->handle)) { failure(GetLastError()); return false; }
     const auto handle = std::exchange(temporary.impl_->handle,nullptr);
     if (!CloseHandle(handle)) { failure(GetLastError()); return false; }
     return true;

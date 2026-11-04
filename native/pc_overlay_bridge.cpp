@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -89,8 +90,15 @@ public:
             if(now-last>=std::chrono::milliseconds(embedded()&&visible?25:150)){
                 last=now;std::vector<int> keys;{std::lock_guard lock(input_mutex);keys.swap(input);}if(!keys.empty())++sequence;
                 const auto state=snapshot(sequence,keys);
-                if(state!=previous){const auto temporary=directory/"state.tmp";if(!fs::is_symlink(temporary,ec)){
-                    std::ofstream file(temporary,std::ios::binary|std::ios::trunc);file<<state;file.close();if(file){fs::rename(temporary,directory/"state.json",ec);if(!ec)previous=state;}}
+                if(state!=previous){
+                    try {
+                        SkyHost::File output;
+                        if(output.open_private_directory(directory) &&
+                           output.write_atomic("state.json",state.data(),state.size(),false)) previous=state;
+                    } catch(const std::exception& error) {
+                        SkyHost::diagnostic_printf("Overlay state publication failed: %s\n",error.what());
+                        connected=false;return;
+                    }
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(embedded()&&visible?8:40));
@@ -100,7 +108,7 @@ public:
 };
 }
 namespace PcOverlay {
-void start(){const auto* value=std::getenv("SKY_PC_OVERLAY_DIR");if(!value||!*value)return;const fs::path path(value);if(!path.is_absolute()||!owner_directory(path))return;static Worker worker(path);}
+void start(){const auto* value=std::getenv("SKY_PC_OVERLAY_DIR");if(!value||!*value)return;const fs::path path=SkyHost::path_from_utf8(value);if(!path.is_absolute()||!owner_directory(path))return;static Worker worker(path);}
 void geometry(int x,int y,int width,int height){if(width<100||height<100||width>16384||height>16384)return;std::lock_guard lock(geometry_mutex);window_geometry={x,y,width,height};}
 bool event(const SDL_Event& event){
     if(!embedded()||!connected||!visible)return false;

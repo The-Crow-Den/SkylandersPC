@@ -228,6 +228,8 @@ if(WIN32)
       target_link_libraries(gpu-adapter-test PRIVATE sky-host-portable sky-portal-core
         PkgConfig::SkyWindowsUSB sky-renderer-media skyrender)
       add_test(NAME native-gpu-adapter COMMAND gpu-adapter-test)
+      add_test(NAME native-overlay-state COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_overlay_state.py $<TARGET_FILE:gpu-adapter-test>)
     endif()
   endif()
 
@@ -410,6 +412,8 @@ if(BUILD_TESTING)
     target_link_libraries(gpu-adapter-test PRIVATE Threads::Threads "${SKY_RENDERER_LIBRARY}" PkgConfig::SkySDL3)
     target_link_options(gpu-adapter-test PRIVATE -Wl,--export-dynamic)
     add_test(NAME native-gpu-adapter COMMAND gpu-adapter-test)
+    add_test(NAME native-overlay-state COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_overlay_state.py $<TARGET_FILE:gpu-adapter-test>)
   endif()
 endif()
 

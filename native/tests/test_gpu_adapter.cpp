@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../gpu_backend.hpp"
+#include "../pc_overlay_bridge.hpp"
 #include "../renderer_adapter.hpp"
 #include "../platform/host_fault.hpp"
 #include <array>
@@ -7,8 +8,18 @@
 #include <stdexcept>
 #include <string>
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        if (argc == 2 && std::string_view(argv[1]) == "--overlay-state-probe") {
+            PcOverlay::start();
+            std::string action;
+            while (std::getline(std::cin,action)) {
+                if (action == "publish") PcOverlay::geometry(17,29,640,480);
+                else if (action == "stop") return 0;
+                else throw std::runtime_error("unknown overlay probe command");
+            }
+            throw std::runtime_error("overlay probe input ended before stop");
+        }
         using U = std::uint64_t;
         const auto check = [](bool value) { if (!value) throw std::runtime_error("GPU adapter contract failed"); };
         const auto pointer = [](auto* value) { return reinterpret_cast<std::uintptr_t>(value); };

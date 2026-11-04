@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <string>
 namespace SkyHost {
-bool File::write_atomic(std::string_view name, const void* data, std::size_t size) const {
+bool File::write_atomic(std::string_view name, const void* data, std::size_t size, bool durable) const {
     if (!data && size) { errno=EINVAL; return false; }
     File parent;
     if (!duplicate_directory(parent)) return false;
@@ -45,10 +45,13 @@ bool File::write_atomic(std::string_view name, const void* data, std::size_t siz
             if (count <= 0) { if (!count) errno=EIO; return finish(false); }
             done += static_cast<std::size_t>(count);
         }
-        int result;
-        do { result = temporary.sync(); } while (result < 0 && errno == EINTR);
-        if (result || !acceptable()) return finish(false);
-        const bool ok = parent.publish_temporary(temporary,source,name,published);
+        if (durable) {
+            int result;
+            do { result = temporary.sync(); } while (result < 0 && errno == EINTR);
+            if (result) return finish(false);
+        }
+        if (!acceptable()) return finish(false);
+        const bool ok = parent.publish_temporary(temporary,source,name,published,durable);
         return finish(ok);
     } catch (...) {
         if (!published) {
