@@ -71,7 +71,10 @@ int main(int argc,char** argv) {
         std::filesystem::path temp;
         check(SkyHost::create_private_temp_directory(std::filesystem::temp_directory_path(),".sky-trap-\xce\xbb-",temp));
         std::filesystem::current_path(temp);
-        struct Cleanup{std::filesystem::path old,temp;~Cleanup(){VirtualPortal::remove();std::filesystem::current_path(old);std::filesystem::remove_all(temp);}} cleanup{old,temp};
+        // Unlink the redirect first: libc++'s remove_all on Windows can descend
+        // through a directory junction and delete the outside fixture.
+        struct Cleanup{std::filesystem::path old,temp;~Cleanup(){VirtualPortal::remove();std::error_code ignored;
+            std::filesystem::remove(temp/"redirected.sky",ignored);std::filesystem::current_path(old);std::filesystem::remove_all(temp);}} cleanup{old,temp};
         std::array<unsigned char,1024> character{},trap{};character[0]=1;trap[0]=2;trap[0x10]=211;
         {std::ofstream f("character.sky",std::ios::binary);f.write(reinterpret_cast<const char*>(character.data()),character.size());}
         {std::ofstream f("trap.sky",std::ios::binary);f.write(reinterpret_cast<const char*>(trap.data()),trap.size());}
@@ -150,6 +153,8 @@ int main(int argc,char** argv) {
         if(directory_link.empty())std::filesystem::create_symlink(generated,redirected);
         else std::filesystem::rename(directory_link,redirected);
         check(!VirtualPortal::create_blank(SkyHost::path_to_utf8(redirected).c_str(),14,0));
+        // The refused write must not have touched the junction's outside target.
+        if(!directory_link.empty())check(std::filesystem::exists(redirected/"marker"));
         std::array<unsigned char,1024> unchanged{};
         {std::ifstream f(generated,std::ios::binary);check(bool(f.read(reinterpret_cast<char*>(unchanged.data()),unchanged.size())));}
         check(made==unchanged);
