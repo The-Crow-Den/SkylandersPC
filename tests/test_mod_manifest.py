@@ -176,6 +176,18 @@ class ManifestTest(unittest.TestCase):
             self.assertEqual(mods.asset_profile(applied, profile['title_id'], profile['app_version'], profile['executable_sha256']),
                              nightmare_mod.recipe(profile))
 
+    def test_builtin_skip_cutscenes_settings(self):
+        available = mods.discover(ROOT)
+        us = 'de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56'
+        environment = lambda settings: mods.host_environment(mods.plan(available, ['skip-cutscenes'], us,
+                                                                       settings={'skip-cutscenes': settings}))
+        self.assertEqual(environment({}), {'SKY_MOVIE_SKIP_MOD': '1', 'SKY_SKIP_STARTUP_INTROS': '1',
+                                           'SKY_SKIP_CUTSCENES': '1'})
+        self.assertEqual(environment({'skip-startup-intros': False, 'allow-skipping-all-cutscenes': False}),
+                         {'SKY_MOVIE_SKIP_MOD': '1'})
+        with self.assertRaises(mods.ModError):
+            mods.plan(available, ['skip-cutscenes'], 'bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd')
+
 
 if __name__ == '__main__':
     unittest.main()

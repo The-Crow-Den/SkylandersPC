@@ -5,7 +5,7 @@
 // An empty movie list proves no movie object is attached. A nonempty list is
 // conservatively treated as video, even if a codec is preparing/finishing it.
 namespace TrapMovieGate {
-struct Result {bool valid=false;std::uint32_t count=0;};
+struct Result {bool valid=false;std::uint32_t count=0;std::uintptr_t data=0;};
 template<class Read> Result sample(Read read) {
     auto word=[&](std::uintptr_t address,std::uintptr_t& value) {return read(address,&value,8);};
     std::uintptr_t directory=0,type=0,services=0,storage=0,system=0,player=0,list=0,data=0;
@@ -28,6 +28,6 @@ template<class Read> Result sample(Read read) {
     if(!word(system+16,check_player) || check_player!=player ||
        !word(player+40,check_list) || check_list!=list ||
        !read(list+12,&check_count,4) || check_count!=count)return {};
-    return {true,count};
+    return {true,count,data};
 }
 }
