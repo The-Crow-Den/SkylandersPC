@@ -496,7 +496,8 @@ def run(argv,sessions):
             env['MANGOHUD_CONFIG'] = 'read_cfg,' + env['MANGOHUD_CONFIG']
         except ValueError as error:
             parser.error(str(error))
-    env.setdefault('SDL_VIDEO_DRIVER', 'x11')
+    if os.name != 'nt':
+        env.setdefault('SDL_VIDEO_DRIVER', 'x11')  # Windows: SDL's only driver is windows.
     env.setdefault('SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', '0')
     env.setdefault('SKY_VIRTUAL_PORTAL', '1')
     if args.figure:
