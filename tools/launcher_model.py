@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """GUI-independent launch configuration; the session runner remains authoritative."""
 import json
+import os
 from pathlib import Path
 
 try:
@@ -61,8 +62,17 @@ def save(path, value):
     temporary.replace(path)
 
 
+# The NVIDIA driver manifest path and MangoHud are Linux-only.
+LINUX_ONLY = ('nvidia', 'mangohud')
+
+
+def platform_settings():
+    return [] if os.name == 'nt' else list(LINUX_ONLY)
+
+
 def command(root, python, value, mods=None, game=None):
     value = validate(value)
+    value = {**value, **{key: False for key in LINUX_ONLY if key not in platform_settings()}}
     # The exact-build mod gates 60 on engine loading, cutscene and UI state.
     argv = [str(python), str(Path(root) / 'tools/run_session.py'),
             '--variant', '60-delta', '--performance-profile', 'standard',

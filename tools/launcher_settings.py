@@ -79,6 +79,7 @@ class SettingsPage(QWidget):
             'portal_volume':'Volume of voices from the portal speaker.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'level_events':'Record events for troubleshooting.'}
         for name,description,entries in GROUPS:
+            entries = [e for e in entries if e[0] not in model.LINUX_ONLY or e[0] in model.platform_settings()]
             page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)
             caption=QLabel(description);caption.setStyleSheet('color: #92929e; font-size: 13px;');column.addWidget(caption)
             scroll=QScrollArea();scroll.setWidgetResizable(True);sheet=QWidget();rows=QVBoxLayout(sheet);rows.setContentsMargins(0,0,4,0);rows.setSpacing(8)

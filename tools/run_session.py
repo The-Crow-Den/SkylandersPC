@@ -627,6 +627,10 @@ def run(argv,sessions):
         print('Restarting with saved PC settings.',flush=True)
         # execv skips main's cleanup.
         while sessions:finish_session(*sessions.pop())
+        if os.name == 'nt':
+            # Windows execv spawns a new process and exits this one, so the
+            # launcher would lose the game it is tracking; run it as a child.
+            return subprocess.run(restart).returncode
         os.execv(sys.executable,restart)
     return 0 if result['stop_reason'] != 'process-exit' else (result['returncode'] if result['returncode'] >= 0 else 128 - result['returncode'])
 

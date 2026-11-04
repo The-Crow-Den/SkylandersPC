@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from tools import launcher_model as model
 from tools.run_session import exclusive_session
@@ -34,6 +35,13 @@ class LauncherModelTests(unittest.TestCase):
         self.assertIn('--motion-blur', argv)
         self.assertEqual(argv[argv.index('--frame-limit') + 1], '30')
         self.assertNotIn('--seconds', argv)
+
+    def test_linux_only_switches_are_off_on_windows(self):
+        value={**model.DEFAULTS,'nvidia':True,'mangohud':True}
+        self.assertIn('--nvidia',model.command('/project','python',value))
+        with patch.object(model,'platform_settings',return_value=[]):
+            argv=model.command('/project','python',value)
+        self.assertIn('--no-nvidia',argv);self.assertIn('--no-mangohud',argv)
 
     def test_gameplay_mod_switches_are_forwarded_explicitly(self):
         argv=model.command('/project','python',model.DEFAULTS,mods={'element-gates':True,'traptanium':False})

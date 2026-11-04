@@ -102,6 +102,8 @@ class Launcher(QMainWindow):
         self.check(display,'Motion blur','motion_blur')
         self.check(display,'Use NVIDIA GPU','nvidia')
         self.check(display,'MangoHud overlay · optional installation','mangohud')
+        for key in model.LINUX_ONLY:
+            self.fields[key].setVisible(key in model.platform_settings())
         display.addRow(text_label('Automatic follows gameplay, loading, cutscenes and portal arrival. Shift+F1 takes manual control for this session.','muted'))
 
         portal=self.page('Portal & controls','Bring your collection to life.','Choose a starting Skylander. Manage figures and individual villain traps in the game’s right-hand portal drawer.')
