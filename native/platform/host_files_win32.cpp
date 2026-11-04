@@ -162,7 +162,7 @@ bool rename_handle(HANDLE source, HANDLE parent, std::wstring_view name, bool re
     // that is still open (FILE_SHARE_DELETE) as rename(2) does on Linux; the
     // classic class refuses with STATUS_ACCESS_DENIED instead.
     constexpr ULONG replace_if_exists = 0x1, posix_semantics = 0x2;
-    constexpr auto rename_information_ex = static_cast<FILE_INFORMATION_CLASS>(65);
+    const auto rename_information_ex = static_cast<FILE_INFORMATION_CLASS>(65);
     const ULONG flags = posix_semantics | (replace ? replace_if_exists : 0);
     std::memcpy(storage.data(),&header,sizeof(header));
     std::memcpy(storage.data(),&flags,sizeof(flags));
