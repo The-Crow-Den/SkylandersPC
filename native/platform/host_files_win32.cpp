@@ -204,6 +204,16 @@ struct OpenPolicy {
 };
 
 }
+namespace {
+bool exact_name(HANDLE handle, std::wstring_view name) {
+    std::vector<std::max_align_t> storage((sizeof(FILE_NAME_INFO) + 65536 + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
+    auto* info = reinterpret_cast<FILE_NAME_INFO*>(storage.data());
+    if (!GetFileInformationByHandleEx(handle,FileNameInfo,info,static_cast<DWORD>(storage.size()*sizeof(std::max_align_t)))) return false;
+    const std::wstring_view path(info->FileName,info->FileNameLength / sizeof(wchar_t));
+    const auto slash = path.find_last_of(L'\\');
+    return (slash == std::wstring_view::npos ? path : path.substr(slash + 1)) == name;
+}
+}
 struct File::Impl {
     HANDLE handle = nullptr;
     bool directory = false, append = false;
@@ -245,6 +255,10 @@ struct File::Impl {
         if (!GetFileInformationByHandleEx(next->handle,FileAttributeTagInfo,&tag,sizeof(tag))) { failure(GetLastError()); return {}; }
         if (tag.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) { errno=ELOOP; return {}; }
         if (GetFileType(next->handle) != FILE_TYPE_DISK) { errno=ENOTSUP; return {}; }
+        // Windows resolves names case-insensitively whatever OBJ_CASE_INSENSITIVE
+        // says (ObCaseInsensitive defaults on). The guest file system is case-
+        // sensitive: the opened object's final component must be name exactly.
+        if (!policy.insensitive && !exact_name(next->handle,name)) { errno=ENOENT; return {}; }
         FileInfo info{};
         if (!information(next->handle,info)) return {};
         if (policy.single_link && !info.directory && (!info.regular || info.links != 1)) { errno=EACCES; return {}; }
