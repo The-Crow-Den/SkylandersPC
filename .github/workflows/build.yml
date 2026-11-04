@@ -115,6 +115,40 @@ jobs:
           cmake --build .local/windows-full-build
       - name: Full host synthetic tests (no guest admission/game validation)
         run: ctest --test-dir .local/windows-full-build --output-on-failure
+      - name: Windows bundle (source tree, host, its DLLs, launcher script)
+        run: |
+          dist=out/SkylandersPC-windows
+          mkdir -p "$dist/.local/native-gpu-build"
+          git config --global --add safe.directory "$(cygpath -m "$GITHUB_WORKSPACE")"
+          git archive HEAD | tar -x -C "$dist"
+          host=.local/windows-full-build/skylanders-native-host.exe
+          cp "$host" "$dist/.local/native-gpu-build/"
+          # Every MSYS2 DLL the host loads; Windows system DLLs are not copied.
+          ldd "$host" | awk '$3 ~ /^\/clang64\// {print $3}' | sort -u | xargs -r -I{} cp {} "$dist/.local/native-gpu-build/"
+          cat > "$dist/Launch Skylanders.cmd" <<'EOF'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          set "PYTHONPATH=%~dp0.local\python"
+          py -3.14 -c "import PyQt6.QtWidgets, cryptography" 2>nul && goto launch
+          echo Installing the launcher's pinned Python packages into .local\python ...
+          py -3.14 -m pip install --quiet --target .local\python --require-hashes --only-binary :all: -r tools\appimage\requirements.txt || goto fail
+          :launch
+          start "" pyw -3.14 tools\launcher.py
+          exit /b 0
+          :fail
+          echo The launcher needs Python 3.14 from python.org, with the py launcher.
+          pause
+          exit /b 1
+          EOF
+          sed -i 's/^          //; s/$/\r/' "$dist/Launch Skylanders.cmd"
+          ls "$dist/.local/native-gpu-build"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: SkylandersPC-windows
+          path: out/SkylandersPC-windows
+          include-hidden-files: true
+          if-no-files-found: error
 
   appimage:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
