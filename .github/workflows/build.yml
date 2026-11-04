@@ -107,6 +107,7 @@ jobs:
           git -C "$RUNNER_TEMP/xbyak" fetch -q --depth 1 https://github.com/herumi/xbyak.git "$XBYAK_COMMIT"
           git -C "$RUNNER_TEMP/xbyak" checkout -q FETCH_HEAD
       - name: Build complete Windows host with static renderer
+        id: full-build
         run: |
           xbyak="$(cygpath -m "$RUNNER_TEMP/xbyak")"
           cmake -S native -B .local/windows-full-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
@@ -116,6 +117,8 @@ jobs:
       - name: Full host synthetic tests (no guest admission/game validation)
         run: ctest --test-dir .local/windows-full-build --output-on-failure
       - name: Windows bundle (source tree, host, its DLLs, launcher script)
+        # Built even when a synthetic test fails, so the bundle can be tried.
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         run: |
           dist=out/SkylandersPC-windows
           mkdir -p "$dist/.local/native-gpu-build"
@@ -144,6 +147,7 @@ jobs:
           sed -i 's/^          //; s/$/\r/' "$dist/Launch Skylanders.cmd"
           ls "$dist/.local/native-gpu-build"
       - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         with:
           name: SkylandersPC-windows
           path: out/SkylandersPC-windows
