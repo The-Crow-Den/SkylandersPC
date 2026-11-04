@@ -22,6 +22,34 @@ def movie():
 
 
 class MovieAudioTests(unittest.TestCase):
+    def test_shorten_keeps_first_keyframe_unchanged(self):
+        data=movie();short=movie_audio.shorten(data)
+        tracks,records,_,_=movie_audio._layout(short)
+        _,original,_,_=movie_audio._layout(data)
+        self.assertEqual((tracks,len(records)),([1,7,0],1))
+        (audio,video,key),(old_audio,old_video,_)=records[0],original[0]
+        self.assertEqual(key,1)
+        self.assertEqual(short[slice(*video)],data[slice(*old_video)])
+        self.assertEqual([short[slice(*a)] for a in audio],[data[slice(*a)] for a in old_audio])
+        with self.assertRaises(ValueError):movie_audio.shorten(data,2)
+        with self.assertRaises(ValueError):movie_audio.shorten(data,0)
+
+    def test_skip_logos_swaps_session_copy_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();source=root/'source';session=root/'out/session';target=session/'game'
+            (source/'movies').mkdir(parents=True);(target/'movies').mkdir(parents=True)
+            data=movie();(source/'eboot.bin').write_bytes(b'executable')
+            for folder in (source,target):(folder/'movies/logo.avi').write_bytes(data)
+            profile=root/'profiles/patches/intro.json';profile.parent.mkdir(parents=True)
+            profile.write_text(json.dumps(dict(schema_version=1,executable_sha256=movie_audio.digest(b'executable'),
+                logos=[dict(asset='movies/logo.avi',source_sha256=movie_audio.digest(data),source_tracks=[1,7,0],
+                            output_sha256=movie_audio.digest(movie_audio.shorten(data)))])))
+            report=movie_audio.skip_logos(source,target,session,profile)
+            self.assertEqual(report['assets'][0]['asset'],'movies/logo.avi')
+            self.assertEqual((target/'movies/logo.avi').read_bytes(),movie_audio.shorten(data))
+            self.assertEqual((source/'movies/logo.avi').read_bytes(),data)
+            with self.assertRaises(ValueError):movie_audio.skip_logos(source,target,session,profile)  # session copy already changed
+
     def test_localization_preserves_video_and_selected_encoded_packets(self):
         data=movie();after=movie_audio.rewrite(data,[7,0])
         tracks,frames,_,_=movie_audio._layout(after)

@@ -123,6 +123,7 @@ class Launcher(QMainWindow):
         portal.addRow(PortraitStrip(self.root))
 
         mods=self.page('Game mods','Your adventure. Your rules.','PC features that respect your existing progress.')
+        self.check(mods,'Skip startup logos','skip_intro')
         self.check(mods,'Make Nightmare available immediately','unlock_nightmare')
         mods.addRow(text_label('Choose Nightmare when creating a save. Existing games keep their difficulty.','muted'))
         self.check(mods,'Record level events · diagnostic only','level_events')

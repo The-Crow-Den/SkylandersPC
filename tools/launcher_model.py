@@ -15,9 +15,9 @@ except ImportError:
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
                 motion_blur=True, anti_aliasing=True, nvidia=True, mangohud=False,
-                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', language='en-US',
+                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US',
                 portal_device='virtual')
-FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
+FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
 
@@ -57,6 +57,8 @@ def load(path):
         value['figure_bottom']=''
     if isinstance(value,dict) and 'portal_device' not in value:
         value['portal_device']='virtual'
+    if isinstance(value,dict) and 'skip_intro' not in value:
+        value['skip_intro']=False
     if isinstance(value,dict) and 'language' not in value:
         value['language']='en-US'
     if isinstance(value,dict) and 'anti_aliasing' not in value:
@@ -93,7 +95,7 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
     for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy', 'language'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
-    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare'):
+    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'skip_intro'):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))
     if mods is not None:
         try:

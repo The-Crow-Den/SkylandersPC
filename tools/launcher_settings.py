@@ -15,7 +15,7 @@ GROUPS = [
  ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
- ('Tweaks','Optional game behavior changes and diagnostic tools.', [('unlock_nightmare','Nightmare available by default')]),
+ ('Tweaks','Optional game behavior changes and diagnostic tools.', [('skip_intro','Skip startup logos'),('unlock_nightmare','Nightmare available by default')]),
 ]
 
 
@@ -87,6 +87,7 @@ class SettingsPage(QWidget):
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
             'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'A connected physical portal, or the virtual portal with figure files. Real portals are listed when the launcher opens.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
+            'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',
             'level_events':'Record events for troubleshooting.'}
         for name,description,entries in GROUPS:
             page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)

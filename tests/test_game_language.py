@@ -37,6 +37,8 @@ class GameLanguageTests(unittest.TestCase):
         value = dict(launcher_model.DEFAULTS, language='de-DE')
         argv = launcher_model.command('/project', 'python', value)
         self.assertEqual(argv[argv.index('--language') + 1], 'de-DE')
+        self.assertIn('--no-skip-intro', argv)
+        self.assertIn('--skip-intro', launcher_model.command('/project', 'python', dict(value, skip_intro=True)))
         with self.assertRaises(ValueError):
             launcher_model.validate(dict(value, language='xx'))
         self.assertEqual(launcher_model.languages(ROOT)[0], 'en-US')

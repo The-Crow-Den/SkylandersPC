@@ -257,6 +257,8 @@ def run(argv,sessions):
                         help='experimental internal render size; restart required')
     parser.add_argument('--language',choices=tuple(game_language.CODES),default=game_language.DEFAULT,
                         help='console system language the game reads; titles fall back to English (US) when they lack it')
+    parser.add_argument('--skip-intro',action=argparse.BooleanOptionalAction,default=False,
+                        help='cut the startup logo movies to one frame on builds with a verified intro profile')
     parser.add_argument('--movie-audio',choices=('auto','original','english'),default='auto',
                         help='fix movie narration on the verified US update: auto keeps the selected language when its track is known, original retains all tracks')
     parser.add_argument('--window-resolution', choices=PRESETS,
@@ -371,6 +373,8 @@ def run(argv,sessions):
         if movie_profile is None or narration not in json.loads(movie_profile.read_text()).get('narration_tracks',{}):
             narration=None
         selected_movie_audio=narration.lower() if narration else 'original'
+        intro_profile=next((path for path in sorted((ROOT/'profiles/patches').glob('*-skip-intro.json'))
+                            if json.loads(path.read_text()).get('executable_sha256')==executable_sha256),None) if args.skip_intro else None
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
         if glyph_mode!='playstation' and not controller_art.available():
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
@@ -456,7 +460,7 @@ def run(argv,sessions):
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
-    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or narration or 'controller-glyphs' in mod_handlers:
+    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or narration or intro_profile or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
                 PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
@@ -470,6 +474,15 @@ def run(argv,sessions):
         except (OSError,ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('movie_localization')
+    intro_metadata={'requested':args.skip_intro,'applied':False}
+    if intro_profile:
+        try:
+            intro_metadata.update(movie_audio.skip_logos(original_game,game_root,session,intro_profile),applied=True)
+        except (OSError,ValueError) as error:
+            parser.error(str(error))
+    elif args.skip_intro:
+        intro_metadata['note']='no verified intro profile for this build; logos play as shipped'
+    preparation_checkpoint('skip_intro')
     glyph_metadata={'mode':glyph_mode,'requested':args.controller_glyphs,'detection':glyph_detection}
     if 'controller-glyphs' in mod_handlers:
         try:
@@ -627,6 +640,7 @@ def run(argv,sessions):
                 'gameplay_mods': {'enabled':selected_mods,'assets':gameplay_metadata},
                 'controller_glyphs':glyph_metadata,
                 'movie_audio': {'mode':selected_movie_audio,'assets':movie_metadata},
+                'skip_intro': intro_metadata,
                 'language': {'requested':args.language,'selected':language,'system_code':game_language.CODES[language],'note':language_note},
                 'window_size': env.get('SKY_WINDOW_SIZE', '1280x720'),
                 'sha256': {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -679,7 +693,7 @@ def run(argv,sessions):
                    '--anti-aliasing' if args.anti_aliasing else '--no-anti-aliasing',
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
-                   '--movie-audio',args.movie_audio,'--language',args.language,
+                   '--movie-audio',args.movie_audio,'--skip-intro' if args.skip_intro else '--no-skip-intro','--language',args.language,
                    '--resolution',chosen['resolution'],'--quality',chosen['quality'],
                    '--frame-limit',str(chosen['frame_limit']),
                    '--portal-volume',str(chosen.get('portal_volume',30)),
