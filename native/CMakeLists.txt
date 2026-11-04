@@ -17,7 +17,8 @@ endif()
 
 # Fault dispatch needs the FS-restoring bridge on POSIX. Keep the platform
 # objects in an archive so memory-only tests don't acquire that dependency.
-add_library(sky-host-platform STATIC platform/host_files.cpp ${SKY_HOST_PLATFORM_SOURCES})
+# guest_fs: Windows guest TLS through FS-load fault emulation (guest_fs.hpp).
+add_library(sky-host-platform STATIC platform/host_files.cpp guest_fs.cpp ${SKY_HOST_PLATFORM_SOURCES})
 target_compile_features(sky-host-platform PUBLIC cxx_std_20)
 if(CMAKE_DL_LIBS)
   target_link_libraries(sky-host-platform PUBLIC ${CMAKE_DL_LIBS})
@@ -29,6 +30,9 @@ target_compile_options(sky-host-platform PRIVATE -Wall -Wextra -Wconversion -Wsh
 include(CTest)
 if(BUILD_TESTING)
   find_package(Python3 3.11 COMPONENTS Interpreter REQUIRED)
+  add_executable(guest-fs-test tests/test_guest_fs.cpp)
+  target_link_libraries(guest-fs-test PRIVATE sky-host-platform Threads::Threads)
+  add_test(NAME synthetic-guest-fs COMMAND guest-fs-test)
   add_executable(host-files-test tests/test_host_files.cpp hle/kernel_file.cpp hle/save_data.cpp)
   target_compile_features(host-files-test PRIVATE cxx_std_20)
   target_compile_options(host-files-test PRIVATE -Wall -Wextra -Wconversion -Wshadow)

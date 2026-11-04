@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "guest_fs.hpp"
 #include "platform/host_memory.hpp"
 
 #include "hle/pure_libc.hpp"
@@ -362,9 +363,11 @@ int main(int argc, char** argv) {
         }
         Pack pack(path);
 #ifdef _WIN32
-        // A complete code-range/rewrite profile is not yet admitted. Refuse
-        // before any guest entry instead of executing Windows FS accesses.
-        if (trace) fail("Windows execution requires an admitted executable/TLS rewrite profile; integration is incomplete");
+        // Guest FS loads fault on Windows' zero FS base and are emulated against
+        // the thread's TCB (guest_fs.hpp). The probe executes a real FS load
+        // first; never enter guest code unless it is handled exactly.
+        if (trace && !GuestFs::install())
+            fail("guest TLS: FS loads do not fault on a zero FS base in this process; cannot run guest code");
 #endif
         Arena arena;
         if (trace) {
