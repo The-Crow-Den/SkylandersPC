@@ -98,6 +98,7 @@ class Launcher(QMainWindow):
         self.check(display,'Show frame rate','fps_counter')
         self.check(display,'Show trophy popups','trophy_popups')
         self.check(display,'Motion blur','motion_blur')
+        self.check(display,'Anti-aliasing','anti_aliasing')
         self.check(display,'Use NVIDIA GPU','nvidia')
         self.check(display,'MangoHud overlay · optional installation','mangohud')
         display.addRow(text_label('Automatic follows gameplay, loading, cutscenes and portal arrival. Shift+F1 takes manual control for this session.','muted'))

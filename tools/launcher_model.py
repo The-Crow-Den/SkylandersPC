@@ -14,9 +14,9 @@ except ImportError:
 
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
-                motion_blur=True, nvidia=True, mangohud=False,
+                motion_blur=True, anti_aliasing=True, nvidia=True, mangohud=False,
                 unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='')
-FLAGS = ('motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
+FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
 
@@ -41,6 +41,8 @@ def load(path):
         value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
     if isinstance(value,dict) and 'figure_bottom' not in value:
         value['figure_bottom']=''
+    if isinstance(value,dict) and 'anti_aliasing' not in value:
+        value['anti_aliasing']=True
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
         value['frame_policy']='auto'
     return validate(value)
@@ -73,7 +75,7 @@ def command(root, python, value, mods=None, game=None):
         argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
     for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
-    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'nvidia', 'mangohud', 'unlock_nightmare'):
+    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare'):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))
     if mods is not None:
         try:

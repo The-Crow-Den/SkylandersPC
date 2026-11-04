@@ -274,6 +274,8 @@ def run(argv,sessions):
     parser.add_argument('--performance-profile', choices=('standard','low-end'), default='standard',
                         help='low-end targets 1080p/60 gameplay with lighter shadows and no motion blur')
     parser.add_argument('--motion-blur', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--anti-aliasing', action=argparse.BooleanOptionalAction, default=True,
+                        help='smooth jagged edges in the present pass (SKY_RENDERER_AA)')
     parser.add_argument('--memory-mode', choices=('standard','compact'), default='standard')
     parser.add_argument('--renderer-idle', choices=('adaptive','sleep'), default='adaptive',
                         help='sleep avoids speculative renderer idle spinning; experimental')
@@ -506,6 +508,7 @@ def run(argv,sessions):
         env['SKY_PORTAL_FIGURE'] = str(args.figure.resolve())
         if args.figure_bottom:
             env['SKY_PORTAL_FIGURE_BOTTOM'] = str(args.figure_bottom.resolve())
+    env['SKY_RENDERER_AA'] = '1' if args.anti_aliasing else '0'
     if args.timing:
         env['SKY_TIMING_TRACE'] = '1'
     if args.profile:
@@ -548,6 +551,7 @@ def run(argv,sessions):
                                  'base':str(installation.base),'update':str(installation.update) if installation.update else None,
                                  'executable_sha256':build['executable_sha256']},
                 'performance_profile': args.performance_profile, 'motion_blur': args.motion_blur,
+                'anti_aliasing': args.anti_aliasing,
                 'memory_mode': args.memory_mode,
                 'renderer_idle': args.renderer_idle,
                 'level_events': level_metadata,
@@ -606,6 +610,7 @@ def run(argv,sessions):
         restart = [sys.executable,str(Path(__file__).resolve()),'--game',game_library.selector(installation.title_id,installation.app_version),'--pc-menu',args.pc_menu,'--variant',args.variant,
                    '--performance-profile',args.performance_profile,
                    '--motion-blur' if args.motion_blur else '--no-motion-blur',
+                   '--anti-aliasing' if args.anti_aliasing else '--no-anti-aliasing',
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
                    '--movie-audio',selected_movie_audio,

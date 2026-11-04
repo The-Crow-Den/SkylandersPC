@@ -35,6 +35,14 @@ class LauncherModelTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--frame-limit') + 1], '30')
         self.assertNotIn('--seconds', argv)
 
+    def test_settings_saved_before_anti_aliasing_turn_it_on(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.json'
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'anti_aliasing'}))
+            self.assertTrue(model.load(path)['anti_aliasing'])
+        argv = model.command('/project', 'python', dict(model.DEFAULTS, anti_aliasing=False))
+        self.assertIn('--no-anti-aliasing', argv)
+
     def test_gameplay_mod_switches_are_forwarded_explicitly(self):
         argv=model.command('/project','python',model.DEFAULTS,mods={'element-gates':True,'traptanium':False})
         self.assertIn('--element-gates',argv);self.assertIn('--no-traptanium',argv)
