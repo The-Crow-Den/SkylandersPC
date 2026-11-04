@@ -3,6 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <atomic>
+#include <cstdint>
 
 namespace SkyHost {
 namespace {
@@ -11,6 +12,30 @@ static_assert(decltype(handler)::is_always_lock_free);
 void* registration = nullptr;
 enum class Owner { None, Generic, Runtime };
 Owner owner = Owner::None;
+// Windows runs vectored handlers on the faulting stack, which for guest code is
+// a guest stack outside the TEB's [StackLimit, StackBase). __chkstk (any frame
+// over a page, e.g. UCRT stdio) then probes downward from the host StackLimit
+// and dies with STATUS_STACK_OVERFLOW. Point the TIB at the committed region
+// actually in use for the handler's duration, as fibers do, then restore it.
+class HandlerStack {
+public:
+    HandlerStack() noexcept : tib_(reinterpret_cast<NT_TIB*>(NtCurrentTeb())),
+                              base_(tib_->StackBase), limit_(tib_->StackLimit) {
+        const auto here = reinterpret_cast<std::uintptr_t>(&tib_);
+        if (here >= reinterpret_cast<std::uintptr_t>(limit_) && here < reinterpret_cast<std::uintptr_t>(base_)) return;
+        MEMORY_BASIC_INFORMATION region{};
+        if (!VirtualQuery(&tib_, &region, sizeof(region)) || region.State != MEM_COMMIT) return;
+        tib_->StackLimit = region.BaseAddress;
+        tib_->StackBase = static_cast<unsigned char*>(region.BaseAddress) + region.RegionSize;
+    }
+    ~HandlerStack() { tib_->StackBase = base_; tib_->StackLimit = limit_; }
+    HandlerStack(const HandlerStack&) = delete;
+    HandlerStack& operator=(const HandlerStack&) = delete;
+private:
+    NT_TIB* tib_;
+    void* base_;
+    void* limit_;
+};
 LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     const auto* record = info->ExceptionRecord;
     if (record->ExceptionFlags & EXCEPTION_NONCONTINUABLE) return EXCEPTION_CONTINUE_SEARCH;
@@ -49,7 +74,13 @@ LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     fault.cpu.pc = c->Rip;
     fault.cpu.flags = c->EFlags;
     const auto callback = handler.load(std::memory_order_acquire);
-    if (!callback || !callback(fault)) return EXCEPTION_CONTINUE_SEARCH;
+    if (!callback) return EXCEPTION_CONTINUE_SEARCH;
+    bool handled;
+    {
+        HandlerStack stack;
+        handled = callback(fault);
+    }
+    if (!handled) return EXCEPTION_CONTINUE_SEARCH;
     c->Rax=fault.cpu.gpr[0]; c->Rcx=fault.cpu.gpr[1]; c->Rdx=fault.cpu.gpr[2];
     c->Rbx=fault.cpu.gpr[3]; c->Rsp=fault.cpu.gpr[4]; c->Rbp=fault.cpu.gpr[5];
     c->Rsi=fault.cpu.gpr[6]; c->Rdi=fault.cpu.gpr[7]; c->R8=fault.cpu.gpr[8];
