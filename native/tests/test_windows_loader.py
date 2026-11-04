@@ -38,7 +38,9 @@ class WindowsLoaderTests(unittest.TestCase):
             fault = next(json.loads(line) for line in result.stderr.splitlines()
                          if line.startswith('{"event":"guest-fault"'))
             self.assertTrue(fault['guest_executed'])
-            self.assertEqual(fault['pc'], json.loads(result.stderr.splitlines()[0])['entry'])
+            entry = next(json.loads(line) for line in result.stderr.splitlines()
+                         if line.startswith('{"event":"entry-attempt"'))
+            self.assertEqual(fault['pc'], entry['entry'])
 
     def test_guest_tls_load_is_emulated_against_the_tcb(self):
         # Windows' zero FS base makes the load fault; guest_fs emulates it.

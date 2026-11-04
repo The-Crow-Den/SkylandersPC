@@ -19,6 +19,8 @@
 #include <vector>
 
 #include "guest_fs.hpp"
+#include <chrono>
+#include <thread>
 #include "platform/host_memory.hpp"
 
 #include "hle/pure_libc.hpp"
@@ -368,6 +370,22 @@ int main(int argc, char** argv) {
         // first; never enter guest code unless it is handled exactly.
         if (trace && !GuestFs::install())
             fail("guest TLS: FS loads do not fault on a zero FS base in this process; cannot run guest code");
+        if (trace) {
+            std::fprintf(stderr, "{\"event\":\"guest-tls\",\"mode\":\"fault-emulation\"}\n");
+            // Each emulated load costs one exception round trip; log the rate
+            // so a slow session shows whether TLS is why.
+            std::thread([] {
+                std::uint64_t previous = GuestFs::emulated_loads();
+                for (;;) {
+                    std::this_thread::sleep_for(std::chrono::seconds(10));
+                    const auto now = GuestFs::emulated_loads();
+                    if (now != previous)
+                        std::fprintf(stderr, "{\"event\":\"guest-tls-loads\",\"total\":%llu,\"per_second\":%llu}\n",
+                                     static_cast<unsigned long long>(now), static_cast<unsigned long long>((now - previous) / 10));
+                    previous = now;
+                }
+            }).detach();
+        }
 #endif
         Arena arena;
         if (trace) {
