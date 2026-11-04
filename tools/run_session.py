@@ -23,14 +23,14 @@ try:
     from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
-    from . import nightmare_mod
+    from . import mod_manifest
     from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 except ImportError:
     from overlay_session import html_overlay
     from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
-    import nightmare_mod
+    import mod_manifest
     import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -263,7 +263,9 @@ def run(argv,sessions):
     parser.add_argument('--frame-policy', choices=('manual','auto'), default='manual',
                         help='auto follows mod loading, UI visibility and cutscene state (30/60)')
     parser.add_argument('--unlock-nightmare', action=argparse.BooleanOptionalAction, default=True,
-                        help='make Nightmare available in fresh-save difficulty selection')
+                        help='make Nightmare available in fresh-save difficulty selection (alias for --mod nightmare)')
+    parser.add_argument('--mod', action='append', default=[], metavar='ID',
+                        help='enable a mod by id from profiles/mods or the per-user mods/ folder; repeatable')
     for name in gameplay_mods.NAMES:
         parser.add_argument('--'+name,action=argparse.BooleanOptionalAction,default=None,
                             help='exact-build gameplay mod; defaults to the selected title mod profile')
@@ -335,6 +337,8 @@ def run(argv,sessions):
         entry = game_library.resolve_entry(ROOT,args.game)
         game_prepare.require_ready(ROOT,entry,args.variant)
         selected_save, save_source = save_profile.select(ROOT, installation.title_id, args.save_root)
+        available_mods=mod_manifest.discover(ROOT)
+        selected_mod_ids=list(dict.fromkeys((['nightmare'] if args.unlock_nightmare else [])+args.mod))
         selected_mods=gameplay_mods.selection(ROOT,installation.title_id,{name:getattr(args,name.replace('-','_')) for name in gameplay_mods.NAMES})
         recipes=gameplay_mods.recipes(ROOT,installation.title_id,installation.app_version,selected_mods)
         movie_profile=ROOT/'profiles/patches/trap-team-us-01.01-movie-audio.json' if (installation.title_id,installation.app_version,build['executable_sha256'])==('CUSA00626','01.01',game_build.US_UPDATE_SHA256) else None
@@ -378,7 +382,8 @@ def run(argv,sessions):
     resolution_metadata = None
     asset_metadata = None
     level_metadata = None
-    nightmare_metadata = None
+    mod_metadata = []
+    mod_environment = {}
     game_root = installation.materialize(session/'install') if installation.update else installation.base
     preparation_checkpoint("install_overlay")
     original_game = game_root
@@ -389,26 +394,31 @@ def run(argv,sessions):
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
-    if args.resolution or shadows != 'native' or not args.motion_blur or args.unlock_nightmare or recipes or selected_movie_audio=='english' or glyph_mode!='playstation':
+    if args.resolution or shadows != 'native' or not args.motion_blur or selected_mod_ids or recipes or selected_movie_audio=='english' or glyph_mode!='playstation':
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
                 PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
-    if args.unlock_nightmare:
-        # Composed with the other asset recipes, since the controller glyph pack
-        # also edits level/title.bld; a separate write would block that edit.
+    if selected_mod_ids:
+        # Asset patches compose with the other asset recipes, since the
+        # controller glyph pack also edits level/title.bld; a separate write
+        # would block that edit.
         try:
-            nightmare_profile=json.loads(Path(build['nightmare']).read_text())
-            if nightmare_profile['executable_sha256']!=build['executable_sha256']:
-                raise ValueError('Nightmare mod refuses an unknown original executable')
-            recipes=list(recipes or [])+[nightmare_mod.recipe(nightmare_profile)]
-            nightmare_metadata={'asset':nightmare_profile['asset'],'status':nightmare_profile['status'],
-                                'prepared':'composed asset recipe'}
-        except (OSError,ValueError,KeyError) as error:
+            code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
+                     for operation in available_mods[ident]['operations'])
+            applied=mod_manifest.plan(available_mods,selected_mod_ids,build['executable_sha256'],
+                                      executable=Path(build['executable']).read_bytes() if code else None)
+            if any(operation['type']=='code-patch' for mod in applied for operation in mod['operations']):
+                raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
+            profile=mod_manifest.asset_profile(applied,installation.title_id,installation.app_version,build['executable_sha256'])
+            if profile:recipes=list(recipes or [])+[profile]
+            mod_environment=mod_manifest.host_environment(applied)
+            mod_metadata=mod_manifest.record(applied)
+        except (OSError,ValueError) as error:
             parser.error(str(error))
-    preparation_checkpoint('nightmare')
+    preparation_checkpoint('mods')
     movie_metadata=None
     if selected_movie_audio=='english':
         try:
@@ -454,6 +464,7 @@ def run(argv,sessions):
         protected.append(selected_save)
     if trophy_metadata.get('available'):protected.append(trophy_metadata['store'])
     env = renderer_environment(env, args.renderer_idle)
+    env.update(mod_environment)
     if args.level_events:
         try:
             files[0],level_metadata = level_events_mod.prepare(pack,session,
@@ -555,7 +566,7 @@ def run(argv,sessions):
                 'memory_mode': args.memory_mode,
                 'renderer_idle': args.renderer_idle,
                 'level_events': level_metadata,
-                'nightmare_unlock': nightmare_metadata,
+                'mods': mod_metadata,
                 'allocator_environment': {k: env[k] for k in ('MALLOC_ARENA_MAX','MALLOC_TRIM_THRESHOLD_') if k in env},
                 'resolution': resolution_metadata,
                 'graphics_assets': asset_metadata,
@@ -630,6 +641,7 @@ def run(argv,sessions):
         restart += ['--frame-policy',chosen.get('frame_policy',args.frame_policy)]
         if args.level_events: restart.append('--level-events')
         restart.append('--unlock-nightmare' if args.unlock_nightmare else '--no-unlock-nightmare')
+        for ident in args.mod:restart += ['--mod',ident]
         for name,enabled in selected_mods.items():restart.append(('--' if enabled else '--no-')+name)
         print('Restarting with saved PC settings.',flush=True)
         # execv skips main's cleanup.
