@@ -47,7 +47,7 @@ def run_tls_fixture(test):
         (root / 'types').write_bytes(b'')
         result = subprocess.run([str(BINARY), '--trace-start', str(root / 'image.pack'), str(root / 'types')],
                                 capture_output=True, text=True, timeout=15)
-        test.assertEqual(result.returncode, 0, result.stderr)
+        test.assertEqual(result.returncode, 0, f'exit {result.returncode:#x}\nstderr:\n{result.stderr}\nstdout:\n{result.stdout}')
         return json.loads(result.stderr.splitlines()[-1])['return_value']
 
 

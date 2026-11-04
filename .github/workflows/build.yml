@@ -116,6 +116,10 @@ jobs:
           cmake --build .local/windows-full-build
       - name: Full host synthetic tests (no guest admission/game validation)
         run: ctest --test-dir .local/windows-full-build --output-on-failure
+      - name: Repeat the guest TLS loader test (flake hunt, informational)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        continue-on-error: true
+        run: ctest --test-dir .local/windows-full-build --output-on-failure -R native-windows-loader --repeat until-fail:30
       - name: Windows bundle (source tree, host, its DLLs, launcher script)
         # Built even when a synthetic test fails, so the bundle can be tried.
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
