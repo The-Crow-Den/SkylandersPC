@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import time
 
 WINDOWS = os.name == 'nt'
 if WINDOWS:
@@ -58,24 +59,28 @@ def interrupt(pid):
 
 
 @contextmanager
-def exclusive_lock(path):
-    """Holds a nonblocking exclusive lock on path; raises BlockingIOError if held."""
+def exclusive_lock(path, blocking=False):
+    """Holds an exclusive lock on path; unless blocking, raises BlockingIOError if held."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a+b') as guard:
         if WINDOWS:
             guard.seek(0)
-            try:
-                msvcrt.locking(guard.fileno(), msvcrt.LK_NBLCK, 1)
-            except OSError:
-                raise BlockingIOError('lock is held') from None
+            while True:
+                try:
+                    msvcrt.locking(guard.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if not blocking:
+                        raise BlockingIOError('lock is held') from None
+                    time.sleep(0.1)
             try:
                 yield
             finally:
                 guard.seek(0)
                 msvcrt.locking(guard.fileno(), msvcrt.LK_UNLCK, 1)
         else:
-            fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(guard, fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
             yield
 
 

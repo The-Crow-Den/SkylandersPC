@@ -2,7 +2,6 @@
 """Versioned installation manifests; game data and user preferences stay separate."""
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import json
 from pathlib import Path
@@ -10,6 +9,11 @@ import re
 import shutil
 import uuid
 import warnings
+
+try:
+    from . import host_process
+except ImportError:
+    import host_process
 
 try:
     from . import game_install
@@ -114,8 +118,7 @@ def locked(library):
     if any(p.is_symlink() for p in (library, *library.parents)):
         raise ValueError('Library path refuses symlinks')
     library.mkdir(parents=True, exist_ok=True)
-    with (library / '.library.lock').open('a') as stream:
-        fcntl.flock(stream, fcntl.LOCK_EX)
+    with host_process.exclusive_lock(library / '.library.lock', blocking=True):
         yield
 
 

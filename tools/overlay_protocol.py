@@ -12,7 +12,7 @@ import time
 def private_directory(path):
     path=Path(path).absolute()
     info=path.lstat()
-    if path.resolve()!=path or not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode&0o077:
+    if path.resolve()!=path or not stat.S_ISDIR(info.st_mode) or (os.name!='nt' and (info.st_uid!=os.getuid() or info.st_mode&0o077)):
         raise ValueError('overlay directory must be private and owned by this user')
     return path
 

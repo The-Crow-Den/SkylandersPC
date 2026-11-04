@@ -133,19 +133,47 @@ jobs:
           setlocal
           cd /d "%~dp0"
           set "PYTHONPATH=%~dp0.local\python"
-          py -3.14 -c "import PyQt6.QtWidgets, cryptography" 2>nul && goto launch
+          set "LOG=%~dp0launcher.log"
+          set "PY=py -3"
+          %PY% -c "import sys" 2>nul || set "PY=python"
+          %PY% -c "import sys; sys.exit(sys.version_info < (3, 11))" 2>nul || goto nopython
+          %PY% -c "import PyQt6.QtWidgets, cryptography" 2>nul && goto launch
           echo Installing the launcher's pinned Python packages into .local\python ...
-          py -3.14 -m pip install --quiet --target .local\python --require-hashes --only-binary :all: -r tools\appimage\requirements.txt || goto fail
+          %PY% -m pip install --quiet --target .local\python --require-hashes --only-binary :all: -r tools\appimage\requirements.txt || goto fail
           :launch
-          start "" pyw -3.14 tools\launcher.py
+          echo Starting the launcher; errors go to launcher.log. Keep this window open.
+          %PY% tools\launcher.py > "%LOG%" 2>&1
+          if errorlevel 1 goto crashed
           exit /b 0
+          :crashed
+          echo The launcher exited with an error:
+          type "%LOG%"
+          pause
+          exit /b 1
+          :nopython
+          echo Python 3.11 or newer from python.org was not found (tried "py -3" and "python").
+          pause
+          exit /b 1
           :fail
-          echo The launcher needs Python 3.14 from python.org, with the py launcher.
+          echo Installing the Python packages failed; see the messages above.
           pause
           exit /b 1
           EOF
           sed -i 's/^          //; s/$/\r/' "$dist/Launch Skylanders.cmd"
           ls "$dist/.local/native-gpu-build"
+      - uses: actions/setup-python@v6
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        with:
+          python-version: '3.14'
+      - name: Launcher imports on Windows Python
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -m pip install --quiet --target "$env:RUNNER_TEMP\pydeps" --require-hashes --only-binary :all: -r tools/appimage/requirements.txt
+          $env:PYTHONPATH = "$env:RUNNER_TEMP\pydeps"
+          python -c "import sys; sys.path.insert(0, 'tools'); import launcher, run_session, overlay_session, game_prepare; print('launcher imports ok')"
       - uses: actions/upload-artifact@v5
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         with:
