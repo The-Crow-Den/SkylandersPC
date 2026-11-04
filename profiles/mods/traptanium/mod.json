@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "traptanium",
+  "name": "No Trap Master required for Traptanium",
+  "version": "1.0.0",
+  "author": "SkylandersPS4 contributors",
+  "licence": "GPL-3.0-or-later",
+  "description": "Experimental: break Traptanium with any Skylander. The recipe is withheld from public checkouts.",
+  "targets": [
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.01",
+      "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    }
+  ],
+  "requires": [],
+  "conflicts": [],
+  "settings": {},
+  "operations": [
+    {
+      "type": "asset-patch",
+      "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+      "profile": "profiles/patches/trap-team-us-01.01-traptanium.experimental.json"
+    }
+  ]
+}

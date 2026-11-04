@@ -18,8 +18,22 @@ Mod ids must be unique across both folders.
 python3 tools/run_session.py --mod nightmare --mod my-mod
 ```
 
-`--mod ID` can be repeated. `--unlock-nightmare` (on by default) is an alias for
-`--mod nightmare`; pass `--no-unlock-nightmare` to turn it off. A requested mod
+`--mod ID` can be repeated. The built-in mods keep their older options, which
+now just select the mod:
+
+| Mod id | Option | What it does |
+| --- | --- | --- |
+| `nightmare` | `--unlock-nightmare` (on by default) | Nightmare selectable on a new save |
+| `level-events` | `--level-events`, or `--frame-policy auto` | Level-switch hooks for automatic FPS |
+| `controller-glyphs` | `--controller-glyphs xbox\|nintendo\|auto` | Xbox or Nintendo button prompts from imported Steam artwork |
+| `movie-audio` | `--movie-audio english\|auto` | English narration in cutscene movies |
+| `element-gates` | `--element-gates` | Experimental gate change |
+| `traptanium` | `--traptanium` | Experimental; recipe withheld from public checkouts |
+| `unlock-expansions` | `--unlock-expansions` | Experimental adventure pack access |
+| `replay-expansion-intros` | `--replay-expansion-intros` | Experimental; recipe withheld from public checkouts |
+
+The launcher's switches set these options; the four experimental choices are
+remembered per title in `out/mod-profiles/<title>.json`. A requested mod
 that is missing, does not support the build, or clashes with another mod stops
 the launch with an error before anything is changed. Mods a mod `requires` are
 turned on with it.
@@ -67,9 +81,13 @@ Every operation may have `"when": {"setting": "<name>", "equals": <value>}`;
 it then runs only when that setting has that value. A mod with no operations
 left for the selected build and settings is refused.
 
-**`asset-patch`**: an expected-byte edit inside a game archive. `target` is the
-executable sha256 it belongs to; `recipe` is one asset entry in the
-`tools/asset_mod.py` recipe format:
+**`asset-patch`**: expected-byte edits inside game archives. `target` is the
+executable sha256 it belongs to. Give either `recipe`, one asset entry in the
+`tools/asset_mod.py` recipe format, or `profile`, a recipe file whose `assets`
+list holds such entries and whose `executable_sha256` matches the target. A
+built-in mod's `profile` is a path under `profiles/patches/`; a user mod's is a
+path inside its own folder. A missing recipe file is reported as unavailable.
+Inline example:
 
 ```json
 {"type": "asset-patch", "target": "<sha256>", "recipe": {
@@ -97,6 +115,22 @@ checked against the original executable, but launching with one is refused
 for now: the game runs from pre-translated code, and there is no step yet that
 applies executable patches to it.
 
+**`generated`**: edits a host step builds at launch, for changes that cannot
+be stored as fixed bytes (they depend on local artwork, or rewrite whole
+files). `handler` names the step; `profile` is its data file, found the same
+way as above; `writes` lists game files it replaces whole, so another mod
+editing those files is refused. The handlers are `level-events` (patches the
+translated code pack), `controller-glyphs` (draws prompts into the font and
+title archives; its edits are checked for overlaps once built) and
+`movie-audio` (rewrites the listed movies). A mod naming any other handler is
+refused.
+
+```json
+{"type": "generated", "handler": "movie-audio", "target": "<sha256>",
+ "profile": "profiles/patches/trap-team-us-01.01-movie-audio.json",
+ "writes": ["movies/darkexp.mov"]}
+```
+
 **`host-option`**: environment values for the native host. Only `SKY_*` names
 with string values are allowed:
 
@@ -109,7 +143,8 @@ with string values are allowed:
 Before launch the loader collects every byte each selected mod writes. Two mods
 that change the same executable bytes, or the same bytes of the same archive
 chunk, are refused with an error naming both. Edits to different bytes of one
-archive are combined into a single preparation. Two mods setting one
+archive are combined into a single preparation. A file listed in a generated
+operation's `writes` belongs to that mod alone. Two mods setting one
 host option to different values are refused the same way.
 
 ## Finding addresses

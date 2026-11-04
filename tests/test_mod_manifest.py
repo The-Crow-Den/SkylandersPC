@@ -104,6 +104,53 @@ class ManifestTest(unittest.TestCase):
             (root / 'mods/x/mod.json').unlink()
             self.assertTrue(mods.discover(root)['sample']['builtin'])
 
+    def test_recipe_files_and_withheld_recipes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recipe = manifest()['operations'][0]['recipe']
+            gates = manifest('gates', operations=[dict(type='asset-patch', target=BUILD, profile='profiles/patches/gates.json')])
+            gates.update(builtin=True, root=str(root))
+            with self.assertRaisesRegex(mods.ModError, 'unavailable in this checkout'):
+                mods.plan({'gates': gates}, ['gates'], BUILD)
+            (root / 'profiles/patches').mkdir(parents=True)
+            (root / 'profiles/patches/gates.json').write_text(json.dumps(dict(executable_sha256=OTHER, assets=[recipe])))
+            with self.assertRaisesRegex(mods.ModError, 'different executable'):
+                mods.plan({'gates': gates}, ['gates'], BUILD)
+            (root / 'profiles/patches/gates.json').write_text(json.dumps(dict(executable_sha256=BUILD, assets=[recipe])))
+            applied = mods.plan({'gates': gates}, ['gates'], BUILD)
+            self.assertEqual(mods.asset_profile(applied, 'CUSA00000', '01.00', BUILD)['assets'], [recipe])
+            # A user mod reads only from its own folder; a built-in one only from profiles/patches.
+            outside = dict(gates, builtin=False, source=str(root / 'mods/gates'))
+            with self.assertRaisesRegex(mods.ModError, 'unavailable'):
+                mods.plan({'gates': outside}, ['gates'], BUILD)
+            with self.assertRaises(mods.ModError):
+                manifest(operations=[dict(type='asset-patch', target=BUILD, profile='../escape.json')])
+            stray = dict(gates, operations=[dict(type='asset-patch', target=BUILD, profile='tools/x.json')])
+            with self.assertRaisesRegex(mods.ModError, 'must live in profiles/patches'):
+                mods.plan({'gates': stray}, ['gates'], BUILD)
+
+    def test_whole_file_writes_conflict_with_edits(self):
+        movies = manifest('movies', operations=[dict(type='generated', handler='movies', target=BUILD, writes=['level/title.bld'])])
+        with self.assertRaisesRegex(mods.ModError, 'mods movies and sample both change level/title.bld'):
+            mods.plan({'movies': movies, 'sample': manifest()}, ['sample', 'movies'], BUILD)
+        writes = []
+        applied = mods.plan({'sample': manifest()}, ['sample'], BUILD, writes=writes)
+        self.assertEqual(mods.record(applied)[0]['operations'][0]['assets'], ['level/title.bld'])
+        generated = manifest()['operations'][0]['recipe']
+        with self.assertRaisesRegex(mods.ModError, 'mods sample and glyphs both change bytes 16..18'):
+            mods.claim(writes, 'glyphs', list(mods.recipe_ranges(generated)))
+        with self.assertRaises(mods.ModError):
+            manifest(operations=[dict(type='generated', handler='Bad Handler', target=BUILD)])
+
+    def test_builtin_manifests_parse(self):
+        available = mods.discover(ROOT)
+        for ident in ('nightmare', 'level-events', 'controller-glyphs', 'movie-audio', 'element-gates',
+                      'traptanium', 'unlock-expansions', 'replay-expansion-intros'):
+            self.assertTrue(available[ident]['builtin'], ident)
+        self.assertTrue(mods.supports(available, "movie-audio", json.loads(
+            (ROOT / 'profiles/patches/trap-team-us-01.01-movie-audio.json').read_text())['executable_sha256']))
+        self.assertFalse(mods.supports(available, 'movie-audio', BUILD))
+
     def test_builtin_nightmare_matches_profiles(self):
         nightmare = mods.read(ROOT / 'profiles/mods/nightmare')
         for name in ('trap-team-us-01.01-nightmare.json', 'trap-team-nightmare.json'):

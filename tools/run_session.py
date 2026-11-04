@@ -40,6 +40,8 @@ PACKS = {'original': 'native-linked-boot-weak',
 
 
 SESSION_TEMP = ROOT / 'out/session-temp'
+# Host steps that build a mod's edits at launch (mod.json `generated` operations).
+MOD_HANDLERS = {'level-events', 'controller-glyphs', 'movie-audio'}
 LAST_SESSION = ROOT / 'out/last-session'
 KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log')
 
@@ -338,22 +340,41 @@ def run(argv,sessions):
         game_prepare.require_ready(ROOT,entry,args.variant)
         selected_save, save_source = save_profile.select(ROOT, installation.title_id, args.save_root)
         available_mods=mod_manifest.discover(ROOT)
-        selected_mod_ids=list(dict.fromkeys((['nightmare'] if args.unlock_nightmare else [])+args.mod))
+        executable_sha256=build['executable_sha256']
         selected_mods=gameplay_mods.selection(ROOT,installation.title_id,{name:getattr(args,name.replace('-','_')) for name in gameplay_mods.NAMES})
-        recipes=gameplay_mods.recipes(ROOT,installation.title_id,installation.app_version,selected_mods)
-        movie_profile=ROOT/'profiles/patches/trap-team-us-01.01-movie-audio.json' if (installation.title_id,installation.app_version,build['executable_sha256'])==('CUSA00626','01.01',game_build.US_UPDATE_SHA256) else None
-        if args.movie_audio=='english' and movie_profile is None:
+        movie_supported=mod_manifest.supports(available_mods,'movie-audio',executable_sha256)
+        if args.movie_audio=='english' and not movie_supported:
             raise ValueError('English movie localization requires the verified US update')
-        selected_movie_audio='english' if args.movie_audio!='original' and movie_profile else 'original'
+        selected_movie_audio='english' if args.movie_audio!='original' and movie_supported else 'original'
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
-        glyph_profile=ROOT/'profiles/patches/trap-team-us-01.01-controller-glyphs.json'
         if glyph_mode!='playstation' and not controller_art.available():
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
             glyph_mode,glyph_detection='playstation','no imported artwork: original prompts retained'
 
-        if glyph_mode!='playstation' and movie_profile is None:
+        if glyph_mode!='playstation' and not mod_manifest.supports(available_mods,'controller-glyphs',executable_sha256):
             if args.controller_glyphs!='auto':raise ValueError('Controller glyph packs require the verified US update')
             glyph_mode,glyph_detection='playstation','unsupported build: original prompts retained'
+        # Built-in mods selected by their historical flags, then --mod ids.
+        selected_mod_ids=list(dict.fromkeys((['nightmare'] if args.unlock_nightmare else [])+
+                                            [name for name,enabled in selected_mods.items() if enabled]+
+                                            (['level-events'] if args.level_events else [])+
+                                            (['movie-audio'] if selected_movie_audio=='english' else [])+
+                                            (['controller-glyphs'] if glyph_mode!='playstation' else [])+args.mod))
+        mod_writes=[]
+        code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
+                 for operation in available_mods[ident]['operations'])
+        applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
+                                       settings={'controller-glyphs':{'mode':glyph_mode}} if glyph_mode!='playstation' else None,
+                                       executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
+        if any(operation['type']=='code-patch' for mod in applied_mods for operation in mod['operations']):
+            raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
+        mod_handlers={(operation['handler']):(mod,operation) for mod,operation in mod_manifest.generated(applied_mods)}
+        unknown=set(mod_handlers)-MOD_HANDLERS
+        if unknown:raise ValueError('mods use unknown handlers: '+', '.join(sorted(unknown)))
+        asset_profile=mod_manifest.asset_profile(applied_mods,installation.title_id,installation.app_version,executable_sha256)
+        recipes=[asset_profile] if asset_profile else []
+        mod_environment=mod_manifest.host_environment(applied_mods)
+        mod_metadata=mod_manifest.record(applied_mods)
 
     except (OSError,ValueError) as error:
         parser.error(str(error))
@@ -382,8 +403,6 @@ def run(argv,sessions):
     resolution_metadata = None
     asset_metadata = None
     level_metadata = None
-    mod_metadata = []
-    mod_environment = {}
     game_root = installation.materialize(session/'install') if installation.update else installation.base
     preparation_checkpoint("install_overlay")
     original_game = game_root
@@ -394,42 +413,26 @@ def run(argv,sessions):
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
-    if args.resolution or shadows != 'native' or not args.motion_blur or selected_mod_ids or recipes or selected_movie_audio=='english' or glyph_mode!='playstation':
+    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or 'movie-audio' in mod_handlers or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
                 PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
-    if selected_mod_ids:
-        # Asset patches compose with the other asset recipes, since the
-        # controller glyph pack also edits level/title.bld; a separate write
-        # would block that edit.
-        try:
-            code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
-                     for operation in available_mods[ident]['operations'])
-            applied=mod_manifest.plan(available_mods,selected_mod_ids,build['executable_sha256'],
-                                      executable=Path(build['executable']).read_bytes() if code else None)
-            if any(operation['type']=='code-patch' for mod in applied for operation in mod['operations']):
-                raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
-            profile=mod_manifest.asset_profile(applied,installation.title_id,installation.app_version,build['executable_sha256'])
-            if profile:recipes=list(recipes or [])+[profile]
-            mod_environment=mod_manifest.host_environment(applied)
-            mod_metadata=mod_manifest.record(applied)
-        except (OSError,ValueError) as error:
-            parser.error(str(error))
-    preparation_checkpoint('mods')
     movie_metadata=None
-    if selected_movie_audio=='english':
+    if 'movie-audio' in mod_handlers:
         try:
-            movie_metadata=movie_audio.prepare(original_game,game_root,session,movie_profile)
+            movie_metadata=movie_audio.prepare(original_game,game_root,session,Path(mod_handlers['movie-audio'][1]['profile_path']))
         except (OSError,ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('movie_localization')
     glyph_metadata={'mode':glyph_mode,'requested':args.controller_glyphs,'detection':glyph_detection}
-    if glyph_mode!='playstation':
+    if 'controller-glyphs' in mod_handlers:
         try:
-            recipes.append(controller_glyphs.build_profile(original_game,glyph_profile,glyph_mode,build['executable_sha256']))
+            recipes.append(controller_glyphs.build_profile(original_game,mod_handlers['controller-glyphs'][1]['profile_path'],glyph_mode,executable_sha256))
+            # Generated edits face the same overlap check as manifest edits.
+            mod_manifest.claim(mod_writes,'controller-glyphs',[item for asset in recipes[-1]['assets'] for item in mod_manifest.recipe_ranges(asset)])
             glyph_metadata.update(coverage='shared font, animated mash prompts and title confirm button',assets=[item['asset'] for item in recipes[-1]['assets']])
         except (OSError,ValueError,lzma.LZMAError) as error:
             parser.error(str(error))
@@ -465,10 +468,10 @@ def run(argv,sessions):
     if trophy_metadata.get('available'):protected.append(trophy_metadata['store'])
     env = renderer_environment(env, args.renderer_idle)
     env.update(mod_environment)
-    if args.level_events:
+    if 'level-events' in mod_handlers:
         try:
             files[0],level_metadata = level_events_mod.prepare(pack,session,
-                build['executable'],args.variant,args.resolution,build['level-events'],build['resolution'])
+                build['executable'],args.variant,args.resolution,mod_handlers['level-events'][1]['profile_path'],build['resolution'])
         except (OSError,ValueError) as error:
             parser.error(str(error))
         env['SKY_LEVEL_EVENT_MAILBOX'] = str(level_metadata['mailbox_address'])

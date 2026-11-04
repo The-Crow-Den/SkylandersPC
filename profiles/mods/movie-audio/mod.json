@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "movie-audio",
+  "name": "English movie narration",
+  "version": "1.0.0",
+  "author": "SkylandersPS4 contributors",
+  "licence": "GPL-3.0-or-later",
+  "description": "Keeps only the English narration track in the cutscene movies.",
+  "targets": [
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.01",
+      "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    }
+  ],
+  "requires": [],
+  "conflicts": [],
+  "settings": {},
+  "operations": [
+    {
+      "type": "generated",
+      "handler": "movie-audio",
+      "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+      "profile": "profiles/patches/trap-team-us-01.01-movie-audio.json",
+      "writes": [
+        "movies/darkexp.mov",
+        "movies/flynnexp.mov",
+        "movies/fmv1.mov",
+        "movies/fmv10.mov",
+        "movies/fmv2.mov",
+        "movies/fmv3.mov",
+        "movies/fmv4.mov",
+        "movies/fmv5.mov",
+        "movies/fmv6.mov",
+        "movies/fmv8.mov",
+        "movies/fmv9.mov",
+        "movies/lightexp.mov",
+        "movies/mirrorexp.mov"
+      ]
+    }
+  ]
+}

@@ -9,9 +9,12 @@ expected source hash, so a mismatched build is refused before launch.
 Operations:
   code-patch   executable file offset, expected and replacement bytes (the
                profiles/patches schema 1 entry format)
-  asset-patch  one tools/asset_mod recipe asset (archive path, source sha256,
-               chunks with expected-byte edits)
+  asset-patch  tools/asset_mod recipe assets (archive path, source sha256,
+               chunks with expected-byte edits), inline as `recipe` or in a
+               recipe file named by `profile`
   host-option  SKY_* environment values for the native host
+  generated    edits built at launch by a named host handler (for example
+               from local artwork); `writes` lists whole files it replaces
 """
 import json
 from pathlib import Path
@@ -27,7 +30,8 @@ BUILTIN = Path('profiles/mods')
 USER = Path('mods')
 IDENTIFIER = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
 SHA256 = re.compile(r'[0-9a-f]{64}')
-OPERATIONS = ('code-patch', 'asset-patch', 'host-option')
+OPERATIONS = ('code-patch', 'asset-patch', 'host-option', 'generated')
+PATCHES = 'profiles/patches/'
 SETTING_TYPES = ('bool', 'choice', 'number')
 HOST_OPTION = re.compile(r'SKY_[A-Z0-9_]{1,64}')
 
@@ -108,30 +112,27 @@ def check_operation(operation, targets, settings, index):
     elif kind == 'asset-patch':
         if target is None:
             raise ModError(f'{where}: asset patches must name one target executable')
-        recipe = operation.get('recipe')
-        if not isinstance(recipe, dict) or not SHA256.fullmatch(str(recipe.get('source_sha256'))):
-            raise ModError(f'{where} needs an asset recipe with source_sha256')
-        try:
-            relative_asset(recipe.get('asset'))
-        except (ValueError, TypeError):
-            raise ModError(f'{where} has an invalid asset path') from None
-        chunks = recipe.get('chunks')
-        if not isinstance(chunks, list) or not chunks:
-            raise ModError(f'{where} recipe needs chunks')
-        for chunk in chunks:
-            if not isinstance(chunk, dict) or type(chunk.get('offset')) is not int or not isinstance(chunk.get('edits'), list) or not chunk['edits']:
-                raise ModError(f'{where} has an invalid chunk')
-            for edit in chunk['edits']:
-                if not isinstance(edit, dict) or type(edit.get('offset')) is not int:
-                    raise ModError(f'{where} has an invalid edit')
-                if 'copy_from' in edit:
-                    if type(edit.get('length')) is not int or edit['length'] <= 0:
-                        raise ModError(f'{where} has an invalid copy edit')
-                else:
-                    before = hex_bytes(edit.get('expected_hex'), f'{where} expected_hex')
-                    after = hex_bytes(edit.get('replacement_hex'), f'{where} replacement_hex')
-                    if not before or len(before) != len(after):
-                        raise ModError(f'{where} edits must preserve byte length')
+        if ('recipe' in operation) == ('profile' in operation):
+            raise ModError(f'{where} needs exactly one of recipe or profile')
+        if 'recipe' in operation:
+            check_recipe(operation['recipe'], where)
+        else:
+            profile_path(operation['profile'], where)
+    elif kind == 'generated':
+        if target is None:
+            raise ModError(f'{where}: generated operations must name one target executable')
+        if not isinstance(operation.get('handler'), str) or not IDENTIFIER.fullmatch(operation['handler']):
+            raise ModError(f'{where} needs a handler id')
+        if 'profile' in operation:
+            profile_path(operation['profile'], where)
+        writes = operation.get('writes', [])
+        if not isinstance(writes, list):
+            raise ModError(f'{where} writes must be a list of game files')
+        for item in writes:
+            try:
+                relative_asset(item)
+            except (ValueError, TypeError):
+                raise ModError(f'{where} writes an invalid path') from None
     else:
         environment = operation.get('environment')
         if not isinstance(environment, dict) or not environment:
@@ -140,6 +141,65 @@ def check_operation(operation, targets, settings, index):
             if not HOST_OPTION.fullmatch(key) or not isinstance(value, str) or len(value) > 256:
                 raise ModError(f'{where} may only set SKY_* string values')
     return operation
+
+
+def check_recipe(recipe, where):
+    if not isinstance(recipe, dict) or not SHA256.fullmatch(str(recipe.get('source_sha256'))):
+        raise ModError(f'{where} needs an asset recipe with source_sha256')
+    try:
+        relative_asset(recipe.get('asset'))
+    except (ValueError, TypeError):
+        raise ModError(f'{where} has an invalid asset path') from None
+    chunks = recipe.get('chunks')
+    if not isinstance(chunks, list) or not chunks:
+        raise ModError(f'{where} recipe needs chunks')
+    for chunk in chunks:
+        if not isinstance(chunk, dict) or type(chunk.get('offset')) is not int or not isinstance(chunk.get('edits'), list) or not chunk['edits']:
+            raise ModError(f'{where} has an invalid chunk')
+        for edit in chunk['edits']:
+            if not isinstance(edit, dict) or type(edit.get('offset')) is not int:
+                raise ModError(f'{where} has an invalid edit')
+            if 'copy_from' in edit:
+                if type(edit.get('length')) is not int or edit['length'] <= 0:
+                    raise ModError(f'{where} has an invalid copy edit')
+            else:
+                before = hex_bytes(edit.get('expected_hex'), f'{where} expected_hex')
+                after = hex_bytes(edit.get('replacement_hex'), f'{where} replacement_hex')
+                if not before or len(before) != len(after):
+                    raise ModError(f'{where} edits must preserve byte length')
+
+
+def profile_path(value, where):
+    try:
+        path = relative_asset(value)
+    except (ValueError, TypeError):
+        raise ModError(f'{where} has an invalid profile path') from None
+    if path.suffix != '.json':
+        raise ModError(f'{where} profile must be a .json file')
+    return path
+
+
+def locate(manifest, value):
+    """Built-in mods name shared recipe files under profiles/patches; user
+    mods name files inside their own folder."""
+    if manifest.get('builtin'):
+        if not value.startswith(PATCHES):
+            raise ModError(f"mod {manifest['id']}: built-in profiles must live in {PATCHES}")
+        return Path(manifest['root']) / value
+    return Path(manifest['source']) / value
+
+
+def load_profile(manifest, value, executable_sha256):
+    path = locate(manifest, value)
+    if not path.is_file():
+        raise ModError(f"mod {manifest['id']}: {value} is unavailable in this checkout; see profiles/patches/README.md")
+    try:
+        profile = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise ModError(f"mod {manifest['id']}: {value}: {error}") from None
+    if not isinstance(profile, dict) or profile.get('executable_sha256') != executable_sha256:
+        raise ModError(f"mod {manifest['id']}: {value} targets a different executable")
+    return path, profile
 
 
 def parse(data, source=None):
@@ -206,6 +266,7 @@ def discover(root):
             if manifest['id'] in found:
                 raise ModError(f"mod id {manifest['id']} is defined by both {found[manifest['id']]['source']} and {folder}")
             manifest['builtin'] = base == Path(root) / BUILTIN
+            manifest['root'] = str(root)
             found[manifest['id']] = manifest
     return found
 
@@ -243,6 +304,11 @@ def order(selected, available):
     return result
 
 
+def supports(available, ident, executable_sha256):
+    manifest = available.get(ident)
+    return bool(manifest) and any(item['executable_sha256'] == executable_sha256 for item in manifest['targets'])
+
+
 def resolve_settings(manifest, values):
     settings, chosen = manifest.get('settings', {}), {}
     for name, spec in settings.items():
@@ -254,28 +320,57 @@ def resolve_settings(manifest, values):
     return chosen
 
 
-def edit_ranges(operation):
-    """(resource, start, end) byte ranges an operation writes, for overlap checks."""
-    if operation['type'] == 'code-patch':
-        start = operation['file_offset']
-        yield ('eboot.bin', start, start + len(bytes.fromhex(operation['expected_hex'])))
-        return
-    recipe = operation['recipe']
+WHOLE = float('inf')
+
+
+def recipe_ranges(recipe):
     for chunk in recipe['chunks']:
         for edit in chunk['edits']:
             size = edit['length'] if 'copy_from' in edit else len(bytes.fromhex(edit['expected_hex']))
             # Edits address decoded chunk bytes; key ranges by archive and chunk.
-            yield (f"{recipe['asset']}@{chunk['offset']}", edit['offset'], edit['offset'] + size)
+            yield (recipe['asset'], chunk['offset'], edit['offset'], edit['offset'] + size)
 
 
-def plan(available, selected, executable_sha256, settings=None, executable=None):
+def edit_ranges(operation):
+    """(file, chunk, start, end) byte ranges an operation writes, for overlap checks.
+    chunk is None for raw file bytes; a whole-file write spans every chunk."""
+    if operation['type'] == 'code-patch':
+        start = operation['file_offset']
+        yield ('eboot.bin', None, start, start + len(bytes.fromhex(operation['expected_hex'])))
+    elif operation['type'] == 'generated':
+        for path in operation.get('writes', []):
+            yield (path, None, 0, WHOLE)
+    else:
+        for recipe in operation['recipes']:
+            yield from recipe_ranges(recipe)
+
+
+def claim(writes, ident, ranges):
+    """Record ranges for mod ident, refusing any overlap with another write."""
+    for path, chunk, start, end in ranges:
+        for other, other_path, other_chunk, other_start, other_end in writes:
+            if path != other_path:
+                continue
+            whole = end == WHOLE or other_end == WHOLE
+            if whole or (chunk == other_chunk and start < other_end and other_start < end):
+                who = f'mods {other} and {ident}' if other != ident else f'mod {ident}'
+                if whole:
+                    raise ModError(f'{who} both change {path}')
+                where = path if chunk is None else f'{path} chunk {chunk}'
+                raise ModError(f'{who} both change bytes {max(start, other_start)}..{min(end, other_end)} of {where}')
+        writes.append((ident, path, chunk, start, end))
+
+
+def plan(available, selected, executable_sha256, settings=None, executable=None, writes=None):
     """Check selected mods against one build; returns ordered, conflict-free operations.
 
     executable: original eboot bytes, required when a code patch is selected so
-    its expected bytes are compared before launch.
+    its expected bytes are compared before launch. writes: a list that receives
+    every claimed byte range, so edits generated later can be checked with claim().
     """
     settings = settings or {}
-    applied, writes, environment = [], [], {}
+    writes = [] if writes is None else writes
+    applied, environment = [], {}
     for ident in order(selected, available):
         manifest = available[ident]
         target = next((item for item in manifest['targets'] if item['executable_sha256'] == executable_sha256), None)
@@ -295,6 +390,20 @@ def plan(available, selected, executable_sha256, settings=None, executable=None)
                 start, before = operation['file_offset'], bytes.fromhex(operation['expected_hex'])
                 if executable[start:start + len(before)] != before:
                     raise ModError(f"mod {ident}: original bytes mismatch for {operation['id']}")
+            if operation['type'] == 'asset-patch':
+                if 'profile' in operation:
+                    path, profile = load_profile(manifest, operation['profile'], executable_sha256)
+                    recipes = profile.get('assets')
+                    if not isinstance(recipes, list) or not recipes:
+                        raise ModError(f"mod {ident}: {operation['profile']} has no assets")
+                    for recipe in recipes:
+                        check_recipe(recipe, f"mod {ident}: {operation['profile']}")
+                else:
+                    recipes = [operation['recipe']]
+                operation = dict(operation, recipes=recipes)
+            if operation['type'] == 'generated' and 'profile' in operation:
+                path, _ = load_profile(manifest, operation['profile'], executable_sha256)
+                operation = dict(operation, profile_path=str(path))
             if operation['type'] == 'host-option':
                 for key, value in operation['environment'].items():
                     owner = environment.get(key)
@@ -302,12 +411,7 @@ def plan(available, selected, executable_sha256, settings=None, executable=None)
                         raise ModError(f'mods {owner[0]} and {ident} both set {key}')
                     environment[key] = (ident, value)
             else:
-                for resource, start, end in edit_ranges(operation):
-                    for other, other_resource, other_start, other_end in writes:
-                        if resource == other_resource and start < other_end and other_start < end:
-                            who = f'mods {other} and {ident}' if other != ident else f'mod {ident}'
-                            raise ModError(f'{who} both change bytes {max(start, other_start)}..{min(end, other_end)} of {resource}')
-                    writes.append((ident, resource, start, end))
+                claim(writes, ident, list(edit_ranges(operation)))
             operations.append(operation)
         if not operations:
             raise ModError(f'mod {ident} has no operations for this game build')
@@ -319,11 +423,17 @@ def plan(available, selected, executable_sha256, settings=None, executable=None)
 
 def asset_profile(applied, title_id, app_version, executable_sha256):
     """The asset-patch operations as one asset_mod profile, or None."""
-    assets = [operation['recipe'] for mod in applied for operation in mod['operations'] if operation['type'] == 'asset-patch']
+    assets = [recipe for mod in applied for operation in mod['operations']
+              if operation['type'] == 'asset-patch' for recipe in operation['recipes']]
     if not assets:
         return None
     return dict(schema_version=2, executable_sha256=executable_sha256, title_id=title_id,
                 app_version=app_version, assets=assets)
+
+
+def generated(applied):
+    """(mod, operation) pairs for host handlers, in load order."""
+    return [(mod, operation) for mod in applied for operation in mod['operations'] if operation['type'] == 'generated']
 
 
 def host_environment(applied):
@@ -337,8 +447,10 @@ def record(applied):
         if operation['type'] == 'code-patch':
             return dict(type='code-patch', id=operation['id'], file_offset=operation['file_offset'])
         if operation['type'] == 'asset-patch':
-            return dict(type='asset-patch', asset=operation['recipe']['asset'],
-                        source_sha256=operation['recipe']['source_sha256'])
+            return dict(type='asset-patch', assets=[recipe['asset'] for recipe in operation['recipes']],
+                        **({'profile': operation['profile']} if 'profile' in operation else {}))
+        if operation['type'] == 'generated':
+            return dict(type='generated', handler=operation['handler'], writes=operation.get('writes', []))
         return dict(type='host-option', environment=sorted(operation['environment']))
     return [dict({key: value for key, value in mod.items() if key != 'operations'},
                  operations=[summary(item) for item in mod['operations']]) for mod in applied]
