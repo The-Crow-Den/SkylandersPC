@@ -20,6 +20,11 @@ inline std::string path_to_utf8(const std::filesystem::path& path) {
 // original canonical-path/current-uid/mode077 policy; Windows inspects the
 // actual no-reparse directory's current-user owner and restricted DACL.
 bool private_directory(const std::filesystem::path& path);
+// Exclusive private sibling for host-side factories that require a pathname.
+// POSIX retains mkdtemp; Windows uses a cryptographic name and a protected
+// current-user DACL at creation. Caller owns cleanup and the trusted parent.
+bool create_private_temp_directory(const std::filesystem::path& parent,
+    std::string_view prefix, std::filesystem::path& output);
 // Read-only shared view for the overlay mailbox. Exact size and current-user
 // ownership are checked before mapping. POSIX preserves the existing leaf-only
 // O_NOFOLLOW + mode 077 check. Windows walks/rejects reparse points and accepts
@@ -106,6 +111,8 @@ public:
 private:
     friend class PrivateFileMapping;
     friend bool private_directory(const std::filesystem::path& path);
+    friend bool create_private_temp_directory(const std::filesystem::path&,
+        std::string_view, std::filesystem::path&);
     bool create_temporary(std::string_view name, File& output) const;
     bool publish_temporary(File& temporary, std::string_view source, std::string_view target, bool& published, bool durable) const;
     bool discard_temporary(File& temporary, std::string_view name) const;

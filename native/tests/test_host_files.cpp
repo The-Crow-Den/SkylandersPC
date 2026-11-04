@@ -115,6 +115,26 @@ void private_state_tests(const std::filesystem::path& root) {
     for (const auto& item : std::filesystem::directory_iterator(root/"held-ipc"))
         require(!item.path().filename().string().starts_with(".pending-"));
 }
+void temporary_directory_tests(const std::filesystem::path& root) {
+    using namespace SkyHost;
+    std::filesystem::path first, second;
+    require(create_private_temp_directory(root/"public-ipc",".host-test-",first));
+    require(create_private_temp_directory(root/"public-ipc",".host-test-",second));
+    require(first != second && private_directory(first) && private_directory(second));
+    File directory;
+    require(directory.open_private_directory(first));
+    require(directory.write_atomic("owned","private",7));
+    require(directory.close() == 0);
+    const auto original = second;
+    require(!create_private_temp_directory(root/"missing-parent",".host-test-",second) && second == original);
+    require(!create_private_temp_directory(root,"../escape-",second) && second == original);
+    require(!create_private_temp_directory(root,std::string_view("a\0b",3),second) && second == original);
+#ifdef _WIN32
+    require(!create_private_temp_directory(root/"ipc-alias",".host-test-",second) && second == original);
+#endif
+    std::filesystem::remove_all(first);
+    std::filesystem::remove_all(second);
+}
 void live_frame_test(const std::filesystem::path& root) {
     PcOverlay::FrameReader reader(frame_path(root/"frame.rgba").c_str());
     unsigned generation = 0;
@@ -479,7 +499,7 @@ int main(int argc, char** argv) {
         const auto root = decode_path(argv[1]);
         if (argc == 3 && std::string_view(argv[2]) == "race") race_tests(root);
         else if (argc == 3 && std::string_view(argv[2]) == "frame") live_frame_test(root);
-        else { frame_tests(root); private_state_tests(root); capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
+        else { frame_tests(root); private_state_tests(root); temporary_directory_tests(root); capability_tests(root); directory_tests(root); move_tests(root); atomic_tests(root); save_metadata_tests(root); guest_tests(root); }
         std::cout << "file capability tests passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

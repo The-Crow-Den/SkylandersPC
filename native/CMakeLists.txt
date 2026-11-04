@@ -136,7 +136,7 @@ function(sky_add_portal_core)
   target_compile_definitions(sky-portal-core PRIVATE TRAPTEAM_STANDALONE_PORTAL=1)
   target_compile_options(sky-portal-core PRIVATE -include "${SKY_PORTAL_SOURCE_ROOT}/Cemu-main/src/Common/precompiled.h"
     -ffunction-sections -fdata-sections -w)
-  target_link_libraries(sky-portal-core PUBLIC fmt::fmt)
+  target_link_libraries(sky-portal-core PUBLIC fmt::fmt sky-host-platform)
 endfunction()
 
 if(WIN32)
@@ -230,6 +230,12 @@ if(WIN32)
       add_test(NAME native-gpu-adapter COMMAND gpu-adapter-test)
       add_test(NAME native-overlay-state COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_overlay_state.py $<TARGET_FILE:gpu-adapter-test>)
+      add_executable(virtual-portal-test hle/test_virtual_portal.cpp portal_library.cpp guest_start.S
+        $<TARGET_OBJECTS:sky-virtual-portal>)
+      target_compile_features(virtual-portal-test PRIVATE cxx_std_20)
+      target_link_libraries(virtual-portal-test PRIVATE sky-host-portable sky-portal-core PkgConfig::SkyWindowsUSB)
+      add_test(NAME native-virtual-portal COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cemu_portal.py $<TARGET_FILE:virtual-portal-test>)
     endif()
   endif()
 

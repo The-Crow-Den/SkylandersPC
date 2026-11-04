@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+extern "C" bool sky_portal_blank_adapter(const char*,unsigned,unsigned);
 int main(int argc, char** argv) {
   std::filesystem::path directory_link;
   if(argc!=1) {
@@ -66,5 +67,24 @@ int main(int argc, char** argv) {
   fs::remove(figure.working_copy);fs::rename(backup,figure.working_copy);
   {std::ofstream invalid(root/"invalid.sky");invalid<<"not a figure";}
   if(trapteam::cemu_portal_load_figure(root/"invalid.sky",&figure,&error)) return 1;
+  // The factory's C boundary is UTF-8, including both parent and leaf names.
+  // Exercise Trap Team and both Swap Force halves through the real generator.
+  const auto factory=root/fs::path(u8"factory_\u03bb");
+  fs::create_directory(factory);
+  for (unsigned id : {1u,1000u,2000u}) {
+    auto file=factory/fs::path(u8"figure_\u03bb_");
+    file+=std::to_string(id)+".sky";
+    const auto utf8=file.u8string();
+    const std::string name(reinterpret_cast<const char*>(utf8.data()),utf8.size());
+    if(!sky_portal_blank_adapter(name.c_str(),id,0) || fs::file_size(file)!=1024) return 1;
+    std::array<unsigned char,1024> created{},after{};
+    {std::ifstream input(file,std::ios::binary);input.read(reinterpret_cast<char*>(created.data()),created.size());if(!input)return 1;}
+    if((created[0x10]|(unsigned(created[0x11])<<8))!=id)return 1;
+    if(sky_portal_blank_adapter(name.c_str(),id+1,0))return 1;
+    {std::ifstream input(file,std::ios::binary);input.read(reinterpret_cast<char*>(after.data()),after.size());if(!input)return 1;}
+    if(created!=after)return 1;
+  }
+  for(const auto& entry:fs::directory_iterator(factory))
+    if(entry.is_directory())return 1; // Every private sibling is cleaned up.
   std::cout<<"Cemu portal protocol, protected figure import and progress persistence passed\n";
 }

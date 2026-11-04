@@ -166,12 +166,12 @@ bool create_character(int choice,bool select_after,unsigned player) {
         }
         kind=VirtualPortal::is_vehicle(id)?vehicle_kind:is_item(id)?2:0;
         auto& collection=kind==vehicle_kind?vehicles:kind==2?items:characters;
-        auto pattern=(root/"characters/.new-XXXXXX").string();
-        std::vector<char> writable(pattern.begin(),pattern.end());writable.push_back(0);
-        const auto* directory=mkdtemp(writable.data());
-        if(!directory){feedback="Could not prepare a new Skylander.";return false;}
-        const fs::path temporary=fs::path(directory)/"figure.sky";
-        const auto destination=root/"characters"/(std::string("created-")+fs::path(directory).filename().string().substr(5)+".sky");
+        fs::path directory;
+        if(!SkyHost::create_private_temp_directory(root/"characters",".new-",directory)){
+            feedback="Could not prepare a new Skylander.";return false;
+        }
+        const auto temporary=directory/"figure.sky";
+        const auto destination=root/"characters"/(std::string("created-")+SkyHost::path_to_utf8(directory.filename()).substr(5)+".sky");
         std::error_code ec;
         bool made=VirtualPortal::create_blank(SkyHost::path_to_utf8(temporary).c_str(),id,variant);
         if(made){fs::create_hard_link(temporary,destination,ec);made=!ec;}
@@ -248,8 +248,8 @@ bool select_empty_trap(int element) {
         std::lock_guard lock(library_mutex);if(!ready())return false;refresh_traps(true);
         for(unsigned i=46;i<traps.size();++i)if(traps[i].element==element&&traps[i].exists&&traps[i].capture==0){choice=static_cast<int>(i);break;}
         if(choice<0){if(traps.size()>=1024)return false;const auto& type=elements[static_cast<unsigned>(element)];
-            auto pattern=(root/"traps"/".element-XXXXXX").string();std::vector<char> buffer(pattern.begin(),pattern.end());buffer.push_back(0);const auto* temp=mkdtemp(buffer.data());if(!temp)return false;
-            const fs::path temporary=fs::path(temp)/"trap.sky";const auto destination=root/"traps"/(std::string("element-")+std::to_string(type.id)+"-"+fs::path(temp).filename().string().substr(9)+".sky");std::error_code ec;
+            fs::path temp;if(!SkyHost::create_private_temp_directory(root/"traps",".element-",temp))return false;
+            const auto temporary=temp/"trap.sky";const auto destination=root/"traps"/(std::string("element-")+std::to_string(type.id)+"-"+SkyHost::path_to_utf8(temp.filename()).substr(9)+".sky");std::error_code ec;
             bool made=VirtualPortal::create_blank(SkyHost::path_to_utf8(temporary).c_str(),type.id,type.variant);if(made){fs::create_hard_link(temporary,destination,ec);made=!ec;}fs::remove_all(temp,ec);
             if(!made){feedback="Could not prepare an empty trap. Existing captures were kept.";return false;}
             choice=static_cast<int>(traps.size());traps.push_back({destination,type.id,type.variant,element,0,true});

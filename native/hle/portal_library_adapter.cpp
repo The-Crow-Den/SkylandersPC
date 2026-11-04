@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <string_view>
 #include <vector>
-#include <unistd.h>
+#include "../platform/host_files.hpp"
 
 namespace {
 struct Choice {unsigned id,variant;const char* name;};
@@ -45,14 +45,15 @@ extern "C" bool sky_portal_creation_identity_adapter(unsigned index,unsigned* id
 extern "C" bool sky_portal_blank_adapter(const char* path,unsigned id,unsigned variant) {
     if(!path || id>65535 || variant>65535)return false;
     // Cemu's factory creates/truncates its output. Keep that operation in a
-    // private temporary directory; publish with link(), which never overwrites.
+    // private temporary directory; publish with a hard link, which never overwrites.
     namespace fs=std::filesystem;
-    const fs::path destination(path);
+    fs::path destination;
+    try { destination=SkyHost::path_from_utf8(path); }
+    catch(const fs::filesystem_error&) { return false; }
     const auto parent=destination.has_parent_path()?destination.parent_path():fs::path(".");
-    auto pattern=(parent/".sky-create-XXXXXX").string();
-    std::vector<char> writable(pattern.begin(),pattern.end());writable.push_back(0);
-    const auto* directory=mkdtemp(writable.data());if(!directory)return false;
-    const auto temporary=fs::path(directory)/"figure.sky";
+    fs::path directory;
+    if(!SkyHost::create_private_temp_directory(parent,".sky-create-",directory))return false;
+    const auto temporary=directory/"figure.sky";
     bool success=false;
     try {
         success=nsyshid::g_skyportal.CreateSkylander(temporary,static_cast<uint16>(id),static_cast<uint16>(variant)) &&

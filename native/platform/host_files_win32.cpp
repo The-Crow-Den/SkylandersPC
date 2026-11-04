@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "host_files.hpp"
+#include "host_random.hpp"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -184,6 +185,7 @@ bool rename_handle(HANDLE source, HANDLE parent, std::wstring_view name, bool re
 struct OpenPolicy {
     bool single_link = false, insensitive = false, directory_creation = false,
          metadata_only = false, delete_access = false, security_query = false;
+    PSECURITY_DESCRIPTOR security_descriptor = nullptr;
 };
 
 }
@@ -215,6 +217,7 @@ struct File::Impl {
         attributes.Length = sizeof(attributes);
         attributes.RootDirectory = parent;
         attributes.ObjectName = &text;
+        attributes.SecurityDescriptor = policy.security_descriptor;
         attributes.Attributes = no_reparse | (policy.insensitive ? OBJ_CASE_INSENSITIVE : 0);
         auto next = std::make_unique<Impl>();
         IO_STATUS_BLOCK io{};
@@ -280,6 +283,53 @@ struct File::Impl {
         return done;
     }
 };
+bool create_private_temp_directory(const std::filesystem::path& input, std::string_view prefix,
+                                   std::filesystem::path& output) {
+    if (prefix.size() > 128) { errno=EINVAL; return false; }
+    std::wstring checked;
+    if (!component_name(std::string(prefix)+"x",checked)) return false;
+    File parent;
+    if (!parent.open_directory(input)) return false;
+    const auto path = std::filesystem::absolute(input);
+    HANDLE raw_token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&raw_token)) { failure(GetLastError()); return false; }
+    const std::unique_ptr<void,decltype(&CloseHandle)> token(raw_token,&CloseHandle);
+    alignas(TOKEN_USER) std::array<std::byte,sizeof(TOKEN_USER)+SECURITY_MAX_SID_SIZE> identity{};
+    DWORD used = 0;
+    if (!GetTokenInformation(token.get(),TokenUser,identity.data(),static_cast<DWORD>(identity.size()),&used)) {
+        failure(GetLastError()); return false;
+    }
+    const auto* user = reinterpret_cast<const TOKEN_USER*>(identity.data());
+    alignas(ACL) std::array<std::byte,sizeof(ACL)+sizeof(ACCESS_ALLOWED_ACE)+SECURITY_MAX_SID_SIZE> storage{};
+    auto* acl = reinterpret_cast<PACL>(storage.data());
+    SECURITY_DESCRIPTOR security{};
+    if (!InitializeAcl(acl,static_cast<DWORD>(storage.size()),ACL_REVISION) ||
+        !AddAccessAllowedAceEx(acl,ACL_REVISION,OBJECT_INHERIT_ACE|CONTAINER_INHERIT_ACE,FILE_ALL_ACCESS,user->User.Sid) ||
+        !InitializeSecurityDescriptor(&security,SECURITY_DESCRIPTOR_REVISION) ||
+        !SetSecurityDescriptorOwner(&security,user->User.Sid,FALSE) ||
+        !SetSecurityDescriptorDacl(&security,TRUE,acl,FALSE) ||
+        !SetSecurityDescriptorControl(&security,SE_DACL_PROTECTED,SE_DACL_PROTECTED)) {
+        failure(GetLastError()); return false;
+    }
+    FileOpen options;
+    options.directory = options.create = options.exclusive = true;
+    for (unsigned attempt = 0; attempt < 16; ++attempt) {
+        std::array<std::uint8_t,16> random{};
+        if (!random_bytes(random)) { errno=EIO; return false; }
+        std::string name(prefix);
+        constexpr char hex[] = "0123456789abcdef";
+        for (const auto byte : random) { name += hex[byte >> 4]; name += hex[byte & 15]; }
+        std::wstring wide;
+        if (!component_name(name,wide)) return false;
+        auto directory = File::Impl::open(parent.impl_->handle,wide,options,
+            {.directory_creation=true,.security_query=true,.security_descriptor=&security});
+        if (!directory) { if (errno == EEXIST) continue; return false; }
+        if (!private_owner(directory->handle)) return false;
+        output = path/std::filesystem::path(wide);
+        return true;
+    }
+    errno=EEXIST; return false;
+}
 bool private_directory(const std::filesystem::path& path) {
     if (!path.is_absolute() || path.native().find(L'\0') != std::wstring::npos) { errno=EINVAL; return false; }
     for (const auto& component : path)

@@ -2,6 +2,7 @@
 #include "host_files.hpp"
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
@@ -38,6 +39,15 @@ struct File::Impl {
     int fd = -1;
     ~Impl() { const auto saved = errno; if (fd >= 0) ::close(fd); errno = saved; }
 };
+bool create_private_temp_directory(const std::filesystem::path& parent, std::string_view prefix,
+                                   std::filesystem::path& output) {
+    if (prefix.size() > 128 || !component_name(std::string(prefix)+"x") ||
+        parent.native().find('\0') != std::string::npos) { errno=EINVAL; return false; }
+    auto pattern = (parent/(std::string(prefix)+"XXXXXX")).native();
+    if (!::mkdtemp(pattern.data())) return false;
+    output = std::filesystem::path(pattern);
+    return true;
+}
 bool private_directory(const std::filesystem::path& path) {
     struct ::stat info{};
     std::error_code ec;
