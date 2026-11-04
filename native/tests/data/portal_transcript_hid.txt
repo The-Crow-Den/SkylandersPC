@@ -1,0 +1,13 @@
+# Synthetic HID portal transcript (not recorded from hardware).
+# "> " is a report the host sends, "< " a report the portal returns; bytes are
+# hex and reports are zero-padded to 32 bytes. It holds no figure contents:
+# figure reads in tests come from an all-zero block store.
+< 53 00 00 00 00 00 00
+> 52
+< 53 01 00 00 00 01 00
+< 52 02 18
+> 41 01
+< 41 01 ff 77
+> 43 00 40 00
+> 4d 01
+< 4d 01 00 19

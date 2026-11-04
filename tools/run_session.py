@@ -24,6 +24,7 @@ try:
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
     from . import mod_manifest
+    from . import portal_devices
     from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 except ImportError:
     from overlay_session import html_overlay
@@ -31,6 +32,7 @@ except ImportError:
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
     import mod_manifest
+    import portal_devices
     import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -240,6 +242,11 @@ def run(argv,sessions):
     parser.add_argument('--variant', choices=PACKS, default='original')
     parser.add_argument('--figure', type=Path)
     parser.add_argument('--figure-bottom', type=Path, help='swapper bottom half placed under a starting top half')
+    parser.add_argument('--portal-device', default=portal_devices.VIRTUAL,
+                        help="'virtual' (figure files), 'auto' (first connected portal) or an id from --list-portals")
+    parser.add_argument('--list-portals', action='store_true', help='list connected physical portals and exit')
+    parser.add_argument('--allow-figure-writes', action=argparse.BooleanOptionalAction, default=False,
+                        help='let the game save progress to figures on a physical portal; each figure is backed up first')
     parser.add_argument('--trophy-config',type=Path,help='private shadPS4 config or trophy-key file; never copied into logs')
     parser.add_argument('--pc-menu',choices=('web','native'),default='web',
                         help='HTML PC menu inside the game window (default), with a native fallback when WebEngine is unavailable')
@@ -321,6 +328,10 @@ def run(argv,sessions):
     if preliminary.performance_profile == 'low-end':
         parser.set_defaults(resolution='1080p',quality='performance',motion_blur=False,memory_mode='compact')
     args = parser.parse_args(arguments)
+    if args.list_portals:
+        for portal in portal_devices.list_portals():
+            print(portal['id'], '\t', portal_devices.label(portal))
+        return 0
     if not 0 <= args.portal_volume <= 100: parser.error('portal volume must be between 0 and 100')
     if args.seconds < 0 or not args.seconds < float('inf'):
         parser.error('seconds must be finite and nonnegative')
@@ -402,6 +413,18 @@ def run(argv,sessions):
         parser.error('figure file is missing')
     if args.figure_bottom and not args.figure_bottom.is_file():
         parser.error('bottom half figure file is missing')
+    real_portal = args.portal_device != portal_devices.VIRTUAL
+    if not portal_devices.valid_choice(args.portal_device):
+        parser.error('unknown portal device '+repr(args.portal_device))
+    if real_portal:
+        if args.figure or args.figure_bottom:
+            parser.error('starting figure files need the virtual portal; mixed real and virtual portals are not supported yet')
+        connected = [p for p in portal_devices.list_portals()
+                     if args.portal_device in (portal_devices.AUTO, p['id'])]
+        if not connected:
+            parser.error('no matching portal is connected; plug it in or choose the virtual portal')
+        if not connected[0]['accessible']:
+            parser.error('the portal is connected but this user cannot open it. '+portal_devices.access_help())
     # Same filesystem as the game library: the working copy is hard-linked.
     session = SESSION_TEMP / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     session.mkdir(parents=True)
@@ -534,7 +557,12 @@ def run(argv,sessions):
             parser.error(str(error))
     env.setdefault('SDL_VIDEO_DRIVER', 'x11')
     env.setdefault('SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', '0')
-    env.setdefault('SKY_VIRTUAL_PORTAL', '1')
+    if real_portal:
+        env['SKY_VIRTUAL_PORTAL'] = '0'
+        env['SKY_PORTAL_DEVICE'] = args.portal_device
+        env['SKY_PORTAL_FIGURE_WRITES'] = '1' if args.allow_figure_writes else '0'
+    else:
+        env.setdefault('SKY_VIRTUAL_PORTAL', '1')
     if args.figure:
         env['SKY_PORTAL_FIGURE'] = str(args.figure.resolve())
         if args.figure_bottom:
@@ -568,7 +596,7 @@ def run(argv,sessions):
     keys = ('SDL_VIDEO_DRIVER', 'SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', 'SKY_SAVE_DATA_ROOT',
             'SKY_TLS_BRIDGE',
             'SKY_LEVEL_EVENT_MAILBOX','SKY_FRAME_POLICY','SKY_MANUAL_FRAME_LIMIT','SKY_AUTO_FRAME_POLICY_AVAILABLE',
-            'SKY_VIRTUAL_PORTAL', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
+            'SKY_VIRTUAL_PORTAL', 'SKY_PORTAL_DEVICE', 'SKY_PORTAL_FIGURE_WRITES', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
             'SKY_FRAME_PROFILE', 'SKY_RENDERER_FRAME_STATS', 'SKY_RENDERER_FRAME_LOG', 'SKY_GPU_USER_DIR',
             '__GL_SHADER_DISK_CACHE_PATH', 'MESA_SHADER_CACHE_DIR',
             'SKY_ALLOW_INCOMPLETE_PIPELINES', 'SKY_TRAP_PHASE_PROBE', 'SKY_TRAP_CLOCK_PROBE',
@@ -658,6 +686,8 @@ def run(argv,sessions):
                            ('--present-limit',args.present_limit),('--save-root',selected_save)):
             if value is not None: restart += [flag,str(value)]
         restart.append('--save-backups' if args.save_backups else '--no-save-backups')
+        restart += ['--portal-device',args.portal_device]
+        restart.append('--allow-figure-writes' if args.allow_figure_writes else '--no-allow-figure-writes')
         restart.append('--nvidia' if args.nvidia else '--no-nvidia')
         restart += ['--frame-policy',chosen.get('frame_policy',args.frame_policy)]
         if args.level_events: restart.append('--level-events')

@@ -14,7 +14,7 @@ except ImportError:
 GROUPS = [
  ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
- ('Portal & audio','Starting figure and portal speaker preferences.', [('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
+ ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('unlock_nightmare','Nightmare available by default')]),
 ]
 
@@ -77,7 +77,7 @@ class SettingsPage(QWidget):
             'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
-            'portal_volume':'Volume of voices from the portal speaker.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
+            'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'A connected physical portal, or the virtual portal with figure files. Real portals are listed when the launcher opens.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'level_events':'Record events for troubleshooting.'}
         for name,description,entries in GROUPS:
             page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)
@@ -110,7 +110,7 @@ class SettingsPage(QWidget):
             if name=='Tweaks':
                 card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
                 copy=QVBoxLayout();heading=QLabel('Any portal');heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
-                detail=QLabel('Physical portal compatibility is not implemented. The virtual portal is available.');detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail);line.addLayout(copy,1)
+                detail=QLabel('Physical HID portals (PS3/PS4/Wii/Wii U) can be chosen under Portal & audio; Xbox portals are detected but not yet usable in game.');detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail);line.addLayout(copy,1)
                 self.portal_field=SettingSwitch();self.portal_field.setFixedSize(44,28);self.portal_field.setAccessibleName('Any portal');self.portal_field.setEnabled(False);line.addWidget(self.portal_field)
                 self.mod_rows.append(card);rows.addWidget(card)
             rows.addStretch();scroll.setWidget(sheet);column.addWidget(scroll,1);self.pages.addWidget(page)

@@ -6,16 +6,17 @@ from pathlib import Path
 try:
     from .pc_settings import validate_settings
     from .run_session import PACKS
-    from . import game_install, game_build, game_library, game_prepare, game_language
+    from . import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 except ImportError:
     from pc_settings import validate_settings
     from run_session import PACKS
-    import game_install, game_build, game_library, game_prepare, game_language
+    import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
                 motion_blur=True, anti_aliasing=True, nvidia=True, mangohud=False,
-                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', language='en-US')
+                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', language='en-US',
+                portal_device='virtual')
 FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
@@ -32,6 +33,8 @@ def validate(value):
         raise ValueError('Invalid frame policy')
     if any(not isinstance(value[key], str) or '\0' in value[key] for key in ('figure', 'figure_bottom')):
         raise ValueError('Invalid figure path')
+    if not portal_devices.valid_choice(value['portal_device']):
+        raise ValueError('Invalid portal device')
     return dict(value)
 
 
@@ -52,6 +55,8 @@ def load(path):
         value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
     if isinstance(value,dict) and 'figure_bottom' not in value:
         value['figure_bottom']=''
+    if isinstance(value,dict) and 'portal_device' not in value:
+        value['portal_device']='virtual'
     if isinstance(value,dict) and 'language' not in value:
         value['language']='en-US'
     if isinstance(value,dict) and 'anti_aliasing' not in value:
@@ -98,7 +103,9 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv += mod_arguments(mods, mod_settings)
     if value['level_events']:
         argv.append('--level-events')
-    if value['figure']:
+    if value['portal_device'] != portal_devices.VIRTUAL:
+        argv += ['--portal-device', value['portal_device']]
+    elif value['figure']:
         argv += ['--figure', value['figure']]
         if value['figure_bottom']:
             argv += ['--figure-bottom', value['figure_bottom']]
