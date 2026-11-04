@@ -157,3 +157,8 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .scene:has(.left-tools:focus-within) .game-title, #trap-rail-demo.zone-rail .game-title { opacity:0; }
 #trap-rail-demo.zone-rail .rail { width:var(--rail-open); }
 #trap-rail-demo.zone-rail .nav-label { opacity:1; }
+#trap-rail-demo .quick-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+#trap-rail-demo .quick-figure { flex:0 0 auto; display:flex; align-items:center; gap:8px; max-width:200px; min-height:44px; padding:4px 12px 4px 4px; border:1px solid transparent; border-radius:11px; background:#252528; color:#ffffff; font-size:12px; }
+#trap-rail-demo .quick-figure img { width:36px; height:36px; object-fit:cover; border-radius:8px; }
+#trap-rail-demo .quick-figure span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#trap-rail-demo .quick-figure[aria-pressed="true"] { border-color:var(--accent); }

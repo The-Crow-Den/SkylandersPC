@@ -46,3 +46,27 @@ class SaveBackupTests(unittest.TestCase):
             (root/'main/CUSA00626/Slot1').unlink();(root/'main/CUSA00626/Slot1').symlink_to(root/'isolated/CUSA00626/Slot1')
             with self.assertRaises(ValueError):save_backup.snapshot(root/'main','CUSA00626',backup_root=backups)
             self.assertIsNone(save_backup.snapshot(root/'missing','CUSA00626',backup_root=backups))
+
+    def test_restore_replaces_saves_after_a_safety_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();source=root/'saves';title=source/'CUSA00626';title.mkdir(parents=True)
+            backups=root/'backups';slot=title/'Slot1';slot.write_bytes(b'old progress')
+            old=save_backup.snapshot(source,'CUSA00626',reason='menu',backup_root=backups)
+            slot.write_bytes(b'new progress');(title/'Slot2').write_bytes(b'extra')
+            result=save_backup.restore(old['path'],source,'CUSA00626',backup_root=backups)
+            self.assertEqual(result['status'],'restored')
+            self.assertEqual(slot.read_bytes(),b'old progress');self.assertFalse((title/'Slot2').exists())
+            safety=Path(result['safety']['path'])
+            self.assertEqual((safety/'files/Slot2').read_bytes(),b'extra')
+            self.assertEqual(save_backup.verify(safety,'CUSA00626')['reason'],'before-restore')
+            self.assertIn('Before restore',save_backup.describe(save_backup.verify(safety,'CUSA00626')))
+
+    def test_restore_refuses_modified_or_foreign_snapshots(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();source=root/'saves';title=source/'CUSA00626';title.mkdir(parents=True)
+            backups=root/'backups';(title/'Slot1').write_bytes(b'progress')
+            path=Path(save_backup.snapshot(source,'CUSA00626',backup_root=backups)['path'])
+            (path/'files/Slot1').write_bytes(b'tampered')
+            with self.assertRaises(ValueError):save_backup.restore(path,source,'CUSA00626',backup_root=backups)
+            with self.assertRaises(ValueError):save_backup.restore(root,source,'CUSA00626',backup_root=backups)
+            self.assertEqual((title/'Slot1').read_bytes(),b'progress')

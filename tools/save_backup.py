@@ -14,6 +14,9 @@ except ImportError:
     import save_profile
 
 
+REASONS=('manual','before-launch','after-exit','menu','before-restore')
+
+
 def storage_root(environment=None):
     return save_profile.home_root(environment).parent/'save-backups'
 
@@ -72,7 +75,7 @@ def snapshots(source_root, title_id, backup_root=None):
 
 def snapshot(source_root, title_id, *, reason='manual', backup_root=None, keep=8):
     _title(title_id)
-    if type(keep) is not int or not 1<=keep<=50 or reason not in ('manual','before-launch','after-exit'):
+    if type(keep) is not int or not 1<=keep<=50 or reason not in REASONS:
         raise ValueError('invalid backup policy')
     source_root=Path(source_root).resolve();source=source_root/title_id
     if not source.exists() and not source.is_symlink():return None
@@ -111,3 +114,42 @@ def snapshot(source_root, title_id, *, reason='manual', backup_root=None, keep=8
         verify(old,title_id)  # recheck before removing an owned, immutable snapshot
         shutil.rmtree(old)
     return {'status':'created','path':str(target),'files':len(expected)}
+
+
+def restore(snapshot_path, source_root, title_id, *, backup_root=None, keep=8):
+    """Replace the title's saves with a verified snapshot. Never run while the game is open.
+
+    The current saves are snapshotted first (reason before-restore), so a restore
+    can itself be undone from the same list.
+    """
+    _title(title_id);source_root=Path(source_root).resolve()
+    path=Path(snapshot_path)
+    if not any(row[0]==path for row in snapshots(source_root,title_id,backup_root)):
+        raise ValueError('snapshot does not belong to this save profile')
+    record=verify(path,title_id)
+    safety=snapshot(source_root,title_id,reason='before-restore',backup_root=backup_root,keep=max(keep,2))
+    source=source_root/title_id
+    source_root.mkdir(parents=True,exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.restore-',dir=source_root) as directory:
+        staged=Path(directory)/title_id
+        shutil.copytree(path/'files',staged,symlinks=True)
+        if save_profile._manifest(staged)!=record['files']:
+            raise ValueError('backup changed while restoring')
+        previous=Path(directory)/'previous'
+        if source.exists():source.replace(previous)
+        try:
+            staged.replace(source)
+        except BaseException:
+            if previous.exists():previous.replace(source)
+            raise
+    if save_profile._manifest(source)!=record['files']:
+        raise ValueError('restored saves failed verification')
+    return {'status':'restored','snapshot':record['snapshot_id'],'safety':safety,'files':len(record['files'])}
+
+
+def describe(record):
+    """Short local-time label for a snapshot list."""
+    created=datetime.datetime.strptime(record['created_utc'],'%Y%m%dT%H%M%S%fZ').replace(tzinfo=datetime.timezone.utc)
+    reason={'manual':'Manual','before-launch':'Before play','after-exit':'After play','menu':'From PC menu',
+            'before-restore':'Before restore'}.get(record.get('reason'),'Snapshot')
+    return f"{created.astimezone().strftime('%Y-%m-%d %H:%M')} · {reason} · {len(record['files'])} files"

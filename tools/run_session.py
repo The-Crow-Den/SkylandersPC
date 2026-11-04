@@ -507,6 +507,7 @@ def run(argv,sessions):
 
     if selected_save is not None:
         env['SKY_SAVE_DATA_ROOT'] = str(selected_save)
+        env['SKY_SAVE_TITLE_ID'] = installation.title_id
         protected.append(selected_save)
     if trophy_metadata.get('available'):protected.append(trophy_metadata['store'])
     env = renderer_environment(env, args.renderer_idle)
