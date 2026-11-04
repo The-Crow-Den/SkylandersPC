@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "host_fault.hpp"
+#include "../guest_fs.hpp"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <atomic>
@@ -75,8 +76,9 @@ LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     fault.cpu.flags = c->EFlags;
     const auto callback = handler.load(std::memory_order_acquire);
     if (!callback) return EXCEPTION_CONTINUE_SEARCH;
-    bool handled;
-    {
+    // Guest TLS loads are ordinary execution, not faults for any handler.
+    bool handled = fault.kind == FaultKind::access && GuestFs::emulate_current(fault);
+    if (!handled) {
         HandlerStack stack;
         handled = callback(fault);
     }

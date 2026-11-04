@@ -54,15 +54,17 @@ std::atomic<std::uint64_t> loads{0};
 // The startup probe runs on a host thread with no guest TCB.
 thread_local std::uint64_t probe_tcb = 0;
 
+std::uint64_t current_tcb() noexcept {
+    if (probe_tcb) return probe_tcb;
+    const auto* state = sky_host_tls_state();
+    return state ? reinterpret_cast<std::uint64_t>(state->guest_tcb) : 0;
+}
+
 LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     const auto* record = info->ExceptionRecord;
     if (record->ExceptionCode != EXCEPTION_ACCESS_VIOLATION || record->NumberParameters < 2 ||
         record->ExceptionInformation[0] != 0) return EXCEPTION_CONTINUE_SEARCH;
-    std::uint64_t tcb = probe_tcb;
-    if (!tcb) {
-        const auto* state = sky_host_tls_state();
-        tcb = state ? reinterpret_cast<std::uint64_t>(state->guest_tcb) : 0;
-    }
+    const auto tcb = current_tcb();
     if (!tcb) return EXCEPTION_CONTINUE_SEARCH;
     auto* c = info->ContextRecord;
     SkyHost::Fault fault{};
@@ -104,6 +106,12 @@ bool install() noexcept {
     const auto value = load_fs_zero();
     probe_tcb = 0;
     return value == marker && loads.load(std::memory_order_relaxed) == before + 1;
+}
+
+bool emulate_current(SkyHost::Fault& fault) noexcept {
+    if (!emulate(fault, current_tcb())) return false;
+    loads.fetch_add(1, std::memory_order_relaxed);
+    return true;
 }
 
 std::uint64_t emulated_loads() noexcept { return loads.load(std::memory_order_relaxed); }

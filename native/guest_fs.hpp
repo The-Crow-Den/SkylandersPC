@@ -33,6 +33,10 @@ bool emulate(SkyHost::Fault& fault, std::uint64_t tcb) noexcept;
 // False means guest TLS cannot work here; never enter guest code then.
 bool install() noexcept;
 #ifdef _WIN32
+// For the shared fault dispatcher (host_fault_win32.cpp): emulates fault for
+// the current thread's guest TCB, if it is an admitted FS load. Runs before any
+// registered handler, so a fatal reporter never sees a guest TLS access.
+bool emulate_current(SkyHost::Fault& fault) noexcept;
 // Successful emulations so far (diagnostics; relaxed counter).
 std::uint64_t emulated_loads() noexcept;
 #endif
