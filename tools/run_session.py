@@ -306,7 +306,7 @@ def run(argv,sessions):
                         help='keyboard-and-pad reserves player one for the keyboard and assigns a single pad to player two')
     parser.add_argument('--frame-limit', choices=(0,30,60), type=int, default=30,
                         help='built-in FPS cap; zero is an uncapped diagnostic')
-    parser.add_argument('--portal-volume', type=int, default=30, help='portal speaker volume, 0 to 100 (default 30)')
+    parser.add_argument('--portal-volume', type=int, default=50, help='portal speaker volume, 0 to 100 (default 50)')
     parser.add_argument('--fullscreen', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('--fps-counter', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--trophy-popups', action=argparse.BooleanOptionalAction, default=True,
@@ -710,7 +710,7 @@ def run(argv,sessions):
                    '--movie-audio',args.movie_audio,'--skip-intro' if args.skip_intro else '--no-skip-intro','--language',args.language,
                    '--resolution',chosen['resolution'],'--aspect',args.aspect,'--quality',chosen['quality'],
                    '--frame-limit',str(chosen['frame_limit']),
-                   '--portal-volume',str(chosen.get('portal_volume',30)),
+                   '--portal-volume',str(chosen.get('portal_volume',50)),
                    '--controller-layout',chosen.get('controller_layout',args.controller_layout),
                    '--controller-glyphs',chosen.get('controller_glyphs',args.controller_glyphs),
                    '--fullscreen' if chosen['fullscreen'] else '--no-fullscreen',

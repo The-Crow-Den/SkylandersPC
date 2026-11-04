@@ -131,7 +131,7 @@
   function initializeSettings(settings){
     if(ui.dirty)return;
     for(const [id,key] of [['trap-demo-res','resolution'],['trap-demo-quality','quality'],['trap-demo-fps','framePolicy'],['trap-demo-pad','layout'],['trap-demo-glyphs','glyphs']])root.querySelector('#'+id).selectedIndex=settings[key]??0;
-    root.querySelector('#trap-demo-fullscreen').checked=!!settings.fullscreen;root.querySelector('#trap-demo-counter').checked=!!settings.counter;root.querySelector('#trap-demo-audio').value=String(settings.volume??30);root.querySelector('[data-volume]').textContent=(settings.volume??30)+'%';
+    root.querySelector('#trap-demo-fullscreen').checked=!!settings.fullscreen;root.querySelector('#trap-demo-counter').checked=!!settings.counter;root.querySelector('#trap-demo-audio').value=String(settings.volume??50);root.querySelector('[data-volume]').textContent=(settings.volume??50)+'%';
   }
   function receive(text){
     let snapshot;try{snapshot=JSON.parse(text);}catch{return;}if(snapshot.version!==1)return;
