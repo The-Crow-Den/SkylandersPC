@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const root=document.getElementById('trap-rail-demo');
-  const ui={view:'portal',slot:0,coop:false,page:'display',snapshot:null,dirty:false,sequence:-1};
+  const ui={view:'portal',slot:0,coop:false,page:'display',snapshot:null,dirty:false,sequence:-1,prefs:{}};
   const slotNames={0:'Player 1',3:'Player 2',1:'Trap',2:'Item',9:'Vehicle'};
   const images=new Map();let bridge=null;let previous='';
   let selectPopup=null;
@@ -81,6 +81,27 @@
     }
     if(!captures.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Captured villains appear here after an in-game capture.';grid.append(empty);}
   }
+  // Favourites first, then recently placed, by name within the current collection (per-user, outside the repo).
+  const prefList=(field,category)=>ui.prefs?.[field]?.[String(category)]||[];
+  const applyPrefs=text=>{try{ui.prefs=JSON.parse(text)||{};}catch{return;}render();};
+  function quickRow(category){
+    const row=root.querySelector('[data-quick]');row.replaceChildren();
+    const list=collection(ui.slot);const favourites=prefList('favourites',category);const names=[...favourites,...prefList('recent',category).filter(name=>!favourites.includes(name))];
+    for(const name of names.slice(0,10)){
+      const item=list.find(entry=>entry.name===name);if(!item)continue;
+      const chip=button('quick-figure',(favourites.includes(name)?'Favourite: ':'Recent: ')+'place '+name+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(!!(item.state&2)));
+      chip.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+name;chip.append(label);
+      chip.onclick=()=>place(category,item);row.append(chip);
+    }
+    row.hidden=!row.children.length||!!search.value.trim();
+  }
+  function place(category,item){send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);bridge?.placed(category,item.name,applyPrefs);}
+  function favouriteButton(category){
+    const node=root.querySelector('[data-favourite]');const item=ui.slot===0||ui.slot===3?halves(ui.slot).main:selected(ui.slot);
+    node.hidden=!item;if(!item)return;const on=prefList('favourites',category).includes(item.name);
+    node.textContent=(on?'★ Unfavourite ':'☆ Favourite ')+(item.detail?.startsWith('Swapper ')?halfName(item.name):item.name);
+    node.onclick=()=>bridge?.toggleFavourite(category,item.name,applyPrefs);
+  }
   function figures(){
     const category=kind();const list=collection(ui.slot).filter(item=>item.name.toLowerCase().includes(search.value.trim().toLowerCase()));
     const text=words(category);root.querySelector('[data-collection-title]').textContent=text[1];root.querySelector('[data-current-slot]').textContent=slotNames[ui.slot];search.placeholder=text[2];
@@ -88,10 +109,11 @@
     for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=item.detail.startsWith('Swapper ')?halfName(item.name):item.name;card.append(label);
       if(item.detail.startsWith('Swapper ')){const half=document.createElement('span');half.className='swapper-half';half.textContent=isTop(item)?'Top':'Bottom';card.append(half);}
       if(item.state&2){const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);}
-      card.onclick=()=>send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);grid.append(card);}
+      card.onclick=()=>place(category,item);grid.append(card);}
     if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a '+text[0]+' to start your collection.';grid.append(empty);}
     const selector=root.querySelector('#trap-create-character');const saved=selector.value;selector.replaceChildren();
     for(const item of ui.snapshot?.creation||[]){if(item.kind!==category)continue;const option=document.createElement('option');option.value=String(item.index);option.textContent=item.name;selector.append(option);}if([...selector.options].some(option=>option.value===saved))selector.value=saved;
+    quickRow(category);favouriteButton(category);
     root.querySelector('.figure-creator h3').textContent=text[3];root.querySelector('label[for="trap-create-character"]').textContent=category===9?'Vehicle':category===2?'Item':'Character';root.querySelector('[data-add]').textContent=text[4];
   }
   function render(){
@@ -102,7 +124,7 @@
     root.querySelector('[data-setting-title]').textContent={display:'Display',graphics:'Graphics',controls:'Controls',audio:'Audio'}[ui.page];
     const old=root.querySelector('[data-setting-icon]');const next=document.createElement('i');next.dataset.settingIcon='';next.dataset.lucide={display:'monitor',graphics:'sliders-horizontal',controls:'gamepad-2',audio:'volume-2'}[ui.page];next.setAttribute('aria-hidden','true');old.replaceWith(next);
     slots();const isTrap=ui.slot===1;
-    root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;root.querySelector('.section-title').hidden=isTrap;
+    root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;if(isTrap){root.querySelector('[data-quick]').hidden=true;root.querySelector('[data-favourite]').hidden=true;}root.querySelector('.section-title').hidden=isTrap;
     if(isTrap)traps();else figures();message.textContent=ui.snapshot?.status||'Waiting for the game…';icon();
     if(focused){const match=[...root.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')===focused);if(match){match.focus({preventScroll:true});mark(match);}}
   }
@@ -124,7 +146,7 @@
   }
   // Controller and keyboard navigation. Keys from the host: 1-4 up/down/left/right, 5 activate,
   // 6 close the overlay (Start/Select), 7 back (B), 8 left side: tab rail (LB), 9 right side: open panel (RB).
-  const tabs=()=>[...root.querySelectorAll('.rail [data-view],.rail [data-quit]')];
+  const tabs=()=>[...root.querySelectorAll('.rail [data-view],.rail [data-snapshot],.rail [data-quit]')];
   const currentTab=()=>tabs().find(node=>node.dataset.view===ui.view&&(!node.dataset.page||node.dataset.page===ui.page))||tabs()[0];
   const openPanel=()=>root.querySelector(ui.view==='portal'?'.portal-panel':'.settings-panel');
   const usable=node=>!node.disabled&&node.getClientRects().length&&!node.closest('[hidden]');
@@ -152,7 +174,7 @@
     if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});mark(node);node.scrollIntoView({block:'nearest',inline:'nearest'});
     if(!node.closest('.rail'))remembered.set(panelKey(),identity(node));
   }
-  function openTab(tab){if(!tab)return;if(!tab.matches('[data-quit]'))tab.click();focus(tab);}
+  function openTab(tab){if(!tab)return;if(!tab.matches('[data-quit],[data-snapshot]'))tab.click();focus(tab);}
   function enterPanel(){
     const area=openPanel();if(!area||area.hidden){focus(currentTab());return;}
     const list=targets(area);const last=remembered.get(panelKey());const pressed=area.querySelector('[aria-pressed="true"]');
@@ -187,7 +209,7 @@
     if(!active||active===document.body||!root.contains(active)){enterPanel();return;}
     if(inRail){
       if(key===1||key===2){const list=tabs();const index=list.indexOf(active);openTab(list[Math.min(list.length-1,Math.max(0,index+(key===2?1:-1)))]);return;}
-      if(active.matches('[data-quit]')){if(key===5)active.click();return;}
+      if(active.matches('[data-quit],[data-snapshot]')){if(key===5)active.click();return;}
       if(key===4||key===5)enterPanel();
       return;
     }
@@ -202,6 +224,12 @@
   // Quit to launcher asks for a second press, so a stray A on the rail cannot end the session.
   const quit=root.querySelector('[data-quit]');const quitLabel=quit.querySelector('.nav-label');
   quit.onclick=()=>{if(quit.dataset.armed){send('quit');return;}quit.dataset.armed='1';quitLabel.textContent='Press again to quit';setTimeout(()=>{delete quit.dataset.armed;quitLabel.textContent='Quit to launcher';},4000);};
+  // Snapshot runs in the menu host (it holds no game state); the label reports the outcome briefly.
+  const snap=root.querySelector('[data-snapshot]');const snapLabel=snap.querySelector('.nav-label');
+  snap.onclick=()=>{if(snap.dataset.busy||!bridge)return;snap.dataset.busy='1';snapLabel.textContent='Snapshotting…';
+    bridge.snapshotSaves(text=>{let reply={label:'Snapshot failed',message:''};try{reply=JSON.parse(text);}catch{}
+      snapLabel.textContent=reply.label;snap.title=reply.message;message.textContent=reply.message;
+      setTimeout(()=>{delete snap.dataset.busy;snapLabel.textContent='Snapshot saves';},4000);});};
   root.querySelectorAll('[data-close]').forEach(node=>node.onclick=()=>{ui.view='none';render();});
   root.querySelector('[data-coop]').onclick=()=>{ui.coop=!ui.coop;if(ui.coop)ui.slot=3;else{send('portal',7,0);if(ui.slot===3)ui.slot=0;}render();};
   root.querySelector('[data-remove-top]').onclick=()=>send('portal',ui.slot===3?16:15,0);
@@ -233,5 +261,5 @@
   document.addEventListener('focusin',event=>{if(root.contains(event.target))mark(event.target);});
   window.portalReceive=receive;window.portalNavigate=navigate;
   icon();
-  new QWebChannel(qt.webChannelTransport,channel=>{bridge=channel.objects.portal;bridge.changed.connect(receive);bridge.ready();bridge.snapshot(receive);});
+  new QWebChannel(qt.webChannelTransport,channel=>{bridge=channel.objects.portal;bridge.changed.connect(receive);bridge.ready();bridge.snapshot(receive);bridge.preferences(applyPrefs);});
 })();

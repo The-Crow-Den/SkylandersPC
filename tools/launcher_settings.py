@@ -68,6 +68,15 @@ class SettingsPage(QWidget):
         self.change_games=QPushButton('Change…');self.change_games.clicked.connect(self.change_games_folder);folder_line.addWidget(self.change_games)
         self.open_games=QPushButton('Open');self.open_games.clicked.connect(self.open_games_folder);folder_line.addWidget(self.open_games)
         layout.addWidget(self.games_row)
+        # Per-game restore list: verified snapshots only (tools/save_backup.py).
+        self.backup_row=QWidget();self.backup_row.setObjectName('settingRow')
+        backup_line=QHBoxLayout(self.backup_row);backup_line.setContentsMargins(20,16,20,16)
+        backup_copy=QVBoxLayout();backup_title=QLabel('Save snapshots');backup_title.setStyleSheet('font-size: 14px; font-weight: 600;');backup_copy.addWidget(backup_title)
+        backup_hint=QLabel('Restore a verified snapshot. Your current saves are snapshotted first, so a restore can be undone.')
+        backup_hint.setWordWrap(True);backup_hint.setStyleSheet('color: #93939e; font-size: 12px;');backup_copy.addWidget(backup_hint);backup_line.addLayout(backup_copy,1)
+        self.backups=SettingCombo();self.backups.setFixedWidth(340);self.backups.setAccessibleName('Save snapshot');backup_line.addWidget(self.backups)
+        self.restore_button=QPushButton('Restore');self.restore_button.clicked.connect(self.restore_backup);backup_line.addWidget(self.restore_button)
+        layout.addWidget(self.backup_row)
         navigation=QHBoxLayout();navigation.setSpacing(6);layout.addLayout(navigation)
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
@@ -159,6 +168,7 @@ class SettingsPage(QWidget):
             from game_library import directory
         self.games_row.setVisible(game is None);self.games_path.setText(str(directory(self.owner.root)))
         self.change_games.setEnabled(self.owner.process is None)
+        self.refresh_backups()
         self.scope.blockSignals(True);self.scope.clear();self.scope.addItem('General settings',None)
         for entry in self.owner.library['games']:self.scope.addItem(entry['name'],entry['id'])
         self.scope.setCurrentIndex(self.scope.findData(game['id']) if game else 0);self.scope.blockSignals(False)
@@ -185,6 +195,41 @@ class SettingsPage(QWidget):
         self.save_button.setEnabled(self.owner.process is None)
         self.feedback.setText('Stop the current session to change settings.' if self.owner.process else ('Saved per game · Applies to the next session.' if game else 'Changes apply to your next session.'))
         self.frame_policy();self.owner.views.setCurrentWidget(self)
+
+    def backup_target(self):
+        try:from . import save_profile
+        except ImportError:import save_profile
+        title=(self.game or {}).get('title_id')
+        if not title:return None,None
+        return save_profile.select(self.owner.root,title)[0],title
+
+    def refresh_backups(self):
+        try:from . import save_backup
+        except ImportError:import save_backup
+        self.backups.clear();rows=[]
+        try:
+            root,title=self.backup_target()
+            if title:rows=save_backup.snapshots(root,title)
+        except (OSError,ValueError) as error:
+            self.backups.addItem(f'Unavailable: {error}',None)
+        for path,record in reversed(rows):self.backups.addItem(save_backup.describe(record),str(path))
+        if not rows and not self.backups.count():self.backups.addItem('No snapshots yet',None)
+        self.backup_row.setVisible(self.game is not None)
+        self.restore_button.setEnabled(self.owner.process is None and bool(rows))
+
+    def restore_backup(self):
+        if self.owner.process:return
+        try:from . import save_backup
+        except ImportError:import save_backup
+        path=self.backups.currentData()
+        if not path:return
+        if QMessageBox.question(self,'Restore saves',f'Replace the current saves with the snapshot from {self.backups.currentText()}?\n\nYour current saves are snapshotted first.')!=QMessageBox.StandardButton.Yes:return
+        try:
+            root,title=self.backup_target()
+            result=save_backup.restore(path,root,title)
+        except (OSError,ValueError) as error:
+            QMessageBox.warning(self,'Could not restore saves',f'Your saves were not changed: {error}');return
+        self.refresh_backups();self.feedback.setText(f"Saves restored ({result['files']} files). The previous saves are listed as Before restore.")
 
     def set_field(self,key,value):
         field=self.fields[key]
