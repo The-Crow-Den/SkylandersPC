@@ -12,7 +12,7 @@ except ImportError:
     import launcher_model as model
 
 GROUPS = [
- ('Display','Picture and window preferences.', [('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur')]),
+ ('Display','Picture and window preferences.', [('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('unlock_nightmare','Nightmare available by default')]),
@@ -72,7 +72,7 @@ class SettingsPage(QWidget):
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
             'resolution':'Internal rendering resolution.', 'quality':'Detail and definition of game shadows.',
-            'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.',
+            'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
             'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
