@@ -154,6 +154,13 @@ jobs:
           $out = & out/SkylandersPC-windows/SkylandersPC.exe "$env:RUNNER_TEMP\probe.py" | Out-String
           Write-Output $out
           if ($out -notmatch 'imports ok') { exit 1 }
+      - name: Python tests on Windows (informational)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests 2>&1 | Tee-Object "$env:RUNNER_TEMP\python-tests.log" | Select-Object -Last 120
       - uses: actions/upload-artifact@v5
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         with:
