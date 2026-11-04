@@ -113,6 +113,8 @@ Unknown system calls are reported, never answered with a fake success.
 - [shadPS4](https://github.com/shadps4-emu/shadPS4): the PS4 GPU and system-library work bbport
   builds on.
 - [Cemu](https://github.com/cemu-project/Cemu): the Skylanders portal implementation.
+- Mew00, SuperSamus and Winner Nombre: the Wii U Trap Team FPS graphics pack, whose delta-time
+  clamp change the `60-delta` patch adapts.
 
 ## License
 
