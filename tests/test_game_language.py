@@ -13,6 +13,8 @@ class GameLanguageTests(unittest.TestCase):
     def test_title_profiles_choose_or_fall_back(self):
         self.assertEqual(game_language.choose(ROOT, 'trap-team', 'fr-FR'), ('fr-FR', None))
         self.assertEqual(game_language.choose(ROOT, 'trap-team', 'fr-CA')[0], 'en-US')  # the game ignores fr-CA
+        for ignored in ('es-ES', 'pt-PT'):
+            self.assertEqual(game_language.choose(ROOT, 'trap-team', ignored)[0], 'en-US')
         language, note = game_language.choose(ROOT, 'swap-force', 'fr-FR')
         self.assertEqual(language, 'en-US')
         self.assertIn('not offered', note)
