@@ -128,52 +128,32 @@ jobs:
           cp "$host" "$dist/.local/native-gpu-build/"
           # Every MSYS2 DLL the host loads; Windows system DLLs are not copied.
           ldd "$host" | awk '$3 ~ /^\/clang64\// {print $3}' | sort -u | xargs -r -I{} cp {} "$dist/.local/native-gpu-build/"
-          cat > "$dist/Launch Skylanders.cmd" <<'EOF'
-          @echo off
-          setlocal
-          cd /d "%~dp0"
-          set "PYTHONPATH=%~dp0.local\python"
-          set "LOG=%~dp0launcher.log"
-          set "PY=py -3"
-          %PY% -c "import sys" 2>nul || set "PY=python"
-          %PY% -c "import sys; sys.exit(sys.version_info < (3, 11))" 2>nul || goto nopython
-          %PY% -c "import PyQt6.QtWidgets, cryptography" 2>nul && goto launch
-          echo Installing the launcher's pinned Python packages into .local\python ...
-          %PY% -m pip install --quiet --target .local\python --require-hashes --only-binary :all: -r tools\appimage\requirements.txt || goto fail
-          :launch
-          echo Starting the launcher; errors go to launcher.log. Keep this window open.
-          %PY% tools\launcher.py > "%LOG%" 2>&1
-          if errorlevel 1 goto crashed
-          exit /b 0
-          :crashed
-          echo The launcher exited with an error:
-          type "%LOG%"
-          pause
-          exit /b 1
-          :nopython
-          echo Python 3.11 or newer from python.org was not found (tried "py -3" and "python").
-          pause
-          exit /b 1
-          :fail
-          echo Installing the Python packages failed; see the messages above.
-          pause
-          exit /b 1
-          EOF
-          sed -i 's/^          //; s/$/\r/' "$dist/Launch Skylanders.cmd"
           ls "$dist/.local/native-gpu-build"
       - uses: actions/setup-python@v6
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         with:
-          python-version: '3.14'
-      - name: Launcher imports on Windows Python
+          python-version: '3.13'
+      - name: Freeze the launcher (no Python needed on the player's PC)
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          python -m pip install --quiet --target "$env:RUNNER_TEMP\pydeps" --require-hashes --only-binary :all: -r tools/appimage/requirements.txt
-          $env:PYTHONPATH = "$env:RUNNER_TEMP\pydeps"
-          python -c "import sys; sys.path.insert(0, 'tools'); import launcher, run_session, overlay_session, game_prepare; print('launcher imports ok')"
+          python -m pip install --quiet --require-hashes --only-binary :all: -r tools/appimage/requirements.txt
+          python -m pip install --quiet pyinstaller==6.16.0
+          # Every tool module is a hidden import, so the stdlib/Qt they use is
+          # frozen in; the tools themselves run from source beside the exe.
+          $hidden = Get-ChildItem tools/*.py | Where-Object { $_.Name -notlike 'test*' -and $_.BaseName -ne 'frozen_entry' } | ForEach-Object { '--hidden-import', $_.BaseName }
+          python -m PyInstaller --noconfirm --windowed --name SkylandersPC --paths tools --distpath "$env:RUNNER_TEMP\frozen" --workpath "$env:RUNNER_TEMP\pyi" @hidden tools/frozen_entry.py
+          if ($LASTEXITCODE) { exit 1 }
+          Copy-Item -Recurse "$env:RUNNER_TEMP\frozen\SkylandersPC\*" out/SkylandersPC-windows/
+          # Smoke: the frozen exe runs a helper script and imports the launcher.
+          $out = & out/SkylandersPC-windows/SkylandersPC.exe tools/game_prepare.py --help | Out-String
+          if ($out -notmatch 'usage: game_prepare') { Write-Output $out; exit 1 }
+          Set-Content "$env:RUNNER_TEMP\probe.py" "import sys; sys.path.insert(0, r'$PWD\out\SkylandersPC-windows\tools'); import launcher, run_session, overlay_session; print('frozen launcher imports ok')"
+          $out = & out/SkylandersPC-windows/SkylandersPC.exe "$env:RUNNER_TEMP\probe.py" | Out-String
+          Write-Output $out
+          if ($out -notmatch 'imports ok') { exit 1 }
       - uses: actions/upload-artifact@v5
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         with:
