@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 from filesystem_fixtures import directory_link, frame_permissions
@@ -177,15 +178,31 @@ class HostFilesTests(unittest.TestCase):
             errors = []
             swaps = []
 
+            def move(source, destination):
+                # Windows refuses to rename a directory while a handle beneath
+                # it is open: the host holding one blocks the swap, so retry.
+                while True:
+                    try:
+                        source.rename(destination)
+                        return
+                    except PermissionError:
+                        if os.name != 'nt':
+                            raise
+                        if stop.is_set():
+                            raise InterruptedError('stopped while the host held the directory')
+                        time.sleep(0)
+
             def replace():
                 try:
                     game = root / 'game'
                     while not stop.is_set():
-                        (game / 'switch').rename(game / 'held')
-                        (game / 'attack').rename(game / 'switch')
-                        (game / 'switch').rename(game / 'attack')
-                        (game / 'held').rename(game / 'switch')
+                        move(game / 'switch', game / 'held')
+                        move(game / 'attack', game / 'switch')
+                        move(game / 'switch', game / 'attack')
+                        move(game / 'held', game / 'switch')
                         swaps.append(1)
+                except InterruptedError:
+                    pass
                 except BaseException as error:
                     errors.append(error)
 

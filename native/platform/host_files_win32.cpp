@@ -155,13 +155,28 @@ bool rename_handle(HANDLE source, HANDLE parent, std::wstring_view name, bool re
     const auto length = sizeof(FILE_RENAME_INFORMATION) + bytes;
     std::vector<std::max_align_t> storage((length + sizeof(std::max_align_t)-1) / sizeof(std::max_align_t));
     FILE_RENAME_INFORMATION header{};
-    header.ReplaceIfExists = replace ? TRUE : FALSE;
     header.RootDirectory = parent;
     header.FileNameLength = static_cast<ULONG>(bytes);
+    // FileRenameInformationEx (Windows 10 1709+) shares this layout with a ULONG
+    // Flags word in place of ReplaceIfExists. POSIX semantics replace a target
+    // that is still open (FILE_SHARE_DELETE) as rename(2) does on Linux; the
+    // classic class refuses with STATUS_ACCESS_DENIED instead.
+    constexpr ULONG replace_if_exists = 0x1, posix_semantics = 0x2;
+    constexpr auto rename_information_ex = static_cast<FILE_INFORMATION_CLASS>(65);
+    const ULONG flags = posix_semantics | (replace ? replace_if_exists : 0);
     std::memcpy(storage.data(),&header,sizeof(header));
+    std::memcpy(storage.data(),&flags,sizeof(flags));
     std::memcpy(reinterpret_cast<unsigned char*>(storage.data()) + offsetof(FILE_RENAME_INFORMATION,FileName),name.data(),bytes);
     IO_STATUS_BLOCK io{};
-    auto status = NtSetInformationFile(source,&io,storage.data(),static_cast<ULONG>(length),FileRenameInformation);
+    auto status = NtSetInformationFile(source,&io,storage.data(),static_cast<ULONG>(length),rename_information_ex);
+    if (status == static_cast<NTSTATUS>(0xC0000003L) || status == static_cast<NTSTATUS>(0xC00000BBL)) {
+        // STATUS_INVALID_INFO_CLASS / STATUS_NOT_SUPPORTED: older Windows or a
+        // file system without POSIX renames. Same operation, classic semantics.
+        header.ReplaceIfExists = replace ? TRUE : FALSE;
+        std::memcpy(storage.data(),&header,sizeof(header));
+        io = {};
+        status = NtSetInformationFile(source,&io,storage.data(),static_cast<ULONG>(length),FileRenameInformation);
+    }
     if (status == 0x103) {
         const auto wait = WaitForSingleObject(source,INFINITE);
         if (wait != WAIT_OBJECT_0) {
