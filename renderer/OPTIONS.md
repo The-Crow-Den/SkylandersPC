@@ -6,10 +6,11 @@ itself (SkylandersPS4 `native/gpu_backend.cpp`); the old `BB_<name>` spellings a
 load (`gpu/shim/legacy_options.cpp`). "Default" is read off the code and may be blank where it
 is computed; the description is the comment at the read.
 
-## Behaviour and tuning (127)
+## Behaviour and tuning (128)
 
 | Option | Default | Description | Read in |
 |---|---|---|---|
+| `AA` |  | SKY_RENDERER_AA (default 1): smooth edges of the game's frame in the present pass (FXAA-style; 0: off). | `gpu/render/presenter.cpp` |
 | `ANISO` | `16` | Mipmapped linear samplers of graphics draws get SKY_RENDERER_ANISO (16; 0 = the game's) times. | `gpu/render/raster_textures.cpp` |
 | `ASYNC_PIPELINES` | on; `0` turns it off | Only a pass drawn every frame may go without a draw for a frame or two (its render target drawn to in each of the last frames, below). A one-time render compiles at once, as during loading screens (a frame of fewer than 300 draws before this one). The pipeline must not depend on the draw's vertex buffers (VK_EXT_vertex_input_dynamic_state). A size rule (the scene's, the output's) missed most passe | `gpu/render/pipeline_cache.cpp` |
 | `ASYNC_PIPELINE_THREADS` |  | Workers (prefetch) and the GPU thread (async passes) share one pool, created once. | `gpu/render/pipeline_cache.cpp` |
