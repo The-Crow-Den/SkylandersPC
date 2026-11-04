@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "SkylandersPS4 contributors",
   "licence": "GPL-3.0-or-later",
-  "description": "Make Nightmare selectable when creating a fresh save. Built from profiles/patches/*nightmare.json.",
+  "description": "Make Nightmare selectable when creating a fresh save.",
   "targets": [
     {
       "title_id": "CUSA00626",

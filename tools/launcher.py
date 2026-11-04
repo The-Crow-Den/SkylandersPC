@@ -243,7 +243,8 @@ class Launcher(QMainWindow):
                 pc_value = {}
             pc_value.update({key: value[key] for key in model.PC_KEYS})
             save_settings(pc_path, pc_value)
-            argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None), game=getattr(self, 'game', None))
+            argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None), game=getattr(self, 'game', None),
+                                 mod_settings=(getattr(self, 'game', None) or {}).get('mod_settings'))
         except (OSError, ValueError, TypeError) as error:
             QMessageBox.warning(self, 'Cannot start Trap Team', str(error))
             return

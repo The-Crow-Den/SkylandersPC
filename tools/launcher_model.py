@@ -63,7 +63,7 @@ def save(path, value):
     temporary.replace(path)
 
 
-def command(root, python, value, mods=None, game=None):
+def command(root, python, value, mods=None, game=None, mod_settings=None):
     value = validate(value)
     # The exact-build mod gates 60 on engine loading, cutscene and UI state.
     argv = [str(python), str(Path(root) / 'tools/run_session.py'),
@@ -79,11 +79,10 @@ def command(root, python, value, mods=None, game=None):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))
     if mods is not None:
         try:
-            from .launcher_mods import validate as validate_mods
+            from .launcher_mods import arguments as mod_arguments
         except ImportError:
-            from launcher_mods import validate as validate_mods
-        for name, enabled in validate_mods(mods).items():
-            argv.append(('--' if enabled else '--no-')+name)
+            from launcher_mods import arguments as mod_arguments
+        argv += mod_arguments(mods, mod_settings)
     if value['level_events']:
         argv.append('--level-events')
     if value['figure']:

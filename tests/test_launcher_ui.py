@@ -59,6 +59,7 @@ class LauncherUITests(unittest.TestCase):
         self.assertIs(self.window.settings_page.game,self.window.game)
         self.assertIn('Trap Team',self.window.settings_page.title.text())
         self.assertTrue(any(button.text()=='Tweaks' for button in self.window.settings_page.nav))
+        self.assertTrue(any(button.text()=='Mods' for button in self.window.settings_page.nav))
         self.window.settings_page.cancel()
         self.window.select_game('swap-force')
         self.window.findChild(QPushButton,'gameSettings').click()
@@ -74,9 +75,17 @@ class LauncherUITests(unittest.TestCase):
         self.assertTrue(page.fields['unlock_nightmare'].isEnabled())
         from PyQt6.QtWidgets import QCheckBox,QPushButton
         self.assertFalse(any('Use general' in widget.text() for kind in (QCheckBox,QPushButton) for widget in page.findChildren(kind)))
-        page.mod_fields['element-gates'].setChecked(True)
-        page.mod_fields['unlock-expansions'].setChecked(True)
-        page.mod_fields['replay-expansion-intros'].setChecked(True)
+        self.assertEqual(page.mod_fields,{})
+        folder=self.root/'mods/sample';folder.mkdir(parents=True)
+        (folder/'mod.json').write_text(json.dumps(dict(schema_version=1,id='sample',name='Sample mod',version='1.0',author='Tests',licence='MIT',
+            targets=[dict(title_id='CUSA00626',app_version='01.01',executable_sha256='a'*64)],
+            settings={'strength':dict(type='choice',choices=['low','high'],default='low')},
+            operations=[dict(type='host-option',environment={'SKY_SAMPLE':'1'})])))
+        page.open(self.window.game)
+        self.assertIn('sample',page.mod_fields)
+        self.assertFalse(page.mod_fields['sample'].isEnabled())  # no installed build to check against
+        page.mod_fields['sample'].setChecked(True)
+        combo=page.mod_setting_fields[('sample','strength')];combo.setCurrentIndex(combo.findData('high'))
         page.fields['unlock_nightmare'].setChecked(not general['unlock_nightmare'])
         page.save()
         self.assertEqual(self.window.game['settings'],{'unlock_nightmare':not general['unlock_nightmare']})
@@ -84,11 +93,12 @@ class LauncherUITests(unittest.TestCase):
         trap=next(g for g in saved['games'] if g['id']=='trap-team')
         self.assertEqual(trap['settings'],self.window.game['settings'])
         self.assertEqual(self.window.values(),general)
-        self.assertEqual(trap['mods'],{'element-gates':True,'traptanium':False,'unlock-expansions':True,'replay-expansion-intros':True})
+        self.assertEqual(trap['mods'],{'sample':True})
+        self.assertEqual(trap['mod_settings'],{'sample':{'strength':'high'}})
         page.open(trap)
-        self.assertTrue(page.mod_fields['unlock-expansions'].isChecked())
-        self.assertTrue(page.mod_fields['replay-expansion-intros'].isChecked())
-        self.assertFalse(page.mod_fields['any-portal'].isEnabled())
+        self.assertTrue(page.mod_fields['sample'].isChecked())
+        self.assertEqual(page.mod_setting_fields[('sample','strength')].currentData(),'high')
+        self.assertFalse(page.portal_field.isEnabled())
         page.open();self.assertIsNone(page.game)
         self.assertEqual(self.window.values(),general)
 

@@ -36,10 +36,11 @@ def load(path):
         if not game['id'] or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in game['id']):
             raise ValueError('Invalid library game identifier')
         try:
-            from .launcher_mods import validate as validate_mods
+            from .launcher_mods import validate as validate_mods, validate_settings as validate_mod_settings
         except ImportError:
-            from launcher_mods import validate as validate_mods
+            from launcher_mods import validate as validate_mods, validate_settings as validate_mod_settings
         validate_mods(game.get('mods',{}))
+        validate_mod_settings(game.get('mod_settings',{}))
         if 'installation' in game:
             try:
                 from .game_library import split_selector

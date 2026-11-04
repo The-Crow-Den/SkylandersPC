@@ -32,8 +32,13 @@ now just select the mod:
 | `unlock-expansions` | `--unlock-expansions` | Experimental adventure pack access |
 | `replay-expansion-intros` | `--replay-expansion-intros` | Experimental; recipe withheld from public checkouts |
 
-The launcher's switches set these options; the four experimental choices are
-remembered per title in `out/mod-profiles/<title>.json`. A requested mod
+The launcher's **Mods** page (in a game's settings) lists every mod found in
+both folders, shows whether it works with the installed version, and has a
+switch and the declared settings for each one. Choices are saved per game in
+the launcher library and passed as `--mod ID` and
+`--mod-setting ID.NAME=JSON` (for example `my-mod.strength="high"`). Built-in
+mods that follow another option show which option controls them. **Open mods
+folder** creates `mods/` if needed. A requested mod
 that is missing, does not support the build, or clashes with another mod stops
 the launch with an error before anything is changed. Mods a mod `requires` are
 turned on with it.

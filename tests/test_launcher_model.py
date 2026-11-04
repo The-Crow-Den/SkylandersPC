@@ -52,7 +52,12 @@ class LauncherModelTests(unittest.TestCase):
         for enabled, flag in ((True,'--replay-expansion-intros'),(False,'--no-replay-expansion-intros')):
             argv=model.command('/project','python',model.DEFAULTS,mods={'replay-expansion-intros':enabled})
             self.assertIn(flag,argv)
-        with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'any-portal':True})
+        argv=model.command('/project','python',model.DEFAULTS,mods={'sample':True,'off':False},
+                           mod_settings={'sample':{'strength':'high'},'off':{'x':1}})
+        self.assertEqual(argv[argv.index('--mod'):][:4],['--mod','sample','--mod-setting','sample.strength="high"'])
+        self.assertNotIn('off',' '.join(argv))
+        with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'Bad Id':True})
+        with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'sample':True},mod_settings={'sample':{'x':[1]}})
         with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'traptanium':'yes'})
 
     def test_legacy_game_mod_preferences_keep_their_values(self):

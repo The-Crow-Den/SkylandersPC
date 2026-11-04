@@ -151,6 +151,22 @@ class ManifestTest(unittest.TestCase):
             (ROOT / 'profiles/patches/trap-team-us-01.01-movie-audio.json').read_text())['executable_sha256']))
         self.assertFalse(mods.supports(available, 'movie-audio', BUILD))
 
+    def test_launcher_catalogue_statuses(self):
+        from unittest.mock import patch
+        from tools import launcher_mods
+        with patch.object(launcher_mods, 'build', return_value=None):
+            rows, error = launcher_mods.catalogue(ROOT, {'id': 'trap-team'})
+        self.assertIsNone(error)
+        self.assertEqual({row['status'] for row in rows}, {'not-installed'})
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        with patch.object(launcher_mods, 'build', return_value=('CUSA00626', '01.01', us)):
+            status = {row['id']: row for row in launcher_mods.catalogue(ROOT, {'id': 'trap-team'})[0]}
+        self.assertEqual(status['nightmare']['status'], 'ready')
+        self.assertTrue(status['nightmare']['controlled'])
+        self.assertIsNone(status['element-gates']['controlled'])
+        with patch.object(launcher_mods, 'build', return_value=('CUSA00000', '01.00', BUILD)):
+            self.assertEqual({row['status'] for row in launcher_mods.catalogue(ROOT, {'id': 'x'})[0]}, {'other-build'})
+
     def test_builtin_nightmare_matches_profiles(self):
         nightmare = mods.read(ROOT / 'profiles/mods/nightmare')
         for name in ('trap-team-us-01.01-nightmare.json', 'trap-team-nightmare.json'):

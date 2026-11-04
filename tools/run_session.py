@@ -268,6 +268,8 @@ def run(argv,sessions):
                         help='make Nightmare available in fresh-save difficulty selection (alias for --mod nightmare)')
     parser.add_argument('--mod', action='append', default=[], metavar='ID',
                         help='enable a mod by id from profiles/mods or the per-user mods/ folder; repeatable')
+    parser.add_argument('--mod-setting', action='append', default=[], metavar='ID.NAME=JSON',
+                        help='set one mod setting, for example my-mod.strength="high"; repeatable')
     for name in gameplay_mods.NAMES:
         parser.add_argument('--'+name,action=argparse.BooleanOptionalAction,default=None,
                             help='exact-build gameplay mod; defaults to the selected title mod profile')
@@ -360,11 +362,18 @@ def run(argv,sessions):
                                             (['level-events'] if args.level_events else [])+
                                             (['movie-audio'] if selected_movie_audio=='english' else [])+
                                             (['controller-glyphs'] if glyph_mode!='playstation' else [])+args.mod))
+        mod_settings={}
+        for item in args.mod_setting:
+            name,_,value=item.partition('=')
+            ident,_,setting=name.partition('.')
+            try:mod_settings.setdefault(ident,{})[setting]=json.loads(value)
+            except ValueError:raise ValueError(f'invalid mod setting {item}') from None
+        if glyph_mode!='playstation':mod_settings.setdefault('controller-glyphs',{})['mode']=glyph_mode
         mod_writes=[]
         code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
                  for operation in available_mods[ident]['operations'])
         applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
-                                       settings={'controller-glyphs':{'mode':glyph_mode}} if glyph_mode!='playstation' else None,
+                                       settings=mod_settings,
                                        executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
         if any(operation['type']=='code-patch' for mod in applied_mods for operation in mod['operations']):
             raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
@@ -645,6 +654,7 @@ def run(argv,sessions):
         if args.level_events: restart.append('--level-events')
         restart.append('--unlock-nightmare' if args.unlock_nightmare else '--no-unlock-nightmare')
         for ident in args.mod:restart += ['--mod',ident]
+        for item in args.mod_setting:restart += ['--mod-setting',item]
         for name,enabled in selected_mods.items():restart.append(('--' if enabled else '--no-')+name)
         print('Restarting with saved PC settings.',flush=True)
         # execv skips main's cleanup.
