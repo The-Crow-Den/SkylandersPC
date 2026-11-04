@@ -6,6 +6,11 @@ if(WIN32)
   # Native timers already require Windows 10; expose the matching SDK API set.
   add_compile_definitions(_WIN32_WINNT=0x0A00)
   add_compile_options(-mno-ms-bitfields)
+  # The guest arena is one fixed reservation at 0x1000000000-0xfc00000000.
+  # High-entropy ASLR scatters heaps, stacks and mapped files across the low
+  # 8 TiB, so one usually lands inside it before the arena is reserved
+  # (ERROR_INVALID_ADDRESS). Without it they stay far below 64 GiB.
+  add_link_options(LINKER:--disable-high-entropy-va)
 endif()
 
 # Host platform layer (platform/): POSIX on Linux, Win32 on Windows (MinGW).
