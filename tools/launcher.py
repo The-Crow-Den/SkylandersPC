@@ -96,8 +96,6 @@ class Launcher(QMainWindow):
         self.combo(display,'Aspect ratio','aspect',[('16:9 · original','16:9'),('Automatic · match the screen','auto'),('16:10 · Steam Deck','16:10'),('21:9 · ultrawide','21:9'),('32:9 · super ultrawide','32:9')])
         self.combo(display,'Game language','language',[(model.game_language.NAMES[code],code) for code in model.languages(self.root)])
         self.combo(display,'Shadow detail','quality',[('Original','balanced'),('High','high'),('Low','performance')])
-        self.combo(display,'Frame policy','frame_policy',[('Automatic · 60 gameplay / 30 menus & portal','auto'),('Manual frame limit','manual')])
-        self.combo(display,'Frame limit','frame_limit',[('30 FPS',30),('60 FPS · experimental timing',60),('Uncapped · diagnostic',0)])
         self.check(display,'Fullscreen','fullscreen')
         self.check(display,'Show frame rate','fps_counter')
         self.check(display,'Show trophy popups','trophy_popups')
@@ -156,10 +154,10 @@ class Launcher(QMainWindow):
         self.refresh_devices()
         self.refresh_readiness()
         self.update_summary()
-        for key in ("resolution", "frame_limit", "frame_policy"):
-            self.fields[key].currentIndexChanged.connect(self.update_summary)
+        self.fields['resolution'].currentIndexChanged.connect(self.update_summary)
 
     def apply_values(self, value):
+        self.loaded_values = dict(value)
         for key, selected in value.items():
             # In-game-only choices (e.g. controller layout) have no launcher field.
             field = self.fields.get(key)
@@ -181,11 +179,9 @@ class Launcher(QMainWindow):
     def update_summary(self):
         if not hasattr(self,'home_summary'): return
         resolution=self.fields['resolution'].currentData()
-        fps=self.fields['frame_limit'].currentData()
-        automatic=self.fields['frame_policy'].currentData()=='auto'
-        self.fields['frame_limit'].setEnabled(not automatic)
-        if automatic: fps='Auto 30/60'
-        self.home_summary.setText(f'{resolution}  /  {fps or "Uncapped"} FPS     •     Virtual Traptanium     •     F6 opens PC settings in game')
+        # The 60 FPS mod on the Mods page chooses the frame rate.
+        fps='60 FPS mod' if (getattr(self,'session_mods',None) or {}).get('sixty-fps',True) else '30 FPS'
+        self.home_summary.setText(f'{resolution}  /  {fps}     •     Virtual Traptanium     •     F6 opens PC settings in game')
 
     def page(self, title, heading, description):
         page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(30,24,30,24);column.setSpacing(14)
@@ -219,7 +215,9 @@ class Launcher(QMainWindow):
             self.fields['figure'].setText(path)
 
     def values(self):
-        value = {}
+        # Settings without a launcher field (frame policy follows the 60 FPS mod) keep their saved value.
+        loaded = getattr(self, 'loaded_values', {})
+        value = {key: loaded.get(key, default) for key, default in model.DEFAULTS.items() if key not in self.fields}
         for key, field in self.fields.items():
             if isinstance(field, QComboBox): value[key] = field.currentData()
             elif isinstance(field, QCheckBox): value[key] = field.isChecked()

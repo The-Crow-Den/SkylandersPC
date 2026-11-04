@@ -13,7 +13,7 @@ except ImportError:
 
 GROUPS = [
  ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('aspect','Aspect ratio'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
- ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
+ ('Performance','Frame pacing and optional overlays.', [('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('skip_intro','Skip startup logos'),('unlock_nightmare','Nightmare available by default')]),
 ]
@@ -84,7 +84,6 @@ class SettingsPage(QWidget):
             'resolution':'Internal rendering resolution.',
             'aspect':'Wider screens show more of the world to the sides; menus and HUD keep their shape. Movies stay 16:9.', 'quality':'Detail and definition of game shadows.',
             'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
-            'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
             'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'A connected physical portal, or the virtual portal with figure files. Real portals are listed when the launcher opens.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
@@ -136,7 +135,6 @@ class SettingsPage(QWidget):
         footer=QHBoxLayout();self.feedback=QLabel();self.feedback.setStyleSheet('color: #92929e; font-size: 12px;');footer.addWidget(self.feedback,1)
         cancel=QPushButton('Cancel');cancel.clicked.connect(self.cancel);footer.addWidget(cancel)
         self.save_button=QPushButton('Save changes');self.save_button.setObjectName('settingsSave');self.save_button.clicked.connect(self.save);footer.addWidget(self.save_button);layout.addLayout(footer)
-        self.fields['frame_policy'].currentIndexChanged.connect(self.frame_policy)
         self.setStyleSheet("""
             QWidget#settingsPage { background: #101012; }
             QWidget#settingRow { background: #1c1c20; border: 1px solid #29292f; border-radius: 12px; }
@@ -193,7 +191,7 @@ class SettingsPage(QWidget):
         self.fill_mods(game,selected)
         self.save_button.setEnabled(self.owner.process is None)
         self.feedback.setText('Stop the current session to change settings.' if self.owner.process else ('Saved per game · Applies to the next session.' if game else 'Changes apply to your next session.'))
-        self.frame_policy();self.owner.views.setCurrentWidget(self)
+        self.owner.views.setCurrentWidget(self)
 
     def fill_mods(self,game,selected):
         """One row per mod.json found, with its switch and settings for this game."""
@@ -313,9 +311,6 @@ class SettingsPage(QWidget):
         elif isinstance(field,QCheckBox):field.setChecked(value)
         elif isinstance(field,QSlider):field.setValue(value)
         else:field.setText(value)
-
-    def frame_policy(self):
-        self.fields['frame_limit'].setEnabled(self.owner.process is None and self.fields['frame_policy'].currentData()=='manual')
 
     def open_games_folder(self):
         try:

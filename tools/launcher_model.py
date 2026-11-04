@@ -114,7 +114,10 @@ def platform_settings():
 def command(root, python, value, mods=None, game=None, mod_settings=None):
     value = validate(value)
     value = {**value, **{key: False for key in LINUX_ONLY if key not in platform_settings()}}
-    # The exact-build mod gates 60 on engine loading, cutscene and UI state.
+    if mods is not None and mods.get('sixty-fps') is False:
+        # The 60 FPS mod is off: original 30 FPS cap.
+        value = dict(value, frame_policy='manual', frame_limit=30)
+    # With the 60 FPS mod on, its own setting chooses automatic or fixed 60.
     argv = [str(python), str(Path(root) / 'tools/run_session.py'),
             '--variant', '60-delta', '--performance-profile', 'standard',
             '--memory-mode', 'standard', '--renderer-idle', 'adaptive',

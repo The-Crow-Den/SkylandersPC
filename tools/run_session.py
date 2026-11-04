@@ -345,6 +345,22 @@ def run(argv,sessions):
         parser.error('manual phase cap requires MangoHud')
     if args.mangohud and shutil.which('mangohud') is None:
         parser.error('MangoHud was requested but is not installed; omit --mangohud to run normally')
+    if 'sixty-fps' in args.mod:
+        # The 60 FPS mod owns the frame options: automatic 30/60 or a fixed 60.
+        automatic = True
+        for item in args.mod_setting:
+            name,_,value = item.partition('=')
+            if name == 'sixty-fps.automatic':
+                try:automatic = json.loads(value)
+                except ValueError:parser.error(f'invalid mod setting {item}')
+        if type(automatic) is not bool:parser.error('sixty-fps.automatic must be true or false')
+        if any(item == '--variant' or item.startswith('--variant=') for item in arguments) and args.variant != '60-delta':
+            parser.error('the 60 FPS mod requires 60-delta')
+        args.variant = '60-delta'
+        args.frame_policy = 'auto' if automatic else 'manual'
+        if not automatic:args.frame_limit = 60
+    elif args.frame_policy == 'auto':
+        args.mod.append('sixty-fps')
     if args.frame_policy == 'auto':
         # Saved settings default to automatic FPS; pick its variant unless one was given.
         if not any(item == '--variant' or item.startswith('--variant=') for item in arguments):
@@ -729,6 +745,8 @@ def run(argv,sessions):
         restart.append('--unlock-nightmare' if args.unlock_nightmare else '--no-unlock-nightmare')
         for ident in args.mod:restart += ['--mod',ident]
         for item in args.mod_setting:restart += ['--mod-setting',item]
+        if 'sixty-fps' in args.mod:
+            restart += ['--mod-setting','sixty-fps.automatic='+json.dumps(chosen.get('frame_policy',args.frame_policy)=='auto')]
         for name,enabled in selected_mods.items():restart.append(('--' if enabled else '--no-')+name)
         print('Restarting with saved PC settings.',flush=True)
         # execv skips main's cleanup.

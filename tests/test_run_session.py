@@ -23,6 +23,16 @@ class RunSessionTests(unittest.TestCase):
                 self.assertEqual(result.exception.code,2)
                 self.assertIn('automatic FPS requires 60-delta',output.getvalue())
 
+    def test_sixty_fps_mod_refuses_other_variants_and_invalid_setting(self):
+        for argv,message in ((['--variant','original','--mod','sixty-fps'],'the 60 FPS mod requires 60-delta'),
+                             (['--mod','sixty-fps','--mod-setting','sixty-fps.automatic="yes"'],'sixty-fps.automatic must be true or false')):
+            with self.subTest(argv=argv):
+                output=io.StringIO()
+                with contextlib.redirect_stderr(output), self.assertRaises(SystemExit) as result:
+                    main(argv)
+                self.assertEqual(result.exception.code,2)
+                self.assertIn(message,output.getvalue())
+
     def test_renderer_policy_preserves_guest_filters_and_explicit_overrides(self):
         source = {'SKY_RENDERER_ASYNC_PIPELINES':'0','SKY_RENDERER_GPU_SPIN_US':'25'}
         result = renderer_environment(source)

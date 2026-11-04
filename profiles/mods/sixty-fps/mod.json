@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "sixty-fps",
+  "name": "60 FPS",
+  "version": "1.0.0",
+  "author": "SkylandersPS4 contributors",
+  "licence": "GPL-3.0-or-later",
+  "description": "Plays at 60 FPS with elapsed-time simulation (the 60-delta patches, adapted from the Wii U FPS pack by Mew00, SuperSamus and Winner Nombre). Automatic keeps menus, cutscenes and portal arrival at 30 and switches gameplay to 60; turn it off for a fixed 60 cap.",
+  "targets": [
+    {
+      "title_id": "CUSA00697",
+      "app_version": "01.00",
+      "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd"
+    },
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.01",
+      "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    }
+  ],
+  "requires": ["level-events"],
+  "conflicts": [],
+  "settings": {
+    "automatic": {
+      "type": "bool",
+      "default": true
+    }
+  },
+  "operations": [
+    {
+      "type": "host-option",
+      "environment": {
+        "SKY_SIXTY_FPS_MOD": "1"
+      }
+    }
+  ]
+}

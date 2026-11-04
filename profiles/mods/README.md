@@ -24,7 +24,8 @@ now just select the mod:
 | Mod id | Option | What it does |
 | --- | --- | --- |
 | `nightmare` | `--unlock-nightmare` (on by default) | Nightmare selectable on a new save |
-| `level-events` | `--level-events`, or `--frame-policy auto` | Level-switch hooks for automatic FPS |
+| `sixty-fps` | `--mod sixty-fps`, or `--frame-policy auto` (on by default in the launcher) | 60 FPS with elapsed-time simulation; setting `automatic` (default `true`) keeps menus, cutscenes and portal arrival at 30, `false` caps everything at 60 |
+| `level-events` | `--level-events`, or required by `sixty-fps` | Level-switch hooks for automatic FPS |
 | `controller-glyphs` | `--controller-glyphs xbox\|nintendo\|auto` | Xbox or Nintendo button prompts from imported Steam artwork |
 | `element-gates` | `--element-gates` | Experimental gate change |
 | `traptanium` | `--traptanium` | Experimental; recipe withheld from public checkouts |

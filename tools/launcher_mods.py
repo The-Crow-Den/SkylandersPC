@@ -11,7 +11,7 @@ except ImportError:
 # Built-in mods driven by their own option rather than a Mods page switch.
 CONTROLLED = {
     'nightmare': 'Turned on by “Nightmare available by default” in Tweaks.',
-    'level-events': 'Turned on by automatic FPS or “Record level events” in Performance.',
+    'level-events': 'Turned on by the 60 FPS mod or “Record level events” in Performance.',
     'controller-glyphs': 'Follows the controller in use when Steam controller artwork has been imported.',
 }
 
@@ -85,6 +85,7 @@ def selection(root,game):
         import gameplay_mods, game_library
     selected=dict.fromkeys(NAMES,False)
     if game['id']=='trap-team':
+        selected['sixty-fps']=True
         try:
             title=game_library.resolve(root, game=game).title_id
             current=gameplay_mods.selection(root,title)

@@ -81,6 +81,16 @@ class LauncherModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'sample':True},mod_settings={'sample':{'x':[1]}})
         with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'traptanium':'yes'})
 
+    def test_sixty_fps_mod_switch_chooses_the_frame_options(self):
+        on=model.command('/root','python',model.DEFAULTS,mods={'sixty-fps':True})
+        self.assertIn('sixty-fps',on[on.index('--mod')+1])
+        off=model.command('/root','python',model.DEFAULTS,mods={'sixty-fps':False})
+        self.assertNotIn('--mod',off)
+        self.assertEqual(off[off.index('--frame-policy')+1],'manual')
+        self.assertEqual(off[off.index('--frame-limit')+1],'30')
+        fixed=model.command('/root','python',model.DEFAULTS,mods={'sixty-fps':True},mod_settings={'sixty-fps':{'automatic':False}})
+        self.assertIn('sixty-fps.automatic=false',fixed)
+
     def test_legacy_game_mod_preferences_keep_their_values(self):
         from tools import launcher_mods, launcher_library
         with tempfile.TemporaryDirectory() as directory:
@@ -92,7 +102,8 @@ class LauncherModelTests(unittest.TestCase):
             library=launcher_library.load(path)
             game=next(g for g in library['games'] if g['id']=='trap-team')
             selected=launcher_mods.selection(root,game)
-            self.assertEqual(selected,{'element-gates':True,'traptanium':False,'unlock-expansions':False,'replay-expansion-intros':False})
+            # The 60 FPS mod starts on, as automatic FPS did before it.
+            self.assertEqual(selected,{'element-gates':True,'traptanium':False,'unlock-expansions':False,'replay-expansion-intros':False,'sixty-fps':True})
             selected['unlock-expansions']=True
             game['mods']=selected;launcher_library.save(path,library)
             game=next(g for g in launcher_library.load(path)['games'] if g['id']=='trap-team')
