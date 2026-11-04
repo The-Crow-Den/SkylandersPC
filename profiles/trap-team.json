@@ -82,5 +82,16 @@
     "trap capture and villain switching",
     "figure insertion/removal and persistent upgrades",
     "save/reload and two-player join/leave"
+  ],
+  "languages": [
+    "en-US",
+    "en-GB",
+    "fr-FR",
+    "fr-CA",
+    "es-ES",
+    "es-419",
+    "de-DE",
+    "it-IT",
+    "nl-NL"
   ]
 }

@@ -2,6 +2,7 @@
 #include "system_service.hpp"
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <stdexcept>
@@ -13,6 +14,14 @@ constexpr std::array<std::string_view, 4> names{
     "656LMQSrg6U#libSceSystemService#libSceSystemService",
     "Vo5V8KAwCmk#libSceSystemService#libSceSystemService"};
 }
+SystemService::SystemService() : language_(language_from(std::getenv("SKY_SYSTEM_LANGUAGE"))) {}
+std::int32_t SystemService::language_from(const char* value) {
+    if (!value || !*value) return 1;
+    char* end = nullptr;
+    const long code = std::strtol(value, &end, 10);
+    if (*end || code < 0 || code > 30) throw std::runtime_error("SKY_SYSTEM_LANGUAGE must be a PS4 language code from 0 to 30");
+    return static_cast<std::int32_t>(code);
+}
 bool SystemService::supports(std::string_view identity) noexcept {
     return std::find(names.begin(), names.end(), identity) != names.end();
 }
@@ -21,7 +30,7 @@ std::uint64_t SystemService::call(std::string_view identity, const std::uint64_t
         if (!a[1]) return 0x80a10003;
         auto* out = reinterpret_cast<std::int32_t*>(a[1]);
         switch (a[0]) {
-            case 1: *out = 1; break; // English US.
+            case 1: *out = language_; break; // System language.
             case 2: *out = 1; break; // DD/MM/YYYY.
             case 3: *out = 1; break; // 24-hour clock.
             case 4: case 5: {

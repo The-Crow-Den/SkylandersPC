@@ -26,7 +26,6 @@ now just select the mod:
 | `nightmare` | `--unlock-nightmare` (on by default) | Nightmare selectable on a new save |
 | `level-events` | `--level-events`, or `--frame-policy auto` | Level-switch hooks for automatic FPS |
 | `controller-glyphs` | `--controller-glyphs xbox\|nintendo\|auto` | Xbox or Nintendo button prompts from imported Steam artwork |
-| `movie-audio` | `--movie-audio english\|auto` | English narration in cutscene movies |
 | `element-gates` | `--element-gates` | Experimental gate change |
 | `traptanium` | `--traptanium` | Experimental; recipe withheld from public checkouts |
 | `unlock-expansions` | `--unlock-expansions` | Experimental adventure pack access |
@@ -125,16 +124,17 @@ be stored as fixed bytes (they depend on local artwork, or rewrite whole
 files). `handler` names the step; `profile` is its data file, found the same
 way as above; `writes` lists game files it replaces whole, so another mod
 editing those files is refused. The handlers are `level-events` (patches the
-translated code pack), `controller-glyphs` (draws prompts into the font and
-title archives; its edits are checked for overlaps once built) and
-`movie-audio` (rewrites the listed movies). A mod naming any other handler is
-refused.
+translated code pack) and `controller-glyphs` (draws prompts into the font and
+title archives; its edits are checked for overlaps once built). A mod naming
+any other handler is refused.
 
 ```json
-{"type": "generated", "handler": "movie-audio", "target": "<sha256>",
- "profile": "profiles/patches/trap-team-us-01.01-movie-audio.json",
- "writes": ["movies/darkexp.mov"]}
+{"type": "generated", "handler": "controller-glyphs", "target": "<sha256>",
+ "profile": "profiles/patches/trap-team-us-01.01-controller-glyphs.json"}
 ```
+
+The movie narration fix and the game language are not mods: they are session
+options (`--movie-audio`, `--language`) that every player gets.
 
 **`host-option`**: environment values for the native host. Only `SKY_*` names
 with string values are allowed:

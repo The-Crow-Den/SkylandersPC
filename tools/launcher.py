@@ -91,6 +91,7 @@ class Launcher(QMainWindow):
 
         display=self.page('Graphics', 'A little more magic. A little more detail.', 'Tune your picture and frame rate. Applied choices are shared with the in-game PC menu.')
         self.combo(display,'Internal resolution','resolution',[(f'{k}  ·  {w} × {h}',k) for k,(w,h) in PRESETS.items()])
+        self.combo(display,'Game language','language',[(model.game_language.NAMES[code],code) for code in model.languages(self.root)])
         self.combo(display,'Shadow detail','quality',[('Original','balanced'),('High','high'),('Low','performance')])
         self.combo(display,'Frame policy','frame_policy',[('Automatic · 60 gameplay / 30 menus & portal','auto'),('Manual frame limit','manual')])
         self.combo(display,'Frame limit','frame_limit',[('30 FPS',30),('60 FPS · experimental timing',60),('Uncapped · diagnostic',0)])

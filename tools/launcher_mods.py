@@ -13,7 +13,6 @@ CONTROLLED = {
     'nightmare': 'Turned on by “Nightmare available by default” in Tweaks.',
     'level-events': 'Turned on by automatic FPS or “Record level events” in Performance.',
     'controller-glyphs': 'Follows the controller in use when Steam controller artwork has been imported.',
-    'movie-audio': 'Used automatically on the US update.',
 }
 
 

@@ -6,16 +6,16 @@ from pathlib import Path
 try:
     from .pc_settings import validate_settings
     from .run_session import PACKS
-    from . import game_install, game_build, game_library, game_prepare
+    from . import game_install, game_build, game_library, game_prepare, game_language
 except ImportError:
     from pc_settings import validate_settings
     from run_session import PACKS
-    import game_install, game_build, game_library, game_prepare
+    import game_install, game_build, game_library, game_prepare, game_language
 
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
                 motion_blur=True, anti_aliasing=True, nvidia=True, mangohud=False,
-                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='')
+                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', language='en-US')
 FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
@@ -26,11 +26,22 @@ def validate(value):
     validate_settings({key: value[key] for key in PC_KEYS})
     if any(type(value[key]) is not bool for key in FLAGS):
         raise ValueError('Invalid launcher switch')
+    if value['language'] not in game_language.CODES:
+        raise ValueError('Invalid game language')
     if value['frame_policy'] not in ('auto','manual'):
         raise ValueError('Invalid frame policy')
     if any(not isinstance(value[key], str) or '\0' in value[key] for key in ('figure', 'figure_bottom')):
         raise ValueError('Invalid figure path')
     return dict(value)
+
+
+def languages(root):
+    """Every language some title profile offers, English (US) first."""
+    found=[game_language.DEFAULT]
+    for path in sorted(Path(root,'profiles').glob('*.json')):
+        try:found+=[code for code in game_language.offered(root,path.stem) if code not in found]
+        except ValueError:pass
+    return found
 
 
 def load(path):
@@ -41,6 +52,8 @@ def load(path):
         value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
     if isinstance(value,dict) and 'figure_bottom' not in value:
         value['figure_bottom']=''
+    if isinstance(value,dict) and 'language' not in value:
+        value['language']='en-US'
     if isinstance(value,dict) and 'anti_aliasing' not in value:
         value['anti_aliasing']=True
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
@@ -73,7 +86,7 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
     if game is not None:
         entry = game_library.resolve_entry(root, game=game)
         argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
-    for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy'):
+    for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy', 'language'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
     for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare'):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))

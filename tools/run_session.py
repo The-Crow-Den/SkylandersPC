@@ -24,14 +24,14 @@ try:
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
     from . import mod_manifest
-    from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 except ImportError:
     from overlay_session import html_overlay
     from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
     import mod_manifest
-    import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = {'original': 'native-linked-boot-weak',
@@ -41,7 +41,7 @@ PACKS = {'original': 'native-linked-boot-weak',
 
 SESSION_TEMP = ROOT / 'out/session-temp'
 # Host steps that build a mod's edits at launch (mod.json `generated` operations).
-MOD_HANDLERS = {'level-events', 'controller-glyphs', 'movie-audio'}
+MOD_HANDLERS = {'level-events', 'controller-glyphs'}
 LAST_SESSION = ROOT / 'out/last-session'
 KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log')
 
@@ -248,8 +248,10 @@ def run(argv,sessions):
                         help='verified rotating save snapshots before launch and after normal exit')
     parser.add_argument('--resolution', choices=PRESETS,
                         help='experimental internal render size; restart required')
+    parser.add_argument('--language',choices=tuple(game_language.CODES),default=game_language.DEFAULT,
+                        help='console system language the game reads; titles fall back to English (US) when they lack it')
     parser.add_argument('--movie-audio',choices=('auto','original','english'),default='auto',
-                        help='select English movie narration for the verified US update; original retains all tracks')
+                        help='fix movie narration on the verified US update: auto keeps the selected language when its track is known, original retains all tracks')
     parser.add_argument('--window-resolution', choices=PRESETS,
                         help='presentation window size, independent of internal rendering')
     parser.add_argument('--shadows', choices=SHADOWS, default=None,
@@ -344,10 +346,15 @@ def run(argv,sessions):
         available_mods=mod_manifest.discover(ROOT)
         executable_sha256=build['executable_sha256']
         selected_mods=gameplay_mods.selection(ROOT,installation.title_id,{name:getattr(args,name.replace('-','_')) for name in gameplay_mods.NAMES})
-        movie_supported=mod_manifest.supports(available_mods,'movie-audio',executable_sha256)
-        if args.movie_audio=='english' and not movie_supported:
+        language,language_note=game_language.choose(ROOT,build['profile_id'],args.language)
+        movie_recipe=build['preparation'].get('optional_recipes',{}).get('movie-audio')
+        movie_profile=ROOT/movie_recipe if movie_recipe else None
+        if args.movie_audio=='english' and movie_profile is None:
             raise ValueError('English movie localization requires the verified US update')
-        selected_movie_audio='english' if args.movie_audio!='original' and movie_supported else 'original'
+        # Only the English narration track is identified; other languages keep
+        # the movies as shipped until their tracks are confirmed.
+        selected_movie_audio=('english' if movie_profile and (args.movie_audio=='english' or
+                              (args.movie_audio=='auto' and game_language.is_english(language))) else 'original')
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
         if glyph_mode!='playstation' and not controller_art.available():
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
@@ -360,7 +367,6 @@ def run(argv,sessions):
         selected_mod_ids=list(dict.fromkeys((['nightmare'] if args.unlock_nightmare else [])+
                                             [name for name,enabled in selected_mods.items() if enabled]+
                                             (['level-events'] if args.level_events else [])+
-                                            (['movie-audio'] if selected_movie_audio=='english' else [])+
                                             (['controller-glyphs'] if glyph_mode!='playstation' else [])+args.mod))
         mod_settings={}
         for item in args.mod_setting:
@@ -422,7 +428,7 @@ def run(argv,sessions):
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
-    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or 'movie-audio' in mod_handlers or 'controller-glyphs' in mod_handlers:
+    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or selected_movie_audio=='english' or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
                 PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
@@ -430,9 +436,9 @@ def run(argv,sessions):
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
     movie_metadata=None
-    if 'movie-audio' in mod_handlers:
+    if selected_movie_audio=='english':
         try:
-            movie_metadata=movie_audio.prepare(original_game,game_root,session,Path(mod_handlers['movie-audio'][1]['profile_path']))
+            movie_metadata=movie_audio.prepare(original_game,game_root,session,movie_profile)
         except (OSError,ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('movie_localization')
@@ -477,6 +483,8 @@ def run(argv,sessions):
     if trophy_metadata.get('available'):protected.append(trophy_metadata['store'])
     env = renderer_environment(env, args.renderer_idle)
     env.update(mod_environment)
+    env['SKY_SYSTEM_LANGUAGE']=str(game_language.CODES[language])
+    if language_note:print(language_note,file=sys.stderr)
     if 'level-events' in mod_handlers:
         try:
             files[0],level_metadata = level_events_mod.prepare(pack,session,
@@ -585,6 +593,7 @@ def run(argv,sessions):
                 'gameplay_mods': {'enabled':selected_mods,'assets':gameplay_metadata},
                 'controller_glyphs':glyph_metadata,
                 'movie_audio': {'mode':selected_movie_audio,'assets':movie_metadata},
+                'language': {'requested':args.language,'selected':language,'system_code':game_language.CODES[language],'note':language_note},
                 'window_size': env.get('SKY_WINDOW_SIZE', '1280x720'),
                 'sha256': {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                            for path in [host, *files]},
@@ -636,7 +645,7 @@ def run(argv,sessions):
                    '--anti-aliasing' if args.anti_aliasing else '--no-anti-aliasing',
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
-                   '--movie-audio',selected_movie_audio,
+                   '--movie-audio',args.movie_audio,'--language',args.language,
                    '--resolution',chosen['resolution'],'--quality',chosen['quality'],
                    '--frame-limit',str(chosen['frame_limit']),
                    '--portal-volume',str(chosen.get('portal_volume',30)),

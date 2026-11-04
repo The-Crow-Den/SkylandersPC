@@ -144,12 +144,13 @@ class ManifestTest(unittest.TestCase):
 
     def test_builtin_manifests_parse(self):
         available = mods.discover(ROOT)
-        for ident in ('nightmare', 'level-events', 'controller-glyphs', 'movie-audio', 'element-gates',
+        self.assertNotIn('movie-audio', available)  # a fix, not a mod
+        for ident in ('nightmare', 'level-events', 'controller-glyphs', 'element-gates',
                       'traptanium', 'unlock-expansions', 'replay-expansion-intros'):
             self.assertTrue(available[ident]['builtin'], ident)
-        self.assertTrue(mods.supports(available, "movie-audio", json.loads(
-            (ROOT / 'profiles/patches/trap-team-us-01.01-movie-audio.json').read_text())['executable_sha256']))
-        self.assertFalse(mods.supports(available, 'movie-audio', BUILD))
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        self.assertTrue(mods.supports(available, 'nightmare', us))
+        self.assertFalse(mods.supports(available, 'nightmare', BUILD))
 
     def test_launcher_catalogue_statuses(self):
         from unittest.mock import patch
