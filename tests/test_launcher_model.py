@@ -43,6 +43,18 @@ class LauncherModelTests(unittest.TestCase):
         argv = model.command('/project', 'python', dict(model.DEFAULTS, anti_aliasing=False))
         self.assertIn('--no-anti-aliasing', argv)
 
+    def test_aspect_ratio_is_saved_and_forwarded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.json'
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'aspect'}))
+            self.assertEqual(model.load(path)['aspect'], '16:9')
+        argv = model.command('/project', 'python', dict(model.DEFAULTS, aspect='21:9'))
+        self.assertEqual(argv[argv.index('--aspect') + 1], '21:9')
+        argv = model.command('/project', 'python', dict(model.DEFAULTS, aspect='auto'))
+        self.assertEqual(argv[argv.index('--aspect') + 1], 'auto')
+        with self.assertRaises(ValueError):
+            model.validate(dict(model.DEFAULTS, aspect='4:3'))
+
     def test_gameplay_mod_switches_are_forwarded_explicitly(self):
         argv=model.command('/project','python',model.DEFAULTS,mods={'element-gates':True,'traptanium':False})
         self.assertIn('--element-gates',argv);self.assertIn('--no-traptanium',argv)

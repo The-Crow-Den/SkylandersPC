@@ -15,10 +15,25 @@ except ImportError:
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=30,
                 motion_blur=True, anti_aliasing=True, nvidia=True, mangohud=False,
-                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US',
+                unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US', aspect='16:9',
                 portal_device='virtual')
 FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro')
+# 'auto' follows the display in fullscreen and the window size otherwise.
+ASPECTS = ('16:9', 'auto', '16:10', '21:9', '32:9')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
+
+
+def display_aspect():
+    """The primary display's W:H, or 'auto' when no display is known."""
+    try:
+        from PyQt6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen() if QGuiApplication.instance() else None
+    except ImportError:
+        screen = None
+    if screen is None:
+        return 'auto'
+    size = screen.size() * screen.devicePixelRatio()
+    return f'{size.width()}:{size.height()}' if size.width() >= size.height() > 0 else 'auto'
 
 
 def validate(value):
@@ -29,6 +44,8 @@ def validate(value):
         raise ValueError('Invalid launcher switch')
     if value['language'] not in game_language.CODES:
         raise ValueError('Invalid game language')
+    if value['aspect'] not in ASPECTS:
+        raise ValueError('Invalid aspect ratio')
     if value['frame_policy'] not in ('auto','manual'):
         raise ValueError('Invalid frame policy')
     if any(not isinstance(value[key], str) or '\0' in value[key] for key in ('figure', 'figure_bottom')):
@@ -61,6 +78,8 @@ def load(path):
         value['skip_intro']=False
     if isinstance(value,dict) and 'language' not in value:
         value['language']='en-US'
+    if isinstance(value,dict) and 'aspect' not in value:
+        value['aspect']='16:9'
     if isinstance(value,dict) and 'anti_aliasing' not in value:
         value['anti_aliasing']=True
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
@@ -95,6 +114,7 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
     for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy', 'language'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
+    argv += ['--aspect', display_aspect() if value['aspect'] == 'auto' and value['fullscreen'] else value['aspect']]
     for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'skip_intro'):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))
     if mods is not None:

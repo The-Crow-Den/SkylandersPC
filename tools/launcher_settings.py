@@ -12,7 +12,7 @@ except ImportError:
     import launcher_model as model
 
 GROUPS = [
- ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
+ ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('aspect','Aspect ratio'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('skip_intro','Skip startup logos'),('unlock_nightmare','Nightmare available by default')]),
@@ -81,7 +81,8 @@ class SettingsPage(QWidget):
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
             'language':'Text and voices, when the game has them. Movies follow it in English, Spanish, French and Portuguese.',
-            'resolution':'Internal rendering resolution.', 'quality':'Detail and definition of game shadows.',
+            'resolution':'Internal rendering resolution.',
+            'aspect':'Wider screens show more of the world to the sides; menus and HUD keep their shape. Movies stay 16:9.', 'quality':'Detail and definition of game shadows.',
             'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
             'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',

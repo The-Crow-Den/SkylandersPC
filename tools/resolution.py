@@ -100,8 +100,45 @@ def prepare_assets(game, session, dimensions=None, shadows='native', motion_blur
                     'asset_root': str(output), 'unchanged_assets': 'read-only hard links'}
 
 
-def patch_pack(data, preset, variant, profile):
+ASPECTS = {'16:9': 16 / 9, '16:10': 16 / 10, '21:9': 64 / 27, '32:9': 32 / 9}
+
+
+def parse_aspect(text):
+    """'21:9', '2560:1080' or '2.37' to a ratio within sane monitor limits."""
+    if text in ASPECTS:
+        return ASPECTS[text]
+    try:
+        width, _, height = text.partition(':')
+        ratio = float(width) / float(height) if height else float(width)
+    except (ValueError, ZeroDivisionError):
+        raise ValueError('aspect ratio must look like 21:9 or 2.37') from None
+    if not 1.0 <= ratio <= 4.0:
+        raise ValueError('aspect ratio must be between 1:1 and 4:1')
+    return ratio
+
+
+def render_size(preset, aspect=None):
+    """Keep the preset's height; Hor+ widens (or narrows) only the width."""
     width, height = PRESETS[preset]
+    if aspect is None or abs(aspect - 16 / 9) < 1e-3:
+        return width, height
+    return max(8, round(height * aspect / 8) * 8), height
+
+
+def mapped_offset(data, header, address, size):
+    locations = []
+    for index in range(header[4]):
+        start, memory, length, flags, offset = prepare_native.SEGMENT.unpack_from(
+            data, prepare_native.HEADER.size + index * prepare_native.SEGMENT.size)
+        if flags & 1 and start <= address and address + size <= start + length:
+            locations.append(offset + address - start)
+    if len(locations) != 1:
+        raise ValueError('patched instructions are not uniquely mapped executable bytes')
+    return locations[0]
+
+
+def patch_pack(data, preset, variant, profile, aspect=None):
+    width, height = preset if isinstance(preset, tuple) else PRESETS[preset]
     if hashlib.sha256(data).hexdigest() != profile['pack_sha256'].get(variant):
         raise ValueError('resolution patch refuses unknown linked executable pack')
     header = prepare_native.HEADER.unpack_from(data)
@@ -126,20 +163,31 @@ def patch_pack(data, preset, variant, profile):
         raise ValueError('resolution patch must preserve instruction length')
     result = bytearray(data)
     result[offset:offset + len(expected)] = replacement
+    if aspect is not None and abs(aspect - 16 / 9) >= 1e-3:
+        if 'aspect' not in profile:
+            raise ValueError('this build has no verified camera aspect patch')
+        expected = bytes.fromhex(profile['aspect']['expected_hex'])
+        offset = mapped_offset(data, header, profile['aspect']['virtual_address'], len(expected))
+        if data[offset:offset + len(expected)] != expected:
+            raise ValueError('camera aspect instruction bytes mismatch')
+        # movl $16/9 into the global camera aspect: only the float immediate changes.
+        result[offset:offset + len(expected)] = expected[:2] + struct.pack('<f', aspect)
     return bytes(result)
 
 
-def prepare_resolution(pack, session, executable, preset, variant, profile_path=None):
+def prepare_resolution(pack, session, executable, preset, variant, profile_path=None, aspect=None):
     profile = json.loads(Path(profile_path or PROFILE).read_text())
     if hashlib.sha256(executable.read_bytes()).hexdigest() != profile['executable_sha256']:
         raise ValueError('resolution patch refuses unknown original executable')
     source = pack / 'image.pack'
     data = source.read_bytes()
-    patched = patch_pack(data, preset, variant, profile)
+    size = render_size(preset, aspect)
+    patched = patch_pack(data, size, variant, profile, aspect)
     output = session / 'resolution.pack'
     with output.open('xb') as stream:
         stream.write(patched)
-    return output, {'preset': preset, 'requested_internal_size': list(PRESETS[preset]),
+    return output, {'preset': preset, 'requested_internal_size': list(size),
+                    'aspect': round(aspect or 16 / 9, 4),
                     'status': profile['status'], 'title_id': profile['title_id'],
                     'source_pack_sha256': hashlib.sha256(data).hexdigest(),
                     'output_pack_sha256': hashlib.sha256(patched).hexdigest()}

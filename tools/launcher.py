@@ -91,6 +91,7 @@ class Launcher(QMainWindow):
 
         display=self.page('Graphics', 'A little more magic. A little more detail.', 'Tune your picture and frame rate. Applied choices are shared with the in-game PC menu.')
         self.combo(display,'Internal resolution','resolution',[(f'{k}  ·  {w} × {h}',k) for k,(w,h) in PRESETS.items()])
+        self.combo(display,'Aspect ratio','aspect',[('16:9 · original','16:9'),('Automatic · match the screen','auto'),('16:10 · Steam Deck','16:10'),('21:9 · ultrawide','21:9'),('32:9 · super ultrawide','32:9')])
         self.combo(display,'Game language','language',[(model.game_language.NAMES[code],code) for code in model.languages(self.root)])
         self.combo(display,'Shadow detail','quality',[('Original','balanced'),('High','high'),('Low','performance')])
         self.combo(display,'Frame policy','frame_policy',[('Automatic · 60 gameplay / 30 menus & portal','auto'),('Manual frame limit','manual')])

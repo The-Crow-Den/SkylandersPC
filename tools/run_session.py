@@ -20,7 +20,7 @@ import sys
 import shutil
 try:
     from .overlay_session import html_overlay
-    from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
+    from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
     from . import mod_manifest
@@ -28,7 +28,7 @@ try:
     from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 except ImportError:
     from overlay_session import html_overlay
-    from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
+    from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
     import mod_manifest
@@ -261,6 +261,9 @@ def run(argv,sessions):
                         help='cut the startup logo movies to one frame on builds with a verified intro profile')
     parser.add_argument('--movie-audio',choices=('auto','original','english'),default='auto',
                         help='fix movie narration on the verified US update: auto keeps the selected language when its track is known, original retains all tracks')
+    parser.add_argument('--aspect', default='16:9',
+                        help='game aspect ratio: 16:9 (original), auto (from the window size), or W:H such as 21:9, 32:9, 16:10; '
+                             'wider shows more to the sides (Hor+)')
     parser.add_argument('--window-resolution', choices=PRESETS,
                         help='presentation window size, independent of internal rendering')
     parser.add_argument('--shadows', choices=SHADOWS, default=None,
@@ -449,6 +452,16 @@ def run(argv,sessions):
         phase_started=now
     resolution_metadata = None
     asset_metadata = None
+    try:
+        window_preset = args.window_resolution or args.resolution
+        aspect = (parse_aspect('%d:%d' % PRESETS[window_preset]) if window_preset else 16 / 9) \
+            if args.aspect == 'auto' else parse_aspect(args.aspect)
+    except ValueError as error:
+        parser.error(str(error))
+    if abs(aspect - 16 / 9) < 1e-3:
+        aspect = None
+    elif not args.resolution:
+        args.resolution = '1080p'
     level_metadata = None
     game_root = installation.materialize(session/'install') if installation.update else installation.base
     preparation_checkpoint("install_overlay")
@@ -456,14 +469,14 @@ def run(argv,sessions):
     if args.resolution:
         try:
             files[0], resolution_metadata = prepare_resolution(pack, session,
-                build['executable'], args.resolution, args.variant, build['resolution'])
+                build['executable'], args.resolution, args.variant, build['resolution'], aspect)
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
     if args.resolution or shadows != 'native' or not args.motion_blur or recipes or narration or intro_profile or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
-                PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
+                render_size(args.resolution, aspect) if args.resolution else None, shadows, args.motion_blur, build['resolution'])
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
@@ -530,7 +543,8 @@ def run(argv,sessions):
     if 'level-events' in mod_handlers:
         try:
             files[0],level_metadata = level_events_mod.prepare(pack,session,
-                build['executable'],args.variant,args.resolution,mod_handlers['level-events'][1]['profile_path'],build['resolution'])
+                build['executable'],args.variant,args.resolution and render_size(args.resolution,aspect),
+                mod_handlers['level-events'][1]['profile_path'],build['resolution'],aspect)
         except (OSError,ValueError) as error:
             parser.error(str(error))
         env['SKY_LEVEL_EVENT_MAILBOX'] = str(level_metadata['mailbox_address'])
@@ -562,7 +576,7 @@ def run(argv,sessions):
         env['SKY_RENDERER_TRIM_SHADER_WARMUP']='1'
     window = args.window_resolution or args.resolution
     if window:
-        env['SKY_WINDOW_SIZE'] = 'x'.join(map(str, PRESETS[window]))
+        env['SKY_WINDOW_SIZE'] = 'x'.join(map(str, PRESETS[window] if args.window_resolution else render_size(window, aspect)))
     if args.nvidia:
         icd = Path('/usr/share/vulkan/icd.d/nvidia_icd.json')
         if not icd.is_file():
@@ -694,7 +708,7 @@ def run(argv,sessions):
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
                    '--movie-audio',args.movie_audio,'--skip-intro' if args.skip_intro else '--no-skip-intro','--language',args.language,
-                   '--resolution',chosen['resolution'],'--quality',chosen['quality'],
+                   '--resolution',chosen['resolution'],'--aspect',args.aspect,'--quality',chosen['quality'],
                    '--frame-limit',str(chosen['frame_limit']),
                    '--portal-volume',str(chosen.get('portal_volume',30)),
                    '--controller-layout',chosen.get('controller_layout',args.controller_layout),
