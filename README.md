@@ -99,7 +99,7 @@ cmake --build .local/native-gpu-build
   See [native/README.md](native/README.md).
 - `tools/`: the launcher, session runner, in-game PC menu, package extractor
   and asset/patch recipe tools.
-- `profiles/`: per-game build identities and patch recipes. Recipes hold
+- `profiles/`: per-game build identities and patch recipes; `profiles/mods/README.md` describes how to write a mod. Recipes hold
   expected bytes and refuse to apply to anything else.
 - `renderer/`: skyrender, the Vulkan GPU, video-out and audio component.
 - `tests/`: synthetic tests; none need a game.
