@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class GameLanguageTests(unittest.TestCase):
     def test_title_profiles_choose_or_fall_back(self):
-        self.assertEqual(game_language.choose(ROOT, 'trap-team', 'fr-CA'), ('fr-CA', None))
+        self.assertEqual(game_language.choose(ROOT, 'trap-team', 'fr-FR'), ('fr-FR', None))
+        self.assertEqual(game_language.choose(ROOT, 'trap-team', 'fr-CA')[0], 'en-US')  # the game ignores fr-CA
         language, note = game_language.choose(ROOT, 'swap-force', 'fr-FR')
         self.assertEqual(language, 'en-US')
         self.assertIn('not offered', note)
@@ -37,7 +38,7 @@ class GameLanguageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             launcher_model.validate(dict(value, language='xx'))
         self.assertEqual(launcher_model.languages(ROOT)[0], 'en-US')
-        self.assertIn('fr-CA', launcher_model.languages(ROOT))
+        self.assertIn('fr-FR', launcher_model.languages(ROOT))
 
 
 if __name__ == '__main__':
