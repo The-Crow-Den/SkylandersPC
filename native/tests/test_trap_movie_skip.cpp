@@ -31,29 +31,17 @@ int main() {
         value=TrapMovieSkip::kEnded;put(address,&value,4);return true;
     };
     auto report=[&](const TrapMovieSkip::Skipped& item){skipped.push_back(item.name);};
-    const std::uintptr_t list=0x100000,logo=0x200000,fmv=0x300000,music=0x400000;
+    const std::uintptr_t list=0x100000,fmv=0x300000,music=0x400000;
     auto entries=[&](std::vector<std::uintptr_t> items){for(std::size_t i=0;i<items.size();++i)put(list+i*8,&items[i],8);};
 
     check(TrapMovieSkip::movie_name("app0:/movies/fmv1.mov")=="fmv1");
     check(TrapMovieSkip::movie_name("tfb_logo_640x456")=="tfb_logo_640x456");
 
-    // Startup logos end as soon as they play; story movies are left alone.
-    TrapMovieSkip::Skipper skipper;
-    TrapMovieSkip::Settings startup{true,false};
-    movie(logo,"movies/atvinewlogo_640.mov",TrapMovieSkip::kLoading);movie(fmv,"movies/fmv1.mov",TrapMovieSkip::kPlay);
-    entries({logo,fmv});
-    skipper.frame(list,2,true,0,false,startup,read,end,report);
-    check(skipped.empty() && state(logo)==TrapMovieSkip::kLoading); // not playing yet
-    movie(logo,"movies/atvinewlogo_640.mov",TrapMovieSkip::kPlay);
-    skipper.frame(list,2,true,TrapMovieSkip::kCross,false,startup,read,end,report);
-    check(skipped==std::vector<std::string>{"atvinewlogo_640"} && state(logo)==TrapMovieSkip::kEnded);
-    check(state(fmv)==TrapMovieSkip::kPlay); // button skipping is off
-
     // A press only skips a movie that was already listed on an earlier frame.
     skipped.clear();
     TrapMovieSkip::Skipper buttons;
-    TrapMovieSkip::Settings any{false,true};
-    entries({fmv});
+    TrapMovieSkip::Settings any{true};
+    movie(fmv,"movies/fmv1.mov",TrapMovieSkip::kPlay);entries({fmv});
     buttons.frame(list,1,true,TrapMovieSkip::kCross,false,any,read,end,report);
     check(skipped.empty() && state(fmv)==TrapMovieSkip::kPlay);
     buttons.frame(list,1,true,0x10,false,any,read,end,report); // triangle does nothing

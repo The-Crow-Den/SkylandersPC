@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "SkylandersPS4 contributors",
   "licence": "GPL-3.0-or-later",
-  "description": "Skips the publisher logos at startup and lets Cross or Options end any movie, including ones the game makes unskippable. A skipped movie ends the way it would at its last frame, so story flags and saves are unchanged. In-engine scripted cutscenes keep the game's own skip rules.",
+  "description": "Lets Cross or Options end any movie, including ones the game makes unskippable. A skipped movie ends the way it would at its last frame, so story flags and saves are unchanged. Startup logos are skipped by “Skip startup logos” in Tweaks. In-engine scripted cutscenes keep the game's own skip rules.",
   "targets": [
     {
       "title_id": "CUSA00626",
@@ -16,10 +16,6 @@
   "requires": [],
   "conflicts": [],
   "settings": {
-    "skip-startup-intros": {
-      "type": "bool",
-      "default": true
-    },
     "allow-skipping-all-cutscenes": {
       "type": "bool",
       "default": true
@@ -30,16 +26,6 @@
       "type": "host-option",
       "environment": {
         "SKY_MOVIE_SKIP_MOD": "1"
-      }
-    },
-    {
-      "type": "host-option",
-      "when": {
-        "setting": "skip-startup-intros",
-        "equals": true
-      },
-      "environment": {
-        "SKY_SKIP_STARTUP_INTROS": "1"
       }
     },
     {

@@ -19,14 +19,10 @@ constexpr std::int32_t kLoading=1,kPlay=3,kEnded=5,kAudioOnly=2;
 constexpr std::uint32_t kCross=0x4000,kOptions=0x8;
 constexpr std::size_t kSlots=64;
 
-struct Settings {bool startup=false,any=false;};
+struct Settings {bool any=false;};
 inline Settings settings_from_environment() {
     auto on=[](const char* name){const auto* v=std::getenv(name);return v && !std::strcmp(v,"1");};
-    return {on("SKY_SKIP_STARTUP_INTROS"),on("SKY_SKIP_CUTSCENES")};
-}
-// Publisher logos shown on every boot, before the title screen.
-inline bool startup_movie(std::string_view name) {
-    return name=="atvinewlogo_640" || name=="tfb_logo_640x456" || name=="beenoxlogo";
+    return {on("SKY_SKIP_CUTSCENES")};
 }
 inline std::string movie_name(std::string_view path) {
     if(const auto slash=path.find_last_of("/\\");slash!=path.npos)path.remove_prefix(slash+1);
@@ -34,7 +30,7 @@ inline std::string movie_name(std::string_view path) {
     return std::string(path);
 }
 
-struct Skipped {std::uintptr_t info;std::string name;bool startup;};
+struct Skipped {std::uintptr_t info;std::string name;};
 
 // Read(address,out,size) -> bool reads guest memory; End(state address) moves
 // PLAY to ENDED atomically and returns false if the movie changed state first.
@@ -57,9 +53,8 @@ public:
             const auto* known=seen(info);
             names[i]=known && !known->empty()?*known:movie_name(path(read,info));
             if(state!=kPlay)continue;
-            const bool startup=settings.startup && startup_movie(names[i]);
-            if(!startup && !(skip && known))continue;
-            if(end(info+kState))report(Skipped{info,names[i],startup});
+            if(!skip || !known)continue;
+            if(end(info+kState))report(Skipped{info,names[i]});
         }
         seen_=current;names_=std::move(names);
     }

@@ -10,7 +10,7 @@ namespace {
 constexpr std::string_view kTitle = "Skylanders: Trap Team";
 void skip_movies(bool pc_menu) {
     static const auto settings = TrapMovieSkip::settings_from_environment();
-    if (!settings.startup && !settings.any) return;
+    if (!settings.any) return;
     static TrapMovieSkip::Skipper skipper;
     const auto presses = KeyboardPad::presses.exchange(0);
     const auto movies = TrapMovieGate::sample(TrapTeamProbe::read);
@@ -22,9 +22,8 @@ void skip_movies(bool pc_menu) {
                 TrapMovieSkip::kEnded, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
         },
         [](const TrapMovieSkip::Skipped& movie) {
-            std::fprintf(stderr, "{\"event\":\"trap-movie-skipped\",\"observed_us\":%llu,\"movie\":\"%s\",\"reason\":\"%s\"}\n",
-                static_cast<unsigned long long>(TrapTeamProbe::timestamp()), movie.name.c_str(),
-                movie.startup ? "startup" : "button");
+            std::fprintf(stderr, "{\"event\":\"trap-movie-skipped\",\"observed_us\":%llu,\"movie\":\"%s\"}\n",
+                static_cast<unsigned long long>(TrapTeamProbe::timestamp()), movie.name.c_str());
         });
 }
 void frame(const GameHooks::Build& build, bool pc_menu) {
