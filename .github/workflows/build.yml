@@ -96,7 +96,7 @@ jobs:
           pacboy: >-
             toolchain:p cmake:p ninja:p python:p pkgconf:p git:p sdl3:p fmt:p boost:p robin-map:p
             zydis:p spirv-headers:p vulkan-headers:p vulkan-loader:p glslang:p xxhash:p
-            ffmpeg:p glm:p vulkan-memory-allocator:p
+            ffmpeg:p glm:p vulkan-memory-allocator:p openssl:p libusb:p
       - uses: actions/checkout@v7
         with:
           submodules: recursive
@@ -106,12 +106,15 @@ jobs:
           git init -q "$RUNNER_TEMP/xbyak"
           git -C "$RUNNER_TEMP/xbyak" fetch -q --depth 1 https://github.com/herumi/xbyak.git "$XBYAK_COMMIT"
           git -C "$RUNNER_TEMP/xbyak" checkout -q FETCH_HEAD
-      - name: Build renderer (static skyrender)
+      - name: Build complete Windows host with static renderer
         run: |
           xbyak="$(cygpath -m "$RUNNER_TEMP/xbyak")"
-          cmake -S renderer/gpu -B .local/renderer-build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DSKY_RENDERER_LTO=OFF -DSKY_RENDERER_PGO=off -DCMAKE_CXX_FLAGS="-isystem $xbyak"
-          cmake --build .local/renderer-build --target skyrender
+          cmake -S native -B .local/windows-full-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSKY_WINDOWS_FULL_HOST=ON -DSKY_TLS_PREFLIGHT=ON -DSKY_RENDERER_LTO=OFF \
+            -DSKY_RENDERER_PGO=off -DCMAKE_CXX_FLAGS="-isystem $xbyak"
+          cmake --build .local/windows-full-build
+      - name: Full host synthetic tests (no guest admission/game validation)
+        run: ctest --test-dir .local/windows-full-build --output-on-failure
 
   appimage:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')

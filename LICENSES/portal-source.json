@@ -78,9 +78,9 @@
     },
     {
       "path": "Cemu-main/src/Common/precompiled.h",
-      "sha256": "d9b2b997029aa61ad2a0780eb68c216fd6b878060fa69fb5b13788cd192f5b31",
+      "sha256": "474b7b2a44da5ac1cab8597ae17de74d3097385322cbca849da23d28c67044e6",
       "origin": "Cemu, modified",
-      "modifications": "MinGW uses native Windows types, compiler byte swaps, DebugBreak and standard-library clocks instead of MSVC internals; Linux branches unchanged."
+      "modifications": "MinGW uses native Windows types, compiler byte swaps, DebugBreak and standard-library clocks instead of MSVC internals. The standalone Windows portal uses the linked fmt implementation shared with the host; Linux branches unchanged."
     },
     {
       "path": "Cemu-main/src/Common/unix/FileStream_unix.cpp",

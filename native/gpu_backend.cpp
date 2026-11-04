@@ -580,6 +580,9 @@ std::uint64_t memory_call(std::string_view identity, const std::uint64_t* a) {
     std::size_t operation = 0;
     while (operation < memory_symbols.size() && identity != memory_symbols[operation].identity) ++operation;
     if (operation == memory_symbols.size()) throw std::runtime_error("unregistered GPU memory import scope");
+    // Also support memory-provider probes before presenter configuration.
+    static std::once_flag reserve_once;
+    std::call_once(reserve_once,[] { runtime_memory_reserve(); });
     const auto address = runtime_memory_resolve(memory_symbols[operation].identity);
     if (!address) throw std::runtime_error("GPU memory provider lacks registered service");
     using U = std::uint64_t;

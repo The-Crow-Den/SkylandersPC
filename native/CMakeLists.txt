@@ -142,14 +142,14 @@ endfunction()
 if(WIN32)
   enable_language(C)
   set(SKY_WIN32_RENDERER_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/../renderer/gpu/platform/win32/include")
-  # Compile the production C memory runtime too; full static renderer/host
-  # linkage remains separate. No replacement memory runtime is used for tests.
+  # Compile the production C memory runtime, also used by the full host below.
+  # Keep each forced-header option grouped so CMake does not deduplicate -include.
   add_library(sky-renderer-runtime-memory OBJECT ../renderer/src/runtime_memory.c)
   target_compile_features(sky-renderer-runtime-memory PRIVATE c_std_11)
   target_include_directories(sky-renderer-runtime-memory BEFORE PRIVATE "${SKY_WIN32_RENDERER_INCLUDE}")
   target_compile_options(sky-renderer-runtime-memory PRIVATE
-    -include "${SKY_WIN32_RENDERER_INCLUDE}/renderer_win32.h"
-    -include "${SKY_WIN32_RENDERER_INCLUDE}/renderer_posix_c.h")
+    "SHELL:-include \"${SKY_WIN32_RENDERER_INCLUDE}/renderer_win32.h\""
+    "SHELL:-include \"${SKY_WIN32_RENDERER_INCLUDE}/renderer_posix_c.h\"")
   # Windows port in progress: compile the real portable providers and loader.
   # Full executable/renderer linking and real-game TLS admission remain gated.
   include(CTest)
@@ -163,13 +163,13 @@ if(WIN32)
   target_compile_options(sky-host-portable PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   target_link_libraries(sky-host-portable PUBLIC sky-host-platform Threads::Threads OpenSSL::Crypto ws2_32)
 
-  # Compile the real pack loader now; linking the executable still depends on
-  # the remaining runtime/renderer ports and admitted guest TLS. No stub runtime.
+  # Compile the real loader/runtime even in the portable-subset build.
+  # The optional full link below still refuses unadmitted Windows guest entry.
   add_library(sky-guest-runtime OBJECT guest_runtime.cpp)
   target_compile_features(sky-guest-runtime PRIVATE cxx_std_20)
   target_compile_options(sky-guest-runtime PRIVATE -Wall -Wextra -Wconversion -Wshadow)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(SkyWindowsSDL3 REQUIRED IMPORTED_TARGET sdl3)
+  find_package(SDL3 CONFIG REQUIRED)
   add_library(sky-renderer-host-glue OBJECT gpu_backend.cpp renderer_adapter.cpp pc_overlay_bridge.cpp portal_library.cpp)
   target_compile_features(sky-renderer-host-glue PRIVATE cxx_std_20)
   target_compile_definitions(sky-renderer-host-glue PRIVATE SKY_RENDERER=1)
@@ -178,10 +178,58 @@ if(WIN32)
     "${CMAKE_CURRENT_SOURCE_DIR}/../renderer" "${CMAKE_CURRENT_SOURCE_DIR}/../renderer/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../renderer/gpu")
   target_compile_options(sky-renderer-host-glue PRIVATE -include "${SKY_WIN32_RENDERER_INCLUDE}/renderer_win32.h")
-  target_link_libraries(sky-renderer-host-glue PRIVATE sky-host-platform OpenSSL::Crypto PkgConfig::SkyWindowsSDL3 Threads::Threads)
+  target_link_libraries(sky-renderer-host-glue PRIVATE sky-host-platform OpenSSL::Crypto SDL3::SDL3 Threads::Threads)
   add_library(sky-pack-loader OBJECT main.cpp)
   target_compile_features(sky-pack-loader PRIVATE cxx_std_20)
   target_compile_options(sky-pack-loader PRIVATE -Wall -Wextra -Wconversion -Wshadow)
+
+  option(SKY_WINDOWS_FULL_HOST "Link the Windows host with the pinned static renderer" OFF)
+  if(SKY_WINDOWS_FULL_HOST)
+    if(NOT SKY_TLS_PREFLIGHT)
+      message(FATAL_ERROR "The full Windows host requires SKY_TLS_PREFLIGHT; real guest admission is still gated")
+    endif()
+    if(NOT TARGET sky-portal-core)
+      message(FATAL_ERROR "The full Windows host requires the pinned Cemu portal source")
+    endif()
+    pkg_check_modules(SkyWindowsUSB REQUIRED IMPORTED_TARGET libusb-1.0)
+    set(SKY_WINDOWS_RENDERER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../renderer")
+    file(GLOB SKY_WINDOWS_ATRAC9 CONFIGURE_DEPENDS "${SKY_WINDOWS_RENDERER_ROOT}/third_party/LibAtrac9/C/src/*.c")
+    if(NOT SKY_WINDOWS_ATRAC9)
+      message(FATAL_ERROR "Initialize the pinned LibAtrac9 submodule for the full Windows host")
+    endif()
+    add_subdirectory("${SKY_WINDOWS_RENDERER_ROOT}/gpu" "${CMAKE_CURRENT_BINARY_DIR}/renderer")
+    add_library(sky-renderer-media STATIC
+      "${SKY_WINDOWS_RENDERER_ROOT}/src/runtime_ajm.c"
+      "${SKY_WINDOWS_RENDERER_ROOT}/src/runtime_audio.c" ${SKY_WINDOWS_ATRAC9})
+    target_compile_features(sky-renderer-media PRIVATE c_std_11)
+    target_include_directories(sky-renderer-media BEFORE PRIVATE "${SKY_WIN32_RENDERER_INCLUDE}")
+    target_include_directories(sky-renderer-media PRIVATE "${SKY_WINDOWS_RENDERER_ROOT}")
+    target_compile_options(sky-renderer-media PRIVATE
+      "SHELL:-include \"${SKY_WIN32_RENDERER_INCLUDE}/renderer_win32.h\""
+      "SHELL:-include \"${SKY_WIN32_RENDERER_INCLUDE}/renderer_posix_c.h\"")
+    target_link_libraries(sky-renderer-media PUBLIC SDL3::SDL3 Threads::Threads)
+    add_library(sky-virtual-portal OBJECT hle/virtual_portal.cpp)
+    target_compile_features(sky-virtual-portal PRIVATE cxx_std_20)
+    target_compile_definitions(sky-virtual-portal PRIVATE SKY_CEMU_PORTAL=1)
+    target_link_libraries(sky-virtual-portal PRIVATE sky-portal-core PkgConfig::SkyWindowsUSB)
+    add_executable(skylanders-native-host guest_start.S
+      $<TARGET_OBJECTS:sky-pack-loader> $<TARGET_OBJECTS:sky-guest-runtime>
+      $<TARGET_OBJECTS:sky-renderer-host-glue> $<TARGET_OBJECTS:sky-renderer-runtime-memory>
+      $<TARGET_OBJECTS:sky-virtual-portal>)
+    target_link_libraries(skylanders-native-host PRIVATE sky-host-portable sky-guest-tls
+      sky-portal-core PkgConfig::SkyWindowsUSB sky-renderer-media skyrender)
+    if(BUILD_TESTING)
+      add_test(NAME native-windows-loader COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_windows_loader.py $<TARGET_FILE:skylanders-native-host>)
+      add_executable(gpu-adapter-test tests/test_gpu_adapter.cpp guest_start.S
+        $<TARGET_OBJECTS:sky-renderer-host-glue> $<TARGET_OBJECTS:sky-renderer-runtime-memory>
+        $<TARGET_OBJECTS:sky-virtual-portal>)
+      target_compile_features(gpu-adapter-test PRIVATE cxx_std_20)
+      target_link_libraries(gpu-adapter-test PRIVATE sky-host-portable sky-portal-core
+        PkgConfig::SkyWindowsUSB sky-renderer-media skyrender)
+      add_test(NAME native-gpu-adapter COMMAND gpu-adapter-test)
+    endif()
+  endif()
 
   if(BUILD_TESTING)
     add_executable(renderer-memory-test ../renderer/tests/test_win32_memory.cpp

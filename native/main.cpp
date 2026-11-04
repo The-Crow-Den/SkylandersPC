@@ -341,6 +341,9 @@ int main(int argc, char** argv) {
     try {
         if (argc == 2 && std::string(argv[1]) == "--help") {
             std::cout << "usage: skylanders-native-host [--inspect|--load] PACK\n       skylanders-native-host --run PACK IMPORT_TYPES [BOOT_PLAN [GAME_ROOT]]\nOnly --run (alias --trace-start) executes the guest; unknown imports/faults stop it.\n";
+#ifdef _WIN32
+            std::cout << "Windows guest execution is gated until executable/TLS profile admission is integrated.\n";
+#endif
             return 0;
         }
         bool load = false;
@@ -358,6 +361,11 @@ int main(int argc, char** argv) {
             return 2;
         }
         Pack pack(path);
+#ifdef _WIN32
+        // A complete code-range/rewrite profile is not yet admitted. Refuse
+        // before any guest entry instead of executing Windows FS accesses.
+        if (trace) fail("Windows execution requires an admitted executable/TLS rewrite profile; integration is incomplete");
+#endif
         Arena arena;
         if (trace) {
             std::setvbuf(stdout, nullptr, _IONBF, 0);

@@ -5,7 +5,9 @@
 #include "version.h"
 #include "platform.h"
 
+#if !defined(_WIN32) || !defined(TRAPTEAM_STANDALONE_PORTAL)
 #define FMT_HEADER_ONLY
+#endif // Standalone Windows portal shares the host's linked fmt implementation.
 #define FMT_USE_GRISU 1
 #include <fmt/core.h>
 #include <fmt/format.h>
