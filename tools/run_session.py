@@ -342,6 +342,9 @@ def run(argv,sessions):
     if args.mangohud and shutil.which('mangohud') is None:
         parser.error('MangoHud was requested but is not installed; omit --mangohud to run normally')
     if args.frame_policy == 'auto':
+        # Saved settings default to automatic FPS; pick its variant unless one was given.
+        if not any(item == '--variant' or item.startswith('--variant=') for item in arguments):
+            args.variant = '60-delta'
         if args.variant != '60-delta' or args.manual_phase_cap or args.present_limit is not None:
             parser.error('automatic FPS requires 60-delta and the built-in limiter')
         args.level_events = True
