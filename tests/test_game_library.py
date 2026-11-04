@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from tools import game_library as library, game_install, launcher_library, launcher_model
-from tools import launcher_packages, launcher_trophies, run_session
+from tools import folder_import, launcher_packages, launcher_trophies, run_session
 from test_game_install import sfo
 
 
@@ -37,6 +37,29 @@ class GameLibraryTests(unittest.TestCase):
         path = self.root/'profiles'/f'{profile_id}.json'
         path.write_text(json.dumps(dict(id=profile_id,title='Synthetic profile',validated_builds=[dict(
             title_id=title,app_version=ver,executable_sha256=hashlib.sha256(executable).hexdigest())])))
+
+    def test_unpacked_folders_install_and_originals_stay(self):
+        base=self.dump('mine/Game');update=self.dump('mine/Update',ver='01.01',category='gp',executable=b'patch')
+        (base/'data').mkdir();(base/'data/level.bin').write_bytes(b'level')
+        self.assertTrue(launcher_packages.unpacked(base))
+        self.assertFalse(launcher_packages.unpacked(self.root/'mine'))
+        self.assertEqual(launcher_packages.package_info(update)['CATEGORY'],'gp')
+        launcher_packages.check_packages(str(base),str(update))
+        with self.assertRaisesRegex(ValueError,'looks like an update'):
+            launcher_packages.check_packages(str(update))
+        staging=self.root/'staging'
+        for kind,source in (('base',base),('update',update)):
+            folder_import.import_folder(source,staging/kind,progress=lambda line:None)
+        entry=launcher_packages.publish(staging,self.library,['Game','Update'])
+        self.assertEqual(entry['app_version'],'01.01')
+        self.assertEqual((Path(entry['base_path'])/'data/level.bin').read_bytes(),b'level')
+        self.assertEqual((base/'data/level.bin').read_bytes(),b'level')
+        self.assertTrue((update/'eboot.bin').is_file())
+
+    def test_folder_import_refuses_folders_without_game_metadata(self):
+        (self.root/'empty').mkdir()
+        with self.assertRaisesRegex(ValueError,'sce_sys'):
+            folder_import.import_folder(self.root/'empty',self.root/'out')
 
     def test_manifest_discovery_and_versioned_layout(self):
         base=self.dump('incoming/base');update=self.dump('incoming/update',ver='01.01',category='gp',executable=b'patch')
