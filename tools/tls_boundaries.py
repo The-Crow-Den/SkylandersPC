@@ -326,7 +326,15 @@ def nonreturning_import_thunks(data, expected_sha256):
 
     __stack_chk_fail has a nonreturning compiler ABI contract (for example,
     glibc debug/stack_chk_fail.c). std::terminate is specified [[noreturn]] in
-    https://eel.is/c++draft/exception.terminate . Match exact scoped NIDs,
+    https://eel.is/c++draft/exception.terminate . abort/exit/_Exit have the
+    same no-return contract in https://eel.is/c++draft/cstdlib.syn .
+    __cxa_throw/__cxa_rethrow are declared noreturn in
+    https://github.com/llvm/llvm-project/blob/main/libcxxabi/include/cxxabi.h ;
+    _Unwind_Resume never returns under section 1.6.3 of
+    https://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html .
+    These are control-flow facts only: exception landing-pad roots remain
+    separate metadata evidence, and no exception/termination service is faked.
+    Match exact scoped NIDs,
     function types and JUMP_SLOT relocations, then verify unconditional
     RIP-relative import JMP bytes. No other calls are guessed nonreturning.
     Output is diagnostic evidence, never patch or service implementation.
@@ -334,8 +342,10 @@ def nonreturning_import_thunks(data, expected_sha256):
     image, _ = _verified_image(data, expected_sha256)
     one, blob, _ = link_native.dynamic_tables(image)
     imports = {s['index']: s for s in module_graph.analyze_bytes(data, 'main')['imports']}
-    identities = {audit_imports.nid('__stack_chk_fail') + '#libkernel#libkernel',
-                  audit_imports.nid('_ZSt9terminatev') + '#libc#libc'}
+    identities = {audit_imports.nid('__stack_chk_fail') + '#libkernel#libkernel'}
+    identities.update(audit_imports.nid(name) + '#libc#libc' for name in (
+        '_ZSt9terminatev', '__cxa_throw', '__cxa_rethrow', '_Unwind_Resume',
+        'abort', 'exit', '_Exit'))
     slots = {}
     for offset_tag, size_tag in ((0x6100002F, 0x61000031), (0x61000029, 0x6100002D)):
         offset, size = one(offset_tag), one(size_tag)

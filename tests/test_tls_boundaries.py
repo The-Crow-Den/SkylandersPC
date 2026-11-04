@@ -309,15 +309,17 @@ class BoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'hash mismatch'):
             t.nonreturning_import_thunks(data, '0' * 64)
 
-    def test_terminate_thunks_use_exact_abi_name_and_both_scopes(self):
+    def test_nonreturning_libc_thunks_use_exact_abi_name_and_both_scopes(self):
         from test_prepare_native import native_fixture
-        for name, library, module, expected in (
-            ('_ZSt9terminatev', 'libc', 'libc', 1),
-            ('_ZSt9terminatev', 'libc', 'libkernel', 0),
-            ('_ZSt9terminatev', 'libkernel', 'libc', 0),
-            ('__cxa_begin_catch', 'libc', 'libc', 0),
-            ('_ZSt13set_terminatePFvvE', 'libc', 'libc', 0),
-        ):
+        cases = [(name, library, module, int(library == module == 'libc'))
+                 for name in ('_ZSt9terminatev', '__cxa_throw', '__cxa_rethrow',
+                              '_Unwind_Resume', 'abort', 'exit', '_Exit')
+                 for library, module in (('libc', 'libc'), ('libc', 'libkernel'),
+                                         ('libkernel', 'libc'))]
+        cases += [(name, 'libc', 'libc', 0) for name in (
+            '__cxa_begin_catch', '__cxa_end_catch', '_Unwind_RaiseException',
+            '_Unwind_Resume_or_Rethrow', 'atexit', '_ZSt13set_terminatePFvvE')]
+        for name, library, module, expected in cases:
             with self.subTest(name=name, library=library, module=module):
                 data = native_fixture()
                 original = b'syntheticNID#A#B'
