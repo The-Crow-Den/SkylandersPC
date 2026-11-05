@@ -390,8 +390,12 @@ class SettingsPage(QWidget):
             elif isinstance(field,QCheckBox):values[key]=field.isChecked()
             elif isinstance(field,QSlider):values[key]=field.value()
             else:values[key]=field.text()
-        # The swapper bottom half is chosen on the Portal page, not here.
-        values.setdefault('figure_bottom',self.baseline.get('figure_bottom',''))
+        # Settings this page does not show keep their current values: the swapper
+        # bottom half (chosen on the Portal page) and options hidden on this
+        # platform (NVIDIA and MangoHud on Windows). Without them, validation
+        # refused every save as "Unknown or missing launcher settings".
+        for key,default in model.DEFAULTS.items():
+            values.setdefault(key,self.baseline.get(key,default))
         try:
             values=model.validate(values)
             if self.game is not None:
