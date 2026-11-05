@@ -68,14 +68,20 @@ MapStatus failure(std::uint64_t address, std::uint64_t size) noexcept {
 // inside it takes its range back and re-reserves what is left.
 // Windows also hands out ordinary host allocations (heaps, renderer, driver)
 // bottom-up, which otherwise fills the low 2 GiB that guest stacks and TLS
-// need. So the hold also covers a guest-thread arena after the image window;
-// allocate_low_guest carves low guest thread memory out of it, and host
-// allocations are placed above it.
-constexpr std::uint64_t kLowGuestBegin = 0x400000, kThreadArenaBegin = 0x4400000, kLowGuestEnd = 0x24400000;
+// need. So the child also holds a guest-thread arena right after the image
+// window, as a second, separate reservation that is never released:
+// allocate_low_guest commits 64 KiB blocks inside it and free_low_guest
+// decommits them. Nothing else can land there, and image mappings (which
+// release and re-reserve parts of the image window) never touch it.
+constexpr std::uint64_t kLowGuestBegin = 0x400000, kLowGuestEnd = 0x4400000;
+constexpr std::uint64_t kThreadArenaBegin = kLowGuestEnd, kThreadArenaEnd = 0x24400000;
+constexpr std::uint64_t kArenaBlock = 0x10000, kArenaBlocks = (kThreadArenaEnd - kThreadArenaBegin) / kArenaBlock;
 constexpr char kHeldVariable[] = "SKY_GUEST_WINDOW_HELD";
 struct LowGuestHold {
     std::mutex lock;
     std::vector<std::pair<std::uint64_t, std::uint64_t>> held; // base, size
+    bool arena = false;                                        // arena reservation adopted
+    std::vector<bool> arena_used = std::vector<bool>(kArenaBlocks, false);
     void reserve(std::uint64_t begin, std::uint64_t end) noexcept {
         for (std::uint64_t at = begin; at < end;) {
             MEMORY_BASIC_INFORMATION info{};
@@ -100,6 +106,11 @@ struct LowGuestHold {
             reinterpret_cast<std::uint64_t>(info.BaseAddress) + info.RegionSize >= kLowGuestEnd)
             held.emplace_back(kLowGuestBegin, kLowGuestEnd - kLowGuestBegin);
         else describe_range("adopt-window", kLowGuestBegin, kLowGuestEnd - kLowGuestBegin);
+        info = {};
+        arena = VirtualQuery(reinterpret_cast<void*>(kThreadArenaBegin), &info, sizeof(info)) && info.State == MEM_RESERVE &&
+            reinterpret_cast<std::uint64_t>(info.AllocationBase) == kThreadArenaBegin &&
+            reinterpret_cast<std::uint64_t>(info.BaseAddress) + info.RegionSize >= kThreadArenaEnd;
+        if (!arena) describe_range("adopt-arena", kThreadArenaBegin, kThreadArenaEnd - kThreadArenaBegin);
     }
     // Releases held reservations overlapping the request; returns the span
     // released so the caller can re-reserve what the mapping leaves free.
@@ -133,31 +144,35 @@ MapStatus map_low_guest(std::uint64_t address, std::uint64_t size, Map&& map) no
 }
 
 void* allocate_low_guest(std::size_t size, bool inaccessible) noexcept {
-    if (!size) return nullptr;
-    const std::uint64_t reserved = (size + 0xffff) & ~std::uint64_t{0xffff};
+    if (!size || size > kThreadArenaEnd - kThreadArenaBegin) return nullptr;
+    const std::uint64_t blocks = (size + kArenaBlock - 1) / kArenaBlock;
     std::lock_guard guard(low_guest.lock);
-    for (const auto [base, length] : std::vector(low_guest.held)) {
-        // The image window stays free for the guest's fixed mappings: use only
-        // the arena part of a held span (one span can cover both).
-        const auto start = std::max(base, kThreadArenaBegin);
-        if (base + length <= start || base + length - start < reserved) continue;
-        low_guest.release(base, length);
-        void* data = VirtualAlloc(reinterpret_cast<void*>(start), size, MEM_RESERVE | MEM_COMMIT,
-                                  inaccessible ? PAGE_NOACCESS : PAGE_READWRITE);
-        low_guest.reserve(base, base + length);
-        if (data == reinterpret_cast<void*>(start)) return data;
-        if (data) VirtualFree(data, 0, MEM_RELEASE);
+    if (!low_guest.arena) return nullptr;
+    auto& used = low_guest.arena_used;
+    // First fit over 64 KiB blocks; the reservation itself is never released.
+    for (std::uint64_t first = 0, run = 0; first + run < kArenaBlocks;) {
+        if (used[first + run]) { first += run + 1; run = 0; continue; }
+        if (++run < blocks) continue;
+        auto* address = reinterpret_cast<void*>(kThreadArenaBegin + first * kArenaBlock);
+        // Commit inside the reservation: fresh pages are zero-filled.
+        if (VirtualAlloc(address, size, MEM_COMMIT, inaccessible ? PAGE_NOACCESS : PAGE_READWRITE) != address)
+            return nullptr;
+        for (std::uint64_t i = 0; i < blocks; ++i) used[first + i] = true;
+        return address;
     }
     return nullptr;
 }
 
 bool free_low_guest(void* data, std::size_t size) noexcept {
     const auto base = reinterpret_cast<std::uint64_t>(data);
-    if (!data || base < kThreadArenaBegin || base >= kLowGuestEnd) return false;
+    if (!data || base < kThreadArenaBegin || base >= kThreadArenaEnd || (base - kThreadArenaBegin) % kArenaBlock) return false;
     std::lock_guard guard(low_guest.lock);
-    if (!VirtualFree(data, 0, MEM_RELEASE)) return false;
-    // Hand the range back to the arena so host allocations cannot take it.
-    low_guest.reserve(base, std::min<std::uint64_t>(base + ((size + 0xffff) & ~std::uint64_t{0xffff}), kLowGuestEnd));
+    if (!low_guest.arena) return false;
+    const std::uint64_t first = (base - kThreadArenaBegin) / kArenaBlock;
+    const std::uint64_t blocks = std::min<std::uint64_t>((size + kArenaBlock - 1) / kArenaBlock, kArenaBlocks - first);
+    // Decommit only: the range stays reserved for later guest threads.
+    if (!VirtualFree(data, blocks * kArenaBlock, MEM_DECOMMIT)) return false;
+    for (std::uint64_t i = 0; i < blocks; ++i) low_guest.arena_used[first + i] = false;
     return true;
 }
 
@@ -276,12 +291,16 @@ bool run_with_guest_window_held(int& exit_code) noexcept {
             use_policy = false;
             continue;
         }
+        // Two reservations: the image window, and the guest-thread arena after
+        // it (kept separate so image mappings never release thread memory).
         const auto window = VirtualAllocEx(child.hProcess, reinterpret_cast<void*>(kLowGuestBegin),
                                            kLowGuestEnd - kLowGuestBegin, MEM_RESERVE, PAGE_NOACCESS);
-        if (reinterpret_cast<std::uint64_t>(window) != kLowGuestBegin) {
+        const auto arena = window ? VirtualAllocEx(child.hProcess, reinterpret_cast<void*>(kThreadArenaBegin),
+                                                   kThreadArenaEnd - kThreadArenaBegin, MEM_RESERVE, PAGE_NOACCESS) : nullptr;
+        if (reinterpret_cast<std::uint64_t>(window) != kLowGuestBegin || reinterpret_cast<std::uint64_t>(arena) != kThreadArenaBegin) {
             // Diagnostic: what the fresh suspended child already has in the window.
             const DWORD error = GetLastError();
-            for (std::uint64_t at = kLowGuestBegin; at < kLowGuestEnd;) {
+            for (std::uint64_t at = kLowGuestBegin; at < kThreadArenaEnd;) {
                 MEMORY_BASIC_INFORMATION info{};
                 if (!VirtualQueryEx(child.hProcess, reinterpret_cast<void*>(at), &info, sizeof(info))) break;
                 const auto base = reinterpret_cast<std::uint64_t>(info.BaseAddress);
