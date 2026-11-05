@@ -399,8 +399,12 @@ def select(project, choice):
     write_json(directory(project) / 'selection.json', {'selected': choice})
 
 
-def publish(library, base=None, update=None, source_packages=()):
-    """Publish a base and/or attach an update, rolling back only this transaction's files."""
+def publish(library, base=None, update=None, source_packages=(), in_place=False):
+    """Publish a base and/or attach an update, rolling back only this transaction's files.
+
+    in_place registers unpacked folders where they are: the manifest points at
+    them and nothing is moved, so the player's folders stay theirs.
+    """
     library = Path(library)
     if base is None and update is None:
         raise ValueError('Choose a game package or an update package')
@@ -434,6 +438,8 @@ def publish(library, base=None, update=None, source_packages=()):
             if previous['content_id'] != base_entry['content_id'] or previous['executable_sha256'] != base_entry['executable_sha256']:
                 raise ValueError('A different base already exists for this title/version')
             target_base = Path(previous['base_path'])
+        elif base and in_place:
+            target_base = Path(base)
         elif base:
             target_base = manifest_path(library, base_entry).parent / 'base'
             moves.append((Path(base), target_base))
@@ -441,10 +447,11 @@ def publish(library, base=None, update=None, source_packages=()):
             target_base = source_base
         target_update = None
         if update:
-            target_update = manifest_path(library, initial).parent / 'update'
+            target_update = Path(update) if in_place else manifest_path(library, initial).parent / 'update'
             if any(e['title_id'] == initial['title_id'] and e['app_version'] == initial['app_version'] for e in existing):
                 raise ValueError('Installation destination already exists for this title/version')
-            moves.append((Path(update), target_update))
+            if not in_place:
+                moves.append((Path(update), target_update))
         elif previous:
             raise ValueError('Installation destination already exists for this title/version')
         new_entries = []

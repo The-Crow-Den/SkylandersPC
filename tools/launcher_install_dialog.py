@@ -189,6 +189,10 @@ class InstallDialog(QDialog):
             update = self.fields['update_pkg'].text().strip()
             self.summary.setText('Game: '+(Path(game).name if game else 'Already installed')+
                                  '\nUpdate: '+(Path(update).name if update else 'Not adding an update'))
+            folders = [path for path in (game,update) if path]
+            in_place = bool(folders) and all(packages.unpacked(path) for path in folders)
+            self.hint.setText('Nothing is copied: the game will run from the folders you chose, so keep them where they are.'
+                              if in_place else 'Your original files will stay where they are.')
 
     def add_update_only(self):
         self.only_update = True;self.fields['game_pkg'].clear();self.show_step(1)
@@ -252,7 +256,9 @@ class InstallDialog(QDialog):
         self.source_packages = [Path(path).name for _,path in jobs]
         self.game.update({key:self.fields[key].text().strip() for key in ('game_pkg','update_pkg')})
         self.owner.persist();self.extractor = packages.BUILTIN_EXTRACTOR
-        self.jobs = jobs;self.total_jobs = len(jobs);self.completed_jobs = 0
+        # Unpacked folders only: register them where they are, no copy.
+        self.in_place = {kind:path for kind,path in jobs if packages.unpacked(path)} if all(packages.unpacked(path) for _,path in jobs) else None
+        self.jobs = [] if self.in_place else jobs;self.total_jobs = len(jobs);self.completed_jobs = 0
         self.staging = self.owner.root / '.local/pkg-imports' / uuid.uuid4().hex
         try:self.staging.mkdir(parents=True)
         except OSError as error:
@@ -266,7 +272,11 @@ class InstallDialog(QDialog):
         if not self.jobs:
             self.phase.setText('Finishing installation…')
             try:
-                entry = packages.publish(self.staging,game_library.directory(self.owner.root),self.source_packages)
+                library = game_library.directory(self.owner.root)
+                if self.in_place:
+                    entry = game_library.publish(library,self.in_place.get('base'),self.in_place.get('update'),self.source_packages,in_place=True)
+                else:
+                    entry = packages.publish(self.staging,library,self.source_packages)
                 hidden=game_library.removed(self.owner.root)
                 restored={game_library.selector(entry['title_id'],version) for version in (entry['base_version'],entry['app_version'])}
                 hidden=[key for key in hidden if key not in restored]

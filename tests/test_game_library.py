@@ -56,6 +56,19 @@ class GameLibraryTests(unittest.TestCase):
         self.assertEqual((base/'data/level.bin').read_bytes(),b'level')
         self.assertTrue((update/'eboot.bin').is_file())
 
+    def test_unpacked_folders_register_in_place_without_moving(self):
+        base=self.dump('mine/Game');update=self.dump('mine/Update',ver='01.01',category='gp',executable=b'patch')
+        entry=library.publish(self.library,base,update,['Game','Update'],in_place=True)
+        self.assertEqual(Path(entry['base_path']),base.resolve())
+        self.assertEqual(Path(entry['update_path']),update.resolve())
+        self.assertTrue((base/'eboot.bin').is_file() and (update/'eboot.bin').is_file())
+        [read]=[e for e in library.read_entries(self.library) if e['app_version']=='01.01']
+        self.assertEqual(Path(read['base_path']),base.resolve())
+        install=library.discover(read)
+        self.assertEqual(install.app_version,'01.01')
+        with self.assertRaisesRegex(ValueError,'already exists'):
+            library.publish(self.library,base,update,in_place=True)
+
     def test_folder_import_refuses_folders_without_game_metadata(self):
         (self.root/'empty').mkdir()
         with self.assertRaisesRegex(ValueError,'sce_sys'):
