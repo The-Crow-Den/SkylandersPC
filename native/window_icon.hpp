@@ -27,7 +27,15 @@ inline void apply_window_icon() {
     const bool valid=std::fread(pixels.data(),1,pixels.size(),input)==pixels.size() && std::fgetc(input)==EOF;
     std::fclose(input);
     if (!valid) return;
-    auto* surface=SDL_CreateSurfaceFrom(int(width),int(height),SDL_PIXELFORMAT_RGBA32,pixels.data(),int(width*4));
+    // Window icons are square on Windows: a non-square image (the crystal is
+    // 50x110) was stretched to a square and looked squashed. Centre it on a
+    // transparent square instead; desktops that letterbox show it unchanged.
+    const unsigned side=width>height?width:height;
+    std::vector<unsigned char> square(std::size_t(side)*side*4,0);
+    const unsigned left=(side-width)/2,top=(side-height)/2;
+    for (unsigned y=0;y<height;++y)
+        std::memcpy(&square[(std::size_t(top+y)*side+left)*4],&pixels[std::size_t(y)*width*4],std::size_t(width)*4);
+    auto* surface=SDL_CreateSurfaceFrom(int(side),int(side),SDL_PIXELFORMAT_RGBA32,square.data(),int(side*4));
     if (!surface) return;
     int count=0;auto** windows=SDL_GetWindows(&count);
     for (int i=0;i<count;++i) SDL_SetWindowIcon(windows[i],surface);
