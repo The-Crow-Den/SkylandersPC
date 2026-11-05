@@ -7,9 +7,20 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <timeapi.h>
 #include <limits>
 namespace SkyHost {
 namespace {
+// Guest timed waits (pthread condition/mutex timeouts, semaphore and event-flag
+// waits) end in Windows waits with millisecond timeouts, which the system rounds
+// to its timer tick: 15.6 ms by default. A guest "wait up to 1 ms" on the frame
+// path could then take a whole 60 FPS frame. Request a 1 ms tick for the life
+// of the process (per process on Windows 11), as games do. Linux needs nothing.
+struct TimerResolution {
+    bool raised = timeBeginPeriod(1) == TIMERR_NOERROR;
+    ~TimerResolution() { if (raised) timeEndPeriod(1); }
+};
+const TimerResolution timer_resolution;
 std::uint64_t ticks(const FILETIME& value) noexcept {
     return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32) | value.dwLowDateTime;
 }
