@@ -23,6 +23,7 @@ public:
     explicit BindHelper(bool enabled) {
         if (enabled) {
             thread = std::jthread([this](std::stop_token stop) { Run(stop); });
+            available = thread.joinable();
         }
     }
 
@@ -34,8 +35,10 @@ public:
         }
     }
 
+    // Checked for every draw. Cached: with libc++ on MinGW, thread.joinable() asks
+    // Windows for the thread id (a kernel call through winpthread) each time.
     [[nodiscard]] bool Available() const noexcept {
-        return thread.joinable();
+        return available;
     }
 
     /// True on the helper thread (its callees must not join it).
@@ -113,6 +116,7 @@ private:
     Task task = nullptr;
     void* context = nullptr;
     bool active = false;
+    bool available = false;
     alignas(64) std::atomic<u64> posted{0};
     alignas(64) std::atomic<u64> done{0};
     alignas(64) std::atomic<bool> sleeping{false};

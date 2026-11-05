@@ -798,6 +798,9 @@ private:
     std::atomic<u64> signals_published_upto{0};
     std::atomic<bool> signal_flush_requested{false};
     std::jthread gpu_signal_thread;
+    // Under gpu_signals_mutex. Avoids gpu_signal_thread.joinable() per signal, which on
+    // MinGW libc++ asks Windows for the thread id (a kernel call) each time.
+    bool gpu_signal_started = false;
     void SubmitForSignalsNow();
     /// steady_clock nanoseconds of the last submission (written by both pipeline stages).
     std::atomic<s64> last_flush_ns{0};
