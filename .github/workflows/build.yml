@@ -168,6 +168,14 @@ jobs:
           path: out/SkylandersPC-windows
           include-hidden-files: true
           if-no-files-found: error
+      - name: Library and manifest tests on Windows (informational)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -v -s tests -p "test_game_*.py"
       - name: Python tests on Windows (informational)
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         continue-on-error: true
