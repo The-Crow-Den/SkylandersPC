@@ -194,7 +194,7 @@ def load_profile(manifest, value, executable_sha256):
     if not path.is_file():
         raise ModError(f"mod {manifest['id']}: {value} is unavailable in this checkout; see profiles/patches/README.md")
     try:
-        profile = json.loads(path.read_text())
+        profile = json.loads(path.read_text(encoding='utf-8'))
     except (OSError, ValueError) as error:
         raise ModError(f"mod {manifest['id']}: {value}: {error}") from None
     if not isinstance(profile, dict) or profile.get('executable_sha256') != executable_sha256:
@@ -247,7 +247,8 @@ def parse(data, source=None):
 def read(folder):
     path = Path(folder) / 'mod.json'
     try:
-        data = json.loads(path.read_text())
+        # JSON is UTF-8; the Windows default code page cannot read the manifests.
+        data = json.loads(path.read_text(encoding='utf-8'))
     except (OSError, ValueError) as error:
         raise ModError(f'{path}: {error}') from None
     return parse(data, Path(folder))
