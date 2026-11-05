@@ -49,4 +49,11 @@ MapStatus map_anonymous(std::uint64_t address, std::uint64_t size, int protectio
 // Releases a mapping made by map_anonymous (shared == false) or SharedMemory::map.
 bool unmap(std::uint64_t address, std::uint64_t size, bool shared) noexcept;
 
+// PS4 executables load at fixed low addresses. Windows can occupy them before
+// any host code runs, so on Windows this runs the same command again as a
+// child whose guest window was reserved while it was still suspended, waits,
+// and returns true with its exit code. False: carry on in this process (POSIX,
+// or already that child).
+bool run_with_guest_window_held(int& exit_code) noexcept;
+
 } // namespace SkyHost

@@ -60,4 +60,5 @@ MapStatus map_anonymous(std::uint64_t address, std::uint64_t size, int protectio
 bool unmap(std::uint64_t address, std::uint64_t size, bool) noexcept {
     return munmap(reinterpret_cast<void*>(address), size) == 0;
 }
+bool run_with_guest_window_held(int&) noexcept { return false; }
 } // namespace SkyHost

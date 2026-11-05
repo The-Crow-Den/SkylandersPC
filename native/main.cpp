@@ -341,6 +341,7 @@ SkyBootPlan read_boot_plan(const std::string& path, const Pack& pack) {
 } // namespace
 
 int main(int argc, char** argv) {
+    if (int child_exit = 0; SkyHost::run_with_guest_window_held(child_exit)) return child_exit;
     try {
         if (argc == 2 && std::string(argv[1]) == "--help") {
             std::cout << "usage: skylanders-native-host [--inspect|--load] PACK\n       skylanders-native-host --run PACK IMPORT_TYPES [BOOT_PLAN [GAME_ROOT]]\nOnly --run (alias --trace-start) executes the guest; unknown imports/faults stop it.\n";
