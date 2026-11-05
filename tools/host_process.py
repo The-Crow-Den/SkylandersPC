@@ -23,7 +23,10 @@ else:
 def group_options():
     """Keyword arguments for subprocess.Popen that start a separately stoppable group."""
     if WINDOWS:
-        return {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP}
+        # CREATE_NO_WINDOW: the host and menu helper are console programs; started
+        # from the windowless launcher, Windows would otherwise open a console
+        # window for each. Their output is redirected to the session logs.
+        return {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
     return {'start_new_session': True}
 
 
@@ -56,6 +59,35 @@ def interrupt(pid):
         os.kill(int(pid), signal.SIGINT)
     except ProcessLookupError:
         pass
+
+
+def private_directory(path):
+    """Creates a directory only this user can access (POSIX 0700; Windows: protected DACL).
+
+    On Windows mkdir's mode is ignored and the folder inherits its parent's
+    permissions (often Authenticated Users), which the host's privacy check for
+    the PC menu bridge refuses; it then fell back to the built-in menu.
+    """
+    path = Path(path)
+    path.mkdir(mode=0o700)
+    if not WINDOWS:
+        return path
+    try:
+        identity = subprocess.run(['whoami', '/user', '/fo', 'csv', '/nh'], capture_output=True, text=True,
+                                  check=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW).stdout
+        sid = identity.strip().split(',')[-1].strip('"')
+        if not sid.startswith('S-1-'):
+            raise OSError('could not read the current user SID')
+        # Stop inheriting and grant this user full control. /inheritance:r keeps
+        # explicit copies of the parent's SYSTEM, Administrators and OWNER RIGHTS
+        # entries; the host accepts the first two but not OWNER RIGHTS (S-1-3-4).
+        subprocess.run(['icacls', str(path), '/inheritance:r', '/grant:r', f'*{sid}:(OI)(CI)F',
+                        '/remove:g', '*S-1-3-4'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=10,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise OSError(f'could not make {path} private: {error}') from error
+    return path
 
 
 @contextmanager

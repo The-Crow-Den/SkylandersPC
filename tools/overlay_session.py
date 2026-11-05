@@ -36,8 +36,13 @@ def overlay_python(environment):
     except ModuleNotFoundError:
         pass
     checked={os.path.realpath(sys.executable)}
+    # An explicitly configured interpreter comes first (on Windows, PATH's
+    # python3 is usually the Microsoft Store stub, without WebEngine).
+    explicit=environment.get('SKY_OVERLAY_PYTHON','')
+    candidates=[explicit] if explicit else []
     for search_path in (environment.get('PATH',os.defpath),os.defpath):
-        candidate=shutil.which('python3',path=search_path)
+        candidates.append(shutil.which('python3',path=search_path))
+    for candidate in candidates:
         if not candidate or os.path.realpath(candidate) in checked:continue
         checked.add(os.path.realpath(candidate))
         try:
@@ -62,7 +67,7 @@ def html_overlay(directory,root,environment):
     status={'requested':'web','active':'native','presentation':'embedded' if embedded else 'desktop'}
     try:
         python=overlay_python(environment)
-        private=directory/'pc-overlay';private.mkdir(mode=0o700)
+        private=host_process.private_directory(directory/'pc-overlay')
         ui_env=dict(environment);ui_env['MANGOHUD']='0';ui_env['DISABLE_MANGOHUD']='1'
         if os.path.realpath(python)!=os.path.realpath(sys.executable):
             ui_env=system_python_environment(ui_env)
