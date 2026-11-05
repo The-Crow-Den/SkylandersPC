@@ -358,6 +358,14 @@ except ImportError:
 Launcher = renovated(Launcher)
 
 def main():
+    if os.name == 'nt':
+        # Windows groups a pythonw window under Python's icon unless the
+        # process names its own app id; then the taskbar shows the window icon.
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('Skylanders.PC.Launcher')
+        except (AttributeError, OSError):
+            pass
     app = QApplication(sys.argv)
     app.setApplicationName('Skylanders PC')
     # Its own identity, so desktops show the launcher icon rather than the game's.
