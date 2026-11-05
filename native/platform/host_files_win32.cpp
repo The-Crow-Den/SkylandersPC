@@ -205,10 +205,23 @@ struct OpenPolicy {
 
 }
 namespace {
+// Returns the opened object's final name component check, or sets errno and
+// returns false. Starts with a small buffer and grows to the reported length:
+// some non-NTFS volume drivers fail FileNameInfo for buffers near 64 KiB
+// (ERROR_MORE_DATA even for short names), which made every file look missing.
 bool exact_name(HANDLE handle, std::wstring_view name) {
-    std::vector<std::max_align_t> storage((sizeof(FILE_NAME_INFO) + 65536 + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
-    auto* info = reinterpret_cast<FILE_NAME_INFO*>(storage.data());
-    if (!GetFileInformationByHandleEx(handle,FileNameInfo,info,static_cast<DWORD>(storage.size()*sizeof(std::max_align_t)))) return false;
+    std::size_t bytes = sizeof(FILE_NAME_INFO) + 1024;
+    std::vector<std::max_align_t> storage;
+    FILE_NAME_INFO* info = nullptr;
+    for (int attempt = 0;; ++attempt) {
+        storage.assign((bytes + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t), {});
+        info = reinterpret_cast<FILE_NAME_INFO*>(storage.data());
+        if (GetFileInformationByHandleEx(handle,FileNameInfo,info,static_cast<DWORD>(storage.size()*sizeof(std::max_align_t)))) break;
+        const DWORD error = GetLastError();
+        const std::size_t needed = sizeof(FILE_NAME_INFO) + info->FileNameLength;
+        if (error != ERROR_MORE_DATA || attempt >= 2 || needed <= bytes) { failure(error); return false; }
+        bytes = needed;
+    }
     const std::wstring_view path(info->FileName,info->FileNameLength / sizeof(wchar_t));
     const auto slash = path.find_last_of(L'\\');
     return (slash == std::wstring_view::npos ? path : path.substr(slash + 1)) == name;
@@ -258,7 +271,10 @@ struct File::Impl {
         // Windows resolves names case-insensitively whatever OBJ_CASE_INSENSITIVE
         // says (ObCaseInsensitive defaults on). The guest file system is case-
         // sensitive: the opened object's final component must be name exactly.
-        if (!policy.insensitive && !exact_name(next->handle,name)) { errno=ENOENT; return {}; }
+        if (!policy.insensitive) {
+            errno = 0;
+            if (!exact_name(next->handle,name)) { if (!errno) errno=ENOENT; return {}; }
+        }
         FileInfo info{};
         if (!information(next->handle,info)) return {};
         if (policy.single_link && !info.directory && (!info.regular || info.links != 1)) { errno=EACCES; return {}; }
