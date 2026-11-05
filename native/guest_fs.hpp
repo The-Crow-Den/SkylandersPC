@@ -9,7 +9,9 @@
 // faults reading the low 64 KiB (always reserved) instead. The fault handler
 // decodes that one instruction, performs the load against the thread's guest
 // TCB and resumes after it. Only executed instructions are touched, so no
-// static code/data boundary proof is needed, and nothing is patched.
+// static code/data boundary proof is needed. After the first emulation of a
+// guest site, that site is rewritten to jump to a stub doing the same load
+// through the host TLS slot, so it stops faulting (SKY_TLS_PATCH=0 disables).
 namespace GuestFs {
 // The single admitted form (all FS sites in the Trap Team census): 64 REX.W
 // [REX.R] 8B /r with mod=00, rm=100, SIB 0x25 (absolute disp32), 9 bytes.
@@ -39,5 +41,7 @@ bool install() noexcept;
 bool emulate_current(SkyHost::Fault& fault) noexcept;
 // Successful emulations so far (diagnostics; relaxed counter).
 std::uint64_t emulated_loads() noexcept;
+// Guest sites rewritten to a non-faulting stub so far (SKY_TLS_PATCH=0 disables).
+std::uint64_t patched_sites() noexcept;
 #endif
 }

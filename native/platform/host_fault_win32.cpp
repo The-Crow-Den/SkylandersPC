@@ -77,7 +77,8 @@ LONG CALLBACK dispatch(EXCEPTION_POINTERS* info) noexcept {
     const auto callback = handler.load(std::memory_order_acquire);
     if (!callback) return EXCEPTION_CONTINUE_SEARCH;
     // Guest TLS loads are ordinary execution, not faults for any handler.
-    bool handled = fault.kind == FaultKind::access && GuestFs::emulate_current(fault);
+    // Breakpoints are offered too: a thread can meet the int3 of a site being patched.
+    bool handled = (fault.kind == FaultKind::access || fault.kind == FaultKind::breakpoint) && GuestFs::emulate_current(fault);
     if (!handled) {
         HandlerStack stack;
         handled = callback(fault);

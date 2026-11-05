@@ -381,8 +381,9 @@ int main(int argc, char** argv) {
                     std::this_thread::sleep_for(std::chrono::seconds(10));
                     const auto now = GuestFs::emulated_loads();
                     if (now != previous)
-                        std::fprintf(stderr, "{\"event\":\"guest-tls-loads\",\"total\":%llu,\"per_second\":%llu}\n",
-                                     static_cast<unsigned long long>(now), static_cast<unsigned long long>((now - previous) / 10));
+                        std::fprintf(stderr, "{\"event\":\"guest-tls-loads\",\"total\":%llu,\"per_second\":%llu,\"patched_sites\":%llu}\n",
+                                     static_cast<unsigned long long>(now), static_cast<unsigned long long>((now - previous) / 10),
+                                     static_cast<unsigned long long>(GuestFs::patched_sites()));
                     previous = now;
                 }
             }).detach();
