@@ -30,6 +30,9 @@ public:
     std::size_t size() const noexcept { return size_; }
 private:
     bool allocate_impl(std::size_t size, bool low, bool inaccessible) noexcept;
+#ifdef _WIN32
+    bool allocate_search(std::size_t size, bool low, bool inaccessible) noexcept;
+#endif
     void* data_ = nullptr;
     std::size_t size_ = 0;
 };

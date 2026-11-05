@@ -8,6 +8,7 @@
 #include "host_memory.hpp"
 #include <windows.h>
 #include <algorithm>
+#include <cstdio>
 #include <limits>
 #include <mutex>
 #include <vector>
@@ -34,7 +35,29 @@ bool occupied(std::uint64_t address, std::uint64_t size) noexcept {
     }
     return false;
 }
+// Diagnostic only: names what holds an exact-address range that could not be
+// mapped (VirtualQuery base/allocation/state/type), so the cause is recorded.
+void describe_range(const char* why, std::uint64_t address, std::uint64_t size) noexcept {
+    std::fprintf(stderr, "{\"event\":\"guest-map-failure\",\"why\":\"%s\",\"address\":\"%#llx\",\"size\":\"%#llx\",\"error\":%lu,\"regions\":[",
+                 why, static_cast<unsigned long long>(address), static_cast<unsigned long long>(size), GetLastError());
+    bool first = true;
+    for (std::uint64_t at = address; at < address + size;) {
+        MEMORY_BASIC_INFORMATION info{};
+        if (!VirtualQuery(reinterpret_cast<void*>(at), &info, sizeof(info))) break;
+        const auto base = reinterpret_cast<std::uint64_t>(info.BaseAddress);
+        std::fprintf(stderr, "%s{\"base\":\"%#llx\",\"size\":\"%#llx\",\"allocation\":\"%#llx\",\"state\":\"%s\",\"type\":\"%s\",\"protect\":\"%#lx\"}",
+                     first ? "" : ",", static_cast<unsigned long long>(base), static_cast<unsigned long long>(info.RegionSize),
+                     static_cast<unsigned long long>(reinterpret_cast<std::uint64_t>(info.AllocationBase)),
+                     info.State == MEM_FREE ? "free" : info.State == MEM_RESERVE ? "reserve" : "commit",
+                     info.Type == MEM_IMAGE ? "image" : info.Type == MEM_MAPPED ? "mapped" : info.Type == MEM_PRIVATE ? "private" : "none",
+                     info.Protect);
+        first = false;
+        at = base + info.RegionSize;
+    }
+    std::fprintf(stderr, "]}\n");
+}
 MapStatus failure(std::uint64_t address, std::uint64_t size) noexcept {
+    if (address < 0x4400000 && address + size > 0x400000) describe_range("exact-map", address, size);
     return occupied(address, size) ? MapStatus::Occupied : MapStatus::Failed;
 }
 
@@ -42,9 +65,13 @@ MapStatus failure(std::uint64_t address, std::uint64_t size) noexcept {
 // is about 22 MiB). Windows can put the initial heap or stack there before any
 // host code runs, so run_with_guest_window_held reserves this window in a
 // suspended child. The child adopts that reservation here; a guest mapping
-// inside it takes its range back and re-reserves what is left. Only the
-// window is held: guest thread memory needs the rest of the low 2 GiB.
-constexpr std::uint64_t kLowGuestBegin = 0x400000, kLowGuestEnd = 0x4400000;
+// inside it takes its range back and re-reserves what is left.
+// Windows also hands out ordinary host allocations (heaps, renderer, driver)
+// bottom-up, which otherwise fills the low 2 GiB that guest stacks and TLS
+// need. So the hold also covers a guest-thread arena after the image window;
+// allocate_low_guest carves low guest thread memory out of it, and host
+// allocations are placed above it.
+constexpr std::uint64_t kLowGuestBegin = 0x400000, kThreadArenaBegin = 0x4400000, kLowGuestEnd = 0x24400000;
 constexpr char kHeldVariable[] = "SKY_GUEST_WINDOW_HELD";
 struct LowGuestHold {
     std::mutex lock;
@@ -72,6 +99,7 @@ struct LowGuestHold {
             reinterpret_cast<std::uint64_t>(info.AllocationBase) == kLowGuestBegin &&
             reinterpret_cast<std::uint64_t>(info.BaseAddress) + info.RegionSize >= kLowGuestEnd)
             held.emplace_back(kLowGuestBegin, kLowGuestEnd - kLowGuestBegin);
+        else describe_range("adopt-window", kLowGuestBegin, kLowGuestEnd - kLowGuestBegin);
     }
     // Releases held reservations overlapping the request; returns the span
     // released so the caller can re-reserve what the mapping leaves free.
@@ -102,6 +130,35 @@ MapStatus map_low_guest(std::uint64_t address, std::uint64_t size, Map&& map) no
     if (high > low) low_guest.reserve(std::max(low, kLowGuestBegin), std::min(high, kLowGuestEnd));
     return status;
 }
+}
+
+void* allocate_low_guest(std::size_t size, bool inaccessible) noexcept {
+    if (!size) return nullptr;
+    const std::uint64_t reserved = (size + 0xffff) & ~std::uint64_t{0xffff};
+    std::lock_guard guard(low_guest.lock);
+    for (const auto [base, length] : std::vector(low_guest.held)) {
+        // The image window stays free for the guest's fixed mappings: use only
+        // the arena part of a held span (one span can cover both).
+        const auto start = std::max(base, kThreadArenaBegin);
+        if (base + length <= start || base + length - start < reserved) continue;
+        low_guest.release(base, length);
+        void* data = VirtualAlloc(reinterpret_cast<void*>(start), size, MEM_RESERVE | MEM_COMMIT,
+                                  inaccessible ? PAGE_NOACCESS : PAGE_READWRITE);
+        low_guest.reserve(base, base + length);
+        if (data == reinterpret_cast<void*>(start)) return data;
+        if (data) VirtualFree(data, 0, MEM_RELEASE);
+    }
+    return nullptr;
+}
+
+bool free_low_guest(void* data, std::size_t size) noexcept {
+    const auto base = reinterpret_cast<std::uint64_t>(data);
+    if (!data || base < kThreadArenaBegin || base >= kLowGuestEnd) return false;
+    std::lock_guard guard(low_guest.lock);
+    if (!VirtualFree(data, 0, MEM_RELEASE)) return false;
+    // Hand the range back to the arena so host allocations cannot take it.
+    low_guest.reserve(base, std::min<std::uint64_t>(base + ((size + 0xffff) & ~std::uint64_t{0xffff}), kLowGuestEnd));
+    return true;
 }
 
 std::uint64_t map_granularity() noexcept {
@@ -186,22 +243,56 @@ bool run_with_guest_window_held(int& exit_code) noexcept {
     const DWORD length = GetModuleFileNameW(nullptr, module, 32768);
     if (!length || length >= 32768) return false;
     if (!SetEnvironmentVariableA(kHeldVariable, "1")) return false;
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    startup.dwFlags = STARTF_USESTDHANDLES;
-    startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    STARTUPINFOEXW startup{};
+    startup.StartupInfo.cb = sizeof(startup); // STARTUPINFOEXW: required with EXTENDED_STARTUPINFO_PRESENT
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    startup.StartupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    startup.StartupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    // Without high-entropy VA, bottom-up ASLR scatters the child's initial
+    // stack, PEB/TEB and early section views across the low addresses, so they
+    // usually land inside the window before it can be reserved. Turning
+    // bottom-up randomization off for the child puts them at the lowest free
+    // addresses, below 0x400000. If policy refuses it, fall back to retries.
+    DWORD64 policy = PROCESS_CREATION_MITIGATION_POLICY_BOTTOM_UP_ASLR_ALWAYS_OFF;
+    SIZE_T attribute_size = 0;
+    InitializeProcThreadAttributeList(nullptr, 1, 0, &attribute_size);
+    std::vector<unsigned char> attributes(attribute_size);
+    auto* list = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributes.data());
+    bool use_policy = attribute_size && InitializeProcThreadAttributeList(list, 1, 0, &attribute_size) &&
+        UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY, &policy, sizeof(policy), nullptr, nullptr);
     // The initial stack/PEB can still land in the window at creation: retry
     // with a fresh child (its layout is randomized again).
     for (int attempt = 0; attempt < 16; ++attempt) {
         std::vector<wchar_t> command(GetCommandLineW(), GetCommandLineW() + wcslen(GetCommandLineW()) + 1);
         PROCESS_INFORMATION child{};
-        if (!CreateProcessW(module, command.data(), nullptr, nullptr, TRUE, CREATE_SUSPENDED,
-                            nullptr, nullptr, &startup, &child)) break;
+        startup.lpAttributeList = use_policy ? list : nullptr;
+        startup.StartupInfo.cb = use_policy ? sizeof(startup) : sizeof(startup.StartupInfo);
+        if (!CreateProcessW(module, command.data(), nullptr, nullptr, TRUE,
+                            CREATE_SUSPENDED | (use_policy ? EXTENDED_STARTUPINFO_PRESENT : 0),
+                            nullptr, nullptr, &startup.StartupInfo, &child)) {
+            if (!use_policy) break;
+            std::fprintf(stderr, "{\"event\":\"guest-window-hold\",\"result\":\"policy-refused\",\"error\":%lu}\n", GetLastError());
+            use_policy = false;
+            continue;
+        }
         const auto window = VirtualAllocEx(child.hProcess, reinterpret_cast<void*>(kLowGuestBegin),
                                            kLowGuestEnd - kLowGuestBegin, MEM_RESERVE, PAGE_NOACCESS);
         if (reinterpret_cast<std::uint64_t>(window) != kLowGuestBegin) {
+            // Diagnostic: what the fresh suspended child already has in the window.
+            const DWORD error = GetLastError();
+            for (std::uint64_t at = kLowGuestBegin; at < kLowGuestEnd;) {
+                MEMORY_BASIC_INFORMATION info{};
+                if (!VirtualQueryEx(child.hProcess, reinterpret_cast<void*>(at), &info, sizeof(info))) break;
+                const auto base = reinterpret_cast<std::uint64_t>(info.BaseAddress);
+                if (info.State != MEM_FREE)
+                    std::fprintf(stderr, "{\"event\":\"guest-window-child\",\"attempt\":%d,\"error\":%lu,\"base\":\"%#llx\",\"size\":\"%#llx\",\"allocation\":\"%#llx\",\"state\":\"%s\",\"type\":\"%s\"}\n",
+                                 attempt, error, static_cast<unsigned long long>(base), static_cast<unsigned long long>(info.RegionSize),
+                                 static_cast<unsigned long long>(reinterpret_cast<std::uint64_t>(info.AllocationBase)),
+                                 info.State == MEM_RESERVE ? "reserve" : "commit",
+                                 info.Type == MEM_IMAGE ? "image" : info.Type == MEM_MAPPED ? "mapped" : "private");
+                at = base + info.RegionSize;
+            }
             TerminateProcess(child.hProcess, 1);
             CloseHandle(child.hThread);
             CloseHandle(child.hProcess);
@@ -211,6 +302,7 @@ bool run_with_guest_window_held(int& exit_code) noexcept {
         SetConsoleCtrlHandler(nullptr, TRUE);
         ResumeThread(child.hThread);
         CloseHandle(child.hThread);
+        if (use_policy) DeleteProcThreadAttributeList(list);
         WaitForSingleObject(child.hProcess, INFINITE);
         DWORD code = 1;
         GetExitCodeProcess(child.hProcess, &code);
@@ -220,6 +312,8 @@ bool run_with_guest_window_held(int& exit_code) noexcept {
     }
     // No child could hold the window: carry on here, where an exact mapping
     // that cannot be made still fails with its own message.
+    std::fprintf(stderr, "{\"event\":\"guest-window-hold\",\"result\":\"no-child-could-hold\",\"error\":%lu}\n", GetLastError());
+    if (use_policy) DeleteProcThreadAttributeList(list);
     SetEnvironmentVariableA(kHeldVariable, nullptr);
     return false;
 }

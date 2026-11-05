@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "host_thread.hpp"
+#include "host_memory.hpp"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -10,6 +11,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstdint>
+#include <cstdio>
+#include <iterator>
 #include <limits>
 #include <string>
 
@@ -29,14 +32,55 @@ std::size_t thread_page_size() noexcept {
     GetSystemInfo(&info);
     return info.dwPageSize;
 }
-ThreadMemory::~ThreadMemory() { if (data_) VirtualFree(data_, 0, MEM_RELEASE); }
+ThreadMemory::~ThreadMemory() {
+    if (data_ && !free_low_guest(data_, size_)) VirtualFree(data_, 0, MEM_RELEASE);
+}
 bool ThreadMemory::allocate(std::size_t size, bool low) noexcept {
     return allocate_impl(size, low, false);
 }
 bool ThreadMemory::allocate_inaccessible(std::size_t size, bool low) noexcept {
     return allocate_impl(size, low, true);
 }
+namespace {
+// Diagnostic only: summarizes the low 2 GiB when a low allocation fails.
+void describe_low_memory(std::size_t size) noexcept {
+    std::uintptr_t largest_free = 0, free_total = 0, at = 0x10000;
+    struct Big { std::uintptr_t base, size; DWORD type, state; } big[8]{};
+    while (at < 0x80000000) {
+        MEMORY_BASIC_INFORMATION r{};
+        if (!VirtualQuery(reinterpret_cast<void*>(at), &r, sizeof(r))) break;
+        const auto base = reinterpret_cast<std::uintptr_t>(r.AllocationBase ? r.AllocationBase : r.BaseAddress);
+        const auto end = std::min<std::uintptr_t>(reinterpret_cast<std::uintptr_t>(r.BaseAddress) + r.RegionSize, 0x80000000);
+        const auto length = end - reinterpret_cast<std::uintptr_t>(r.BaseAddress);
+        if (r.State == MEM_FREE) { free_total += length; largest_free = std::max(largest_free, length); }
+        else {
+            // Merge regions of the same allocation, then keep the eight largest.
+            Big* slot = nullptr;
+            for (auto& b : big) if (b.size && b.base == base) slot = &b;
+            if (!slot) { slot = std::min_element(std::begin(big), std::end(big), [](auto& a, auto& b){ return a.size < b.size; }); *slot = {base, 0, r.Type, r.State}; }
+            slot->size += length;
+        }
+        at = end;
+    }
+    std::fprintf(stderr, "{\"event\":\"guest-thread-memory-failure\",\"size\":\"%#zx\",\"largest_free_below_2g\":\"%#zx\",\"free_below_2g\":\"%#zx\",\"largest\":[",
+                 size, static_cast<std::size_t>(largest_free), static_cast<std::size_t>(free_total));
+    std::sort(std::begin(big), std::end(big), [](auto& a, auto& b){ return a.size > b.size; });
+    bool first = true;
+    for (auto& b : big) if (b.size) {
+        std::fprintf(stderr, "%s{\"base\":\"%#zx\",\"size\":\"%#zx\",\"type\":\"%s\"}", first ? "" : ",",
+                     static_cast<std::size_t>(b.base), static_cast<std::size_t>(b.size),
+                     b.type == MEM_IMAGE ? "image" : b.type == MEM_MAPPED ? "mapped" : "private");
+        first = false;
+    }
+    std::fprintf(stderr, "]}\n");
+}
+}
 bool ThreadMemory::allocate_impl(std::size_t size, bool low, bool inaccessible) noexcept {
+    const bool result = allocate_search(size, low, inaccessible);
+    if (!result && low && !data_) describe_low_memory(size);
+    return result;
+}
+bool ThreadMemory::allocate_search(std::size_t size, bool low, bool inaccessible) noexcept {
     if (data_ || !size) return false;
     const auto allocate_at = [&](std::uintptr_t address) {
         void* data = VirtualAlloc(reinterpret_cast<void*>(address), size, MEM_RESERVE | MEM_COMMIT,
@@ -51,6 +95,11 @@ bool ThreadMemory::allocate_impl(std::size_t size, bool low, bool inaccessible) 
         return true;
     };
     if (!low) return allocate_at(0);
+    if (void* data = allocate_low_guest(size, inaccessible)) {
+        data_ = data;
+        size_ = size;
+        return true;
+    }
     SYSTEM_INFO info{};
     GetSystemInfo(&info);
     const std::uintptr_t granularity = info.dwAllocationGranularity;

@@ -56,4 +56,12 @@ bool unmap(std::uint64_t address, std::uint64_t size, bool shared) noexcept;
 // or already that child).
 bool run_with_guest_window_held(int& exit_code) noexcept;
 
+#ifdef _WIN32
+// Committed zeroed memory for guest stacks/TLS from the held low arena (below
+// 2 GiB), or nullptr when no arena is held or it has no room. free_low_guest
+// returns such memory to the arena; false means it was not arena memory.
+void* allocate_low_guest(std::size_t size, bool inaccessible) noexcept;
+bool free_low_guest(void* data, std::size_t size) noexcept;
+#endif
+
 } // namespace SkyHost
