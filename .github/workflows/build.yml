@@ -127,7 +127,9 @@ jobs:
           dist=out/SkylandersPC-windows
           mkdir -p "$dist/.local/native-gpu-build"
           git config --global --add safe.directory "$(cygpath -m "$GITHUB_WORKSPACE")"
-          git archive HEAD | tar -x -C "$dist"
+          # Byte-exact: the runner sets core.autocrlf, and CRLF would break the
+          # hash-checked patch manifests and profiles.
+          git -c core.autocrlf=false -c core.eol=lf archive HEAD | tar -x -C "$dist"
           host=.local/windows-full-build/skylanders-native-host.exe
           cp "$host" "$dist/.local/native-gpu-build/"
           # Every MSYS2 DLL the host loads; Windows system DLLs are not copied.
