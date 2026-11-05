@@ -16,7 +16,8 @@ LEGACY_PACKS = {'original':'native-linked-boot-weak', '60':'native-linked-one-vb
 
 def relative(root, value):
     path = Path(value)
-    if path.is_absolute() or '..' in path.parts or '\\' in str(path):
+    # Check the profile's text: str(Path) uses backslashes on Windows.
+    if not isinstance(value, str) or path.is_absolute() or '..' in path.parts or '\\' in value or ':' in value:
         raise ValueError('Preparation profile paths must stay inside the project')
     result = Path(root)/path
     if any(p.is_symlink() for p in (result,*result.parents)):

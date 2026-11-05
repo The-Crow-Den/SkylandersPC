@@ -169,8 +169,11 @@ def validate_entry(entry):
             raise ValueError('Invalid manifest executable hash')
         for key in ('base_path','update_path'):
             if entry[key] is not None:
-                path = Path(entry[key])
-                if not str(path) or '..' in path.parts or (not path.is_absolute() and ('\\' in str(path) or ':' in str(path))):
+                # Check the stored text: on Windows str(Path(...)) turns the
+                # library-relative 'CUSA.../base' into backslashes.
+                raw = entry[key]
+                path = Path(raw)
+                if not isinstance(raw, str) or not raw or '..' in path.parts or (not path.is_absolute() and ('\\' in raw or ':' in raw)):
                     raise ValueError('Invalid manifest game path')
         if bool(entry['update_path']) != bool(entry['update_version']):
             raise ValueError('Manifest update path/version mismatch')
