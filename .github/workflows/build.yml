@@ -130,6 +130,7 @@ jobs:
           # Byte-exact: the runner sets core.autocrlf, and CRLF would break the
           # hash-checked patch manifests and profiles.
           git -c core.autocrlf=false -c core.eol=lf archive HEAD | tar -x -C "$dist"
+          if grep -rlI $'\r' "$dist/profiles" "$dist/patches"; then echo "CRLF in hash-checked files"; exit 1; fi
           host=.local/windows-full-build/skylanders-native-host.exe
           cp "$host" "$dist/.local/native-gpu-build/"
           # Every MSYS2 DLL the host loads; Windows system DLLs are not copied.
