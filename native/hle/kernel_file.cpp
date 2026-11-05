@@ -119,11 +119,6 @@ struct KernelFile::Impl {
             if (!final) options.directory = true;
             SkyHost::File next_file;
             if (!directory.open_child(components[i],options,save_mount && final,next_file)) {
-                // Diagnostic: which component of which guest path failed, and why.
-                const int error = errno;
-                std::fprintf(stderr,"{\"event\":\"guest-open-failed\",\"path\":\"%s\",\"component\":\"%s\",\"index\":%zu,\"errno\":%d}\n",
-                             input,components[i].c_str(),i,error);
-                errno = error;
                 return false;
             }
             directory = std::move(next_file);
