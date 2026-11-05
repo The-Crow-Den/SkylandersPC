@@ -35,6 +35,9 @@ public:
     MapStatus map(std::uint64_t address, std::uint64_t size, std::uint64_t offset, int protection) const noexcept;
 private:
 #ifdef _WIN32
+    MapStatus map_exact(std::uint64_t address, std::uint64_t size, std::uint64_t offset, int protection) const noexcept;
+#endif
+#ifdef _WIN32
     void* handle_ = nullptr;
 #else
     int fd_ = -1;

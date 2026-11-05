@@ -7,7 +7,10 @@
 #endif
 #include "host_memory.hpp"
 #include <windows.h>
+#include <algorithm>
 #include <limits>
+#include <mutex>
+#include <vector>
 
 // Sections stand in for the memfd and VirtualAlloc for anonymous memory. Views
 // need 64 KiB-aligned addresses and offsets; callers place by map_granularity().
@@ -33,6 +36,59 @@ bool occupied(std::uint64_t address, std::uint64_t size) noexcept {
 }
 MapStatus failure(std::uint64_t address, std::uint64_t size) noexcept {
     return occupied(address, size) ? MapStatus::Occupied : MapStatus::Failed;
+}
+
+// PS4 executables load at fixed low addresses (0x400000 up). Windows places
+// heaps and thread stacks there freely, so an exact guest mapping failed
+// whenever one landed first. Every free region of this window is reserved
+// before main; a guest mapping inside it takes its range back from here.
+constexpr std::uint64_t kLowGuestBegin = 0x400000, kLowGuestEnd = 0x80000000;
+struct LowGuestHold {
+    std::mutex lock;
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> held; // base, size
+    void reserve(std::uint64_t begin, std::uint64_t end) noexcept {
+        for (std::uint64_t at = begin; at < end;) {
+            MEMORY_BASIC_INFORMATION info{};
+            if (!VirtualQuery(reinterpret_cast<void*>(at), &info, sizeof(info))) return;
+            const auto base = reinterpret_cast<std::uint64_t>(info.BaseAddress);
+            auto next = base + info.RegionSize;
+            if (info.State == MEM_FREE) {
+                // Reservations start on the 64 KiB allocation granularity.
+                const auto start = (std::max(at, base) + 0xffff) & ~std::uint64_t{0xffff};
+                const auto stop = std::min(next, end) & ~std::uint64_t{0xffff};
+                if (stop > start && VirtualAlloc(reinterpret_cast<void*>(start), stop - start, MEM_RESERVE, PAGE_NOACCESS))
+                    held.emplace_back(start, stop - start);
+            }
+            at = next;
+        }
+    }
+    LowGuestHold() noexcept { reserve(kLowGuestBegin, kLowGuestEnd); }
+    // Releases held reservations overlapping the request; returns the span
+    // released so the caller can re-reserve what the mapping leaves free.
+    std::pair<std::uint64_t, std::uint64_t> release(std::uint64_t address, std::uint64_t size) noexcept {
+        std::uint64_t low = address, high = address + size;
+        for (auto it = held.begin(); it != held.end();) {
+            if (it->first < address + size && address < it->first + it->second) {
+                VirtualFree(reinterpret_cast<void*>(it->first), 0, MEM_RELEASE);
+                low = std::min(low, it->first);
+                high = std::max(high, it->first + it->second);
+                it = held.erase(it);
+            } else ++it;
+        }
+        return {low, high};
+    }
+};
+// Constructed before ordinary static objects and long before main's threads.
+__attribute__((init_priority(101))) LowGuestHold low_guest;
+
+template <typename Map>
+MapStatus map_low_guest(std::uint64_t address, std::uint64_t size, Map&& map) noexcept {
+    if (address >= kLowGuestEnd || address + size <= kLowGuestBegin) return map();
+    std::lock_guard guard(low_guest.lock);
+    const auto [low, high] = low_guest.release(address, size);
+    const auto status = map();
+    low_guest.reserve(std::max(low, kLowGuestBegin), std::min(high, kLowGuestEnd));
+    return status;
 }
 }
 
@@ -70,6 +126,10 @@ bool SharedMemory::open(const char*, std::uint64_t size) noexcept {
 bool SharedMemory::is_open() const noexcept { return handle_ != nullptr; }
 
 MapStatus SharedMemory::map(std::uint64_t address, std::uint64_t size, std::uint64_t offset, int protection) const noexcept {
+    return map_low_guest(address, size, [&] { return map_exact(address, size, offset, protection); });
+}
+
+MapStatus SharedMemory::map_exact(std::uint64_t address, std::uint64_t size, std::uint64_t offset, int protection) const noexcept {
     const auto granularity = map_granularity();
     if (!handle_ || !size || size > std::numeric_limits<std::uint64_t>::max() - address ||
         address % granularity || offset % granularity) return MapStatus::Failed;
@@ -92,14 +152,16 @@ MapStatus SharedMemory::map(std::uint64_t address, std::uint64_t size, std::uint
 MapStatus map_anonymous(std::uint64_t address, std::uint64_t size, int protection) noexcept {
     if (!size || size > std::numeric_limits<std::uint64_t>::max() - address ||
         address % map_granularity()) return MapStatus::Failed;
-    void* memory = VirtualAlloc(reinterpret_cast<void*>(address), size, MEM_RESERVE | MEM_COMMIT,
-                                page_protection(protection));
-    if (!memory) return failure(address, size);
-    if (reinterpret_cast<std::uintptr_t>(memory) != address) {
-        VirtualFree(memory, 0, MEM_RELEASE);
-        return MapStatus::Failed;
-    }
-    return MapStatus::Mapped;
+    return map_low_guest(address, size, [&]() -> MapStatus {
+        void* memory = VirtualAlloc(reinterpret_cast<void*>(address), size, MEM_RESERVE | MEM_COMMIT,
+                                    page_protection(protection));
+        if (!memory) return failure(address, size);
+        if (reinterpret_cast<std::uintptr_t>(memory) != address) {
+            VirtualFree(memory, 0, MEM_RELEASE);
+            return MapStatus::Failed;
+        }
+        return MapStatus::Mapped;
+    });
 }
 
 bool unmap(std::uint64_t address, std::uint64_t, bool shared) noexcept {
