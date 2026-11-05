@@ -323,6 +323,38 @@ struct GuestRuntime::Impl {
                 FrameProfile::record(active->profile_buckets[id], FrameProfile::now_ns() - profile_started);
                 if (active->ends_frame[id]) FrameProfile::frame();
             }
+            // Opt-in diagnostic (SKY_SERVICE_COUNTS=1): every 10 s, log the
+            // most-called services in that interval, to find a spinning wait.
+            static const bool count_services = [] {
+                const auto* value = std::getenv("SKY_SERVICE_COUNTS");
+                return value && std::strcmp(value, "1") == 0;
+            }();
+            if (count_services) {
+                static std::vector<std::atomic<std::uint64_t>> totals(active->names.size());
+                static std::once_flag reporter;
+                totals[static_cast<std::size_t>(id)].fetch_add(1, std::memory_order_relaxed);
+                std::call_once(reporter, [] {
+                    std::thread([] {
+                        std::vector<std::uint64_t> last(totals.size());
+                        for (;;) {
+                            std::this_thread::sleep_for(std::chrono::seconds(10));
+                            std::vector<std::pair<std::uint64_t, std::size_t>> deltas;
+                            for (std::size_t i = 0; i < totals.size(); ++i) {
+                                const auto now = totals[i].load(std::memory_order_relaxed);
+                                if (now != last[i]) deltas.emplace_back(now - last[i], i);
+                                last[i] = now;
+                            }
+                            std::sort(deltas.rbegin(), deltas.rend());
+                            std::string line = "{\"event\":\"service-counts\",\"top\":[";
+                            for (std::size_t k = 0; k < std::min<std::size_t>(deltas.size(), 10); ++k)
+                                line += (k ? "," : "") + std::string("{\"name\":") + escaped(active->names[deltas[k].second]) +
+                                        ",\"calls\":" + std::to_string(deltas[k].first) + "}";
+                            line += "]}\n";
+                            SkyHost::diagnostic_printf("%s", line.c_str());
+                        }
+                    }).detach();
+                });
+            }
             // The import table is fixed before guest threads start. Once the
             // four startup samples are logged, normal calls need neither a
             // string allocation nor the shared logging mutex.

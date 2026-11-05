@@ -42,7 +42,9 @@ PACKS = {'original': 'native-linked-boot-weak',
 
 SESSION_TEMP = ROOT / 'out/session-temp'
 LAST_SESSION = ROOT / 'out/last-session'
-KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log')
+KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log',
+             # --profile output; without these the profile was deleted with the session.
+             'frames.csv', 'frame-profile.csv')
 
 
 def latest_log(last=None):
@@ -532,7 +534,7 @@ def run(argv,sessions):
     keys = ('SDL_VIDEO_DRIVER', 'SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', 'SKY_SAVE_DATA_ROOT',
             'SKY_TLS_BRIDGE',
             'SKY_LEVEL_EVENT_MAILBOX','SKY_FRAME_POLICY','SKY_MANUAL_FRAME_LIMIT','SKY_AUTO_FRAME_POLICY_AVAILABLE',
-            'SKY_VIRTUAL_PORTAL', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
+            'SKY_VIRTUAL_PORTAL', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE', 'SKY_SERVICE_COUNTS',
             'SKY_FRAME_PROFILE', 'SKY_RENDERER_FRAME_STATS', 'SKY_RENDERER_FRAME_LOG', 'SKY_GPU_USER_DIR',
             '__GL_SHADER_DISK_CACHE_PATH', 'MESA_SHADER_CACHE_DIR',
             'SKY_ALLOW_INCOMPLETE_PIPELINES', 'SKY_TRAP_PHASE_PROBE', 'SKY_TRAP_CLOCK_PROBE',

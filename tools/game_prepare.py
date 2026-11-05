@@ -394,9 +394,15 @@ def prepare_optional(root, entry, name, progress):
         progress(event('optional.'+name,'optional-failed',1,str(error)))
 
 
+def required_steps(variant):
+    # Must match the pipeline: on Windows the renderer is linked into the prebuilt
+    # host, so there is no separate 'renderer' step to require.
+    return ['verify-executable','recipes',*([] if WINDOWS else ['renderer']),'runtime','pack.'+variant]
+
+
 def shallow_ready(root, entry, variant):
     """Metadata changes from hard links are harmless when the recorded bytes still match."""
-    required = ['verify-executable','recipes','renderer','runtime','pack.'+variant]
+    required = required_steps(variant)
     def check(record, refresh=False):
         if not record:raise PreparationError('verify-executable')
         changed = False;digests = VerifiedDigests(file_hash)
@@ -433,7 +439,7 @@ def require_ready(root, entry, variant='60-delta', *, deep=True):
     record = read_state(root,entry)
     def missing(name):raise PreparationError(f'Game setup needs {name}. Choose Repair in the launcher to finish setup.')
     if not record:missing('verify-executable')
-    required = ['verify-executable','recipes','renderer','runtime','pack.'+variant]
+    required = required_steps(variant)
     pipeline = None;steps = {}
     if deep:
         try:
