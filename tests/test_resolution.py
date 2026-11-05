@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools import prepare_native
-from tools.resolution import patch_pack, PRESETS, renderer_options, prepare_assets
+from tools.resolution import patch_pack, PRESETS, renderer_options, prepare_assets, parse_aspect, render_size
 
 
 class ResolutionTests(unittest.TestCase):
@@ -96,6 +96,41 @@ class ResolutionTests(unittest.TestCase):
         profile['virtual_address'] = 5000
         with self.assertRaises(ValueError):
             patch_pack(data, '1440p', 'original', profile)
+
+    def aspect_fixture(self):
+        code = bytes.fromhex('c7459080070000c7459438040000c700398ee33f')
+        offset = prepare_native.HEADER.size + prepare_native.SEGMENT.size
+        data = (prepare_native.HEADER.pack(prepare_native.MAGIC, 4096, 4096, 4096, 1, 0, 0)
+                + prepare_native.SEGMENT.pack(4096, 4096, len(code), 5, offset) + code)
+        profile = {'pack_sha256': {'original': hashlib.sha256(data).hexdigest()},
+                   'virtual_address': 4096, 'expected_hex': code[:14].hex(),
+                   'aspect': {'virtual_address': 4096 + 14, 'expected_hex': code[14:].hex()}}
+        return data, profile, offset + 14
+
+    def test_aspect_replaces_only_the_camera_aspect_immediate(self):
+        data, profile, offset = self.aspect_fixture()
+        self.assertEqual(patch_pack(data, '1080p', 'original', profile, 16 / 9)[offset:], data[offset:])
+        result = patch_pack(data, render_size('1080p', parse_aspect('21:9')), 'original', profile, parse_aspect('21:9'))
+        self.assertEqual(result[offset:offset + 2], data[offset:offset + 2])
+        self.assertAlmostEqual(struct.unpack_from('<f', result, offset + 2)[0], 64 / 27, places=5)
+        self.assertEqual(struct.unpack_from('<I', result, offset - 11)[0], 2560)
+        profile['aspect']['expected_hex'] = '00' * 6
+        with self.assertRaises(ValueError):
+            patch_pack(data, '1080p', 'original', profile, 2.0)
+        del profile['aspect']
+        with self.assertRaises(ValueError):
+            patch_pack(data, '1080p', 'original', profile, 2.0)
+
+    def test_aspect_keeps_preset_height_and_widens(self):
+        self.assertEqual(render_size('1080p'), (1920, 1080))
+        self.assertEqual(render_size('1080p', parse_aspect('16:9')), (1920, 1080))
+        self.assertEqual(render_size('1080p', parse_aspect('21:9')), (2560, 1080))
+        self.assertEqual(render_size('1080p', parse_aspect('32:9')), (3840, 1080))
+        self.assertEqual(render_size('800p', parse_aspect('16:10')), (1280, 800))
+        self.assertEqual(render_size('1440p', parse_aspect('3440:1440')), (3440, 1440))
+        for bad in ('wide', '1:0', '9:16', '5:1'):
+            with self.assertRaises(ValueError):
+                parse_aspect(bad)
 
     def test_menu_and_native_host_list_presets_in_the_same_order(self):
         # The in-game menu sends an index; both sides must agree on it.

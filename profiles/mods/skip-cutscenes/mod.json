@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "skip-cutscenes",
+  "name": "Skip cutscenes",
+  "version": "1.0.0",
+  "author": "SkylandersPS4 contributors",
+  "licence": "GPL-3.0-or-later",
+  "description": "Lets Cross or Options end any movie, including ones the game makes unskippable. A skipped movie ends the way it would at its last frame, so story flags and saves are unchanged. Startup logos are skipped by “Skip startup logos” in Tweaks. In-engine scripted cutscenes keep the game's own skip rules.",
+  "targets": [
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.01",
+      "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    }
+  ],
+  "requires": [],
+  "conflicts": [],
+  "settings": {
+    "allow-skipping-all-cutscenes": {
+      "type": "bool",
+      "default": true
+    }
+  },
+  "operations": [
+    {
+      "type": "host-option",
+      "environment": {
+        "SKY_MOVIE_SKIP_MOD": "1"
+      }
+    },
+    {
+      "type": "host-option",
+      "when": {
+        "setting": "allow-skipping-all-cutscenes",
+        "equals": true
+      },
+      "environment": {
+        "SKY_SKIP_CUTSCENES": "1"
+      }
+    }
+  ]
+}

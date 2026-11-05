@@ -1,4 +1,4 @@
-# SkylandersPC
+# SkylandersPC (W.I.P)
 
 Play the PS4 Skylanders games natively on PC, from your own copies.
 
@@ -9,6 +9,12 @@ threads, memory, audio, controllers, saves, trophies and the portal) itself,
 with a Vulkan renderer for graphics. The parts the games share live in one
 runtime; anything specific to one game is kept in a small profile matched to
 that game's exact build.
+
+SkylandersPC builds on **bbport** ([bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)
+by deadinside28), the native PS4 port work for Bloodborne. Its approach of running the original
+executable natively, and its Vulkan renderer (itself derived from
+[shadPS4](https://github.com/shadps4-emu/shadPS4)), are the foundation this project's host and
+renderer grew from.
 
 | Game | Status |
 | --- | --- |
@@ -93,12 +99,20 @@ cmake --build .local/native-gpu-build
   See [native/README.md](native/README.md).
 - `tools/`: the launcher, session runner, in-game PC menu, package extractor
   and asset/patch recipe tools.
-- `profiles/`: per-game build identities and patch recipes. Recipes hold
+- `profiles/`: per-game build identities and patch recipes; `profiles/mods/README.md` describes how to write a mod. Recipes hold
   expected bytes and refuse to apply to anything else.
 - `renderer/`: skyrender, the Vulkan GPU, video-out and audio component.
 - `tests/`: synthetic tests; none need a game.
 
 Unknown system calls are reported, never answered with a fake success.
+
+## Credits
+
+- [bbport / bloodborne_pc](https://github.com/deadinside28/bloodborne_pc) by deadinside28: the
+  native-port approach and the renderer this project's `renderer/` is forked from.
+- [shadPS4](https://github.com/shadps4-emu/shadPS4): the PS4 GPU and system-library work bbport
+  builds on.
+- [Cemu](https://github.com/cemu-project/Cemu): the Skylanders portal implementation.
 
 ## License
 

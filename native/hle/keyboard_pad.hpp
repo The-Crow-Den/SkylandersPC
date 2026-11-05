@@ -18,8 +18,10 @@ public:
     void set_physical(const PhysicalState& state,unsigned player=0) {
         if(player>=2)return;
         std::lock_guard guard(lock_);
-        if(state.connected && physical_[player].connected)
+        if(state.connected && physical_[player].connected) {
             physical_presses_[player] |= state.buttons & ~physical_[player].buttons;
+            presses.fetch_or(state.buttons & ~physical_[player].buttons);
+        }
         else physical_presses_[player]=0;
         physical_[player]=state;
         if(player==1)LocalPlayers::second_connected.store(state.connected);
@@ -30,6 +32,9 @@ public:
     void key(std::uint32_t mask, bool pressed) noexcept;
     void set_keys(std::uint32_t keys) noexcept;
     void release_keys() noexcept;
+    // Every button press from any player or the keyboard since the last
+    // exchange, whether or not the game is currently reading the pad.
+    static inline std::atomic<std::uint32_t> presses{0};
 private:
     std::mutex lock_;
     std::uint32_t keys_ = 0, pending_presses_ = 0;

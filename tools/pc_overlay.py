@@ -12,6 +12,10 @@ try:
     from .overlay_protocol import Commands,Portraits,private_directory,read_snapshot
 except ImportError:
     from overlay_protocol import Commands,Portraits,private_directory,read_snapshot
+try:
+    from . import pc_menu_prefs,save_backup
+except ImportError:
+    import pc_menu_prefs,save_backup
 ROOT=Path(__file__).resolve().parents[1]
 
 
@@ -78,6 +82,33 @@ def main(argv=None):
                 print('Demo command:',text,flush=True);return
             try:commands.write(text)
             except (OSError,ValueError) as error:print('PC overlay command rejected:',error,file=sys.stderr)
+        def title(self):
+            try:return json.loads(self.state).get('title') or 'trap-team'
+            except ValueError:return 'trap-team'
+        @pyqtSlot(result=str)
+        def preferences(self):
+            return json.dumps(pc_menu_prefs.load().get(self.title(),{}))
+        @pyqtSlot(int,str,result=str)
+        def toggleFavourite(self,kind,name):
+            try:return json.dumps(pc_menu_prefs.toggle_favourite(self.title(),kind,name).get(self.title(),{}))
+            except (OSError,ValueError) as error:print('PC menu preferences:',error,file=sys.stderr);return self.preferences()
+        @pyqtSlot(int,str,result=str)
+        def placed(self,kind,name):
+            try:return json.dumps(pc_menu_prefs.record_recent(self.title(),kind,name).get(self.title(),{}))
+            except (OSError,ValueError) as error:print('PC menu preferences:',error,file=sys.stderr);return self.preferences()
+        @pyqtSlot(result=str)
+        def snapshotSaves(self):
+            # The session holds the save lock while this menu runs; the copy is
+            # verified against the live saves, so a write mid-copy is reported, not kept.
+            root=os.environ.get('SKY_SAVE_DATA_ROOT');title=os.environ.get('SKY_SAVE_TITLE_ID')
+            reply=lambda label,message:json.dumps({'label':label,'message':message})
+            if args.demo:return reply('Demo only','Demo: saves would be snapshotted now.')
+            if not root or not title:return reply('Unavailable','Save snapshots are unavailable for this session.')
+            try:result=save_backup.snapshot(root,title,reason='menu')
+            except (OSError,ValueError) as error:return reply('Snapshot failed',f'Snapshot failed; your saves are unchanged: {error}')
+            if result is None:return reply('No saves yet','No saves to snapshot yet.')
+            if result['status']=='unchanged':return reply('Already backed up','Saves are unchanged since the last snapshot.')
+            return reply('Saves snapshotted',f"Snapshot saved ({result['files']} files). Restore it from the launcher's game settings.")
         @pyqtSlot(int)
         def importFigure(self,player):
             if player not in (0,1):return

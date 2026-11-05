@@ -154,7 +154,7 @@ def run_command(argv, root):
 
 
 def source_files(folder):
-    suffixes = {'.c','.cpp','.h','.hpp','.S','.cmake'}
+    suffixes = {'.c','.cpp','.h','.hpp','.S','.cmake','.vert','.frag','.comp'}
     return sorted(p for p in Path(folder).rglob('*') if p.is_file() and (p.suffix in suffixes or p.name=='CMakeLists.txt'))
 
 

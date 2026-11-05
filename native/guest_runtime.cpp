@@ -26,6 +26,9 @@
 #include "hle/local_playgo.hpp"
 #include "hle/keyboard_pad.hpp"
 #include "hle/empty_usb_bus.hpp"
+#ifdef SKY_REAL_PORTAL
+#include "hle/real_portal_bus.hpp"
+#endif
 #include <mutex>
 #include <atomic>
 #include <thread>
@@ -121,7 +124,7 @@ struct GuestRuntime::Impl {
     SkyBootPlan boot;
     std::atomic<std::uint64_t> heap_api = 0;
     std::atomic<bool> common_dialog_initialized = false;
-    enum class ServiceKind { Special, KernelMemory, KernelClock, UserService, KernelSemaphore, KernelThread, KernelFile, KernelEvent, OfflineNetwork, SystemService, LocalNp, AppContent, LocalPlayGo, KeyboardPad, SaveData, VirtualPortal, EmptyUsbBus, SkyGpu, KernelSync };
+    enum class ServiceKind { Special, KernelMemory, KernelClock, UserService, KernelSemaphore, KernelThread, KernelFile, KernelEvent, OfflineNetwork, SystemService, LocalNp, AppContent, LocalPlayGo, KeyboardPad, SaveData, VirtualPortal, RealPortal, EmptyUsbBus, SkyGpu, KernelSync };
     std::vector<ServiceKind> service_kinds;
     std::vector<FrameProfile::Bucket> profile_buckets;
     std::vector<bool> ends_frame;
@@ -153,6 +156,9 @@ struct GuestRuntime::Impl {
             else if (KeyboardPad::supports(identity)) kind = ServiceKind::KeyboardPad;
             else if (SaveData::supports(identity)) kind = ServiceKind::SaveData;
             else if (VirtualPortal::supports(identity)) kind = ServiceKind::VirtualPortal;
+#ifdef SKY_REAL_PORTAL
+            else if (RealPortalBus::supports(identity)) kind = ServiceKind::RealPortal;
+#endif
             else if (EmptyUsbBus::supports(identity)) kind = ServiceKind::EmptyUsbBus;
             else if (SkyGpu::supports(identity)) kind = ServiceKind::SkyGpu;
             else if (KernelSync::supports(identity)) kind = ServiceKind::KernelSync;
@@ -300,6 +306,9 @@ struct GuestRuntime::Impl {
             else if (active->service_kinds[id] == ServiceKind::KeyboardPad) result = active->keyboard_pad.call(identity, args, SkyGpu::captures_input());
             else if (active->service_kinds[id] == ServiceKind::SaveData) result = active->save_data.call(identity,args);
             else if (active->service_kinds[id] == ServiceKind::VirtualPortal) result = VirtualPortal::call(identity, args);
+#ifdef SKY_REAL_PORTAL
+            else if (active->service_kinds[id] == ServiceKind::RealPortal) result = RealPortalBus::call(identity, args);
+#endif
             else if (active->service_kinds[id] == ServiceKind::EmptyUsbBus) result = active->empty_usb_bus.call(identity, args);
             else if (active->service_kinds[id] == ServiceKind::SkyGpu) result = SkyGpu::call(identity, args);
             else if (active->service_kinds[id] == ServiceKind::KernelSync) result = active->kernel_sync.call(identity, args);

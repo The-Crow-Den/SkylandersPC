@@ -5,17 +5,17 @@ from PyQt6.QtCore import Qt, QSize, QRectF
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,
     QStackedWidget,QScrollArea,QFormLayout,QComboBox,QCheckBox,QSlider,QLineEdit,
-    QTextEdit,QFileDialog,QMessageBox,QProgressDialog)
+    QTextEdit,QFileDialog,QMessageBox,QProgressDialog,QSpinBox,QDoubleSpinBox)
 try:
     from . import launcher_model as model
 except ImportError:
     import launcher_model as model
 
 GROUPS = [
- ('Display','Picture and window preferences.', [('resolution','Resolution'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur')]),
+ ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('aspect','Aspect ratio'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('frame_policy','Frame policy'),('frame_limit','Frame limit'),('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('nvidia','Use NVIDIA GPU'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
- ('Portal & audio','Starting figure and portal speaker preferences.', [('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
- ('Tweaks','Optional game behavior changes and diagnostic tools.', [('unlock_nightmare','Nightmare available by default')]),
+ ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
+ ('Tweaks','Optional game behavior changes and diagnostic tools.', [('skip_intro','Skip startup logos'),('unlock_nightmare','Nightmare available by default')]),
 ]
 
 
@@ -52,7 +52,7 @@ class SettingSwitch(QCheckBox):
 
 class SettingsPage(QWidget):
     def __init__(self, owner):
-        super().__init__();self.owner=owner;self.fields={};self.nav=[];self.mod_fields={};self.mod_rows=[];self.game=None;self.baseline={}
+        super().__init__();self.owner=owner;self.fields={};self.nav=[];self.mod_fields={};self.mod_setting_fields={};self.mod_rows=[];self.game=None;self.baseline={}
         self.setObjectName('settingsPage')
         outer=QHBoxLayout(self);outer.setContentsMargins(36,28,36,24);outer.addStretch()
         content=QWidget();content.setMaximumWidth(1040);outer.addWidget(content,1);outer.addStretch()
@@ -68,15 +68,27 @@ class SettingsPage(QWidget):
         self.change_games=QPushButton('Change…');self.change_games.clicked.connect(self.change_games_folder);folder_line.addWidget(self.change_games)
         self.open_games=QPushButton('Open');self.open_games.clicked.connect(self.open_games_folder);folder_line.addWidget(self.open_games)
         layout.addWidget(self.games_row)
+        # Per-game restore list: verified snapshots only (tools/save_backup.py).
+        self.backup_row=QWidget();self.backup_row.setObjectName('settingRow')
+        backup_line=QHBoxLayout(self.backup_row);backup_line.setContentsMargins(20,16,20,16)
+        backup_copy=QVBoxLayout();backup_title=QLabel('Save snapshots');backup_title.setStyleSheet('font-size: 14px; font-weight: 600;');backup_copy.addWidget(backup_title)
+        backup_hint=QLabel('Restore a verified snapshot. Your current saves are snapshotted first, so a restore can be undone.')
+        backup_hint.setWordWrap(True);backup_hint.setStyleSheet('color: #93939e; font-size: 12px;');backup_copy.addWidget(backup_hint);backup_line.addLayout(backup_copy,1)
+        self.backups=SettingCombo();self.backups.setFixedWidth(340);self.backups.setAccessibleName('Save snapshot');backup_line.addWidget(self.backups)
+        self.restore_button=QPushButton('Restore');self.restore_button.clicked.connect(self.restore_backup);backup_line.addWidget(self.restore_button)
+        layout.addWidget(self.backup_row)
         navigation=QHBoxLayout();navigation.setSpacing(6);layout.addLayout(navigation)
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
-            'resolution':'Internal rendering resolution.', 'quality':'Detail and definition of game shadows.',
-            'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.',
+            'language':'Text and voices, when the game has them. Movies follow it in English, Spanish, French and Portuguese.',
+            'resolution':'Internal rendering resolution.',
+            'aspect':'Wider screens show more of the world to the sides; menus and HUD keep their shape. Movies stay 16:9.', 'quality':'Detail and definition of game shadows.',
+            'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
             'frame_policy':'Automatic adapts to gameplay and menus.', 'frame_limit':'Available when using a manual frame policy.',
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'nvidia':'Prefer the NVIDIA Vulkan driver.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
-            'portal_volume':'Volume of voices from the portal speaker.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
+            'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'A connected physical portal, or the virtual portal with figure files. Real portals are listed when the launcher opens.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
+            'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',
             'level_events':'Record events for troubleshooting.'}
         for name,description,entries in GROUPS:
             entries = [e for e in entries if e[0] not in model.LINUX_ONLY or e[0] in model.platform_settings()]
@@ -108,19 +120,18 @@ class SettingsPage(QWidget):
                 else:line.addWidget(field)
                 rows.addWidget(row)
             if name=='Tweaks':
-                for key,label,hint in [
-                    ('any-portal','Any portal','Physical portal compatibility is not implemented. The virtual portal is available.'),
-                    ('element-gates','No Trap Master required for gates','Open elemental gates with a matching-element Skylander. Experimental · US 01.01.'),
-                    ('traptanium','No Trap Master required for Traptanium','Break Traptanium with any Skylander. Experimental · US 01.01.'),
-                    ('unlock-expansions','Unlock adventure packs','Access all four adventure packs without toys after the island’s original introduction following Chapter 2. Experimental · US 01.01.'),
-                    ('replay-expansion-intros','Replay adventure pack introductions','Play the selected pack’s introduction after confirming travel at its Academy statue. Experimental · US 01.01.')]:
-                    card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
-                    copy=QVBoxLayout();heading=QLabel(label);heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
-                    detail=QLabel(hint);detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail);line.addLayout(copy,1)
-                    field=SettingSwitch();field.setFixedSize(44,28);field.setAccessibleName(label);line.addWidget(field)
-                    self.mod_fields[key]=field;self.mod_rows.append(card);rows.addWidget(card)
+                card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
+                copy=QVBoxLayout();heading=QLabel('Any portal');heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
+                detail=QLabel('Physical HID portals (PS3/PS4/Wii/Wii U) can be chosen under Portal & audio; Xbox portals are detected but not yet usable in game.');detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail);line.addLayout(copy,1)
+                self.portal_field=SettingSwitch();self.portal_field.setFixedSize(44,28);self.portal_field.setAccessibleName('Any portal');self.portal_field.setEnabled(False);line.addWidget(self.portal_field)
+                self.mod_rows.append(card);rows.addWidget(card)
             rows.addStretch();scroll.setWidget(sheet);column.addWidget(scroll,1);self.pages.addWidget(page)
             self.add_nav(navigation,name)
+        page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)
+        top=QHBoxLayout();self.mods_caption=QLabel();self.mods_caption.setWordWrap(True);self.mods_caption.setStyleSheet('color: #92929e; font-size: 13px;');top.addWidget(self.mods_caption,1)
+        folder=QPushButton('Open mods folder');folder.clicked.connect(self.open_mods_folder);top.addWidget(folder);column.addLayout(top)
+        scroll=QScrollArea();scroll.setWidgetResizable(True);sheet=QWidget();self.mods_list=QVBoxLayout(sheet);self.mods_list.setContentsMargins(0,0,4,0);self.mods_list.setSpacing(8)
+        scroll.setWidget(sheet);column.addWidget(scroll,1);self.pages.addWidget(page);self.add_nav(navigation,'Mods')
         log=QTextEdit();log.setReadOnly(True);log.setDocument(owner.log.document());self.pages.addWidget(log);self.add_nav(navigation,'Session log');navigation.addStretch()
         footer=QHBoxLayout();self.feedback=QLabel();self.feedback.setStyleSheet('color: #92929e; font-size: 12px;');footer.addWidget(self.feedback,1)
         cancel=QPushButton('Cancel');cancel.clicked.connect(self.cancel);footer.addWidget(cancel)
@@ -160,6 +171,7 @@ class SettingsPage(QWidget):
             from game_library import directory
         self.games_row.setVisible(game is None);self.games_path.setText(str(directory(self.owner.root)))
         self.change_games.setEnabled(self.owner.process is None)
+        self.refresh_backups()
         self.scope.blockSignals(True);self.scope.clear();self.scope.addItem('General settings',None)
         for entry in self.owner.library['games']:self.scope.addItem(entry['name'],entry['id'])
         self.scope.setCurrentIndex(self.scope.findData(game['id']) if game else 0);self.scope.blockSignals(False)
@@ -178,14 +190,122 @@ class SettingsPage(QWidget):
             from launcher_mods import selection
         selected=selection(self.owner.root,game) if game else {}
         for row in self.mod_rows:row.setVisible(game is not None and game['id']=='trap-team')
-        for key,field in self.mod_fields.items():
-            field.setChecked(selected.get(key,False));field.setEnabled(self.owner.process is None and key!='any-portal')
-            if key!='any-portal':
-                recipe=self.owner.root/'profiles/patches'/f'trap-team-us-01.01-{key}.experimental.json'
-                if not recipe.is_file():field.setEnabled(False);field.setToolTip('The mod recipe is unavailable in this checkout.')
+        self.fill_mods(game,selected)
         self.save_button.setEnabled(self.owner.process is None)
         self.feedback.setText('Stop the current session to change settings.' if self.owner.process else ('Saved per game · Applies to the next session.' if game else 'Changes apply to your next session.'))
         self.frame_policy();self.owner.views.setCurrentWidget(self)
+
+    def fill_mods(self,game,selected):
+        """One row per mod.json found, with its switch and settings for this game."""
+        try:
+            from .launcher_mods import catalogue
+        except ImportError:
+            from launcher_mods import catalogue
+        while self.mods_list.count():
+            item=self.mods_list.takeAt(0)
+            if item.widget():item.widget().deleteLater()
+        self.mod_fields={};self.mod_setting_fields={}
+        if game is None:
+            self.mods_caption.setText('Mods are chosen per game. Pick a game in the menu above. Add your own mods to the mods folder.')
+            self.mods_list.addStretch();return
+        rows,error=catalogue(self.owner.root,game)
+        self.mods_caption.setText(error or 'Mods change the game for the next session. Each one is checked against your installed version first.')
+        saved=game.get('mod_settings',{})
+        status_text={'ready':'Works with your version','other-build':'Not made for your version',
+                     'not-installed':'Install the game to use mods','unavailable':'Recipe missing from this copy'}
+        editable=self.owner.process is None
+        for mod in rows:
+            card=QWidget();card.setObjectName('settingRow');outer=QVBoxLayout(card);outer.setContentsMargins(20,16,20,16);outer.setSpacing(10)
+            line=QHBoxLayout();line.setSpacing(24);outer.addLayout(line)
+            copy=QVBoxLayout();copy.setSpacing(4)
+            heading=QLabel(mod['name']);heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
+            if mod['description']:
+                detail=QLabel(mod['description']);detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail)
+            ready=mod['status']=='ready'
+            origin='Built in' if mod['builtin'] else 'From your mods folder'
+            facts=QLabel(' · '.join([status_text[mod['status']],f"Version {mod['version']}",mod['author'],origin]))
+            facts.setWordWrap(True);facts.setStyleSheet('font-size: 12px; color: %s;'%('#9fe5ab' if ready else '#e1bb70'))
+            facts.setToolTip('Made for: '+', '.join(mod['targets']));copy.addWidget(facts)
+            line.addLayout(copy,1)
+            if mod['controlled']:
+                note=QLabel(mod['controlled']);note.setWordWrap(True);note.setFixedWidth(240);note.setStyleSheet('font-size: 12px; color: #93939e;');line.addWidget(note)
+            else:
+                field=SettingSwitch();field.setFixedSize(44,28);field.setAccessibleName(mod['name'])
+                field.setChecked(selected.get(mod['id'],False));field.setEnabled(editable and ready)
+                if not ready:field.setToolTip(status_text[mod['status']])
+                line.addWidget(field);self.mod_fields[mod['id']]=field
+                for name,spec in mod['settings'].items():
+                    value=saved.get(mod['id'],{}).get(name,spec['default'])
+                    row=QHBoxLayout();label=QLabel(name.replace('-',' ').capitalize());label.setStyleSheet('font-size: 12px;');row.addWidget(label,1)
+                    if spec['type']=='bool':
+                        widget=SettingSwitch();widget.setFixedSize(44,28);widget.setChecked(value is True)
+                    elif spec['type']=='choice':
+                        widget=SettingCombo();widget.setFixedWidth(240);widget.setMinimumHeight(34)
+                        for choice in spec['choices']:widget.addItem(choice.replace('-',' ').capitalize(),choice)
+                        widget.setCurrentIndex(max(0,widget.findData(value)))
+                    else:
+                        integer=all(type(spec[key]) is int for key in ('min','max','default'))
+                        widget=QSpinBox() if integer else QDoubleSpinBox();widget.setRange(spec['min'],spec['max']);widget.setValue(value);widget.setFixedWidth(240)
+                    widget.setAccessibleName(f"{mod['name']}: {label.text()}");widget.setEnabled(editable and ready)
+                    row.addWidget(widget);outer.addLayout(row);self.mod_setting_fields[(mod['id'],name)]=widget
+            self.mods_list.addWidget(card)
+        if not rows:
+            empty=QLabel('No mods found.');empty.setStyleSheet('color: #92929e;');self.mods_list.addWidget(empty)
+        self.mods_list.addStretch()
+
+    def mod_choices(self):
+        mods={key:field.isChecked() for key,field in self.mod_fields.items()}
+        settings={}
+        for (ident,name),widget in self.mod_setting_fields.items():
+            if isinstance(widget,QComboBox):value=widget.currentData()
+            elif isinstance(widget,QCheckBox):value=widget.isChecked()
+            else:value=widget.value()
+            settings.setdefault(ident,{})[name]=value
+        return mods,settings
+
+    def open_mods_folder(self):
+        folder=self.owner.root/'mods'
+        try:
+            folder.mkdir(exist_ok=True)
+            from PyQt6.QtCore import QUrl
+            from PyQt6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        except OSError as error:QMessageBox.warning(self,'Cannot open mods folder',str(error))
+
+    def backup_target(self):
+        try:from . import save_profile
+        except ImportError:import save_profile
+        title=(self.game or {}).get('title_id')
+        if not title:return None,None
+        return save_profile.select(self.owner.root,title)[0],title
+
+    def refresh_backups(self):
+        try:from . import save_backup
+        except ImportError:import save_backup
+        self.backups.clear();rows=[]
+        try:
+            root,title=self.backup_target()
+            if title:rows=save_backup.snapshots(root,title)
+        except (OSError,ValueError) as error:
+            self.backups.addItem(f'Unavailable: {error}',None)
+        for path,record in reversed(rows):self.backups.addItem(save_backup.describe(record),str(path))
+        if not rows and not self.backups.count():self.backups.addItem('No snapshots yet',None)
+        self.backup_row.setVisible(self.game is not None)
+        self.restore_button.setEnabled(self.owner.process is None and bool(rows))
+
+    def restore_backup(self):
+        if self.owner.process:return
+        try:from . import save_backup
+        except ImportError:import save_backup
+        path=self.backups.currentData()
+        if not path:return
+        if QMessageBox.question(self,'Restore saves',f'Replace the current saves with the snapshot from {self.backups.currentText()}?\n\nYour current saves are snapshotted first.')!=QMessageBox.StandardButton.Yes:return
+        try:
+            root,title=self.backup_target()
+            result=save_backup.restore(path,root,title)
+        except (OSError,ValueError) as error:
+            QMessageBox.warning(self,'Could not restore saves',f'Your saves were not changed: {error}');return
+        self.refresh_backups();self.feedback.setText(f"Saves restored ({result['files']} files). The previous saves are listed as Before restore.")
 
     def set_field(self,key,value):
         field=self.fields[key]
@@ -277,8 +397,11 @@ class SettingsPage(QWidget):
             if self.game is not None:
                 selected=dict(self.game['settings'])
                 selected.update({key:value for key,value in values.items() if value!=self.baseline[key]})
-                previous=self.game['settings'];previous_mods=self.game.get('mods');self.game['settings']=selected
-                if self.game['id']=='trap-team':self.game['mods']={key:field.isChecked() for key,field in self.mod_fields.items() if key!='any-portal'}
+                previous=self.game['settings'];previous_mods=self.game.get('mods');previous_mod_settings=self.game.get('mod_settings')
+                self.game['settings']=selected
+                mods,mod_settings=self.mod_choices()
+                self.game['mods']={**self.game.get('mods',{}),**mods}
+                if mod_settings:self.game['mod_settings']={**self.game.get('mod_settings',{}),**mod_settings}
                 try:
                     try:
                         from . import launcher_library
@@ -289,6 +412,8 @@ class SettingsPage(QWidget):
                     self.game['settings']=previous
                     if previous_mods is None:self.game.pop('mods',None)
                     else:self.game['mods']=previous_mods
+                    if previous_mod_settings is None:self.game.pop('mod_settings',None)
+                    else:self.game['mod_settings']=previous_mod_settings
                     raise
             else:
                 model.save(self.owner.preferences,values)

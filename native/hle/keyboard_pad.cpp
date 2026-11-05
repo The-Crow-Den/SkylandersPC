@@ -42,12 +42,13 @@ bool KeyboardPad::supports(std::string_view identity) noexcept {
 }
 void KeyboardPad::key(std::uint32_t mask, bool pressed) noexcept {
     std::lock_guard guard(lock_);
-    if (pressed) { pending_presses_ |= mask & ~keys_; keys_ |= mask; }
+    if (pressed) { pending_presses_ |= mask & ~keys_; presses.fetch_or(mask & ~keys_); keys_ |= mask; }
     else keys_ &= ~mask;
 }
 void KeyboardPad::set_keys(std::uint32_t keys) noexcept {
     std::lock_guard guard(lock_);
     pending_presses_ |= keys & ~keys_;
+    presses.fetch_or(keys & ~keys_);
     static const bool trace=[] {const auto* p=std::getenv("SKY_TRAP_PHASE_PROBE");return p && !std::strcmp(p,"1");}();
     if(trace && keys!=keys_)std::fprintf(stderr,"{\"event\":\"probe-keyboard-state\",\"keys\":%u}\n",keys);
     keys_ = keys;

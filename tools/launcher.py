@@ -15,13 +15,13 @@ except ImportError:
     raise SystemExit('The optional launcher needs PyQt6. You can still use tools/run_session.py.')
 
 try:
-    from . import launcher_model as model
+    from . import launcher_model as model, portal_devices
     from . import host_process
     from .launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
     from .pc_settings import load_settings, save_settings
     from .resolution import PRESETS
 except ImportError:
-    import launcher_model as model
+    import launcher_model as model, portal_devices
     import host_process
     from launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
     from pc_settings import load_settings, save_settings
@@ -93,6 +93,8 @@ class Launcher(QMainWindow):
 
         display=self.page('Graphics', 'A little more magic. A little more detail.', 'Tune your picture and frame rate. Applied choices are shared with the in-game PC menu.')
         self.combo(display,'Internal resolution','resolution',[(f'{k}  ·  {w} × {h}',k) for k,(w,h) in PRESETS.items()])
+        self.combo(display,'Aspect ratio','aspect',[('16:9 · original','16:9'),('Automatic · match the screen','auto'),('16:10 · Steam Deck','16:10'),('21:9 · ultrawide','21:9'),('32:9 · super ultrawide','32:9')])
+        self.combo(display,'Game language','language',[(model.game_language.NAMES[code],code) for code in model.languages(self.root)])
         self.combo(display,'Shadow detail','quality',[('Original','balanced'),('High','high'),('Low','performance')])
         self.combo(display,'Frame policy','frame_policy',[('Automatic · 60 gameplay / 30 menus & portal','auto'),('Manual frame limit','manual')])
         self.combo(display,'Frame limit','frame_limit',[('30 FPS',30),('60 FPS · experimental timing',60),('Uncapped · diagnostic',0)])
@@ -100,6 +102,7 @@ class Launcher(QMainWindow):
         self.check(display,'Show frame rate','fps_counter')
         self.check(display,'Show trophy popups','trophy_popups')
         self.check(display,'Motion blur','motion_blur')
+        self.check(display,'Anti-aliasing','anti_aliasing')
         self.check(display,'Use NVIDIA GPU','nvidia')
         self.check(display,'MangoHud overlay · optional installation','mangohud')
         for key in model.LINUX_ONLY:
@@ -113,15 +116,19 @@ class Launcher(QMainWindow):
         row=QHBoxLayout();row.addWidget(self.fields['figure'],1)
         browse=QPushButton('Browse…');browse.clicked.connect(self.browse);row.addWidget(browse)
         portal.addRow('Starting Skylander',row)
+        self.fields['portal_device']=QComboBox();portal.addRow('Portal',self.fields['portal_device'])
+        self.portal_note=text_label('','muted');portal.addRow(self.portal_note)
+        refresh_portals=QPushButton('Refresh portals');refresh_portals.clicked.connect(self.refresh_portals);portal.addRow(refresh_portals)
         volume=QSlider(Qt.Orientation.Horizontal);volume.setRange(0,100);self.fields['portal_volume']=volume
         self.volume_label=QLabel();volume.valueChanged.connect(lambda n:self.volume_label.setText(f'{n}%'))
         row=QHBoxLayout();row.addWidget(volume,1);row.addWidget(self.volume_label);portal.addRow('Portal speaker',row)
         self.devices=text_label('');portal.addRow('Controllers',self.devices)
         refresh=QPushButton('Refresh controllers');refresh.clicked.connect(self.refresh_devices);portal.addRow(refresh)
-        portal.addRow(text_label('F6 / Insert / L3+R3   ·   PC settings & virtual portal\nF2   ·   Choose a Skylander\nF10   ·   Minimize game for recording\n\nNew villain traps start empty, ready for in-game capture. Virtual Traptanium is available; physical portal support is still in development.','muted'))
+        portal.addRow(text_label('F6 / Insert / L3+R3   ·   PC settings & virtual portal\nF2   ·   Choose a Skylander\nF10   ·   Minimize game for recording\n\nNew villain traps start empty, ready for in-game capture. Virtual Traptanium is available; physical portals can be chosen above (in development).','muted'))
         portal.addRow(PortraitStrip(self.root))
 
         mods=self.page('Game mods','Your adventure. Your rules.','PC features that respect your existing progress.')
+        self.check(mods,'Skip startup logos','skip_intro')
         self.check(mods,'Make Nightmare available immediately','unlock_nightmare')
         mods.addRow(text_label('Choose Nightmare when creating a save. Existing games keep their difficulty.','muted'))
         self.check(mods,'Record level events · diagnostic only','level_events')
@@ -144,6 +151,7 @@ class Launcher(QMainWindow):
             value.update(load_settings(self.root / 'out/pc-settings.json'))
         except (OSError, ValueError, TypeError) as error:
             self.log.append(f'Saved settings could not be loaded: {error}')
+        self.refresh_portals(value.get('portal_device'))
         self.apply_values(value)
         self.refresh_devices()
         self.refresh_readiness()
@@ -219,6 +227,18 @@ class Launcher(QMainWindow):
             else: value[key] = field.text()
         return model.validate(value)
 
+    def refresh_portals(self, selected=None):
+        field=self.fields['portal_device']
+        selected=selected or field.currentData() or 'virtual'
+        portals=portal_devices.list_portals()
+        field.clear();field.addItem('Virtual portal · figure files','virtual')
+        for portal in portals: field.addItem(portal_devices.label(portal),portal['id'])
+        if field.findData(selected)<0: field.addItem(f'{selected} · not connected',selected)
+        field.setCurrentIndex(field.findData(selected))
+        blocked=[p for p in portals if not p['accessible']]
+        self.portal_note.setText(portal_devices.access_help() if blocked else
+            'Real portals read figures directly; the game cannot write to them unless allowed. Starting figure files apply to the virtual portal only.')
+
     def refresh_devices(self):
         self.devices.setText('\n'.join(model.controllers()) or 'No joystick devices detected. Connect a controller to test it in game.')
 
@@ -246,7 +266,8 @@ class Launcher(QMainWindow):
                 pc_value = {}
             pc_value.update({key: value[key] for key in model.PC_KEYS})
             save_settings(pc_path, pc_value)
-            argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None), game=getattr(self, 'game', None))
+            argv = model.command(self.root, sys.executable, value, mods=getattr(self, 'session_mods', None), game=getattr(self, 'game', None),
+                                 mod_settings=(getattr(self, 'game', None) or {}).get('mod_settings'))
         except (OSError, ValueError, TypeError) as error:
             QMessageBox.warning(self, 'Cannot start Trap Team', str(error))
             return

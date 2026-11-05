@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "title_id": "CUSA00626",
+  "app_version": "01.01",
+  "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+  "status": "Logo movies cut to their first keyframe; in-game behaviour pending",
+  "logos": [
+    {
+      "asset": "movies/atvinewlogo_640.mov",
+      "source_sha256": "b0d04987a1f4071266e31be82d877de643b1888ded1ad675a5250fbacdd83330",
+      "source_tracks": [
+        0
+      ],
+      "output_sha256": "df5dda822c9d59f6f16e6af56b1d2f5c1223e2c1f811ddf7229154307c791e56"
+    },
+    {
+      "asset": "movies/tfb_logo_640x456.mov",
+      "source_sha256": "1db752e2001718f5b989e4b3176d44905701799b85c641535ca202a608e33ab8",
+      "source_tracks": [
+        0
+      ],
+      "output_sha256": "b591a3bfa05e3dc2b19be9b57b83b399de9fc739e4b13d56b243e3b32fb3e106"
+    },
+    {
+      "asset": "movies/beenoxlogo.avi",
+      "source_sha256": "6d8ee4eb1c2c7f4f04c8948ab0fcdd4613606057867d1037b857a33359f59899",
+      "source_tracks": [
+        6,
+        0
+      ],
+      "output_sha256": "a7b5998ecf4ef407940d178c3bdda0ba71b531b04d580456b19c2b0027f6f5da"
+    }
+  ]
+}

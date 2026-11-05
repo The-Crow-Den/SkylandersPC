@@ -38,10 +38,31 @@ class LauncherModelTests(unittest.TestCase):
 
     def test_linux_only_switches_are_off_on_windows(self):
         value={**model.DEFAULTS,'nvidia':True,'mangohud':True}
-        self.assertIn('--nvidia',model.command('/project','python',value))
+        with patch.object(model,'platform_settings',return_value=list(model.LINUX_ONLY)):
+            self.assertIn('--nvidia',model.command('/project','python',value))
         with patch.object(model,'platform_settings',return_value=[]):
             argv=model.command('/project','python',value)
         self.assertIn('--no-nvidia',argv);self.assertIn('--no-mangohud',argv)
+
+    def test_settings_saved_before_anti_aliasing_turn_it_on(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.json'
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'anti_aliasing'}))
+            self.assertTrue(model.load(path)['anti_aliasing'])
+        argv = model.command('/project', 'python', dict(model.DEFAULTS, anti_aliasing=False))
+        self.assertIn('--no-anti-aliasing', argv)
+
+    def test_aspect_ratio_is_saved_and_forwarded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.json'
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'aspect'}))
+            self.assertEqual(model.load(path)['aspect'], '16:9')
+        argv = model.command('/project', 'python', dict(model.DEFAULTS, aspect='21:9'))
+        self.assertEqual(argv[argv.index('--aspect') + 1], '21:9')
+        argv = model.command('/project', 'python', dict(model.DEFAULTS, aspect='auto'))
+        self.assertEqual(argv[argv.index('--aspect') + 1], 'auto')
+        with self.assertRaises(ValueError):
+            model.validate(dict(model.DEFAULTS, aspect='4:3'))
 
     def test_gameplay_mod_switches_are_forwarded_explicitly(self):
         argv=model.command('/project','python',model.DEFAULTS,mods={'element-gates':True,'traptanium':False})
@@ -52,7 +73,12 @@ class LauncherModelTests(unittest.TestCase):
         for enabled, flag in ((True,'--replay-expansion-intros'),(False,'--no-replay-expansion-intros')):
             argv=model.command('/project','python',model.DEFAULTS,mods={'replay-expansion-intros':enabled})
             self.assertIn(flag,argv)
-        with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'any-portal':True})
+        argv=model.command('/project','python',model.DEFAULTS,mods={'sample':True,'off':False},
+                           mod_settings={'sample':{'strength':'high'},'off':{'x':1}})
+        self.assertEqual(argv[argv.index('--mod'):][:4],['--mod','sample','--mod-setting','sample.strength="high"'])
+        self.assertNotIn('off',' '.join(argv))
+        with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'Bad Id':True})
+        with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'sample':True},mod_settings={'sample':{'x':[1]}})
         with self.assertRaises(ValueError):model.command('/project','python',model.DEFAULTS,mods={'traptanium':'yes'})
 
     def test_legacy_game_mod_preferences_keep_their_values(self):

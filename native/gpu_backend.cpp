@@ -506,14 +506,12 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
         std::call_once(presenter_once, [] {
             std::int32_t window_width = 1280, window_height = 720;
             if (const auto* size = std::getenv("SKY_WINDOW_SIZE")) {
-                bool found = false;
-                for (const auto& preset : SkyPc::resolutions) {
-                    const auto name = std::to_string(preset.width) + "x" + std::to_string(preset.height);
-                    if (name == size) {
-                        window_width = preset.width; window_height = preset.height; found = true; break;
-                    }
-                }
-                if (!found) throw std::runtime_error("unsupported SKY_WINDOW_SIZE preset");
+                // A preset, or a preset's height widened to another aspect ratio.
+                int width = 0, height = 0; char end = 0;
+                if (std::sscanf(size, "%dx%d%c", &width, &height, &end) != 2 ||
+                    width < 320 || width > 16384 || height < 240 || height > 8640)
+                    throw std::runtime_error("unsupported SKY_WINDOW_SIZE");
+                window_width = width; window_height = height;
             }
             // SDL_APP_ID from the launcher environment takes precedence.
             SDL_SetHint(SDL_HINT_APP_ID,"org.skylanders.PS4Native");

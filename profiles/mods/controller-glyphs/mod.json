@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "controller-glyphs",
+  "name": "Controller button prompts",
+  "version": "1.0.0",
+  "author": "SkylandersPS4 contributors",
+  "licence": "GPL-3.0-or-later",
+  "description": "Redraws PlayStation button prompts with Xbox or Nintendo glyphs from locally imported Steam artwork.",
+  "targets": [
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.01",
+      "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    }
+  ],
+  "requires": [],
+  "conflicts": [],
+  "settings": {
+    "mode": {
+      "type": "choice",
+      "choices": [
+        "xbox",
+        "nintendo"
+      ],
+      "default": "xbox"
+    }
+  },
+  "operations": [
+    {
+      "type": "generated",
+      "handler": "controller-glyphs",
+      "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+      "profile": "profiles/patches/trap-team-us-01.01-controller-glyphs.json"
+    }
+  ]
+}

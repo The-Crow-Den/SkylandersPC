@@ -10,5 +10,10 @@
   },
   "virtual_address": 4206588,
   "expected_hex": "c7459080070000c7459438040000",
-  "status": "US 01.01 expected bytes verified; live gameplay validation pending"
+  "status": "US 01.01 expected bytes verified; live gameplay validation pending",
+  "aspect": {
+    "virtual_address": 4236148,
+    "expected_hex": "c700398ee33f",
+    "reason": "graphics-device startup stores 16/9 in the global camera aspect read by every game camera projection; replace the movl immediate"
+  }
 }

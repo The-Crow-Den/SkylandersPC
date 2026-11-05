@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Title-specific selection of shipped, hash-guarded gameplay recipes."""
+"""Saved per-title choice of the experimental gameplay mods.
+
+Each name is a built-in mod in profiles/mods; tools/mod_manifest.py loads its recipe."""
 import json
 from pathlib import Path
 import re
@@ -30,16 +32,3 @@ def selection(root, title_id, overrides=None):
         if value is not None:selected[name]=value
     return selected
 
-
-def recipes(root, title_id, app_version, selected):
-    if not any(selected.values()):return []
-    if (title_id,app_version)!=('CUSA00626','01.01'):
-        raise ValueError('gameplay mods require the verified US 01.01 build')
-    result=[]
-    for name in NAMES:
-        if not selected[name]:continue
-        path=Path(root)/'profiles/patches'/f'trap-team-us-01.01-{name}.experimental.json'
-        if not path.is_file():
-            raise ValueError(f'{name} recipe is unavailable in this source checkout; see profiles/patches/README.md')
-        result.append(json.loads(path.read_text()))
-    return result

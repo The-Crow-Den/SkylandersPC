@@ -70,6 +70,16 @@ u32 FramesAhead() {
     return value;
 }
 
+/// SKY_RENDERER_AA (default 1): smooth edges of the game's frame in the present pass (FXAA-style;
+/// 0: off).
+bool AntiAlias() {
+    static const bool value = [] {
+        const char* env = std::getenv("SKY_RENDERER_AA");
+        return !env || std::atoi(env) != 0;
+    }();
+    return value;
+}
+
 void WaitFence(vk::Device device, vk::Fence fence) {
     while (true) {
         const vk::Result result = device.waitForFences(fence, true, std::numeric_limits<u64>::max());
@@ -240,6 +250,7 @@ Frame* Presenter::PrepareFrame(const SkyVideoOut::BufferAttributeGroup& attribut
         .gamma = gamma.load(std::memory_order_relaxed),
         .hdr = hdr.load(std::memory_order_relaxed),
         .srgb_input = attribute.attrib.pixel_format == SkyVideoOut::PixelFormat::A2R10G10B10Srgb,
+        .anti_alias = AntiAlias(),
     };
     // Numbered here, in command order; marked where the commands are recorded.
     const u32 stream = draw_scheduler.CrumbStream();

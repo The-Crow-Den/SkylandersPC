@@ -20,19 +20,21 @@ import shutil
 try:
     from .overlay_session import html_overlay
     from . import host_process
-    from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
+    from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
-    from . import nightmare_mod
-    from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    from . import mod_manifest
+    from . import portal_devices
+    from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 except ImportError:
     from overlay_session import html_overlay
     import host_process
-    from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets
+    from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
-    import nightmare_mod
-    import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art
+    import mod_manifest
+    import portal_devices
+    import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = {'original': 'native-linked-boot-weak',
@@ -41,6 +43,8 @@ PACKS = {'original': 'native-linked-boot-weak',
 
 
 SESSION_TEMP = ROOT / 'out/session-temp'
+# Host steps that build a mod's edits at launch (mod.json `generated` operations).
+MOD_HANDLERS = {'level-events', 'controller-glyphs'}
 LAST_SESSION = ROOT / 'out/last-session'
 KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log',
              # --profile output; without these the profile was deleted with the session.
@@ -237,6 +241,11 @@ def run(argv,sessions):
     parser.add_argument('--variant', choices=PACKS, default='original')
     parser.add_argument('--figure', type=Path)
     parser.add_argument('--figure-bottom', type=Path, help='swapper bottom half placed under a starting top half')
+    parser.add_argument('--portal-device', default=portal_devices.VIRTUAL,
+                        help="'virtual' (figure files), 'auto' (first connected portal) or an id from --list-portals")
+    parser.add_argument('--list-portals', action='store_true', help='list connected physical portals and exit')
+    parser.add_argument('--allow-figure-writes', action=argparse.BooleanOptionalAction, default=False,
+                        help='let the game save progress to figures on a physical portal; each figure is backed up first')
     parser.add_argument('--trophy-config',type=Path,help='private shadPS4 config or trophy-key file; never copied into logs')
     parser.add_argument('--pc-menu',choices=('web','native'),default='web',
                         help='HTML PC menu inside the game window (default), with a native fallback when WebEngine is unavailable')
@@ -245,8 +254,15 @@ def run(argv,sessions):
                         help='verified rotating save snapshots before launch and after normal exit')
     parser.add_argument('--resolution', choices=PRESETS,
                         help='experimental internal render size; restart required')
+    parser.add_argument('--language',choices=tuple(game_language.CODES),default=game_language.DEFAULT,
+                        help='console system language the game reads; titles fall back to English (US) when they lack it')
+    parser.add_argument('--skip-intro',action=argparse.BooleanOptionalAction,default=False,
+                        help='cut the startup logo movies to one frame on builds with a verified intro profile')
     parser.add_argument('--movie-audio',choices=('auto','original','english'),default='auto',
-                        help='select English movie narration for the verified US update; original retains all tracks')
+                        help='fix movie narration on the verified US update: auto keeps the selected language when its track is known, original retains all tracks')
+    parser.add_argument('--aspect', default='16:9',
+                        help='game aspect ratio: 16:9 (original), auto (from the window size), or W:H such as 21:9, 32:9, 16:10; '
+                             'wider shows more to the sides (Hor+)')
     parser.add_argument('--window-resolution', choices=PRESETS,
                         help='presentation window size, independent of internal rendering')
     parser.add_argument('--shadows', choices=SHADOWS, default=None,
@@ -262,7 +278,11 @@ def run(argv,sessions):
     parser.add_argument('--frame-policy', choices=('manual','auto'), default='manual',
                         help='auto follows mod loading, UI visibility and cutscene state (30/60)')
     parser.add_argument('--unlock-nightmare', action=argparse.BooleanOptionalAction, default=True,
-                        help='make Nightmare available in fresh-save difficulty selection')
+                        help='make Nightmare available in fresh-save difficulty selection (alias for --mod nightmare)')
+    parser.add_argument('--mod', action='append', default=[], metavar='ID',
+                        help='enable a mod by id from profiles/mods or the per-user mods/ folder; repeatable')
+    parser.add_argument('--mod-setting', action='append', default=[], metavar='ID.NAME=JSON',
+                        help='set one mod setting, for example my-mod.strength="high"; repeatable')
     for name in gameplay_mods.NAMES:
         parser.add_argument('--'+name,action=argparse.BooleanOptionalAction,default=None,
                             help='exact-build gameplay mod; defaults to the selected title mod profile')
@@ -273,6 +293,8 @@ def run(argv,sessions):
     parser.add_argument('--performance-profile', choices=('standard','low-end'), default='standard',
                         help='low-end targets 1080p/60 gameplay with lighter shadows and no motion blur')
     parser.add_argument('--motion-blur', action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument('--anti-aliasing', action=argparse.BooleanOptionalAction, default=True,
+                        help='smooth jagged edges in the present pass (SKY_RENDERER_AA)')
     parser.add_argument('--memory-mode', choices=('standard','compact'), default='standard')
     parser.add_argument('--renderer-idle', choices=('adaptive','sleep'), default='adaptive',
                         help='sleep avoids speculative renderer idle spinning; experimental')
@@ -283,7 +305,7 @@ def run(argv,sessions):
                         help='keyboard-and-pad reserves player one for the keyboard and assigns a single pad to player two')
     parser.add_argument('--frame-limit', choices=(0,30,60), type=int, default=30,
                         help='built-in FPS cap; zero is an uncapped diagnostic')
-    parser.add_argument('--portal-volume', type=int, default=30, help='portal speaker volume, 0 to 100 (default 30)')
+    parser.add_argument('--portal-volume', type=int, default=50, help='portal speaker volume, 0 to 100 (default 50)')
     parser.add_argument('--fullscreen', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('--fps-counter', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--trophy-popups', action=argparse.BooleanOptionalAction, default=True,
@@ -310,6 +332,10 @@ def run(argv,sessions):
     if preliminary.performance_profile == 'low-end':
         parser.set_defaults(resolution='1080p',quality='performance',motion_blur=False,memory_mode='compact')
     args = parser.parse_args(arguments)
+    if args.list_portals:
+        for portal in portal_devices.list_portals():
+            print(portal['id'], '\t', portal_devices.label(portal))
+        return 0
     if not 0 <= args.portal_volume <= 100: parser.error('portal volume must be between 0 and 100')
     if args.seconds < 0 or not args.seconds < float('inf'):
         parser.error('seconds must be finite and nonnegative')
@@ -320,6 +346,9 @@ def run(argv,sessions):
     if args.mangohud and shutil.which('mangohud') is None:
         parser.error('MangoHud was requested but is not installed; omit --mangohud to run normally')
     if args.frame_policy == 'auto':
+        # Saved settings default to automatic FPS; pick its variant unless one was given.
+        if not any(item == '--variant' or item.startswith('--variant=') for item in arguments):
+            args.variant = '60-delta'
         if args.variant != '60-delta' or args.manual_phase_cap or args.present_limit is not None:
             parser.error('automatic FPS requires 60-delta and the built-in limiter')
         args.level_events = True
@@ -332,21 +361,57 @@ def run(argv,sessions):
         entry = game_library.resolve_entry(ROOT,args.game)
         game_prepare.require_ready(ROOT,entry,args.variant)
         selected_save, save_source = save_profile.select(ROOT, installation.title_id, args.save_root)
+        available_mods=mod_manifest.discover(ROOT)
+        executable_sha256=build['executable_sha256']
         selected_mods=gameplay_mods.selection(ROOT,installation.title_id,{name:getattr(args,name.replace('-','_')) for name in gameplay_mods.NAMES})
-        recipes=gameplay_mods.recipes(ROOT,installation.title_id,installation.app_version,selected_mods)
-        movie_profile=ROOT/'profiles/patches/trap-team-us-01.01-movie-audio.json' if (installation.title_id,installation.app_version,build['executable_sha256'])==('CUSA00626','01.01',game_build.US_UPDATE_SHA256) else None
+        language,language_note=game_language.choose(ROOT,build['profile_id'],args.language)
+        movie_recipe=build['preparation'].get('optional_recipes',{}).get('movie-audio')
+        movie_profile=ROOT/movie_recipe if movie_recipe else None
         if args.movie_audio=='english' and movie_profile is None:
             raise ValueError('English movie localization requires the verified US update')
-        selected_movie_audio='english' if args.movie_audio!='original' and movie_profile else 'original'
+        # Keep one narration track: the chosen language's when the profile
+        # identifies it, otherwise the movies stay as shipped.
+        narration='English' if args.movie_audio=='english' else game_language.narration(language) if args.movie_audio=='auto' else None
+        if movie_profile is None or narration not in json.loads(movie_profile.read_text()).get('narration_tracks',{}):
+            narration=None
+        selected_movie_audio=narration.lower() if narration else 'original'
+        intro_profile=next((path for path in sorted((ROOT/'profiles/patches').glob('*-skip-intro.json'))
+                            if json.loads(path.read_text()).get('executable_sha256')==executable_sha256),None) if args.skip_intro else None
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
-        glyph_profile=ROOT/'profiles/patches/trap-team-us-01.01-controller-glyphs.json'
         if glyph_mode!='playstation' and not controller_art.available():
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
             glyph_mode,glyph_detection='playstation','no imported artwork: original prompts retained'
 
-        if glyph_mode!='playstation' and movie_profile is None:
+        if glyph_mode!='playstation' and not mod_manifest.supports(available_mods,'controller-glyphs',executable_sha256):
             if args.controller_glyphs!='auto':raise ValueError('Controller glyph packs require the verified US update')
             glyph_mode,glyph_detection='playstation','unsupported build: original prompts retained'
+        # Built-in mods selected by their historical flags, then --mod ids.
+        selected_mod_ids=list(dict.fromkeys((['nightmare'] if args.unlock_nightmare else [])+
+                                            [name for name,enabled in selected_mods.items() if enabled]+
+                                            (['level-events'] if args.level_events else [])+
+                                            (['controller-glyphs'] if glyph_mode!='playstation' else [])+args.mod))
+        mod_settings={}
+        for item in args.mod_setting:
+            name,_,value=item.partition('=')
+            ident,_,setting=name.partition('.')
+            try:mod_settings.setdefault(ident,{})[setting]=json.loads(value)
+            except ValueError:raise ValueError(f'invalid mod setting {item}') from None
+        if glyph_mode!='playstation':mod_settings.setdefault('controller-glyphs',{})['mode']=glyph_mode
+        mod_writes=[]
+        code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
+                 for operation in available_mods[ident]['operations'])
+        applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
+                                       settings=mod_settings,
+                                       executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
+        if any(operation['type']=='code-patch' for mod in applied_mods for operation in mod['operations']):
+            raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
+        mod_handlers={(operation['handler']):(mod,operation) for mod,operation in mod_manifest.generated(applied_mods)}
+        unknown=set(mod_handlers)-MOD_HANDLERS
+        if unknown:raise ValueError('mods use unknown handlers: '+', '.join(sorted(unknown)))
+        asset_profile=mod_manifest.asset_profile(applied_mods,installation.title_id,installation.app_version,executable_sha256)
+        recipes=[asset_profile] if asset_profile else []
+        mod_environment=mod_manifest.host_environment(applied_mods)
+        mod_metadata=mod_manifest.record(applied_mods)
 
     except (OSError,ValueError) as error:
         parser.error(str(error))
@@ -359,6 +424,18 @@ def run(argv,sessions):
         parser.error('figure file is missing')
     if args.figure_bottom and not args.figure_bottom.is_file():
         parser.error('bottom half figure file is missing')
+    real_portal = args.portal_device != portal_devices.VIRTUAL
+    if not portal_devices.valid_choice(args.portal_device):
+        parser.error('unknown portal device '+repr(args.portal_device))
+    if real_portal:
+        if args.figure or args.figure_bottom:
+            parser.error('starting figure files need the virtual portal; mixed real and virtual portals are not supported yet')
+        connected = [p for p in portal_devices.list_portals()
+                     if args.portal_device in (portal_devices.AUTO, p['id'])]
+        if not connected:
+            parser.error('no matching portal is connected; plug it in or choose the virtual portal')
+        if not connected[0]['accessible']:
+            parser.error('the portal is connected but this user cannot open it. '+portal_devices.access_help())
     # Same filesystem as the game library: the working copy is hard-linked.
     session = SESSION_TEMP / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     session.mkdir(parents=True)
@@ -374,49 +451,56 @@ def run(argv,sessions):
         phase_started=now
     resolution_metadata = None
     asset_metadata = None
+    try:
+        window_preset = args.window_resolution or args.resolution
+        aspect = (parse_aspect('%d:%d' % PRESETS[window_preset]) if window_preset else 16 / 9) \
+            if args.aspect == 'auto' else parse_aspect(args.aspect)
+    except ValueError as error:
+        parser.error(str(error))
+    if abs(aspect - 16 / 9) < 1e-3:
+        aspect = None
+    elif not args.resolution:
+        args.resolution = '1080p'
     level_metadata = None
-    nightmare_metadata = None
     game_root = installation.materialize(session/'install') if installation.update else installation.base
     preparation_checkpoint("install_overlay")
     original_game = game_root
     if args.resolution:
         try:
             files[0], resolution_metadata = prepare_resolution(pack, session,
-                build['executable'], args.resolution, args.variant, build['resolution'])
+                build['executable'], args.resolution, args.variant, build['resolution'], aspect)
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('resolution_pack')
-    if args.resolution or shadows != 'native' or not args.motion_blur or args.unlock_nightmare or recipes or selected_movie_audio=='english' or glyph_mode!='playstation':
+    if args.resolution or shadows != 'native' or not args.motion_blur or recipes or narration or intro_profile or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
-                PRESETS[args.resolution] if args.resolution else None, shadows, args.motion_blur, build['resolution'])
+                render_size(args.resolution, aspect) if args.resolution else None, shadows, args.motion_blur, build['resolution'])
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
-    if args.unlock_nightmare:
-        # Composed with the other asset recipes, since the controller glyph pack
-        # also edits level/title.bld; a separate write would block that edit.
-        try:
-            nightmare_profile=json.loads(Path(build['nightmare']).read_text())
-            if nightmare_profile['executable_sha256']!=build['executable_sha256']:
-                raise ValueError('Nightmare mod refuses an unknown original executable')
-            recipes=list(recipes or [])+[nightmare_mod.recipe(nightmare_profile)]
-            nightmare_metadata={'asset':nightmare_profile['asset'],'status':nightmare_profile['status'],
-                                'prepared':'composed asset recipe'}
-        except (OSError,ValueError,KeyError) as error:
-            parser.error(str(error))
-    preparation_checkpoint('nightmare')
     movie_metadata=None
-    if selected_movie_audio=='english':
+    if narration:
         try:
-            movie_metadata=movie_audio.prepare(original_game,game_root,session,movie_profile)
+            movie_metadata=movie_audio.prepare(original_game,game_root,session,movie_profile,narration)
         except (OSError,ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('movie_localization')
-    glyph_metadata={'mode':glyph_mode,'requested':args.controller_glyphs,'detection':glyph_detection}
-    if glyph_mode!='playstation':
+    intro_metadata={'requested':args.skip_intro,'applied':False}
+    if intro_profile:
         try:
-            recipes.append(controller_glyphs.build_profile(original_game,glyph_profile,glyph_mode,build['executable_sha256']))
+            intro_metadata.update(movie_audio.skip_logos(original_game,game_root,session,intro_profile),applied=True)
+        except (OSError,ValueError) as error:
+            parser.error(str(error))
+    elif args.skip_intro:
+        intro_metadata['note']='no verified intro profile for this build; logos play as shipped'
+    preparation_checkpoint('skip_intro')
+    glyph_metadata={'mode':glyph_mode,'requested':args.controller_glyphs,'detection':glyph_detection}
+    if 'controller-glyphs' in mod_handlers:
+        try:
+            recipes.append(controller_glyphs.build_profile(original_game,mod_handlers['controller-glyphs'][1]['profile_path'],glyph_mode,executable_sha256))
+            # Generated edits face the same overlap check as manifest edits.
+            mod_manifest.claim(mod_writes,'controller-glyphs',[item for asset in recipes[-1]['assets'] for item in mod_manifest.recipe_ranges(asset)])
             glyph_metadata.update(coverage='shared font, animated mash prompts and title confirm button',assets=[item['asset'] for item in recipes[-1]['assets']])
         except (OSError,ValueError,lzma.LZMAError) as error:
             parser.error(str(error))
@@ -448,13 +532,18 @@ def run(argv,sessions):
 
     if selected_save is not None:
         env['SKY_SAVE_DATA_ROOT'] = str(selected_save)
+        env['SKY_SAVE_TITLE_ID'] = installation.title_id
         protected.append(selected_save)
     if trophy_metadata.get('available'):protected.append(trophy_metadata['store'])
     env = renderer_environment(env, args.renderer_idle)
-    if args.level_events:
+    env.update(mod_environment)
+    env['SKY_SYSTEM_LANGUAGE']=str(game_language.CODES[language])
+    if language_note:print(language_note,file=sys.stderr)
+    if 'level-events' in mod_handlers:
         try:
             files[0],level_metadata = level_events_mod.prepare(pack,session,
-                build['executable'],args.variant,args.resolution,build['level-events'],build['resolution'])
+                build['executable'],args.variant,args.resolution and render_size(args.resolution,aspect),
+                mod_handlers['level-events'][1]['profile_path'],build['resolution'],aspect)
         except (OSError,ValueError) as error:
             parser.error(str(error))
         env['SKY_LEVEL_EVENT_MAILBOX'] = str(level_metadata['mailbox_address'])
@@ -486,7 +575,7 @@ def run(argv,sessions):
         env['SKY_RENDERER_TRIM_SHADER_WARMUP']='1'
     window = args.window_resolution or args.resolution
     if window:
-        env['SKY_WINDOW_SIZE'] = 'x'.join(map(str, PRESETS[window]))
+        env['SKY_WINDOW_SIZE'] = 'x'.join(map(str, PRESETS[window] if args.window_resolution else render_size(window, aspect)))
     if args.nvidia:
         icd = Path('/usr/share/vulkan/icd.d/nvidia_icd.json')
         if not icd.is_file():
@@ -501,11 +590,17 @@ def run(argv,sessions):
     if os.name != 'nt':
         env.setdefault('SDL_VIDEO_DRIVER', 'x11')  # Windows: SDL's only driver is windows.
     env.setdefault('SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', '0')
-    env.setdefault('SKY_VIRTUAL_PORTAL', '1')
+    if real_portal:
+        env['SKY_VIRTUAL_PORTAL'] = '0'
+        env['SKY_PORTAL_DEVICE'] = args.portal_device
+        env['SKY_PORTAL_FIGURE_WRITES'] = '1' if args.allow_figure_writes else '0'
+    else:
+        env.setdefault('SKY_VIRTUAL_PORTAL', '1')
     if args.figure:
         env['SKY_PORTAL_FIGURE'] = str(args.figure.resolve())
         if args.figure_bottom:
             env['SKY_PORTAL_FIGURE_BOTTOM'] = str(args.figure_bottom.resolve())
+    env['SKY_RENDERER_AA'] = '1' if args.anti_aliasing else '0'
     if args.timing:
         env['SKY_TIMING_TRACE'] = '1'
     if args.profile:
@@ -534,7 +629,8 @@ def run(argv,sessions):
     keys = ('SDL_VIDEO_DRIVER', 'SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', 'SKY_SAVE_DATA_ROOT',
             'SKY_TLS_BRIDGE',
             'SKY_LEVEL_EVENT_MAILBOX','SKY_FRAME_POLICY','SKY_MANUAL_FRAME_LIMIT','SKY_AUTO_FRAME_POLICY_AVAILABLE',
-            'SKY_VIRTUAL_PORTAL', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE', 'SKY_SERVICE_COUNTS',
+            'SKY_VIRTUAL_PORTAL', 'SKY_PORTAL_DEVICE', 'SKY_PORTAL_FIGURE_WRITES', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
+            'SKY_SERVICE_COUNTS',
             'SKY_FRAME_PROFILE', 'SKY_RENDERER_FRAME_STATS', 'SKY_RENDERER_FRAME_LOG', 'SKY_GPU_USER_DIR',
             '__GL_SHADER_DISK_CACHE_PATH', 'MESA_SHADER_CACHE_DIR',
             'SKY_ALLOW_INCOMPLETE_PIPELINES', 'SKY_TRAP_PHASE_PROBE', 'SKY_TRAP_CLOCK_PROBE',
@@ -548,16 +644,19 @@ def run(argv,sessions):
                                  'base':str(installation.base),'update':str(installation.update) if installation.update else None,
                                  'executable_sha256':build['executable_sha256']},
                 'performance_profile': args.performance_profile, 'motion_blur': args.motion_blur,
+                'anti_aliasing': args.anti_aliasing,
                 'memory_mode': args.memory_mode,
                 'renderer_idle': args.renderer_idle,
                 'level_events': level_metadata,
-                'nightmare_unlock': nightmare_metadata,
+                'mods': mod_metadata,
                 'allocator_environment': {k: env[k] for k in ('MALLOC_ARENA_MAX','MALLOC_TRIM_THRESHOLD_') if k in env},
                 'resolution': resolution_metadata,
                 'graphics_assets': asset_metadata,
                 'gameplay_mods': {'enabled':selected_mods,'assets':gameplay_metadata},
                 'controller_glyphs':glyph_metadata,
                 'movie_audio': {'mode':selected_movie_audio,'assets':movie_metadata},
+                'skip_intro': intro_metadata,
+                'language': {'requested':args.language,'selected':language,'system_code':game_language.CODES[language],'note':language_note},
                 'window_size': env.get('SKY_WINDOW_SIZE', '1280x720'),
                 'sha256': {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                            for path in [host, *files]},
@@ -606,12 +705,13 @@ def run(argv,sessions):
         restart = [sys.executable,str(Path(__file__).resolve()),'--game',game_library.selector(installation.title_id,installation.app_version),'--pc-menu',args.pc_menu,'--variant',args.variant,
                    '--performance-profile',args.performance_profile,
                    '--motion-blur' if args.motion_blur else '--no-motion-blur',
+                   '--anti-aliasing' if args.anti_aliasing else '--no-anti-aliasing',
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
-                   '--movie-audio',selected_movie_audio,
-                   '--resolution',chosen['resolution'],'--quality',chosen['quality'],
+                   '--movie-audio',args.movie_audio,'--skip-intro' if args.skip_intro else '--no-skip-intro','--language',args.language,
+                   '--resolution',chosen['resolution'],'--aspect',args.aspect,'--quality',chosen['quality'],
                    '--frame-limit',str(chosen['frame_limit']),
-                   '--portal-volume',str(chosen.get('portal_volume',30)),
+                   '--portal-volume',str(chosen.get('portal_volume',50)),
                    '--controller-layout',chosen.get('controller_layout',args.controller_layout),
                    '--controller-glyphs',chosen.get('controller_glyphs',args.controller_glyphs),
                    '--fullscreen' if chosen['fullscreen'] else '--no-fullscreen',
@@ -621,10 +721,14 @@ def run(argv,sessions):
                            ('--present-limit',args.present_limit),('--save-root',selected_save)):
             if value is not None: restart += [flag,str(value)]
         restart.append('--save-backups' if args.save_backups else '--no-save-backups')
+        restart += ['--portal-device',args.portal_device]
+        restart.append('--allow-figure-writes' if args.allow_figure_writes else '--no-allow-figure-writes')
         restart.append('--nvidia' if args.nvidia else '--no-nvidia')
         restart += ['--frame-policy',chosen.get('frame_policy',args.frame_policy)]
         if args.level_events: restart.append('--level-events')
         restart.append('--unlock-nightmare' if args.unlock_nightmare else '--no-unlock-nightmare')
+        for ident in args.mod:restart += ['--mod',ident]
+        for item in args.mod_setting:restart += ['--mod-setting',item]
         for name,enabled in selected_mods.items():restart.append(('--' if enabled else '--no-')+name)
         print('Restarting with saved PC settings.',flush=True)
         # execv skips main's cleanup.
