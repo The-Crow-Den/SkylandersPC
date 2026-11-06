@@ -41,6 +41,17 @@ class InstallTests(unittest.TestCase):
             with self.assertRaises(ValueError):install.materialize(base/'bad')
             with self.assertRaises(ValueError):install.source('../escape')
 
+    def test_merge_copies_when_hard_links_fail(self):
+        # A library on another drive (EXDEV) or a filesystem without links.
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t)/'Game';base=self.make(root,'base','gd','01.00');self.make(root,'update','gp','01.01')
+            (base/'unchanged').write_bytes(b'base-only')
+            with patch('tools.game_install.os.link',side_effect=OSError(18,'cross-device link')):
+                out=discover(root).materialize(Path(t)/'merged')
+            self.assertEqual((out/'eboot.bin').read_bytes(),b'update')
+            self.assertEqual((out/'unchanged').read_bytes(),b'base-only')
+            self.assertNotEqual((out/'unchanged').stat().st_ino,(base/'unchanged').stat().st_ino)
+
     def test_wrong_content_id_and_duplicate_versions_refused(self):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t);self.make(root,'base','gd','01.00');u=self.make(root,'update','gp','01.01','other')

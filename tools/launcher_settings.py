@@ -91,6 +91,7 @@ class SettingsPage(QWidget):
             'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',
             'level_events':'Record events for troubleshooting.'}
         for name,description,entries in GROUPS:
+            entries = [e for e in entries if e[0] not in model.LINUX_ONLY or e[0] in model.platform_settings()]
             page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)
             caption=QLabel(description);caption.setStyleSheet('color: #92929e; font-size: 13px;');column.addWidget(caption)
             scroll=QScrollArea();scroll.setWidgetResizable(True);sheet=QWidget();rows=QVBoxLayout(sheet);rows.setContentsMargins(0,0,4,0);rows.setSpacing(8)
@@ -389,8 +390,12 @@ class SettingsPage(QWidget):
             elif isinstance(field,QCheckBox):values[key]=field.isChecked()
             elif isinstance(field,QSlider):values[key]=field.value()
             else:values[key]=field.text()
-        # The swapper bottom half is chosen on the Portal page, not here.
-        values.setdefault('figure_bottom',self.baseline.get('figure_bottom',''))
+        # Settings this page does not show keep their current values: the swapper
+        # bottom half (chosen on the Portal page) and options hidden on this
+        # platform (NVIDIA and MangoHud on Windows). Without them, validation
+        # refused every save as "Unknown or missing launcher settings".
+        for key,default in model.DEFAULTS.items():
+            values.setdefault(key,self.baseline.get(key,default))
         try:
             values=model.validate(values)
             if self.game is not None:

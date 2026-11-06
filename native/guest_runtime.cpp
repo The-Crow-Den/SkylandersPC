@@ -7,6 +7,9 @@
 #include "gpu_backend.hpp"
 #include "game_hooks.hpp"
 #include "frame_profile.hpp"
+#include "platform/host_memory.hpp"
+#include "platform/host_thread.hpp"
+#include "platform/host_runtime.hpp"
 #include "hle/kernel_data.hpp"
 #include "hle/kernel_sync.hpp"
 #include "hle/kernel_memory.hpp"
@@ -32,7 +35,6 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
-#include <dlfcn.h>
 
 #include <algorithm>
 #include <array>
@@ -41,21 +43,25 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
-#include <sys/mman.h>
-#include <sys/syscall.h>
-#include <ucontext.h>
-#include <unistd.h>
 
 namespace {
 struct Mapping {
-    void* value = MAP_FAILED;
+    SkyHost::ThreadMemory storage;
+    void* value;
     std::size_t size;
-    Mapping(std::size_t length, int protection) : size(length) {
-        value = mmap(nullptr, size, protection, MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
-        if (value == MAP_FAILED) throw std::runtime_error("diagnostic mmap failed");
+    Mapping(std::size_t length, bool inaccessible = false) : size(length) {
+        if (!(inaccessible ? storage.allocate_inaccessible(size) : storage.allocate(size)))
+            throw std::runtime_error("cannot allocate runtime import memory");
+        value = storage.data();
     }
-    ~Mapping() { if (value != MAP_FAILED) munmap(value, size); }
 };
+std::size_t runtime_page_size(std::size_t names, std::size_t types) {
+    if (names != types || names > 1000000)
+        throw std::runtime_error("import types count differs from pack");
+    const auto page = SkyHost::memory_page_size();
+    if (!page) throw std::runtime_error("cannot determine runtime page size");
+    return static_cast<std::size_t>(page);
+}
 std::string escaped(const std::string& text) {
     std::string result = "\"";
     for (unsigned char c : text) {
@@ -128,9 +134,9 @@ struct GuestRuntime::Impl {
     static Impl* active;
 
     Impl(const std::vector<std::string>& input, const std::vector<unsigned char>& input_types)
-        : names(input), types(input_types), page(static_cast<std::size_t>(sysconf(_SC_PAGESIZE))),
-          code(std::max<std::size_t>(page, ((names.size() * 32 + page - 1) / page) * page), PROT_READ | PROT_WRITE),
-          guards(std::max<std::size_t>(page, names.size() * page), PROT_NONE) {
+        : names(input), types(input_types), page(runtime_page_size(input.size(), input_types.size())),
+          code(std::max<std::size_t>(page, ((names.size() * 32 + page - 1) / page) * page)),
+          guards(std::max<std::size_t>(page, names.size() * page), true) {
         service_calls.resize(names.size());
         service_kinds.reserve(names.size()); stack_counts.reserve(names.size());
         for (const auto& identity : names) {
@@ -168,8 +174,6 @@ struct GuestRuntime::Impl {
                 identity == "Ga6r7H6Y0RI#libSceGnmDriver#libSceGnmDriver");
             stack_counts.push_back(std::max(SkyGpu::stack_arguments(identity),VirtualPortal::stack_arguments(identity)));
         }
-        if (names.size() != types.size() || names.size() > 1000000)
-            throw std::runtime_error("import types count differs from pack");
         auto* bytes = static_cast<unsigned char*>(code.value);
         for (std::size_t i = 0; i < names.size(); ++i) {
             weak.push_back((types[i] & 0x80) != 0);
@@ -186,25 +190,26 @@ struct GuestRuntime::Impl {
             std::memcpy(thunk + 12, &bridge, 8);
             thunk[20] = 0xff; thunk[21] = 0xe0;
         }
-        if (mprotect(code.value, code.size, PROT_READ | PROT_EXEC))
+        if (!SkyHost::protect(reinterpret_cast<std::uintptr_t>(code.value), code.size,
+                              SkyHost::ProtRead | SkyHost::ProtExec))
             throw std::runtime_error("cannot protect diagnostic import thunks");
     }
 
-    [[noreturn]] static void trap(std::uint64_t id) {
-        if (!active || id >= active->names.size()) _exit(126);
+    [[noreturn]] static SKY_SYSV_ABI void trap(std::uint64_t id) {
+        if (!active || id >= active->names.size()) std::_Exit(126);
         const auto name = escaped(active->names[static_cast<std::size_t>(id)]);
-        dprintf(STDERR_FILENO, "{\"event\":\"unsupported-import\",\"index\":%llu,\"name\":%s,\"guest_executed\":true}\n",
+        SkyHost::diagnostic_printf("{\"event\":\"unsupported-import\",\"index\":%llu,\"name\":%s,\"guest_executed\":true}\n",
                 static_cast<unsigned long long>(id), name.c_str());
-        _exit(20);
+        std::_Exit(20);
     }
 
-    static std::uint64_t call(std::uint64_t id, const std::uint64_t* registers, const std::uint64_t* stack_arguments) {
-        if (!active || id >= active->names.size()) _exit(126);
+    static SKY_SYSV_ABI std::uint64_t call(std::uint64_t id, const std::uint64_t* registers, const std::uint64_t* stack_arguments) {
+        if (!active || id >= active->names.size()) std::_Exit(126);
         const auto& identity = active->names[static_cast<std::size_t>(id)];
         std::array<std::uint64_t, 12> arguments{};
         std::copy_n(registers, 6, arguments.data());
         const auto stacked = active->stack_counts[id];
-        if (stacked > 6) _exit(126);
+        if (stacked > 6) std::_Exit(126);
         std::copy_n(stack_arguments, stacked, arguments.data() + 6);
         const auto* args = arguments.data();
         static const bool trace_waits = [] {
@@ -228,7 +233,7 @@ struct GuestRuntime::Impl {
             else if (identity == "959qrazPIrg#libkernel#libkernel") result = active->boot.process_param;
             else if (identity == "aI+OeCz8xrQ#libkernel#libkernel") result = GuestThreadContext::current()->handle();
             else if (identity == "9BcDykPmo1I#libkernel#libkernel") result = reinterpret_cast<std::uintptr_t>(GuestThreadContext::current()->error_pointer());
-            else if (identity == "EI-5-jlq2dE#libkernel#libkernel") result = static_cast<std::uint64_t>(syscall(SYS_gettid));
+            else if (identity == "EI-5-jlq2dE#libkernel#libkernel") result = SkyHost::current_thread_id();
             else if (identity == "FzEWeYnAFlI#libSceContentExport#libSceContentExport") result = 0x809d3fff;
             else if (identity == "+KDWny9Y-6k#libSceContentExport#libSceContentExport") result = 0x809d3004;
             // sceVideoRecordingGetStatus: this runtime has no recording backend.
@@ -311,21 +316,53 @@ struct GuestRuntime::Impl {
                 const bool suspend = active->suspend_unsupported_network_workers &&
                     std::this_thread::get_id() != active->main_native_thread &&
                     (identity.find("#libSceNet#") != std::string::npos || identity.find("#libSceNetCtl#") != std::string::npos);
-                dprintf(STDERR_FILENO, "{\"event\":\"unsupported-import\",\"index\":%llu,\"name\":%s,\"arguments\":[%llu,%llu,%llu,%llu,%llu,%llu],\"guest_executed\":true}\n",
+                SkyHost::diagnostic_printf("{\"event\":\"unsupported-import\",\"index\":%llu,\"name\":%s,\"arguments\":[%llu,%llu,%llu,%llu,%llu,%llu],\"guest_executed\":true}\n",
                     static_cast<unsigned long long>(id), escaped(identity).c_str(),
                     static_cast<unsigned long long>(args[0]), static_cast<unsigned long long>(args[1]),
                     static_cast<unsigned long long>(args[2]), static_cast<unsigned long long>(args[3]),
                     static_cast<unsigned long long>(args[4]), static_cast<unsigned long long>(args[5]));
                 if (suspend) {
-                    dprintf(STDERR_FILENO, "{\"event\":\"diagnostic-network-worker-suspended\",\"index\":%llu,\"call_returned\":false}\n",
+                    SkyHost::diagnostic_printf("{\"event\":\"diagnostic-network-worker-suspended\",\"index\":%llu,\"call_returned\":false}\n",
                         static_cast<unsigned long long>(id));
-                    for (;;) pause();
+                    SkyHost::suspend_diagnostic_worker();
                 }
-                _exit(20);
+                std::_Exit(20);
             }
             if (profile_started) {
                 FrameProfile::record(active->profile_buckets[id], FrameProfile::now_ns() - profile_started);
                 if (active->ends_frame[id]) FrameProfile::frame();
+            }
+            // Opt-in diagnostic (SKY_SERVICE_COUNTS=1): every 10 s, log the
+            // most-called services in that interval, to find a spinning wait.
+            static const bool count_services = [] {
+                const auto* value = std::getenv("SKY_SERVICE_COUNTS");
+                return value && std::strcmp(value, "1") == 0;
+            }();
+            if (count_services) {
+                static std::vector<std::atomic<std::uint64_t>> totals(active->names.size());
+                static std::once_flag reporter;
+                totals[static_cast<std::size_t>(id)].fetch_add(1, std::memory_order_relaxed);
+                std::call_once(reporter, [] {
+                    std::thread([] {
+                        std::vector<std::uint64_t> last(totals.size());
+                        for (;;) {
+                            std::this_thread::sleep_for(std::chrono::seconds(10));
+                            std::vector<std::pair<std::uint64_t, std::size_t>> deltas;
+                            for (std::size_t i = 0; i < totals.size(); ++i) {
+                                const auto now = totals[i].load(std::memory_order_relaxed);
+                                if (now != last[i]) deltas.emplace_back(now - last[i], i);
+                                last[i] = now;
+                            }
+                            std::sort(deltas.rbegin(), deltas.rend());
+                            std::string line = "{\"event\":\"service-counts\",\"top\":[";
+                            for (std::size_t k = 0; k < std::min<std::size_t>(deltas.size(), 10); ++k)
+                                line += (k ? "," : "") + std::string("{\"name\":") + escaped(active->names[deltas[k].second]) +
+                                        ",\"calls\":" + std::to_string(deltas[k].first) + "}";
+                            line += "]}\n";
+                            SkyHost::diagnostic_printf("%s", line.c_str());
+                        }
+                    }).detach();
+                });
             }
             // The import table is fixed before guest threads start. Once the
             // four startup samples are logged, normal calls need neither a
@@ -348,42 +385,39 @@ struct GuestRuntime::Impl {
                 // the preceding word is the guest call's return address.
                 const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now() - wait_started).count();
-                dprintf(STDERR_FILENO,
+                SkyHost::diagnostic_printf(
                     "{\"event\":\"guest-wait\",\"name\":%s,\"caller_return\":%llu,\"argument0\":%llu,\"elapsed_us\":%lld,\"calls\":%llu}\n",
                     name.c_str(), static_cast<unsigned long long>(stack_arguments[-1]),
                     static_cast<unsigned long long>(args[0]), static_cast<long long>(elapsed),
                     static_cast<unsigned long long>(calls));
             }
             if (calls <= 4)
-                dprintf(STDERR_FILENO, "{\"event\":\"service-return\",\"name\":%s,\"result\":%llu}\n",
+                SkyHost::diagnostic_printf("{\"event\":\"service-return\",\"name\":%s,\"result\":%llu}\n",
                         name.c_str(), static_cast<unsigned long long>(result));
             return result;
         } catch (const std::exception& error) {
-            dprintf(STDERR_FILENO, "{\"event\":\"service-error\",\"message\":%s}\n", escaped(error.what()).c_str());
-            _exit(72);
+            SkyHost::diagnostic_printf("{\"event\":\"service-error\",\"message\":%s}\n", escaped(error.what()).c_str());
+            std::_Exit(72);
         }
     }
 
-    static int fault(int signal, void* raw_info, void* raw_context) {
-        if (SkyGpu::handle_fault(signal, raw_info, raw_context)) return 1;
-        const auto* info = static_cast<siginfo_t*>(raw_info);
-        const auto* context = static_cast<ucontext_t*>(raw_context);
-        const auto pc = static_cast<unsigned long long>(context->uc_mcontext.gregs[REG_RIP]);
-        const auto address = reinterpret_cast<std::uintptr_t>(info->si_addr);
-        dprintf(STDERR_FILENO, "{\"event\":\"guest-fault\",\"signal\":%d,\"pc\":%llu,\"address\":%llu,\"guest_executed\":true}\n",
-                signal, pc, static_cast<unsigned long long>(address));
-        Dl_info owner{};
-        if (dladdr(reinterpret_cast<void*>(pc), &owner) && owner.dli_fname) {
-            dprintf(STDERR_FILENO, "{\"event\":\"fault-host-owner\",\"file\":%s,\"offset\":%llu}\n",
-                escaped(owner.dli_fname).c_str(), pc - reinterpret_cast<std::uintptr_t>(owner.dli_fbase));
+    [[noreturn]] static void fault(const SkyHost::Fault& fault) noexcept {
+        const auto pc = static_cast<unsigned long long>(fault.cpu.pc);
+        const auto address = fault.address;
+        SkyHost::diagnostic_printf("{\"event\":\"guest-fault\",\"signal\":%u,\"pc\":%llu,\"address\":%llu,\"guest_executed\":true}\n",
+                fault.native_code, pc, static_cast<unsigned long long>(address));
+        SkyHost::ModuleOwner owner;
+        if (SkyHost::module_owner(pc,owner)) {
+            SkyHost::diagnostic_printf("{\"event\":\"fault-host-owner\",\"file\":%s,\"offset\":%llu}\n",
+                escaped(owner.file).c_str(), pc - owner.base);
         }
         auto* thread = GuestThreadContext::current();
-        dprintf(STDERR_FILENO, "{\"event\":\"fault-registers\",\"rsp\":%llu,\"rax\":%llu,\"rdi\":%llu,\"rsi\":%llu,\"error\":%llu,\"stack_guard\":%s}\n",
-            static_cast<unsigned long long>(context->uc_mcontext.gregs[REG_RSP]),
-            static_cast<unsigned long long>(context->uc_mcontext.gregs[REG_RAX]),
-            static_cast<unsigned long long>(context->uc_mcontext.gregs[REG_RDI]),
-            static_cast<unsigned long long>(context->uc_mcontext.gregs[REG_RSI]),
-            static_cast<unsigned long long>(context->uc_mcontext.gregs[REG_ERR]),
+        SkyHost::diagnostic_printf("{\"event\":\"fault-registers\",\"rsp\":%llu,\"rax\":%llu,\"rdi\":%llu,\"rsi\":%llu,\"error\":%llu,\"stack_guard\":%s}\n",
+            static_cast<unsigned long long>(fault.cpu.reg(SkyHost::Gpr::rsp)),
+            static_cast<unsigned long long>(fault.cpu.reg(SkyHost::Gpr::rax)),
+            static_cast<unsigned long long>(fault.cpu.reg(SkyHost::Gpr::rdi)),
+            static_cast<unsigned long long>(fault.cpu.reg(SkyHost::Gpr::rsi)),
+            static_cast<unsigned long long>(fault.native_error),
             thread && thread->is_stack_guard(address) ? "true" : "false");
         if (active) {
             const auto start = reinterpret_cast<std::uintptr_t>(active->guards.value);
@@ -391,11 +425,11 @@ struct GuestRuntime::Impl {
                 const auto id = (address - start) / active->page;
                 if (id < active->names.size()) {
                     const auto name = escaped(active->names[id]);
-                    dprintf(STDERR_FILENO, "{\"event\":\"unresolved-data-import\",\"index\":%zu,\"name\":%s}\n", id, name.c_str());
+                    SkyHost::diagnostic_printf("{\"event\":\"unresolved-data-import\",\"index\":%zu,\"name\":%s}\n", id, name.c_str());
                 }
             }
         }
-        _exit(70);
+        std::_Exit(70);
     }
 };
 
@@ -432,13 +466,7 @@ std::uint64_t GuestRuntime::address(std::uint64_t index) const {
     impl_->app_content.configure(game_root);
     if(impl_->app_content.title_id().starts_with("CUSA")) {
         const auto* save_root=std::getenv("SKY_SAVE_DATA_ROOT");
-        std::filesystem::path default_save;
-        const auto* data_home=std::getenv("XDG_DATA_HOME");
-        const auto* user_home=std::getenv("HOME");
-        if(data_home && std::filesystem::path(data_home).is_absolute())default_save=data_home;
-        else if(user_home && std::filesystem::path(user_home).is_absolute())default_save=std::filesystem::path(user_home)/".local/share";
-        else throw std::runtime_error("HOME or an absolute XDG_DATA_HOME is required for saves");
-        default_save/="skylanders-pc/saves";
+        const auto default_save = SkyHost::default_save_root();
         impl_->save_data.configure(save_root && *save_root?std::filesystem::path(save_root):default_save,impl_->app_content.title_id());
     }
     impl_->local_playgo.configure(game_root);
@@ -457,33 +485,26 @@ std::uint64_t GuestRuntime::address(std::uint64_t index) const {
     Impl::active = impl_.get();
     FrameProfile::configure();
     FrameProfile::thread_started(true);
-    if (sky_guest_configure_trap(&Impl::trap) || sky_guest_configure_fault(&Impl::fault) ||
-        sky_guest_configure_call(&Impl::call))
+    if (sky_guest_configure_trap(&Impl::trap) || sky_guest_configure_call(&Impl::call) ||
+        !SkyHost::install_runtime_faults(&Impl::fault,&SkyGpu::handle_fault,&SkyGpu::handle_fault))
         throw std::runtime_error("guest diagnostics already active");
-    struct sigaction action{};
-    action.sa_sigaction = &sky_guest_fault_bridge;
-    action.sa_flags = SA_SIGINFO | SA_ONSTACK;
-    sigemptyset(&action.sa_mask);
-    for (int sig : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP}) {
-        if (sigaction(sig, &action, nullptr)) throw std::runtime_error("sigaction failed");
-    }
     struct { std::uint64_t argc; const char* argv[2]; } startup{1, {"/app0/eboot.bin", nullptr}};
-    dprintf(STDERR_FILENO, "{\"event\":\"entry-attempt\",\"entry\":%llu,\"mode\":\"single-thread-diagnostic\"}\n",
+    SkyHost::diagnostic_printf("{\"event\":\"entry-attempt\",\"entry\":%llu,\"mode\":\"single-thread-diagnostic\"}\n",
             static_cast<unsigned long long>(entry));
     std::uint64_t returned = 0;
     for (const auto& module : boot.modules) {
         if (module.id == 1 || !module.init) continue;
-        dprintf(STDERR_FILENO, "{\"event\":\"module-init-attempt\",\"module\":%llu,\"entry\":%llu}\n",
+        SkyHost::diagnostic_printf("{\"event\":\"module-init-attempt\",\"module\":%llu,\"entry\":%llu}\n",
                 static_cast<unsigned long long>(module.id), static_cast<unsigned long long>(module.init));
         returned = thread.run(module.init, nullptr);
         const int status = 0;
-        dprintf(STDERR_FILENO, "{\"event\":\"module-init-returned\",\"module\":%llu,\"status\":%d,\"result\":%llu}\n",
+        SkyHost::diagnostic_printf("{\"event\":\"module-init-returned\",\"module\":%llu,\"status\":%d,\"result\":%llu}\n",
                 static_cast<unsigned long long>(module.id), status, static_cast<unsigned long long>(returned));
-        if (status || static_cast<std::uint32_t>(returned)) _exit(73);
+        if (status || static_cast<std::uint32_t>(returned)) std::_Exit(73);
     }
     returned = thread.run(entry, &startup);
     const int status = 0;
-    dprintf(STDERR_FILENO, "{\"event\":\"entry-returned\",\"bridge_status\":%d,\"return_value\":%llu}\n",
+    SkyHost::diagnostic_printf("{\"event\":\"entry-returned\",\"bridge_status\":%d,\"return_value\":%llu}\n",
             status, static_cast<unsigned long long>(returned));
-    _exit(status == 0 ? 0 : 71);
+    std::_Exit(status == 0 ? 0 : 71);
 }

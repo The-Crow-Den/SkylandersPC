@@ -5,13 +5,14 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <thread>
-#include <unistd.h>
 
 namespace {
 using U = std::uint64_t;
@@ -193,7 +194,7 @@ U KernelThread::call(std::string_view identity, const U* a) {
                     // stack and TLS now instead of at process teardown.
                     if (record->detached) impl_->release(record);
                 } catch (const std::exception& e) {
-                    dprintf(STDERR_FILENO, "guest thread failed: %s\n", e.what()); _exit(74);
+                    std::fprintf(stderr, "guest thread failed: %s\n", e.what()); std::_Exit(74);
                 }
             });
         } catch (const std::system_error&) { impl_->threads.erase(id); return 0x80020023; }

@@ -3,6 +3,8 @@
 #include <vector>
 #include <algorithm>
 #include "../portal_library.hpp"
+#include "../platform/host_files.hpp"
+#include "../platform/host_compat.hpp"
 #include "runtime/cemu_portal.hpp"
 #include <libusb.h>
 #include <array>
@@ -14,10 +16,19 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
-int main() {
+int main(int argc,char** argv) {
     try {
+        std::filesystem::path directory_link;
+        if(argc!=1) {
+            if(argc!=3 || std::string_view(argv[1])!="--directory-link")return 2;
+            const std::string_view hex=argv[2];if(hex.size()%2)return 2;
+            std::u8string decoded;
+            auto digit=[](char c)->int{return c>='0'&&c<='9'?c-'0':c>='a'&&c<='f'?c-'a'+10:-1;};
+            for(std::size_t i=0;i<hex.size();i+=2){const auto a=digit(hex[i]),b=digit(hex[i+1]);if(a<0||b<0)return 2;decoded.push_back(static_cast<char8_t>(16*a+b));}
+            directory_link=std::filesystem::path(decoded);if(!directory_link.is_absolute())return 2;
+        }
         using U=std::uint64_t;
-        setenv("SKY_VIRTUAL_PORTAL","1",1);
+        if(SkyHost::set_environment("SKY_VIRTUAL_PORTAL","1")!=0)throw std::runtime_error("cannot enable test portal");
         const auto check=[](bool ok){if(!ok)throw std::runtime_error("virtual portal contract failed");};
         const auto ptr=[](auto* p){return reinterpret_cast<U>(p);};
         const auto call=[](const char* nid,std::array<U,12> args={}){
@@ -57,9 +68,13 @@ int main() {
         check(extra && extra->num_iso_packets==0);
         check(call("-sgi7EeLSO8",{ptr(extra)})==0);
         const auto old=std::filesystem::current_path();
-        const auto temp=std::filesystem::temp_directory_path()/("sky-trap-test-"+std::to_string(ptr(&descriptor)));
-        std::filesystem::create_directories(temp);std::filesystem::current_path(temp);
-        struct Cleanup{std::filesystem::path old,temp;~Cleanup(){VirtualPortal::remove();std::filesystem::current_path(old);std::filesystem::remove_all(temp);}} cleanup{old,temp};
+        std::filesystem::path temp;
+        check(SkyHost::create_private_temp_directory(std::filesystem::temp_directory_path(),".sky-trap-\xce\xbb-",temp));
+        std::filesystem::current_path(temp);
+        // Unlink the redirect first: libc++'s remove_all on Windows can descend
+        // through a directory junction and delete the outside fixture.
+        struct Cleanup{std::filesystem::path old,temp;~Cleanup(){VirtualPortal::remove();std::error_code ignored;
+            std::filesystem::remove(temp/"redirected.sky",ignored);std::filesystem::current_path(old);std::filesystem::remove_all(temp);}} cleanup{old,temp};
         std::array<unsigned char,1024> character{},trap{};character[0]=1;trap[0]=2;trap[0x10]=211;
         {std::ofstream f("character.sky",std::ios::binary);f.write(reinterpret_cast<const char*>(character.data()),character.size());}
         {std::ofstream f("trap.sky",std::ios::binary);f.write(reinterpret_cast<const char*>(trap.data()),trap.size());}
@@ -125,7 +140,7 @@ int main() {
         check(made[0x10]==14 && made[0x11]==0 && made[0x1c]==0 && made[0x1d]==0);
         check(made[4]==(made[0]^made[1]^made[2]^made[3]));
         // A collection tag chosen as the starting figure is used in place, not copied.
-        check(PortalLibrary::import_character(generated.c_str(),false));
+        check(PortalLibrary::import_character(SkyHost::path_to_utf8(generated).c_str(),false));
         check(sky_portal_count(0)==before_count+1);
         unsigned crc=0xffff;
         for(unsigned i=0;i<0x1e;++i) {
@@ -133,10 +148,13 @@ int main() {
             for(unsigned bit=0;bit<8;++bit)crc=((crc<<1)^((crc&0x8000)?0x1021:0))&0xffff;
         }
         check(crc==(made[0x1e]|(unsigned(made[0x1f])<<8)));
-        check(!VirtualPortal::create_blank(generated.c_str(),14,0));
+        check(!VirtualPortal::create_blank(SkyHost::path_to_utf8(generated).c_str(),14,0));
         const auto redirected=std::filesystem::path("redirected.sky");
-        std::filesystem::create_symlink(generated,redirected);
-        check(!VirtualPortal::create_blank(redirected.c_str(),14,0));
+        if(directory_link.empty())std::filesystem::create_symlink(generated,redirected);
+        else std::filesystem::rename(directory_link,redirected);
+        check(!VirtualPortal::create_blank(SkyHost::path_to_utf8(redirected).c_str(),14,0));
+        // The refused write must not have touched the junction's outside target.
+        if(!directory_link.empty())check(std::filesystem::exists(redirected/"marker"));
         std::array<unsigned char,1024> unchanged{};
         {std::ifstream f(generated,std::ios::binary);check(bool(f.read(reinterpret_cast<char*>(unchanged.data()),unchanged.size())));}
         check(made==unchanged);
@@ -199,7 +217,7 @@ int main() {
         check(PortalLibrary::select(0,top_index) && PortalLibrary::create_character(vehicle));
         check(sky_portal_count(9)==1 && (sky_portal_state(9,0)&2) && std::string(sky_portal_detail(9,0))=="Vehicle");
         check(sky_portal_count(0)==other_index+1 && present_ids()==std::vector<unsigned>({211,2010,3224}));
-        check(!VirtualPortal::replace_vehicle(generated.c_str()));
+        check(!VirtualPortal::replace_vehicle(SkyHost::path_to_utf8(generated).c_str()));
         PortalLibrary::remove(9);check(!(sky_portal_state(9,0)&2) && present_ids()==std::vector<unsigned>({211,2010}));
         PortalLibrary::remove(0);check(present_ids()==std::vector<unsigned>({211}));
         // Element buttons reuse an empty tag, never clobber a previous capture.

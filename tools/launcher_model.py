@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """GUI-independent launch configuration; the session runner remains authoritative."""
 import json
+import os
 from pathlib import Path
 
 try:
@@ -102,8 +103,17 @@ def save(path, value):
     temporary.replace(path)
 
 
+# The NVIDIA driver manifest path and MangoHud are Linux-only.
+LINUX_ONLY = ('nvidia', 'mangohud')
+
+
+def platform_settings():
+    return [] if os.name == 'nt' else list(LINUX_ONLY)
+
+
 def command(root, python, value, mods=None, game=None, mod_settings=None):
     value = validate(value)
+    value = {**value, **{key: False for key in LINUX_ONLY if key not in platform_settings()}}
     # The exact-build mod gates 60 on engine loading, cutscene and UI state.
     argv = [str(python), str(Path(root) / 'tools/run_session.py'),
             '--variant', '60-delta', '--performance-profile', 'standard',
@@ -145,9 +155,9 @@ def missing_files(root, game=None):
         pack = game_build.configuration(root,installation,'60-delta')['pack']
         executable = installation.source('eboot.bin')
     except (OSError,ValueError) as error:
-        return [str(error), '.local/native-gpu-build/skylanders-native-host',
+        return [str(error), str(game_prepare.runtime_paths(root)[0].relative_to(root)),
                 'prepared game image.pack', 'prepared imports.types', 'prepared boot.plan']
-    paths = [root / '.local/native-gpu-build/skylanders-native-host',
+    paths = [game_prepare.runtime_paths(root)[0],
              executable,
              *(pack / name for name in ('image.pack', 'imports.types', 'boot.plan'))]
     return [str(path.relative_to(root)) for path in paths if not path.is_file()]

@@ -41,7 +41,7 @@ class TrophyDialog(QDialog):
             npwr=trophies.game_sources(self.owner.root,self.game)[3]
             if not npwr:raise ValueError('This game has no trophy set.')
             title_id=game_library.resolve(self.owner.root,game=self.game).title_id
-            store=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'skylanders-pc/trophies'/title_id
+            store=trophies.host_process.data_home()/'skylanders-pc/trophies'/title_id
             title,rows=psn_trophies.fetch(npwr,psn_trophies.access_token(npsso))
             psn_trophies.write_catalogue(store,npwr,title,rows)
         except (OSError,ValueError,KeyError) as error:

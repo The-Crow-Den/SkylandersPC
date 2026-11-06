@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run a prepared local build with persistent logs and explicit exit reporting."""
 import argparse
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import datetime
-import fcntl
 import hashlib
 import json
 import lzma
@@ -20,6 +19,7 @@ import sys
 import shutil
 try:
     from .overlay_session import html_overlay
+    from . import host_process
     from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
@@ -28,6 +28,7 @@ try:
     from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 except ImportError:
     from overlay_session import html_overlay
+    import host_process
     from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
@@ -45,7 +46,9 @@ SESSION_TEMP = ROOT / 'out/session-temp'
 # Host steps that build a mod's edits at launch (mod.json `generated` operations).
 MOD_HANDLERS = {'level-events', 'controller-glyphs'}
 LAST_SESSION = ROOT / 'out/last-session'
-KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log')
+KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log',
+             # --profile output; without these the profile was deleted with the session.
+             'frames.csv', 'frame-profile.csv')
 
 
 def latest_log(last=None):
@@ -88,11 +91,9 @@ def finish_session(session, protected=(), last=None):
 @contextmanager
 def exclusive_session(path):
     """Do not let two launched games write the same save/portal library."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open('a') as guard:
+    with ExitStack() as stack:
         try:
-            fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            stack.enter_context(host_process.exclusive_lock(path))
         except BlockingIOError:
             raise ValueError('Another Trap Team session is running. Close it before starting a new one.') from None
         # The file stays in place: deleting it could create two independent locks.
@@ -203,7 +204,7 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
     reason = 'process-exit'
     with (directory / 'runtime.log').open('xb') as output, html_overlay(directory,cwd,env) as runtime_environment:
         process = subprocess.Popen(command, cwd=cwd, env=runtime_environment, stdout=output,
-                                   stderr=subprocess.STDOUT, start_new_session=True)
+                                   stderr=subprocess.STDOUT, **host_process.group_options())
         try:
             print('SKYLANDERS_RUNTIME_LAUNCHED', flush=True)
             threading.Thread(target=announce_window, args=(directory / 'runtime.log', process), daemon=True).start()
@@ -211,14 +212,12 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
             code = process.wait(timeout=seconds if seconds else None)
         except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
             reason = 'requested-time-limit' if isinstance(error, subprocess.TimeoutExpired) else 'user-interrupt'
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass  # The child may finish between wait timing out and signaling.
+            # The child may finish between wait timing out and signaling.
+            host_process.stop_group(process.pid)
             try:
                 code = process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
+                host_process.stop_group(process.pid, force=True)
                 code = process.wait()
         result = {'returncode': code, 'stop_reason': reason,
                   'elapsed_seconds': round(time.monotonic() - started, 3),
@@ -417,7 +416,7 @@ def run(argv,sessions):
     except (OSError,ValueError) as error:
         parser.error(str(error))
     pack = build['pack']
-    host = ROOT / '.local/native-gpu-build/skylanders-native-host'
+    host = game_prepare.runtime_paths(ROOT)[0]
     files = [pack / name for name in ('image.pack', 'imports.types', 'boot.plan')]
     if not host.is_file() or not all(path.is_file() for path in files):
         parser.error('Game setup needs pack.'+args.variant+' or runtime. Choose Repair in the launcher to finish setup.')
@@ -588,7 +587,8 @@ def run(argv,sessions):
             env['MANGOHUD_CONFIG'] = 'read_cfg,' + env['MANGOHUD_CONFIG']
         except ValueError as error:
             parser.error(str(error))
-    env.setdefault('SDL_VIDEO_DRIVER', 'x11')
+    if os.name != 'nt':
+        env.setdefault('SDL_VIDEO_DRIVER', 'x11')  # Windows: SDL's only driver is windows.
     env.setdefault('SKY_SUSPEND_UNSUPPORTED_NET_WORKERS', '0')
     if real_portal:
         env['SKY_VIRTUAL_PORTAL'] = '0'
@@ -630,6 +630,7 @@ def run(argv,sessions):
             'SKY_TLS_BRIDGE',
             'SKY_LEVEL_EVENT_MAILBOX','SKY_FRAME_POLICY','SKY_MANUAL_FRAME_LIMIT','SKY_AUTO_FRAME_POLICY_AVAILABLE',
             'SKY_VIRTUAL_PORTAL', 'SKY_PORTAL_DEVICE', 'SKY_PORTAL_FIGURE_WRITES', 'SKY_TIMING_TRACE', 'SKY_WAIT_TRACE',
+            'SKY_SERVICE_COUNTS',
             'SKY_FRAME_PROFILE', 'SKY_RENDERER_FRAME_STATS', 'SKY_RENDERER_FRAME_LOG', 'SKY_GPU_USER_DIR',
             '__GL_SHADER_DISK_CACHE_PATH', 'MESA_SHADER_CACHE_DIR',
             'SKY_ALLOW_INCOMPLETE_PIPELINES', 'SKY_TRAP_PHASE_PROBE', 'SKY_TRAP_CLOCK_PROBE',
@@ -732,6 +733,10 @@ def run(argv,sessions):
         print('Restarting with saved PC settings.',flush=True)
         # execv skips main's cleanup.
         while sessions:finish_session(*sessions.pop())
+        if os.name == 'nt':
+            # Windows execv spawns a new process and exits this one, so the
+            # launcher would lose the game it is tracking; run it as a child.
+            return subprocess.run(restart).returncode
         os.execv(sys.executable,restart)
     return 0 if result['stop_reason'] != 'process-exit' else (result['returncode'] if result['returncode'] >= 0 else 128 - result['returncode'])
 

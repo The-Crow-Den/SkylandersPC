@@ -34,7 +34,7 @@ class Install:
         return self.base / relative
 
     def materialize(self, output):
-        """Hard-link immutable assets; update files win, including SFO/eboot."""
+        """Hard-link (or copy) immutable assets; update files win, including SFO/eboot."""
         output = Path(output)
         if any(root and output.resolve().is_relative_to(root.resolve())
                for root in (self.base,self.update)):
@@ -59,7 +59,11 @@ class Install:
                             if not target.is_file():
                                 raise ValueError('Game update file/directory conflict')
                             target.unlink()
-                        os.link(source, target)
+                        try:
+                            os.link(source, target)
+                        except OSError:
+                            # Library on another drive, or no hard links: copy.
+                            shutil.copy2(source, target)
                     else:
                         raise ValueError('Game installation requires regular files')
         except BaseException:

@@ -16,11 +16,13 @@ except ImportError:
 
 try:
     from . import launcher_model as model, portal_devices
+    from . import host_process
     from .launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
     from .pc_settings import load_settings, save_settings
     from .resolution import PRESETS
 except ImportError:
     import launcher_model as model, portal_devices
+    import host_process
     from launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
     from pc_settings import load_settings, save_settings
     from resolution import PRESETS
@@ -103,6 +105,8 @@ class Launcher(QMainWindow):
         self.check(display,'Anti-aliasing','anti_aliasing')
         self.check(display,'Use NVIDIA GPU','nvidia')
         self.check(display,'MangoHud overlay · optional installation','mangohud')
+        for key in model.LINUX_ONLY:
+            self.fields[key].setVisible(key in model.platform_settings())
         display.addRow(text_label('Automatic follows gameplay, loading, cutscenes and portal arrival. Shift+F1 takes manual control for this session.','muted'))
 
         portal=self.page('Portal & controls','Bring your collection to life.','Choose a starting Skylander. Manage figures and individual villain traps in the game’s right-hand portal drawer.')
@@ -331,11 +335,8 @@ class Launcher(QMainWindow):
         if pid<=0:
             self.process.started.connect(self.interrupt_runner)
             return
-        try:
-            # The runner owns cleanup of its separately grouped game process.
-            os.kill(pid,signal.SIGINT)
-        except ProcessLookupError:
-            pass
+        # The runner owns cleanup of its separately grouped game process.
+        host_process.interrupt(pid)
 
     def closeEvent(self, event):
         if self.process is not None:
@@ -357,6 +358,14 @@ except ImportError:
 Launcher = renovated(Launcher)
 
 def main():
+    if os.name == 'nt':
+        # Windows groups a pythonw window under Python's icon unless the
+        # process names its own app id; then the taskbar shows the window icon.
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('Skylanders.PC.Launcher')
+        except (AttributeError, OSError):
+            pass
     app = QApplication(sys.argv)
     app.setApplicationName('Skylanders PC')
     # Its own identity, so desktops show the launcher icon rather than the game's.

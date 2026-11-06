@@ -554,8 +554,18 @@ void FpsCounter() {
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
                      ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoSavedSettings);
-    ImGui::Text(SkySettings::MenuText("%.0f FPS  %.1f ms", "%.0f FPS  %.1f мс"),
-                frame_ms_avg > 0.0f ? 1000.0f / frame_ms_avg : 0.0f, frame_ms_avg);
+    // The average updates every present; on high-refresh displays the digits
+    // then change faster than they can be read and blur together. Show a value
+    // that refreshes 4 times a second, padded so the box does not resize.
+    static float shown_ms = 0.0f;
+    static std::chrono::steady_clock::time_point shown_at{};
+    const auto now = std::chrono::steady_clock::now();
+    if (shown_ms == 0.0f || now - shown_at >= std::chrono::milliseconds(250)) {
+        shown_ms = frame_ms_avg;
+        shown_at = now;
+    }
+    ImGui::Text(SkySettings::MenuText("%3.0f FPS  %5.1f ms", "%3.0f FPS  %5.1f мс"),
+                shown_ms > 0.0f ? 1000.0f / shown_ms : 0.0f, shown_ms);
     ImGui::End();
 }
 

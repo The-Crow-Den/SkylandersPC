@@ -19,6 +19,36 @@ except ImportError:
 ROOT=Path(__file__).resolve().parents[1]
 
 
+def process_running(pid):
+    """True while pid runs. Never signals it.
+
+    os.kill(pid, 0) is a liveness probe only on POSIX: on Windows it calls
+    TerminateProcess(pid, 0). That failed for the game host, the OSError read
+    as "the game exited", and the menu helper quit about a second after the
+    menu first appeared, leaving the game on its built-in fallback menu.
+    """
+    if os.name!='nt':
+        try:os.kill(pid,0)  # unchanged POSIX behaviour
+        except OSError:return False
+        return True
+    import ctypes
+    from ctypes import wintypes
+    kernel32=ctypes.WinDLL('kernel32',use_last_error=True)
+    kernel32.OpenProcess.restype=wintypes.HANDLE
+    kernel32.OpenProcess.argtypes=(wintypes.DWORD,wintypes.BOOL,wintypes.DWORD)
+    kernel32.GetExitCodeProcess.argtypes=(wintypes.HANDLE,ctypes.POINTER(wintypes.DWORD))
+    kernel32.CloseHandle.argtypes=(wintypes.HANDLE,)
+    handle=kernel32.OpenProcess(0x1000,False,pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return ctypes.get_last_error()==5  # ERROR_ACCESS_DENIED: it exists
+    try:
+        code=wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle,ctypes.byref(code)):return True
+        return code.value==259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def menu_zoom(width,height):
     """Page zoom for a menu filling width x height logical pixels.
 
@@ -220,8 +250,9 @@ def main(argv=None):
     capture_timer=QTimer();capture_timer.timeout.connect(capture);capture_timer.start(33)
     def alive():
         if args.demo or not last_pid:return
-        try:os.kill(int(last_pid),0)
-        except (OSError,ValueError):app.quit()
+        try:
+            if not process_running(int(last_pid)):app.quit()
+        except ValueError:app.quit()
     alive_timer=QTimer();alive_timer.timeout.connect(alive);alive_timer.start(1000)
     page.load(QUrl.fromLocalFile(str(ROOT/'tools/pc_menu/index.html')))
     if args.screenshot:

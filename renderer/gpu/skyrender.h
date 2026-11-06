@@ -23,6 +23,17 @@ int skyrender_init(const SkyRenderConfig *config);
 uintptr_t skyrender_resolve(const char *scoped_nid);
 /* Called first by the loader's SIGSEGV handler: 1 when a GPU page-tracking fault was handled. */
 int skyrender_handle_fault(void *ucontext, void *address);
+/* Register-only access-fault interface for hosts with native CONTEXT or ucontext
+ * layouts. GPR order is x86 encoding order: RAX,RCX,RDX,RBX,RSP,RBP,RSI,RDI,
+ * R8..R15. Access: 0 unknown, 1 read, 2 write, 3 execute. Only a handled fault
+ * commits registers; no FP/vector state is provided or modified. */
+typedef struct {
+    uint64_t gpr[16];
+    uint64_t pc, flags;
+    uint64_t address;
+    uint32_t access;
+} SkyRenderAccessFault;
+int skyrender_handle_access_fault(SkyRenderAccessFault *fault);
 /* SKY_RENDERER_WRITE_LOG=1: prints the logged GPU-side writes to guest memory near the fault. */
 void skyrender_dump_guest_writes(void *ucontext);
 /* Keyboard text entry through the game window (IME dialog). begin returns 0 when

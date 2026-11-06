@@ -5,6 +5,10 @@ import os
 import re
 import struct
 import xml.etree.ElementTree as ET
+try:
+    from . import host_process
+except ImportError:
+    import host_process
 
 
 def read_xml(path):
@@ -68,7 +72,7 @@ def game_sources(root,game):
             break
     definitions=game.get('trophy_definitions','');progress=game.get('trophy_progress','')
     if npwr:
-        homes=[root/'.local/share/shadPS4',Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'shadPS4']
+        homes=[root/'.local/share/shadPS4',host_process.data_home()/'shadPS4']
         for home in homes:
             if not definitions:
                 for relative in (f'trophy/{npwr}/Xml/TROP.XML',f'trophy/{npwr}/Xml/TROP_01.XML'):
@@ -76,7 +80,7 @@ def game_sources(root,game):
             candidate=home/'home'/str(game.get('trophy_user','1000'))/'trophy'/(npwr+'.xml')
             if not progress and candidate.is_file():progress=str(candidate)
     if npwr and installation:
-        native=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/('skylanders-pc/trophies/'+installation.title_id)
+        native=host_process.data_home()/('skylanders-pc/trophies/'+installation.title_id)
         record=native/'users'/str(game.get('native_trophy_user','4096'))/(npwr+'.xml')
         if not game.get('trophy_progress') and record.is_file():progress=str(record)
         if not definitions:

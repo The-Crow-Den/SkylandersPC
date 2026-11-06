@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../frame_profile.hpp"
+#include <chrono>
+#include "../platform/host_compat.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -24,7 +26,7 @@ int main() {
         check(!FrameProfile::enabled(), "profile enabled without configuration");
         FrameProfile::frame(); // Disabled: must be a no-op.
         const auto path = std::filesystem::temp_directory_path() / ("sky-frame-profile-" + std::to_string(getpid()) + ".csv");
-        setenv("SKY_FRAME_PROFILE", path.c_str(), 1);
+        SkyHost::set_environment("SKY_FRAME_PROFILE", path.string().c_str());
         FrameProfile::configure();
         check(FrameProfile::enabled(), "profile not enabled");
         FrameProfile::thread_started(true);
@@ -32,7 +34,9 @@ int main() {
         std::thread worker([] {
             FrameProfile::thread_started(false);
             FrameProfile::record(FrameProfile::Bucket::Sync, 3000000);
-            volatile unsigned long spin = 0; for (unsigned long i = 0; i < 20000000; ++i) spin = spin + i;
+            // Busy for 50 ms of wall time: Windows counts thread CPU time in ~15.6 ms ticks.
+            const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
+            volatile unsigned long spin = 0; while (std::chrono::steady_clock::now() < until) spin = spin + 1;
             FrameProfile::thread_finished();
         });
         worker.join();
@@ -54,7 +58,8 @@ int main() {
         check(column(row, "service_calls") == 2, "service call count");
         check(column(row, "worker_cpu_ms") > 0.0, "retired worker CPU time missing");
         check(column(quiet, "all_gpu_ms") == 0.0 && column(quiet, "service_calls") == 0, "second frame not a delta");
-        std::filesystem::remove(path);
+        std::error_code ignored; // Windows: the profile keeps its file open until exit.
+        std::filesystem::remove(path, ignored);
         std::puts("frame profile: per-frame deltas and thread accounting passed");
         return 0;
     } catch (const std::exception& error) {

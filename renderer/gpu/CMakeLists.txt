@@ -61,6 +61,15 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(XXHASH REQUIRED IMPORTED_TARGET libxxhash)
 pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+if (WIN32)
+    # A static renderer must not choose the executable's subsystem. The host
+    # needs console diagnostics; SDL's MSYS2 pkg-config file adds -mwindows.
+    get_target_property(SKY_SDL3_LINK_OPTIONS PkgConfig::SDL3 INTERFACE_LINK_OPTIONS)
+    if (SKY_SDL3_LINK_OPTIONS)
+        list(REMOVE_ITEM SKY_SDL3_LINK_OPTIONS "-mwindows")
+        set_property(TARGET PkgConfig::SDL3 PROPERTY INTERFACE_LINK_OPTIONS "${SKY_SDL3_LINK_OPTIONS}")
+    endif()
+endif()
 if (NOT WIN32)
     pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
 endif()
@@ -177,6 +186,7 @@ set_source_files_properties(shim/renderer_overlay.cpp PROPERTIES
 target_include_directories(skyrender PRIVATE . shim layer games cp ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
 if (WIN32)
     target_include_directories(skyrender PUBLIC platform/win32/include)
+    target_link_libraries(skyrender PUBLIC onecore) # VirtualAlloc2/MapViewOfFile3 imports.
 endif()
 target_compile_definitions(skyrender PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
 target_compile_options(skyrender PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)

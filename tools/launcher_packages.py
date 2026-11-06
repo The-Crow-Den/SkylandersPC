@@ -8,6 +8,12 @@ except ImportError:
     from workspace import read_sfo
 
 BUILTIN_EXTRACTOR = Path(__file__).resolve().with_name('pkg_extract.py')
+FOLDER_IMPORTER = Path(__file__).resolve().with_name('folder_import.py')
+
+
+def unpacked(path):
+    """True for an already unpacked game/update folder (has sce_sys/param.sfo)."""
+    return Path(path).is_dir() and (Path(path) / 'sce_sys/param.sfo').is_file()
 
 
 def extracted_root(directory):
@@ -36,7 +42,12 @@ def publish(staging, destination, source_packages=()):
 
 
 def package_info(path):
-    """Read the small PKG metadata entry before starting a lengthy extraction."""
+    """Read the small PKG metadata entry (or an unpacked folder's param.sfo)."""
+    if unpacked(path):
+        try:
+            return read_sfo((Path(path) / 'sce_sys/param.sfo').read_bytes())
+        except (OSError,struct.error,UnicodeError) as error:
+            raise ValueError('Could not read the game details in '+Path(path).name+'.') from error
     try:
         from .pkg_extract import Package
     except ImportError:

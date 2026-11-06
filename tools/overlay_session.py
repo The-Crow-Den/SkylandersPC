@@ -10,6 +10,10 @@ import shutil
 import subprocess
 import sys
 import time
+try:
+    from . import host_process
+except ImportError:
+    import host_process
 
 
 # The launcher AppImage pins its own interpreter with these; a system Python
@@ -32,8 +36,13 @@ def overlay_python(environment):
     except ModuleNotFoundError:
         pass
     checked={os.path.realpath(sys.executable)}
+    # An explicitly configured interpreter comes first (on Windows, PATH's
+    # python3 is usually the Microsoft Store stub, without WebEngine).
+    explicit=environment.get('SKY_OVERLAY_PYTHON','')
+    candidates=[explicit] if explicit else []
     for search_path in (environment.get('PATH',os.defpath),os.defpath):
-        candidate=shutil.which('python3',path=search_path)
+        candidates.append(shutil.which('python3',path=search_path))
+    for candidate in candidates:
         if not candidate or os.path.realpath(candidate) in checked:continue
         checked.add(os.path.realpath(candidate))
         try:
@@ -58,7 +67,7 @@ def html_overlay(directory,root,environment):
     status={'requested':'web','active':'native','presentation':'embedded' if embedded else 'desktop'}
     try:
         python=overlay_python(environment)
-        private=directory/'pc-overlay';private.mkdir(mode=0o700)
+        private=host_process.private_directory(directory/'pc-overlay')
         ui_env=dict(environment);ui_env['MANGOHUD']='0';ui_env['DISABLE_MANGOHUD']='1'
         if os.path.realpath(python)!=os.path.realpath(sys.executable):
             ui_env=system_python_environment(ui_env)
@@ -74,7 +83,7 @@ def html_overlay(directory,root,environment):
         with (directory/'pc-overlay.log').open('x') as output:
             command=[python,str(root/'tools/pc_overlay.py'),'--directory',str(private)]
             if embedded:command.append('--embedded')
-            process=subprocess.Popen(command,cwd=root,env=ui_env,stdout=output,stderr=subprocess.STDOUT,start_new_session=True)
+            process=subprocess.Popen(command,cwd=root,env=ui_env,stdout=output,stderr=subprocess.STDOUT,**host_process.group_options())
         deadline=time.monotonic()+12
         while process.poll() is None and time.monotonic()<deadline:
             if (private/'ready').is_file() and (private/'heartbeat').is_file():
@@ -90,10 +99,8 @@ def html_overlay(directory,root,environment):
         yield runtime
     finally:
         if process is not None and process.poll() is None:
-            try:os.killpg(process.pid,signal.SIGTERM)
-            except ProcessLookupError:pass
+            host_process.stop_group(process.pid)
             try:process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                try:os.killpg(process.pid,signal.SIGKILL)
-                except ProcessLookupError:pass
+                host_process.stop_group(process.pid,force=True)
                 process.wait()

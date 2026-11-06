@@ -5,6 +5,10 @@
 #endif
 #include "thread_context.hpp"
 #include "guest_start.hpp"
+#include "platform/host_fault.hpp"
+#include "platform/host_runtime.hpp"
+#include "platform/host_thread.hpp"
+#include "platform/host_compat.hpp"
 #include "hle/kernel_clock.hpp"
 #include "hle/keyboard_pad.hpp"
 #include "game_hooks.hpp"
@@ -19,7 +23,6 @@
 #include <cstring>
 #include <cstdlib>
 #include <stdexcept>
-#include <unistd.h>
 #include <atomic>
 #include <filesystem>
 #include <mutex>
@@ -33,7 +36,6 @@ std::atomic<std::uint64_t> guest_image_base = 0, guest_image_size = 0;
 
 #ifdef SKY_RENDERER
 #include <csetjmp>
-#include <pthread.h>
 #include "renderer_adapter.hpp"
 #include <SDL3/SDL.h>
 extern "C" {
@@ -308,7 +310,7 @@ void runtime_guest_image(uint64_t* base, uint64_t* size) {
     *base = guest_image_base.load(std::memory_order_acquire);
     *size = guest_image_size.load(std::memory_order_acquire);
 }
-void runtime_restart() { dprintf(STDERR_FILENO, "custom runtime restart is unsupported\n"); _exit(75); }
+void runtime_restart() { SkyHost::diagnostic_printf("custom runtime restart is unsupported\n"); std::_Exit(75); }
 int runtime_file_translate(const char*, char*, size_t) { return -1; }
 int runtime_file_host_path(const char*, char*, size_t) { return -1; }
 int runtime_pad_mouse_look() { return 0; }
@@ -316,8 +318,8 @@ int runtime_pad_prompt_device() { return 0; }
 unsigned runtime_pad_prompt_generation() { return 0; }
 int runtime_pad_prompt(const char*, int, char* label, int size) { if (label && size > 0) label[0] = 0; return 0; }
 void runtime_re_watch(uint64_t) {} // Optional Bloodborne reverse-engineering watch is disabled.
-void runtime_thread_attach_host(const char* name) { if (name) pthread_setname_np(pthread_self(), name); }
-void runtime_wait_report(double) { dprintf(STDERR_FILENO, "GPU wait profiling is disabled\n"); }
+void runtime_thread_attach_host(const char* name) { if (name) (void)SkyHost::set_current_thread_name(name); }
+void runtime_wait_report(double) { SkyHost::diagnostic_printf("GPU wait profiling is disabled\n"); }
 void runtime_sleep_stats(uint64_t* calls, uint64_t* ns) { *calls = *ns = 0; } // GPU-library-specific profiler is disabled.
 uint64_t runtime_process_time_us() {
     const std::array<U, 6> args{};
@@ -408,6 +410,7 @@ void note_cpu_write(std::uint64_t address, std::uint64_t size) {
 }
 void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attributes) {
 #ifdef SKY_RENDERER
+    runtime_memory_reserve(); // Exact Windows placeholder arena; no-op on Linux.
     game_serial = serial; sdk_version = sdk; psf_attributes = attributes;
     PortalLibrary::initialize(std::getenv("SKY_PORTAL_FIGURE"),std::getenv("SKY_PORTAL_FIGURE_BOTTOM"));
     VirtualPortal::bind_audio(&portal_speaker);
@@ -420,7 +423,7 @@ void configure(const std::string& serial, std::uint32_t sdk, std::uint32_t attri
     Renderer::set_option("GPU_USER_DIR", gpu_user_directory.c_str(), true);
     Renderer::set_option("CONFIG", (gpu_user_directory + "/" + Renderer::settings_file).c_str(), true);
     Renderer::set_option("GAME_PROFILE", "none", true);
-    setenv("SKY_PC_MENU", "1", 1);
+    if(SkyHost::set_environment("SKY_PC_MENU","1")!=0)throw std::runtime_error("cannot enable PC menu");
     Renderer::set_option("FREE_MOUSE", "1", true);
     Renderer::set_option("SUBMIT_LOCK", "gpu", true);
     // The renderer defaults to forced 16x filtering, which this title does not
@@ -449,6 +452,16 @@ bool handle_fault(int signal, void* info, void* context) {
     return presenter_ready && Renderer::handle_fault(context, static_cast<siginfo_t*>(info)->si_addr);
 #else
     (void)signal; (void)info; (void)context;
+    return false;
+#endif
+}
+bool handle_fault(SkyHost::Fault& fault) {
+#ifdef SKY_RENDERER
+    if (fault.kind != SkyHost::FaultKind::access) return false;
+    if (runtime_fault_recover) siglongjmp(*runtime_fault_recover, 1);
+    return presenter_ready && Renderer::handle_fault(fault);
+#else
+    (void)fault;
     return false;
 #endif
 }
@@ -552,7 +565,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
         if (function) cached.store(function, std::memory_order_relaxed);
     }
     if (!function) throw std::runtime_error("scoped GPU provider is missing");
-    const auto result = sky_host_call_integer(reinterpret_cast<void*>(function), a);
+    const auto result = sky_sysv_call_integer(reinterpret_cast<void*>(function), a);
     return item->returns_void ? 0 : result;
 #else
     (void)identity; (void)a;
@@ -565,26 +578,29 @@ std::uint64_t memory_call(std::string_view identity, const std::uint64_t* a) {
     std::size_t operation = 0;
     while (operation < memory_symbols.size() && identity != memory_symbols[operation].identity) ++operation;
     if (operation == memory_symbols.size()) throw std::runtime_error("unregistered GPU memory import scope");
+    // Also support memory-provider probes before presenter configuration.
+    static std::once_flag reserve_once;
+    std::call_once(reserve_once,[] { runtime_memory_reserve(); });
     const auto address = runtime_memory_resolve(memory_symbols[operation].identity);
     if (!address) throw std::runtime_error("GPU memory provider lacks registered service");
     using U = std::uint64_t;
     using I = std::int32_t;
     switch (operation) {
-    case 0: return reinterpret_cast<U(*)()>(address)();
-    case 1: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(std::int64_t, std::int64_t, U, U, I, std::int64_t*)>(address)(
+    case 0: return reinterpret_cast<U(SKY_SYSV_ABI *)()>(address)();
+    case 1: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(std::int64_t, std::int64_t, U, U, I, std::int64_t*)>(address)(
         static_cast<std::int64_t>(a[0]), static_cast<std::int64_t>(a[1]), a[2], a[3], static_cast<I>(a[4]), reinterpret_cast<std::int64_t*>(a[5])));
     case 2: {
         auto** out = reinterpret_cast<void**>(a[0]);
         if (out && (a[3] & 0x10) && (reinterpret_cast<std::uintptr_t>(*out) < 0x1000000000 ||
             reinterpret_cast<std::uintptr_t>(*out) >= 0xfc00000000 || a[1] > 0xfc00000000 - reinterpret_cast<std::uintptr_t>(*out)))
             return 0x80020016;
-        return static_cast<std::uint32_t>(reinterpret_cast<I(*)(void**, U, I, I, std::int64_t, U)>(address)(out,
+        return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(void**, U, I, I, std::int64_t, U)>(address)(out,
             a[1], static_cast<I>(a[2]), static_cast<I>(a[3]), static_cast<std::int64_t>(a[4]), a[5]));
     }
-    case 3: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(std::int64_t, U)>(address)(static_cast<std::int64_t>(a[0]), a[1]));
-    case 4: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(void*, U)>(address)(reinterpret_cast<void*>(a[0]), a[1]));
-    case 5: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(void**, U, I, I)>(address)(reinterpret_cast<void**>(a[0]), a[1], static_cast<I>(a[2]), static_cast<I>(a[3])));
-    case 6: return static_cast<std::uint32_t>(reinterpret_cast<I(*)(const void*, I, void*, U)>(address)(reinterpret_cast<const void*>(a[0]), static_cast<I>(a[1]), reinterpret_cast<void*>(a[2]), a[3]));
+    case 3: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(std::int64_t, U)>(address)(static_cast<std::int64_t>(a[0]), a[1]));
+    case 4: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(void*, U)>(address)(reinterpret_cast<void*>(a[0]), a[1]));
+    case 5: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(void**, U, I, I)>(address)(reinterpret_cast<void**>(a[0]), a[1], static_cast<I>(a[2]), static_cast<I>(a[3])));
+    case 6: return static_cast<std::uint32_t>(reinterpret_cast<I(SKY_SYSV_ABI *)(const void*, I, void*, U)>(address)(reinterpret_cast<const void*>(a[0]), static_cast<I>(a[1]), reinterpret_cast<void*>(a[2]), a[3]));
     }
 #else
     (void)identity; (void)a;

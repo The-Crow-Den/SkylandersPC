@@ -92,8 +92,8 @@ class InstallDialog(QDialog):
         self.pages = QStackedWidget();self.pages.setMinimumHeight(245);column.addWidget(self.pages,1)
         self.fields = {};self.browse_buttons = [];self.file_labels = {}
         for key,description,button_text in [
-                ('game_pkg','Choose the game file you want to install.\nLook for a file ending in .pkg.','Choose game file…'),
-                ('update_pkg','If you have an update for this game, you can add it now.\nYou can also skip this and add it later.','Choose update file…')]:
+                ('game_pkg','Choose the game you want to install: a file ending in .pkg,\nor a folder where the game is already unpacked.','Choose game file…'),
+                ('update_pkg','If you have an update for this game, you can add it now: a .pkg file\nor an unpacked update folder. You can also skip this and add it later.','Choose update file…')]:
             page = QWidget();layout = QVBoxLayout(page);layout.setContentsMargins(0,0,0,0)
             note = QLabel(description);note.setObjectName('description');note.setWordWrap(True);layout.addWidget(note)
             layout.setSpacing(16)
@@ -104,7 +104,11 @@ class InstallDialog(QDialog):
             file_content = QVBoxLayout();file_content.setSpacing(10);card_layout.addLayout(file_content,1)
             file_content.addStretch()
             button = QPushButton(button_text);button.setObjectName('browse')
-            self.browse_buttons.append(button);file_content.addWidget(button,0,Qt.AlignmentFlag.AlignLeft)
+            folder_button = QPushButton('Choose unpacked folder…');folder_button.setObjectName('browse')
+            self.browse_buttons += [button,folder_button]
+            buttons = QHBoxLayout();buttons.setSpacing(10)
+            buttons.addWidget(button);buttons.addWidget(folder_button);buttons.addStretch()
+            file_content.addLayout(buttons)
             label = QLabel('No file chosen');label.setObjectName('fileName');label.setWordWrap(True)
             self.file_labels[key] = label;file_content.addWidget(label);file_content.addStretch()
             layout.addWidget(card)
@@ -114,7 +118,13 @@ class InstallDialog(QDialog):
                 except ImportError:from launcher_files import choose_file
                 path = choose_file(self,title,('.pkg',))
                 if path:field.setText(path);self.start.setFocus()
-            button.clicked.connect(browse)
+            def browse_folder(checked=False,key=key,field=field):
+                title = 'Choose your unpacked game folder' if key == 'game_pkg' else 'Choose your unpacked update folder'
+                try:from .launcher_files import choose_folder
+                except ImportError:from launcher_files import choose_folder
+                path = choose_folder(self,title)
+                if path:field.setText(path);self.start.setFocus()
+            button.clicked.connect(browse);folder_button.clicked.connect(browse_folder)
             field.textChanged.connect(lambda text,key=key:self.file_changed(key,text))
             if key == 'game_pkg':
                 self.update_only = QPushButton('I only want to add an update');self.update_only.setObjectName('quiet')
@@ -179,6 +189,10 @@ class InstallDialog(QDialog):
             update = self.fields['update_pkg'].text().strip()
             self.summary.setText('Game: '+(Path(game).name if game else 'Already installed')+
                                  '\nUpdate: '+(Path(update).name if update else 'Not adding an update'))
+            folders = [path for path in (game,update) if path]
+            in_place = bool(folders) and all(packages.unpacked(path) for path in folders)
+            self.hint.setText('Nothing is copied: the game will run from the folders you chose, so keep them where they are.'
+                              if in_place else 'Your original files will stay where they are.')
 
     def add_update_only(self):
         self.only_update = True;self.fields['game_pkg'].clear();self.show_step(1)
@@ -194,8 +208,8 @@ class InstallDialog(QDialog):
         if self.step==0:
             path = Path(self.fields['game_pkg'].text().strip())
             try:
-                if not path.is_file() or path.suffix.lower()!='.pkg':
-                    raise ValueError('Choose your game file first. It should end in .pkg.')
+                if not packages.unpacked(path) and (not path.is_file() or path.suffix.lower()!='.pkg'):
+                    raise ValueError('Choose your game first: a file ending in .pkg, or an unpacked game folder (it contains sce_sys).')
                 if packages.package_info(path).get('CATEGORY')!='gd':
                     raise ValueError('This looks like an update. Choose the game file first, then add the update in the next step.')
             except (OSError,ValueError) as error:
@@ -220,8 +234,8 @@ class InstallDialog(QDialog):
         for key,kind in [('game_pkg','base'),('update_pkg','update')]:
             path = self.fields[key].text().strip()
             if path:
-                if not Path(path).is_file() or Path(path).suffix.lower() != '.pkg':
-                    QMessageBox.warning(self,'Choose your file','Choose a file ending in .pkg for the '+('game' if kind=='base' else 'update')+'.');return
+                if not packages.unpacked(path) and (not Path(path).is_file() or Path(path).suffix.lower() != '.pkg'):
+                    QMessageBox.warning(self,'Choose your file','Choose a file ending in .pkg, or an unpacked folder (it contains sce_sys), for the '+('game' if kind=='base' else 'update')+'.');return
                 jobs.append((kind,str(Path(path).resolve())))
         if not jobs:
             QMessageBox.warning(self,'Choose your game','Choose your game file first. You can add an update afterwards.');return
@@ -242,7 +256,9 @@ class InstallDialog(QDialog):
         self.source_packages = [Path(path).name for _,path in jobs]
         self.game.update({key:self.fields[key].text().strip() for key in ('game_pkg','update_pkg')})
         self.owner.persist();self.extractor = packages.BUILTIN_EXTRACTOR
-        self.jobs = jobs;self.total_jobs = len(jobs);self.completed_jobs = 0
+        # Unpacked folders only: register them where they are, no copy.
+        self.in_place = {kind:path for kind,path in jobs if packages.unpacked(path)} if all(packages.unpacked(path) for _,path in jobs) else None
+        self.jobs = [] if self.in_place else jobs;self.total_jobs = len(jobs);self.completed_jobs = 0
         self.staging = self.owner.root / '.local/pkg-imports' / uuid.uuid4().hex
         try:self.staging.mkdir(parents=True)
         except OSError as error:
@@ -256,7 +272,11 @@ class InstallDialog(QDialog):
         if not self.jobs:
             self.phase.setText('Finishing installation…')
             try:
-                entry = packages.publish(self.staging,game_library.directory(self.owner.root),self.source_packages)
+                library = game_library.directory(self.owner.root)
+                if self.in_place:
+                    entry = game_library.publish(library,self.in_place.get('base'),self.in_place.get('update'),self.source_packages,in_place=True)
+                else:
+                    entry = packages.publish(self.staging,library,self.source_packages)
                 hidden=game_library.removed(self.owner.root)
                 restored={game_library.selector(entry['title_id'],version) for version in (entry['base_version'],entry['app_version'])}
                 hidden=[key for key in hidden if key not in restored]
@@ -281,15 +301,16 @@ class InstallDialog(QDialog):
             except (OSError,ValueError) as error:self.fail('Could not finish installation: '+str(error))
             return
         kind,path = self.jobs.pop(0);target = self.staging / kind
-        self.current_kind = kind
+        self.current_kind = kind;self.current_folder = packages.unpacked(path)
         label = 'game' if kind=='base' else 'update'
         self.phase.setText(f'Installing {label} ({self.completed_jobs+1} of {self.total_jobs})… We’ll take care of the files. This may take a few minutes.')
-        self.output.append('Extracting '+label+' package…\nOutput: '+str(target))
+        self.output.append(('Copying '+label+' folder…' if self.current_folder else 'Extracting '+label+' package…')+'\nOutput: '+str(target))
         process = QProcess(self);self.process = process
         process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         process.readyReadStandardOutput.connect(self.read_output)
         process.finished.connect(self.finished);process.errorOccurred.connect(self.error)
-        process.start(sys.executable,['-u',str(self.extractor),path,str(target)])
+        tool = packages.FOLDER_IMPORTER if self.current_folder else self.extractor
+        process.start(sys.executable,['-u',str(tool),path,str(target)])
 
     def start_preparation(self, entry, optional=()):
         try:
@@ -345,7 +366,10 @@ class InstallDialog(QDialog):
             self.fail('Installation cancelled. Your original files and existing games were kept.');return
         if code!=0 or status!=QProcess.ExitStatus.NormalExit:
             self.output.append(f'Extractor failed (exit {code}). No installation was published.')
-            self.fail('Could not unpack the '+('game' if self.current_kind=='base' else 'update')+'. Check that the PKG file is complete and try again.');return
+            what = 'game' if self.current_kind=='base' else 'update'
+            if self.current_folder:self.fail('Could not copy the '+what+' folder. Check that it is complete and readable, and that there is enough free space.')
+            else:self.fail('Could not unpack the '+what+'. Check that the PKG file is complete and try again.')
+            return
         self.completed_jobs += 1;self.next_job()
 
     def done_state(self, success=False):

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <cstddef>
+#include "../platform/host_thread.hpp"
 #include <string_view>
 
 // Lifetime is the guest process. Initialize before switching to guest FS.
@@ -12,6 +12,5 @@ public:
     KernelData& operator=(const KernelData&) = delete;
     const void* resolve(std::string_view identity, unsigned char type) const noexcept;
 private:
-    void* page_;
-    std::size_t size_;
+    SkyHost::ThreadMemory memory_;
 };

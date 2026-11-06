@@ -277,12 +277,22 @@ std::uint64_t KernelSync::call(std::string_view identity, const std::uint64_t* a
             auto record = mutex->second;
             registry_lock.unlock();
             if (relative) {
+#ifdef _WIN32
+                // winpthreads has no clocklock; its timedlock takes a realtime deadline.
+                constexpr clockid_t deadline_clock = CLOCK_REALTIME;
+#else
+                constexpr clockid_t deadline_clock = CLOCK_MONOTONIC;
+#endif
                 timespec deadline{};
-                if (clock_gettime(CLOCK_MONOTONIC, &deadline)) throw std::runtime_error("mutex clock failed");
+                if (clock_gettime(deadline_clock, &deadline)) throw std::runtime_error("mutex clock failed");
                 const auto ns = static_cast<std::uint64_t>(deadline.tv_nsec) + (args[1] % 1000000) * 1000;
                 deadline.tv_sec += args[1] / 1000000 + ns / 1000000000;
                 deadline.tv_nsec = ns % 1000000000;
+#ifdef _WIN32
+                return error(pthread_mutex_timedlock(&record->native, &deadline));
+#else
                 return error(pthread_mutex_clocklock(&record->native, CLOCK_MONOTONIC, &deadline));
+#endif
             }
             if (operation == 5) return error(pthread_mutex_lock(&record->native));
             if (operation == 6) return error(pthread_mutex_trylock(&record->native));

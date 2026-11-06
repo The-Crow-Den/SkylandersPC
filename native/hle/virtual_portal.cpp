@@ -5,6 +5,7 @@
 #ifdef SKY_CEMU_PORTAL
 #include "runtime/cemu_portal.hpp"
 #include "../thread_context.hpp"
+#include "../platform/host_files.hpp"
 #include <libusb.h>
 #include <algorithm>
 #include <array>
@@ -69,7 +70,7 @@ std::string_view name(std::string_view identity) {
     return {};
 }
 unsigned figure_id(const char* path) {
-    std::ifstream input(path,std::ios::binary);
+    std::ifstream input(SkyHost::path_from_utf8(path),std::ios::binary);
     std::array<unsigned char,2> id{};input.seekg(0x10);
     if(!input.read(reinterpret_cast<char*>(id.data()),id.size()))return 65536;
     return id[0]|(static_cast<unsigned>(id[1])<<8);
@@ -84,7 +85,7 @@ bool load_locked(const char* path,bool trap=false) {
         if(value<210 || value>220){std::fprintf(stderr,"Portal: selected dump is not a Trap Team trap; character unchanged\n");return false;}
     }
     trapteam::PortalFigure figure; std::string failure;
-    if (!trapteam::cemu_portal_load_figure(path,&figure,&failure)) {
+    if (!trapteam::cemu_portal_load_figure(SkyHost::path_from_utf8(path),&figure,&failure)) {
         std::fprintf(stderr,"Portal figure import failed: %s\n",failure.c_str()); return false;
     }
     figure_slots.push_back(figure.slot);

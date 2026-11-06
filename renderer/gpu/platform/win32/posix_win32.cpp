@@ -125,17 +125,6 @@ int pause(void) {
 }
 
 
-int madvise(void* address, size_t size, int advice) {
-    if (advice == MADV_DONTNEED) {
-        // The pages read as zero again: decommitted and committed afresh.
-        MEMORY_BASIC_INFORMATION info{};
-        if (VirtualQuery(address, &info, sizeof(info)) && info.Type == MEM_PRIVATE) {
-            VirtualAlloc(address, size, MEM_RESET, PAGE_NOACCESS);
-        }
-    }
-    return 0;
-}
-
 void* dlopen(const char* path, int flags) {
     HMODULE module = nullptr;
     if (!path) {

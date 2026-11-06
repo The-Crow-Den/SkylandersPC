@@ -32,6 +32,25 @@ def fixture(relocations=None, imports=None):
     return result
 
 
+# MOV RAX, FS:[0] (the admitted TLS form); SUB RAX, [RAX]; RET. The TCB begins
+# with a pointer to itself, so this returns 0 only when the load reached it.
+TLS_CODE = b'\x64\x48\x8b\x04\x25\x00\x00\x00\x00' + b'\x48\x2b\x00' + b'\xc3'
+
+
+def run_tls_fixture(test):
+    data = fixture()
+    payload = struct.unpack_from('<Q', data, 56 + 32)[0]
+    data[payload:payload + len(TLS_CODE)] = TLS_CODE
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / 'image.pack').write_bytes(data)
+        (root / 'types').write_bytes(b'')
+        result = subprocess.run([str(BINARY), '--trace-start', str(root / 'image.pack'), str(root / 'types')],
+                                capture_output=True, text=True, timeout=15)
+        test.assertEqual(result.returncode, 0, f'exit {result.returncode:#x}\nstderr:\n{result.stderr}\nstdout:\n{result.stdout}')
+        return json.loads(result.stderr.splitlines()[-1])['return_value']
+
+
 class LoaderTests(unittest.TestCase):
     def test_package_parameter_comes_from_selected_root(self):
         data = fixture([(BASE + 4096, IMPORT | 7, 0, 0)],
@@ -97,6 +116,9 @@ class LoaderTests(unittest.TestCase):
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertNotIn('entry-attempt', result.stderr)
+
+    def test_guest_tls_reaches_the_thread_control_block(self):
+        self.assertEqual(run_tls_fixture(self), 0)
 
     def test_missing_weak_symbol_is_null(self):
         data = fixture([(BASE + 4096, IMPORT | 6, 0, 0)], ['optional-symbol'])

@@ -45,7 +45,7 @@ jobs:
       - name: Build native host
         run: |
           cmake -S native -B .local/native-gpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DSKY_RENDERER_ROOT="$PWD/renderer" -DSKY_RENDERER_LIBRARY="$PWD/.local/renderer-build/libskyrender.so"
+            -DSKY_TLS_PREFLIGHT=ON -DSKY_RENDERER_ROOT="$PWD/renderer" -DSKY_RENDERER_LIBRARY="$PWD/.local/renderer-build/libskyrender.so"
           cmake --build .local/native-gpu-build
       - name: Native tests
         run: ctest --test-dir .local/native-gpu-build --output-on-failure
@@ -58,6 +58,132 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 tools/release_audit.py
           python3 tools/release_audit.py --tracked
+
+  # Windows port (docs/windows-port.md): MinGW under MSYS2 CLANG64, the toolchain the renderer's
+  # platform/win32 layer targets. The native host builds its portable pieces and their tests so far.
+  windows-native:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          pacboy: >-
+            toolchain:p cmake:p ninja:p python:p pkgconf:p openssl:p zydis:p fmt:p boost:p glm:p sdl3:p
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build native host (portable subset)
+        run: |
+          cmake -S native -B .local/native-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSKY_TLS_PREFLIGHT=ON
+          cmake --build .local/native-build
+      - name: Native tests
+        run: ctest --test-dir .local/native-build --output-on-failure
+
+  windows-renderer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          pacboy: >-
+            toolchain:p cmake:p ninja:p python:p pkgconf:p git:p sdl3:p fmt:p boost:p robin-map:p
+            zydis:p spirv-headers:p vulkan-headers:p vulkan-loader:p glslang:p xxhash:p
+            ffmpeg:p glm:p vulkan-memory-allocator:p openssl:p libusb:p
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Header-only dependencies
+        run: |
+          git init -q "$RUNNER_TEMP/xbyak"
+          git -C "$RUNNER_TEMP/xbyak" fetch -q --depth 1 https://github.com/herumi/xbyak.git "$XBYAK_COMMIT"
+          git -C "$RUNNER_TEMP/xbyak" checkout -q FETCH_HEAD
+      - name: Build complete Windows host with static renderer
+        id: full-build
+        run: |
+          xbyak="$(cygpath -m "$RUNNER_TEMP/xbyak")"
+          cmake -S native -B .local/windows-full-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSKY_WINDOWS_FULL_HOST=ON -DSKY_TLS_PREFLIGHT=ON -DSKY_RENDERER_LTO=OFF \
+            -DSKY_RENDERER_PGO=off -DCMAKE_CXX_FLAGS="-isystem $xbyak"
+          cmake --build .local/windows-full-build
+      - name: Full host synthetic tests (no guest admission/game validation)
+        run: ctest --test-dir .local/windows-full-build --output-on-failure
+      - name: Repeat the guest TLS loader test (flake hunt, informational)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        continue-on-error: true
+        run: ctest --test-dir .local/windows-full-build --output-on-failure -R native-windows-loader --repeat until-fail:30
+      - name: Windows bundle (source tree, host, its DLLs, launcher script)
+        # Built even when a synthetic test fails, so the bundle can be tried.
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        run: |
+          dist=out/SkylandersPC-windows
+          mkdir -p "$dist/.local/native-gpu-build"
+          git config --global --add safe.directory "$(cygpath -m "$GITHUB_WORKSPACE")"
+          # Byte-exact: the runner sets core.autocrlf, and CRLF would break the
+          # hash-checked patch manifests and profiles.
+          git -c core.autocrlf=false -c core.eol=lf archive HEAD | tar -x -C "$dist"
+          if grep -rlI $'\r' "$dist/profiles" "$dist/patches"; then echo "CRLF in hash-checked files"; exit 1; fi
+          host=.local/windows-full-build/skylanders-native-host.exe
+          cp "$host" "$dist/.local/native-gpu-build/"
+          # Every MSYS2 DLL the host loads; Windows system DLLs are not copied.
+          ldd "$host" | awk '$3 ~ /^\/clang64\// {print $3}' | sort -u | xargs -r -I{} cp {} "$dist/.local/native-gpu-build/"
+          ls "$dist/.local/native-gpu-build"
+      - uses: actions/setup-python@v6
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        with:
+          python-version: '3.13'
+      - name: Freeze the launcher (no Python needed on the player's PC)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -m pip install --quiet --require-hashes --only-binary :all: -r tools/appimage/requirements.txt
+          python -m pip install --quiet pyinstaller==6.16.0
+          # Every tool module is a hidden import, so the stdlib/Qt they use is
+          # frozen in; the tools themselves run from source beside the exe.
+          $hidden = Get-ChildItem tools/*.py | Where-Object { $_.Name -notlike 'test*' -and $_.BaseName -ne 'frozen_entry' } | ForEach-Object { '--hidden-import', $_.BaseName }
+          python -m PyInstaller --noconfirm --windowed --name SkylandersPC --paths tools --distpath "$env:RUNNER_TEMP\frozen" --workpath "$env:RUNNER_TEMP\pyi" @hidden tools/frozen_entry.py
+          if ($LASTEXITCODE) { exit 1 }
+          Copy-Item -Recurse "$env:RUNNER_TEMP\frozen\SkylandersPC\*" out/SkylandersPC-windows/
+          # Smoke: the frozen exe runs a helper script and imports the launcher.
+          $out = & out/SkylandersPC-windows/SkylandersPC.exe tools/game_prepare.py --help | Out-String
+          if ($out -notmatch 'usage: game_prepare') { Write-Output $out; exit 1 }
+          Set-Content "$env:RUNNER_TEMP\probe.py" "import sys; sys.path.insert(0, r'$PWD\out\SkylandersPC-windows\tools'); import launcher, run_session, overlay_session; print('frozen launcher imports ok')"
+          $out = & out/SkylandersPC-windows/SkylandersPC.exe "$env:RUNNER_TEMP\probe.py" | Out-String
+          Write-Output $out
+          if ($out -notmatch 'imports ok') { exit 1 }
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        with:
+          name: SkylandersPC-windows
+          path: out/SkylandersPC-windows
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Library and manifest tests on Windows (informational)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -v -s tests -p "test_game_*.py"
+      - name: Python tests on Windows (informational)
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests 2>&1 | Tee-Object "$env:RUNNER_TEMP\python-tests.log" | Select-Object -Last 120
 
   appimage:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')

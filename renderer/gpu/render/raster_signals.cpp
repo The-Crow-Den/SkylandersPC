@@ -41,9 +41,10 @@ void Rasterizer::PublishSignals() {
     bool was_empty;
     {
         std::scoped_lock lk{gpu_signals_mutex};
-        if (!gpu_signal_thread.joinable()) {
+        if (!gpu_signal_started) {
             gpu_signal_thread =
                 std::jthread([this](std::stop_token token) { GpuSignalLoop(token); });
+            gpu_signal_started = true;
         }
         was_empty = gpu_signals.empty();
         for (auto& pending : local_signals) {
@@ -71,9 +72,10 @@ void Rasterizer::SignalAfterGpu(std::function<void()> signal, VAddr label, u64 v
     bool was_empty;
     {
         std::scoped_lock lk{gpu_signals_mutex};
-        if (!gpu_signal_thread.joinable()) {
+        if (!gpu_signal_started) {
             gpu_signal_thread =
                 std::jthread([this](std::stop_token token) { GpuSignalLoop(token); });
+            gpu_signal_started = true;
         }
         was_empty = gpu_signals.empty();
         gpu_signals.push_back({scheduler.CurrentTick(), std::move(signal), label, value});

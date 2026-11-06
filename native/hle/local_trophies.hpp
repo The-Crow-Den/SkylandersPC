@@ -20,7 +20,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <unistd.h>
+#include "../platform/host_compat.hpp"
 #include <vector>
 
 // Renderer popup (libskyrender); absent in tests and headless runs.
@@ -258,10 +258,11 @@ class LocalTrophies {
     const auto bytes = document.str();
     const bool wrote =
         std::fwrite(bytes.data(), 1, bytes.size(), file) == bytes.size();
-    const bool flushed = std::fflush(file) == 0 && fsync(fileno(file)) == 0;
+    const bool flushed = std::fflush(file) == 0 && SkyHost::sync_file(file);
+    std::error_code rename_error;
     const bool closed = std::fclose(file) == 0;
     if (!wrote || !flushed || !closed ||
-        std::rename(temporary.c_str(), destination.c_str())) {
+        (std::filesystem::rename(temporary, destination, rename_error), rename_error)) {
       std::remove(temporary.c_str());
       return false;
     }

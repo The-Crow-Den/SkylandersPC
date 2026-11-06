@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <memory>
 
-// Owns the guest-visible stack, TCB, TLS templates and signal stack of one thread.
+// Owns the guest-visible stack, TCB, TLS templates and host fault context of one thread.
 class GuestThreadContext {
 public:
     GuestThreadContext(const SkyBootPlan& boot, std::size_t stack_size = 8 * 1024 * 1024,
