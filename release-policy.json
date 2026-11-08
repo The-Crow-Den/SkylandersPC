@@ -1,9 +1,7 @@
 {
   "schema_version": 1,
   "project_license": "GPL-3.0-or-later",
-  "withheld": {
-    "profiles/patches/trap-team-us-01.01-traptanium.experimental.json": "About 415 kB of literal replacement bytes not found in the game files; keep local until their origin is settled."
-  },
+  "withheld": {},
   "required": [
     "LICENSE",
     "LICENSE_SCOPE.md",

@@ -28,6 +28,8 @@ MAGIC=(b'\x7fELF',b'MZ',b'\x01ZGI',b'IGA\x1a',b'DDS ',b'\x89PNG',b'RIFF',b'PK\x0
 VENDORED=('renderer/gpu/third_party/','renderer/third_party/','native/third_party/cemu/Cemu-main/')
 REVIEWED_BINARY={'renderer/gpu/third_party/fonts/DejaVuSans.ttf'} # Bitstream Vera/DejaVu font license.
 SUBMODULES={'renderer/gpu/third_party/imgui','renderer/third_party/LibAtrac9'}
+# Literal mod payloads the project owner reviewed and chose to publish (2026-11-08).
+REVIEWED_LITERAL={'profiles/patches/trap-team-us-01.01-traptanium.experimental.json'}
 PRIVATE_KEY=re.compile(r'-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----\r?\n')
 INLINE_IMAGE=re.compile(r'data:image/[^;,\s]+;base64,[A-Za-z0-9+/=]{256,}')
 
@@ -95,7 +97,8 @@ def inspect(name,data,record):
     if PurePosixPath(name).suffix in CODE and not name.startswith(VENDORED) and 'SPDX-License-Identifier:' not in text[:1024]:
         errors.append(name+': missing source license identifier')
     if name.endswith('.json'):
-        try:_inspect_json(json.loads(text),name,errors)
+        try:
+            if name not in REVIEWED_LITERAL:_inspect_json(json.loads(text),name,errors)
         except ValueError:errors.append(name+': malformed JSON source file')
     return errors
 

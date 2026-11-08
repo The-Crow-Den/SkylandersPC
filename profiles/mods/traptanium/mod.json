@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "SkylandersPS4 contributors",
   "licence": "GPL-3.0-or-later",
-  "description": "Experimental: break Traptanium with any Skylander. The recipe is withheld from public checkouts.",
+  "description": "Experimental: break Traptanium with any Skylander.",
   "targets": [
     {
       "title_id": "CUSA00626",
