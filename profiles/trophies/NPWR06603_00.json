@@ -1,0 +1,241 @@
+{
+ "title": "Skylanders Trap Team",
+ "source": "Names and descriptions as listed publicly on PSNProfiles, matched to the game icons",
+ "trophies": {
+  "0": {
+   "name": "IMPOSSIBLE!!!",
+   "detail": "Earn all other Trophies",
+   "grade": "P"
+  },
+  "1": {
+   "name": "Soda Saver",
+   "detail": "Complete Chapter 1",
+   "grade": "B"
+  },
+  "2": {
+   "name": "Now YOU Know It All",
+   "detail": "Complete Chapter 2",
+   "grade": "B"
+  },
+  "3": {
+   "name": "Chompy Champ",
+   "detail": "Complete Chapter 3",
+   "grade": "B"
+  },
+  "4": {
+   "name": "Bird Buddy",
+   "detail": "Complete Chapter 4",
+   "grade": "B"
+  },
+  "5": {
+   "name": "Master of Chefs",
+   "detail": "Complete Chapter 5",
+   "grade": "B"
+  },
+  "6": {
+   "name": "Squid Seeker",
+   "detail": "Complete Chapter 6",
+   "grade": "B"
+  },
+  "7": {
+   "name": "Swamp Survivor",
+   "detail": "Complete Chapter 7",
+   "grade": "B"
+  },
+  "8": {
+   "name": "Dreamcatcher Catcher",
+   "detail": "Complete Chapter 8",
+   "grade": "B"
+  },
+  "9": {
+   "name": "Lumber Liberator",
+   "detail": "Complete Chapter 9",
+   "grade": "B"
+  },
+  "10": {
+   "name": "Aroma Avenger",
+   "detail": "Complete Chapter 10",
+   "grade": "B"
+  },
+  "11": {
+   "name": "Krankcase Kapturer",
+   "detail": "Complete Chapter 11",
+   "grade": "B"
+  },
+  "12": {
+   "name": "Clock Crusader",
+   "detail": "Complete Chapter 12",
+   "grade": "B"
+  },
+  "13": {
+   "name": "Back From the Future",
+   "detail": "Complete Chapter 13",
+   "grade": "B"
+  },
+  "14": {
+   "name": "Rocket Recoverer",
+   "detail": "Complete Chapter 14",
+   "grade": "B"
+  },
+  "15": {
+   "name": "Squadron Star",
+   "detail": "Complete Chapter 15",
+   "grade": "B"
+  },
+  "16": {
+   "name": "Desert Dominator",
+   "detail": "Complete Chapter 16",
+   "grade": "B"
+  },
+  "17": {
+   "name": "Royal Flusher",
+   "detail": "Complete Chapter 17",
+   "grade": "B"
+  },
+  "18": {
+   "name": "Kaos Komeuppance",
+   "detail": "Complete Chapter 18",
+   "grade": "B"
+  },
+  "19": {
+   "name": "Statue Smasher",
+   "detail": "Chapter 3: Destroy 4 stone Chompy heads",
+   "grade": "B"
+  },
+  "20": {
+   "name": "Preemptive Power",
+   "detail": "Chapter 4: Destroy 1 Dropship",
+   "grade": "B"
+  },
+  "21": {
+   "name": "Cannon Completest",
+   "detail": "Chapter 5: Destroy 8 Troll Transports during the flying sequence",
+   "grade": "B"
+  },
+  "22": {
+   "name": "Pipe Down",
+   "detail": "Chapter 6: Destroy 4 stacks of pipes using the crane on Dredger’s Yacht",
+   "grade": "B"
+  },
+  "23": {
+   "name": "No Coins Left Behind",
+   "detail": "Chapter 7: Collect 20 coins while following Marsha through the mist",
+   "grade": "B"
+  },
+  "24": {
+   "name": "Ball Sprawler",
+   "detail": "Chapter 8: Knock 12 Golden Balls off the waterfall in the Meditative Pool area",
+   "grade": "S"
+  },
+  "25": {
+   "name": "Evilikin Eliminator",
+   "detail": "Chapter 9: Shoot 20 Evilikin Runner during the flying sequence",
+   "grade": "B"
+  },
+  "26": {
+   "name": "No Goo For You!",
+   "detail": "Chapter 10: Travel to Splash Station without taking any damage from goo",
+   "grade": "B"
+  },
+  "27": {
+   "name": "Ride the Rails",
+   "detail": "Chapter 11: Ride the train to the end of the line",
+   "grade": "B"
+  },
+  "28": {
+   "name": "Da Pinchy Defacer",
+   "detail": "Chapter 12: Destroy 5 Da Pinchy statues",
+   "grade": "B"
+  },
+  "29": {
+   "name": "Just to be Safe",
+   "detail": "Chapter 13: Take down every shield unit during the flying sequence",
+   "grade": "B"
+  },
+  "30": {
+   "name": "Exhaust All Possibilities",
+   "detail": "Chapter 14: Complete the arena battle without getting hit by rocket exhaust",
+   "grade": "B"
+  },
+  "31": {
+   "name": "Look Ma, No Rockets!",
+   "detail": "Chapter 15: Shoot down 30 Air Pirates without using rockets",
+   "grade": "S"
+  },
+  "32": {
+   "name": "Garden Gladiator",
+   "detail": "Chapter 16: Destroy 10 cacti",
+   "grade": "B"
+  },
+  "33": {
+   "name": "Highwire Act",
+   "detail": "Chapter 17: Complete all the tile floor puzzles without falling",
+   "grade": "B"
+  },
+  "34": {
+   "name": "Do a Barrel Roll",
+   "detail": "Chapter 18: Collect 9 coins while falling down the Machine Heart",
+   "grade": "B"
+  },
+  "35": {
+   "name": "Savior of Skylands IV",
+   "detail": "Complete Story Mode on any difficulty setting",
+   "grade": "G"
+  },
+  "36": {
+   "name": "Dream a Little Nightmare",
+   "detail": "Complete Story Mode on the Nightmare difficulty setting",
+   "grade": "G"
+  },
+  "37": {
+   "name": "Kaos Mode Master",
+   "detail": "Defeat 100 enemies in Kaos Mode",
+   "grade": "B"
+  },
+  "38": {
+   "name": "Star Star",
+   "detail": "Earn 50 Stars in Kaos Mode",
+   "grade": "S"
+  },
+  "39": {
+   "name": "Arena Mogul",
+   "detail": "Unlock Brock's special arena",
+   "grade": "B"
+  },
+  "40": {
+   "name": "Chairman of the Rumble Club",
+   "detail": "Complete all Arena levels",
+   "grade": "G"
+  },
+  "41": {
+   "name": "Not Out of Your Element",
+   "detail": "Unlock your first Elemental area",
+   "grade": "B"
+  },
+  "42": {
+   "name": "Hero Hunter",
+   "detail": "Capture 10 Villains",
+   "grade": "B"
+  },
+  "43": {
+   "name": "Skystones Scavenger",
+   "detail": "Collect 20 Skystones",
+   "grade": "B"
+  },
+  "44": {
+   "name": "All the Way Up!",
+   "detail": "Level up any Skylander to level 20",
+   "grade": "B"
+  },
+  "45": {
+   "name": "Wow, That's Tough!",
+   "detail": "Achieve Portal Master Rank 5",
+   "grade": "S"
+  },
+  "46": {
+   "name": "Road to Redemption",
+   "detail": "Complete a captured Villain's quest",
+   "grade": "B"
+  }
+ }
+}

@@ -13,8 +13,8 @@ import re
 import struct
 import tomllib
 import xml.etree.ElementTree as ET
-try:from . import launcher_trophies
-except ImportError:import launcher_trophies
+try:from . import launcher_trophies,psn_trophies
+except ImportError:import launcher_trophies,psn_trophies
 
 
 def entries(path):
@@ -105,6 +105,8 @@ def prepare(root,install,session,*,store=None,key_config=None):
                 target=xml/name.replace('.ESFM','.XML')
                 if target.is_symlink():raise ValueError('redirected trophy XML')
                 if not target.exists():source.seek(offset);plain=decrypt_xml(source.read(size),key,npwr);target.write_bytes(plain)
+    if not any((xml/name).is_file() for name in ('TROP_01.XML','TROP.XML','TROPCONF.XML')) and (shipped:=psn_trophies.packaged(root,npwr)):
+        psn_trophies.write_catalogue(store,npwr,*shipped)
     definition=next((path for path in [xml/'TROP_01.XML',xml/'TROP.XML',xml/'TROPCONF.XML'] if path.is_file()),None)
     game={'id':'trap-team','name':'Trap Team','installed_paths':[str(install.base)]}
     _,external_definition,external_progress,_=launcher_trophies.game_sources(root,game)

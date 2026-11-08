@@ -82,6 +82,17 @@ def write_catalogue(store, npwr, title, rows):
     return written
 
 
+def packaged(root, npwr):
+    """Names shipped in profiles/trophies/<NPWR>.json, or None."""
+    if not re.fullmatch(r'NPWR\d{5}_\d{2}', npwr):return None
+    path = Path(root)/'profiles'/'trophies'/(npwr+'.json')
+    if not path.is_file():return None
+    data = json.loads(path.read_text(encoding='utf-8'))
+    rows = {int(k): dict(name=v['name'], detail=v['detail'], grade=v['grade'] if v['grade'] in 'PGSB' else '',
+                         hidden=bool(v.get('hidden')), group=int(v.get('group', 0))) for k, v in data['trophies'].items()}
+    return data['title'], rows
+
+
 def main():
     import argparse, getpass
     parser = argparse.ArgumentParser(description=__doc__)
