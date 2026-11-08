@@ -35,6 +35,16 @@ def fixture(compressed=True):
 
 
 class AssetModTests(unittest.TestCase):
+    def test_add_edits_shift_little_endian_values(self):
+        original = bytes.fromhex('f0ff0000') + b'\x01'
+        shift = dict(offset=0, width=4, add=0x20)
+        self.assertEqual(asset_mod.edits(original, [shift]), bytes.fromhex('10000100') + b'\x01')
+        self.assertEqual(asset_mod.edits(original, [dict(offset=4, width=1, add=255)]), original[:4] + b'\x00')
+        for bad in (dict(shift, width=0), dict(shift, width=9), dict(shift, add='1'), dict(shift, offset=2),
+                    dict(shift, expected_hex='f0ff0000')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                asset_mod.edits(original, [bad])
+
     def test_copy_edits_read_original_bytes_and_fail_closed(self):
         original = b'AAAABBBBCCCC'
         move = dict(offset=4, copy_from=0, length=4,

@@ -54,6 +54,14 @@ def edits(data, recipe):
             if (digest(before) != item['expected_sha256'] or
                     digest(after) != item['source_sha256']):
                 raise ValueError('asset copy expected bytes mismatch')
+        elif 'add' in item:
+            # Little-endian integer delta. The decoded chunk hash already
+            # pins the original value, so the recipe carries no game bytes.
+            width = number(item['width'], 9, 'add width')
+            if not width or type(item['add']) is not int or at + width > len(data) or 'expected_hex' in item or 'replacement_hex' in item:
+                raise ValueError('invalid asset add edit')
+            before = data[at:at + width]
+            after = ((int.from_bytes(before, 'little') + item['add']) % (1 << 8 * width)).to_bytes(width, 'little')
         else:
             before = bytes.fromhex(item['expected_hex'])
             after = bytes.fromhex(item['replacement_hex'])
@@ -189,7 +197,7 @@ def combine_profiles(profiles):
                 at = item['offset']
                 if at < edit_end:
                     raise ValueError('asset mods overlap edits')
-                edit_end = at + (item['length'] if 'copy_from' in item else
+                edit_end = at + (item['length'] if 'copy_from' in item else item['width'] if 'add' in item else
                                  len(bytes.fromhex(item['expected_hex'])))
     return dict(executable_sha256=identity[0], title_id=identity[1], app_version=identity[2],
                 default_enabled=False, assets=list(assets.values()))
