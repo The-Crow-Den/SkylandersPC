@@ -206,3 +206,50 @@ jobs:
           name: Skylanders-Launcher-x86_64.AppImage
           path: out/dist/Skylanders-Launcher-x86_64.AppImage
           if-no-files-found: error
+
+  # A v* tag publishes a draft release. Every binary ships beside the complete
+  # corresponding source it was built from: this commit, its submodules and the
+  # pinned header-only dependencies, as one archive.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [native, windows-renderer, appimage]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Corresponding source archive
+        run: |
+          name="SkylandersPC-${GITHUB_REF_NAME}-source"
+          stage="$RUNNER_TEMP/$name"
+          mkdir -p "$stage" out/release
+          git -c core.autocrlf=false archive HEAD | tar -x -C "$stage"
+          git submodule foreach --quiet --recursive \
+            'mkdir -p "'"$stage"'/$displaypath" && git archive HEAD | tar -x -C "'"$stage"'/$displaypath"'
+          fetch() {  # repository commit destination
+              git init -q "$3"
+              git -C "$3" fetch -q --depth 1 "https://github.com/$1.git" "$2"
+              git -C "$3" archive FETCH_HEAD | tar -x -C "$4"
+          }
+          mkdir -p "$stage/build-deps/vma" "$stage/build-deps/xbyak"
+          fetch GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator "$VMA_COMMIT" "$RUNNER_TEMP/vma-git" "$stage/build-deps/vma"
+          fetch herumi/xbyak "$XBYAK_COMMIT" "$RUNNER_TEMP/xbyak-git" "$stage/build-deps/xbyak"
+          printf 'Built from %s at commit %s.\nSee README.md for build steps and .github/workflows/build.yml for the exact CI recipe.\nbuild-deps/ holds the pinned header-only renderer dependencies (VMA %s, xbyak %s).\n' \
+            "$GITHUB_REF_NAME" "$GITHUB_SHA" "$VMA_COMMIT" "$XBYAK_COMMIT" > "$stage/SOURCE.txt"
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$RUNNER_TEMP" -czf "out/release/$name.tar.gz" "$name"
+      - uses: actions/download-artifact@v5
+        with:
+          path: out/artifacts
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd out/artifacts/SkylandersPC-windows && zip -qr "$GITHUB_WORKSPACE/out/release/SkylandersPC-${GITHUB_REF_NAME}-windows.zip" .)
+          cp out/artifacts/Skylanders-Launcher-x86_64.AppImage/*.AppImage out/release/
+          (cd out/release && sha256sum * > SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" out/release/* --draft --verify-tag \
+            --title "SkylandersPC $GITHUB_REF_NAME" \
+            --notes "Beta. Bring your own game. Source for these binaries: SkylandersPC-${GITHUB_REF_NAME}-source.tar.gz."

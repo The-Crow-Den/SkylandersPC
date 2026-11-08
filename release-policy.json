@@ -17,6 +17,6 @@
   ],
   "binary_release_ready": false,
   "binary_release_blockers": [
-    "Provide the exact modified corresponding source and build inputs for any executable release."
+    "Inventory the Windows bundle's third-party binaries (MSYS2 runtime DLLs, the frozen Python, PyQt6 and Qt) in LICENSES/bundled-components.json, as is already done for the AppImage. Tagged releases attach the project's corresponding source archive (build.yml release job)."
   ]
 }
