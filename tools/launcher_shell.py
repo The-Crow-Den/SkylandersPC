@@ -5,7 +5,7 @@ from pathlib import Path
 import math
 import time
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer, QPropertyAnimation
-from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen
+from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen, QFontDatabase
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QFrame, QProgressBar, QGraphicsOpacityEffect)
 try:
     from . import game_library
@@ -81,6 +81,15 @@ def logo_palette(path, fallback=('#326080', '#bd9ad8')):
 def shade(color, value, saturation=1.0, alpha=255):
     result = QColor.fromHsvF(max(color.hsvHueF(), 0), min(1, color.hsvSaturationF() * saturation), value)
     result.setAlpha(alpha); return result
+
+
+@lru_cache(maxsize=1)
+def display_font():
+    """Montserrat ExtraBold (SIL OFL) for headings and the play button, or a system fallback."""
+    font = Path(__file__).resolve().parent / 'fonts' / 'Montserrat-ExtraBold.ttf'
+    loaded = QFontDatabase.addApplicationFont(str(font)) if font.is_file() else -1
+    families = QFontDatabase.applicationFontFamilies(loaded) if loaded >= 0 else []
+    return families[0] if families else 'Cantarell'
 
 
 class SkyCanvas(QWidget):
@@ -314,11 +323,11 @@ def renovated(base):
                 QPushButton#gameIcon { border: 1px solid transparent; background: rgba(255,255,255,0.05); border-radius: 16px; padding: 6px; font-size: 14px; font-weight: 600; }
                 QPushButton#gameIcon:hover { background: #303037; border-color: #50505a; padding: 2px 6px 10px 6px; }
                 QPushButton#gameIcon:checked { background: #343e46; color: #f5f5f7; border: 1px solid #98dfef; border-radius: 16px; }
-                QPushButton#libraryPlay { background: #fafafa; color: #10121a; border: none; border-radius: 14px; font-family: "Cantarell", "DejaVu Sans", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+                QPushButton#libraryPlay { background: #fafafa; color: #10121a; border: none; border-radius: 14px; font-family: "DISPLAY_FONT"; font-size: 17px; font-weight: 800; letter-spacing: 1px; }
                 QPushButton#libraryPlay:hover { background: #e4f7fb; }
                 QPushButton#libraryPlay:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.14); }
                 QFrame#infoPanel { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(8,10,16,0.82), stop:1 rgba(8,10,16,0.55)); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; }
-                QLabel#gameTitle { font-size: 24px; font-weight: 800; color: #ffffff; }
+                QLabel#gameTitle { font-family: "DISPLAY_FONT"; font-size: 24px; font-weight: 800; color: #ffffff; }
                 QLabel#gameInfo { color: #d6d6de; font-size: 13px; font-weight: 600; }
                 QLabel#installNote { color: #9a9aa6; font-size: 12px; }
                 QPushButton#trophyLink { background: transparent; border: none; text-align: left; color: #d6d6de; padding: 0; font-size: 14px; font-weight: 600; }
@@ -330,7 +339,7 @@ def renovated(base):
                 QListWidget { background: #222225; color: #f5f5f7; border: 1px solid #343438; border-radius: 12px; padding: 10px; }
                 QListWidget::item { padding: 12px; border-radius: 6px; }
                 QListWidget::item:selected { background: #353539; color: white; }
-            ''')
+            '''.replace('DISPLAY_FONT', display_font()))
             if self.library['portal'] and Path(self.library['portal']).is_file():
                 self.fields['figure'].setText(self.library['portal'])
                 self.fields['figure_bottom'].setText(self.library.get('portal_bottom') or '')
