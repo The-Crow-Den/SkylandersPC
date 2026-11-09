@@ -1,11 +1,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Build the renderer and native host, run every synthetic test, and on a tag or by
 # hand package the launcher AppImage. Nothing here needs game files, keys or a GPU.
+# The full build is slow, so it runs for release tags, pull requests and by hand
+# (Actions > Build > Run workflow), not on every push.
 name: Build
 on:
   push:
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 permissions:
   contents: read
 env:

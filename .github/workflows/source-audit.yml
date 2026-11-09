@@ -1,6 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 name: Source publication checks
-on: [push, pull_request]
+# Quick licence check on pushes to main that touch tracked source.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
