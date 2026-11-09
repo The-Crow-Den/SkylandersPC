@@ -2,9 +2,11 @@
 """Library presentation layered over the existing native session controller."""
 from functools import lru_cache
 from pathlib import Path
-from PyQt6.QtCore import Qt, QSize, QRectF, QTimer
-from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QFrame, QProgressBar)
+import math
+import time
+from PyQt6.QtCore import Qt, QSize, QRectF, QTimer, QPropertyAnimation
+from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen, QFontDatabase
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QFrame, QProgressBar, QGraphicsOpacityEffect)
 try:
     from . import game_library
     from . import launcher_library as library
@@ -81,6 +83,15 @@ def shade(color, value, saturation=1.0, alpha=255):
     result.setAlpha(alpha); return result
 
 
+@lru_cache(maxsize=1)
+def display_font():
+    """Lilita One (SIL OFL) for headings and the play button, or a system fallback."""
+    font = Path(__file__).resolve().parent / 'fonts' / 'LilitaOne-Regular.ttf'
+    loaded = QFontDatabase.addApplicationFont(str(font)) if font.is_file() else -1
+    families = QFontDatabase.applicationFontFamilies(loaded) if loaded >= 0 else []
+    return families[0] if families else 'DejaVu Sans'
+
+
 class SkyCanvas(QWidget):
     def __init__(self, *, show_portal=True):
         super().__init__()
@@ -88,6 +99,15 @@ class SkyCanvas(QWidget):
         self.game = {}; self.palette_cache = {}; self.anchor = None
         # Every game's portal matches the Swap Force logo's width (set by the shell).
         self.portal_logo_width = None
+        # The portal breathes slowly. Paused while a game runs or the window is hidden.
+        self.pulse = 1.0; self.animate = True
+        self.pulse_timer = QTimer(self); self.pulse_timer.setInterval(80); self.pulse_timer.timeout.connect(self.breathe)
+        self.pulse_timer.start()
+
+    def breathe(self):
+        if not self.animate or not self.isVisible() or not self.show_portal or getattr(self.window(),'process',None) is not None:return
+        self.pulse = .82 + .18 * math.sin(time.monotonic() * 1.6)
+        self.update()
 
     def colors(self):
         key = (self.game.get('logo', ''), self.game.get('top'), self.game.get('bottom'))
@@ -151,12 +171,12 @@ class SkyCanvas(QWidget):
         bright = shade(accent, 1.0, .75); deep = shade(primary, .55, 1.0)
         # Light column rising from the portal behind the logo.
         beam = QLinearGradient(0, cy, 0, logo.top() - 40)
-        beam.setColorAt(0, shade(bright, 1.0, 1.0, 70)); beam.setColorAt(1, shade(bright, 1.0, 1.0, 0))
+        beam.setColorAt(0, shade(bright, 1.0, 1.0, int(70 * self.pulse))); beam.setColorAt(1, shade(bright, 1.0, 1.0, 0))
         column = QPainterPath(); column.moveTo(cx - width * .42, cy); column.lineTo(cx - width * .30, logo.top() - 40)
         column.lineTo(cx + width * .30, logo.top() - 40); column.lineTo(cx + width * .42, cy); column.closeSubpath()
         p.fillPath(column, beam)
         halo = QRadialGradient(cx, cy, width * .75)
-        halo.setColorAt(0, shade(bright, 1.0, 1.0, 85)); halo.setColorAt(1, shade(bright, 1.0, 1.0, 0))
+        halo.setColorAt(0, shade(bright, 1.0, 1.0, int(85 * self.pulse))); halo.setColorAt(1, shade(bright, 1.0, 1.0, 0))
         p.save(); p.translate(cx, cy); p.scale(1, .32); p.translate(-cx, -cy)
         p.fillRect(QRectF(cx - width, cy - width, width * 2, width * 2), halo); p.restore()
         # Platform: base, lit rim, inner rings.
@@ -166,7 +186,7 @@ class SkyCanvas(QWidget):
         face.setColorAt(0, shade(deep, .9, 1.0, 200)); face.setColorAt(.75, shade(deep, .45, 1.0, 220)); face.setColorAt(1, shade(deep, .25, 1.0, 235))
         p.setBrush(face); p.drawEllipse(QRectF(cx - width / 2, cy - height / 2, width, height))
         p.setBrush(Qt.BrushStyle.NoBrush)
-        p.setPen(QPen(shade(bright, 1.0, 1.0, 210), 2.5)); p.drawEllipse(QRectF(cx - width / 2, cy - height / 2, width, height))
+        p.setPen(QPen(shade(bright, 1.0, 1.0, int(150 + 60 * self.pulse)), 2.5)); p.drawEllipse(QRectF(cx - width / 2, cy - height / 2, width, height))
         p.setPen(QPen(shade(bright, 1.0, 1.0, 110), 1.2)); p.drawEllipse(QRectF(cx - width * .38, cy - height * .38, width * .76, height * .76))
         p.setPen(QPen(shade(bright, 1.0, 1.0, 60), 1)); p.drawEllipse(QRectF(cx - width * .24, cy - height * .24, width * .48, height * .48))
         # Sparks drifting up from the rim; fixed per game.
@@ -301,13 +321,13 @@ def renovated(base):
             self.setStyleSheet(self.styleSheet() + '''
                 QWidget#libraryRail { background: rgba(14,14,18,0.62); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; }
                 QPushButton#gameIcon { border: 1px solid transparent; background: rgba(255,255,255,0.05); border-radius: 16px; padding: 6px; font-size: 14px; font-weight: 600; }
-                QPushButton#gameIcon:hover { background: #303037; border-color: #50505a; }
+                QPushButton#gameIcon:hover { background: #303037; border-color: #50505a; padding: 2px 6px 10px 6px; }
                 QPushButton#gameIcon:checked { background: #343e46; color: #f5f5f7; border: 1px solid #98dfef; border-radius: 16px; }
-                QPushButton#libraryPlay { background: #fafafa; color: #10121a; border: none; border-radius: 14px; font-family: "Cantarell", "DejaVu Sans", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+                QPushButton#libraryPlay { background: #fafafa; color: #10121a; border: none; border-radius: 14px; font-family: "DISPLAY_FONT"; font-size: 20px; letter-spacing: 1px; }
                 QPushButton#libraryPlay:hover { background: #e4f7fb; }
                 QPushButton#libraryPlay:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.14); }
                 QFrame#infoPanel { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(8,10,16,0.82), stop:1 rgba(8,10,16,0.55)); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; }
-                QLabel#gameTitle { font-size: 24px; font-weight: 800; color: #ffffff; }
+                QLabel#gameTitle { font-family: "DISPLAY_FONT"; font-size: 28px; color: #ffffff; letter-spacing: 0.5px; }
                 QLabel#gameInfo { color: #d6d6de; font-size: 13px; font-weight: 600; }
                 QLabel#installNote { color: #9a9aa6; font-size: 12px; }
                 QPushButton#trophyLink { background: transparent; border: none; text-align: left; color: #d6d6de; padding: 0; font-size: 14px; font-weight: 600; }
@@ -319,7 +339,7 @@ def renovated(base):
                 QListWidget { background: #222225; color: #f5f5f7; border: 1px solid #343438; border-radius: 12px; padding: 10px; }
                 QListWidget::item { padding: 12px; border-radius: 6px; }
                 QListWidget::item:selected { background: #353539; color: white; }
-            ''')
+            '''.replace('DISPLAY_FONT', display_font()))
             if self.library['portal'] and Path(self.library['portal']).is_file():
                 self.fields['figure'].setText(self.library['portal'])
                 self.fields['figure_bottom'].setText(self.library.get('portal_bottom') or '')
@@ -407,17 +427,16 @@ def renovated(base):
                 else:
                     button.setText({'superchargers':'SC','imaginators':'IM'}.get(game['id'],game['name'][:2].upper()))
             self.rail.addStretch()
-            divider = QWidget();divider.setFixedHeight(1);divider.setStyleSheet('background: #38383e;');self.rail.addWidget(divider)
-            for kind, name, callback in [('collection','Skylanders Manager',self.manager),('settings','General settings',self.settings)]:
-                control = self.button(self.rail,'',callback);control.setIcon(utility_icon(kind));control.setIconSize(QSize(24,24))
-                control.setFixedSize(82,48);control.setToolTip(name);control.setAccessibleName(name)
-                control.setStyleSheet('background: transparent; border: none; border-radius: 12px;')
             self.refresh_game()
 
         def select_game(self, key):
             if self.process:
                 QMessageBox.information(self, 'Session active', 'Stop the current session before switching games.'); return
             self.library['selected'] = key; self.persist(); self.rebuild_rail()
+            fade = QGraphicsOpacityEffect(self.brand); self.brand.setGraphicsEffect(fade)
+            self.brand_fade = QPropertyAnimation(fade, b'opacity', self); self.brand_fade.setDuration(260)
+            self.brand_fade.setStartValue(0.0); self.brand_fade.setEndValue(1.0)
+            self.brand_fade.finished.connect(lambda: self.brand.setGraphicsEffect(None)); self.brand_fade.start()
             try:
                 game_library.select(self.root, self.game.get('installation'))
             except (OSError, ValueError) as error:
