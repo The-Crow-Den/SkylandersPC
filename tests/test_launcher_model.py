@@ -37,12 +37,18 @@ class LauncherModelTests(unittest.TestCase):
         self.assertNotIn('--seconds', argv)
 
     def test_linux_only_switches_are_off_on_windows(self):
-        value={**model.DEFAULTS,'nvidia':True,'mangohud':True}
+        value={**model.DEFAULTS,'gpu':'amd','mangohud':True}
         with patch.object(model,'platform_settings',return_value=list(model.LINUX_ONLY)):
-            self.assertIn('--nvidia',model.command('/project','python',value))
+            argv=model.command('/project','python',value)
+        self.assertEqual(argv[argv.index('--gpu')+1],'amd')
         with patch.object(model,'platform_settings',return_value=[]):
             argv=model.command('/project','python',value)
-        self.assertIn('--no-nvidia',argv);self.assertIn('--no-mangohud',argv)
+        self.assertEqual(argv[argv.index('--gpu')+1],'auto');self.assertIn('--no-mangohud',argv)
+
+    def test_old_nvidia_switch_becomes_gpu_choice(self):
+        old={k:v for k,v in model.DEFAULTS.items() if k!='gpu'};old['nvidia']=True
+        self.assertEqual(model.validate(model.migrate(old))['gpu'],'auto')
+        with self.assertRaises(ValueError):model.validate({**model.DEFAULTS,'gpu':'voodoo'})
 
     def test_settings_saved_before_anti_aliasing_turn_it_on(self):
         with tempfile.TemporaryDirectory() as directory:

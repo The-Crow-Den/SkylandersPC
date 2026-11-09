@@ -52,6 +52,42 @@ KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log',
 
 
 
+ICD_FOLDER = Path('/usr/share/vulkan/icd.d')
+# Vulkan driver manifests per GPU maker, in automatic preference order.
+GPU_DRIVERS = {'nvidia': ('nvidia_icd',), 'amd': ('radeon_icd', 'amd_icd', 'amd_pro_icd'), 'intel': ('intel_icd', 'intel_hasvk_icd')}
+GPU_CHOICES = ('auto', *GPU_DRIVERS)
+
+
+def gpu_manifest(vendor, folder=ICD_FOLDER):
+    for stem in GPU_DRIVERS[vendor]:
+        for path in sorted(folder.glob(stem + '*.json')):
+            if path.is_file():return path
+    return None
+
+
+def installed_gpus(folder=ICD_FOLDER):
+    return [vendor for vendor in GPU_DRIVERS if gpu_manifest(vendor, folder)]
+
+
+def choose_gpu(choice, folder=ICD_FOLDER, problem=None):
+    """(Vulkan manifest or None, warning or None) for a GPU choice. Automatic
+    prefers a working NVIDIA driver, then AMD, then Intel, never the software
+    renderer; an unusable choice falls back the same way with a warning."""
+    problem = nvidia_problem() if problem is None else problem or None
+    warning = None
+    if choice != 'auto':
+        manifest = gpu_manifest(choice, folder)
+        if manifest and not (choice == 'nvidia' and problem):return manifest, None
+        warning = f'{choice.upper() if choice != "intel" else "Intel"} GPU unavailable ({problem if manifest else "no Vulkan driver installed"}); choosing automatically'
+    for vendor in GPU_DRIVERS:
+        if vendor == 'nvidia' and problem:
+            warning = warning or f'NVIDIA driver unusable ({problem}); using another GPU'
+            continue
+        manifest = gpu_manifest(vendor, folder)
+        if manifest:return manifest, warning
+    return None, warning
+
+
 def nvidia_problem(proc=Path('/proc/driver/nvidia/version'), libraries=Path('/usr/lib')):
     """Why the NVIDIA driver cannot be used right now, or None. After a driver
     update the loaded kernel module stays old until a reboot, and Vulkan then
@@ -324,9 +360,10 @@ def run(argv,sessions):
     parser.add_argument('--fps-counter', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--trophy-popups', action=argparse.BooleanOptionalAction, default=True,
                         help='show a popup in game when a trophy unlocks')
-    parser.add_argument('--nvidia', action=argparse.BooleanOptionalAction,
-                        default=Path('/usr/share/vulkan/icd.d/nvidia_icd.json').is_file(),
-                        help='restrict Vulkan to the installed NVIDIA driver')
+    parser.add_argument('--gpu', choices=GPU_CHOICES, default='auto',
+                        help='GPU to render with (default: auto, a working NVIDIA driver first)')
+    parser.add_argument('--nvidia', dest='gpu', action='store_const', const='nvidia', help=argparse.SUPPRESS)
+    parser.add_argument('--no-nvidia', dest='gpu', action='store_const', const='auto', help=argparse.SUPPRESS)
     parser.add_argument('--hud-pci-device', help='PCI GPU address for MangoHud statistics')
     parser.add_argument('--manual-phase-cap', action='store_true',
                         help='MangoHud starts at 30; Shift+F1 toggles 30/60 manually')
@@ -606,15 +643,10 @@ def run(argv,sessions):
     window = args.window_resolution or args.resolution
     if window:
         env['SKY_WINDOW_SIZE'] = 'x'.join(map(str, PRESETS[window] if args.window_resolution else render_size(window, aspect)))
-    if args.nvidia:
-        icd = Path('/usr/share/vulkan/icd.d/nvidia_icd.json')
-        if not icd.is_file():
-            parser.error('NVIDIA Vulkan driver manifest is missing')
-        problem = nvidia_problem()
-        if problem:
-            print(f'NVIDIA driver unusable ({problem}); using the default GPU instead', file=sys.stderr)
-        else:
-            env['VK_DRIVER_FILES'] = str(icd)
+    if os.name != 'nt':
+        manifest, warning = choose_gpu(args.gpu)
+        if warning:print(warning, file=sys.stderr)
+        if manifest:env['VK_DRIVER_FILES'] = str(manifest)
     if args.hud_pci_device:
         try:
             env['MANGOHUD_CONFIGFILE'] = str(overlay_pci_configuration(session, args.hud_pci_device))
@@ -757,7 +789,7 @@ def run(argv,sessions):
         restart.append('--save-backups' if args.save_backups else '--no-save-backups')
         restart += ['--portal-device',args.portal_device]
         restart.append('--allow-figure-writes' if args.allow_figure_writes else '--no-allow-figure-writes')
-        restart.append('--nvidia' if args.nvidia else '--no-nvidia')
+        restart += ['--gpu',args.gpu]
         restart += ['--frame-policy',chosen.get('frame_policy',args.frame_policy)]
         if args.level_events: restart.append('--level-events')
         restart.append('--unlock-nightmare' if args.unlock_nightmare else '--no-unlock-nightmare')

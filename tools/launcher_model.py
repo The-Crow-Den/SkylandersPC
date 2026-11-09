@@ -6,19 +6,19 @@ from pathlib import Path
 
 try:
     from .pc_settings import validate_settings
-    from .run_session import PACKS
+    from .run_session import PACKS, GPU_CHOICES, installed_gpus
     from . import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 except ImportError:
     from pc_settings import validate_settings
-    from run_session import PACKS
+    from run_session import PACKS, GPU_CHOICES, installed_gpus
     import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 
 DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=50,
-                motion_blur=True, anti_aliasing=True, nvidia=True, mangohud=False,
+                motion_blur=True, anti_aliasing=True, gpu='auto', mangohud=False,
                 unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US', aspect='16:9',
                 portal_device='virtual')
-FLAGS = ('motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro')
+FLAGS = ('motion_blur', 'anti_aliasing', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro')
 # 'auto' follows the display in fullscreen and the window size otherwise.
 ASPECTS = ('16:9', 'auto', '16:10', '21:9', '32:9')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
@@ -51,6 +51,8 @@ def validate(value):
         raise ValueError('Invalid frame policy')
     if any(not isinstance(value[key], str) or '\0' in value[key] for key in ('figure', 'figure_bottom')):
         raise ValueError('Invalid figure path')
+    if value['gpu'] not in GPU_CHOICES:
+        raise ValueError('Invalid GPU choice')
     if not portal_devices.valid_choice(value['portal_device']):
         raise ValueError('Invalid portal device')
     return dict(value)
@@ -65,10 +67,19 @@ def languages(root):
     return found
 
 
+def migrate(value):
+    """The old NVIDIA switch became the GPU choice; automatic already
+    prefers a working NVIDIA driver."""
+    if isinstance(value, dict) and 'nvidia' in value:
+        value = {k: v for k, v in value.items() if k != 'nvidia'}
+        value.setdefault('gpu', 'auto')
+    return value
+
+
 def load(path):
     path = Path(path)
     if not path.exists(): return dict(DEFAULTS)
-    value=json.loads(path.read_text())
+    value=migrate(json.loads(path.read_text()))
     if isinstance(value,dict):
         value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
     if isinstance(value,dict) and 'figure_bottom' not in value:
@@ -103,8 +114,8 @@ def save(path, value):
     temporary.replace(path)
 
 
-# The NVIDIA driver manifest path and MangoHud are Linux-only.
-LINUX_ONLY = ('nvidia', 'mangohud')
+# Vulkan driver choice and MangoHud are Linux-only.
+LINUX_ONLY = ('gpu', 'mangohud')
 
 
 def platform_settings():
@@ -113,7 +124,7 @@ def platform_settings():
 
 def command(root, python, value, mods=None, game=None, mod_settings=None):
     value = validate(value)
-    value = {**value, **{key: False for key in LINUX_ONLY if key not in platform_settings()}}
+    value = {**value, **{key: DEFAULTS[key] for key in LINUX_ONLY if key not in platform_settings()}}
     if mods is not None and mods.get('sixty-fps') is False:
         # The 60 FPS mod is off: original 30 FPS cap.
         value = dict(value, frame_policy='manual', frame_limit=30)
@@ -127,8 +138,9 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv += ['--game', game_library.selector(entry['title_id'], entry['app_version'])]
     for key in ('resolution', 'quality', 'frame_limit', 'portal_volume', 'frame_policy', 'language'):
         argv += ['--' + key.replace('_', '-'), str(value[key])]
+    argv += ['--gpu', value['gpu']]
     argv += ['--aspect', display_aspect() if value['aspect'] == 'auto' and value['fullscreen'] else value['aspect']]
-    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'nvidia', 'mangohud', 'unlock_nightmare', 'skip_intro'):
+    for key in ('fullscreen', 'fps_counter', 'trophy_popups', 'motion_blur', 'anti_aliasing', 'mangohud', 'unlock_nightmare', 'skip_intro'):
         argv.append('--' + ('' if value[key] else 'no-') + key.replace('_', '-'))
     if mods is not None:
         try:

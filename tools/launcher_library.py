@@ -34,6 +34,7 @@ def load(path):
             raise ValueError('Invalid library game')
         if game['id'] in ids or not isinstance(game.get('settings'), dict):
             raise ValueError('Invalid game settings or duplicate game')
+        game['settings'] = launcher_model.migrate(game['settings'])
         launcher_model.validate({**launcher_model.DEFAULTS, **game['settings']})
         if not game['id'] or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in game['id']):
             raise ValueError('Invalid library game identifier')
