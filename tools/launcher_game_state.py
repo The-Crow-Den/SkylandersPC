@@ -4,12 +4,14 @@ import os
 from pathlib import Path
 import uuid
 try:
-    from . import game_library,game_prepare
+    from . import game_library,game_prepare,launcher_library
 except ImportError:
-    import game_library,game_prepare
+    import game_library,game_prepare,launcher_library
 
 
 def snapshot(root,game,active=None):
+    if game.get('id') not in launcher_library.AVAILABLE:
+        return dict(state='Coming soon',message=game.get('name','This game')+' is not available in this release yet.',entry=None,size=None,version='')
     if active:return dict(state=active['state'],message=active.get('message',''),entry=None,size=None,version='',fraction=active.get('fraction'))
     try:entry=game_library.resolve_entry(root,game=game)
     except (OSError,ValueError):

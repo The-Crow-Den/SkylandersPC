@@ -27,7 +27,21 @@ class LauncherUITests(unittest.TestCase):
 
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory();self.root=Path(self.temporary.name)
+        # Library behaviour is shared by every game; open them all here.
+        from tools import launcher_library
+        everything=type('Everything',(),{'__contains__':lambda self,item:True})()
+        available=patch.object(launcher_library,'AVAILABLE',everything)
+        available.start();self.addCleanup(available.stop)
         self.window=Launcher(self.root)
+
+    def test_unreleased_games_cannot_be_installed(self):
+        from tools import launcher_library
+        with patch.object(launcher_library,'AVAILABLE',{'trap-team'}):
+            self.window.select_game('swap-force')
+            self.assertEqual((self.window.primary.text(),self.window.primary.isEnabled()),('COMING SOON',False))
+            self.assertFalse(self.window.play.isEnabled())
+            with patch('tools.launcher_shell.QMessageBox.information') as told:self.window.install()
+            told.assert_called_once()
 
     def tearDown(self):
         self.window.close();self.app.processEvents();self.temporary.cleanup()

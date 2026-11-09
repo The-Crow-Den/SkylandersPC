@@ -11,10 +11,12 @@ GAMES = [('swap-force', 'Swap Force', '#246bd8', '#ffaf83'),
          ('trap-team', 'Trap Team', '#087f9d', '#92dbc7'),
          ('superchargers', 'SuperChargers', '#572e9b', '#ef965d'),
          ('imaginators', 'Imaginators', '#263da2', '#e3a2ed')]
+# Only these games can be installed and played in this release; the others are shown as coming soon.
+AVAILABLE = {'trap-team'}
 
 
 def defaults():
-    return {'selected': 'swap-force', 'games': [dict(id=i, name=n, top=t, bottom=b,
+    return {'selected': 'trap-team', 'games': [dict(id=i, name=n, top=t, bottom=b,
             background='', logo='', game_pkg='', update_pkg='', settings={})
             for i, n, t, b in GAMES], 'figures': [], 'portal': None, 'portal_bottom': None}
 

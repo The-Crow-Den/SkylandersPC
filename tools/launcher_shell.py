@@ -276,13 +276,13 @@ def renovated(base):
             main.addWidget(self.subtitle)
             self.canvas.anchor = self.brand
             main.addStretch(3)
-            self.game_info=QLabel();self.game_info.setStyleSheet('color: #92929e; font-size: 11px;');self.game_info.setWordWrap(True)
+            self.game_info=QLabel();self.game_info.setStyleSheet('color: #e6e6ec; font-size: 13px; font-weight: 600;');self.game_info.setWordWrap(True)
             bottom = QHBoxLayout()
             self.trophies = self.button(bottom, 'Trophies  —%', self.trophy_tracker)
             self.trophies.setIcon(utility_icon('trophy'));self.trophies.setIconSize(QSize(24,24))
             self.trophies.setStyleSheet('background: transparent; border: none; text-align: left; color: #a9a9b1; padding: 12px 0; font-size: 14px;')
             self.install_note = QLabel(); self.install_note.setWordWrap(True)
-            self.install_note.setStyleSheet('color: #a9a9b1; font-size: 12px;')
+            self.install_note.setStyleSheet('color: #a9a9b1; font-size: 12px;'); self.install_note.setMaximumWidth(460)
             information=QVBoxLayout();information.setSpacing(3);information.addWidget(self.game_info);information.addWidget(self.install_note);bottom.addLayout(information,1)
             bottom.addStretch()
             self.loading_wheel=LoadingWheel();bottom.addWidget(self.loading_wheel)
@@ -299,6 +299,8 @@ def renovated(base):
                 QPushButton#gameIcon:hover { background: #303037; border-color: #50505a; }
                 QPushButton#gameIcon:checked { background: #343e46; color: #f5f5f7; border: 1px solid #98dfef; border-radius: 16px; }
                 QPushButton#libraryPlay { background: #fafafa; color: #10121a; border: none; border-radius: 14px; font-family: "Cantarell", "DejaVu Sans", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+                QPushButton#libraryPlay:hover { background: #e4f7fb; }
+                QPushButton#libraryPlay:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.14); }
                 QDialog { background: #171719; }
                 QListWidget { background: #222225; color: #f5f5f7; border: 1px solid #343438; border-radius: 12px; padding: 10px; }
                 QListWidget::item { padding: 12px; border-radius: 6px; }
@@ -382,6 +384,10 @@ def renovated(base):
                 button.setToolTip(game['name']+' · '+state);button.setAccessibleName(game['name']+' · '+state)
                 self.game_buttons[game['id']]=button
                 logo = QPixmap(supplied_artwork(self.root, game)['logo'])
+                if state=='Coming soon' and not logo.isNull():
+                    # Unreleased games stay visible but read as unavailable at a glance.
+                    faded=QPixmap(logo.size());faded.fill(Qt.GlobalColor.transparent)
+                    painter=QPainter(faded);painter.setOpacity(0.38);painter.drawPixmap(0,0,logo);painter.end();logo=faded
                 if not logo.isNull():
                     button.setIcon(QIcon(logo));button.setIconSize(QSize(70,48))
                 else:
@@ -450,12 +456,13 @@ def renovated(base):
                 button.setToolTip(self.game['name']+' · '+data['state']);button.setAccessibleName(button.toolTip())
             ready=data['state']=='Ready';busy=data['state'] in ('Installing','Preparing') or self.process is not None or getattr(self,'library_transfer',False)
             self.play.setEnabled(ready and not busy)
-            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'NOT SUPPORTED','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
+            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'NOT SUPPORTED','Coming soon':'COMING SOON','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
             self.primary.setEnabled(not busy and data['state'] in ('Ready','Needs repair','Not installed'))
             size='' if data['size'] is None else f"{data['size']/1024**3:.1f} GB" if data['size']>=1024**3 else f"{data['size']/1024**2:.1f} MB"
             progress=f"{round(data['fraction']*100)}%" if data.get('fraction') is not None else ''
             self.game_info.setText(' · '.join(part for part in (data['state'],progress,data['version'],size) if part))
             self.install_note.setText(data['message'])
+            self.trophies.setVisible(data['state']!='Coming soon')
             try:
                 try:
                     from .launcher_trophies import snapshot
@@ -540,6 +547,8 @@ def renovated(base):
         def install(self):
             if self.process:
                 QMessageBox.information(self, 'Session active', 'Stop the game before installing packages.'); return
+            if getattr(self,'game_state',{}).get('state')=='Coming soon':
+                QMessageBox.information(self, self.game['name'], self.game_state['message']); return
             try:
                 from .launcher_install_dialog import InstallDialog
             except ImportError:
@@ -550,7 +559,7 @@ def renovated(base):
             menu = QMenu(self)
             for title, callback in [('Install / update PKGs',self.install), ('Game settings',self.game_settings),
                                     ('Skylanders Manager',self.manager)]:
-                menu.addAction(title, callback)
+                menu.addAction(title, callback).setEnabled(getattr(self,'game_state',{}).get('state')!='Coming soon' or callback==self.manager)
             state=getattr(self,'game_state',{})
             busy=self.process is not None or bool(self.game.get('operation')) or getattr(self,'library_transfer',False)
             menu.addAction('Repair game setup',self.repair_game).setEnabled(not busy and state.get('state') in ('Ready','Needs repair'))
