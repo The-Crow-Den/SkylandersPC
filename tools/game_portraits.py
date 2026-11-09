@@ -12,6 +12,7 @@ alignment at 0x10, name table offset at 0x28, then 4-byte checksums and
 Textures are BC3 in 1D thin micro tiles (8x8 blocks), stored at the file end.
 """
 import argparse
+import hashlib
 import json
 import lzma
 from pathlib import Path
@@ -127,7 +128,97 @@ def prepare(destination, games):
             index[key] = filename
     if not index:raise ValueError('No portraits were found in the installed game')
     (destination / 'index.json').write_text(json.dumps(dict(schema_version=SCHEMA, portraits=index), indent=1, sort_keys=True) + '\n')
+    if destination.name == 'game':install(destination.parent)  # .local/portal-assets/game
     return index
+
+
+def unpng(data):
+    """RGBA rows of a PNG written by png() above (filter 0, 8-bit RGBA)."""
+    width, height = struct.unpack('>II', data[16:24])
+    raw = zlib.decompress(data[data.index(b'IDAT') + 4:data.rindex(b'IEND') - 8])
+    stride = width * 4 + 1
+    if data[24:26] != b'\x08\x06' or len(raw) != stride * height or any(raw[y * stride] for y in range(height)):
+        raise ValueError('unexpected portrait picture')
+    return width, [raw[y * stride + 1:(y + 1) * stride] for y in range(height)]
+
+
+def write(path, content):
+    temporary = path.with_name(path.name + '.tmp')
+    (temporary.write_bytes if isinstance(content, bytes) else temporary.write_text)(content); temporary.replace(path)
+
+
+COLUMNS = 16
+# Cells below this stay for villains and trap elements (the runtime maps
+# villains to fixed cells), even without the optional downloaded pictures.
+RESERVED = 64
+
+
+def install(assets):
+    """Put the game's pictures in the in-game portal's atlas and index
+    (.local/portal-assets/portraits.rgba, portrait-index.txt, sources.json),
+    keeping the villain and element cells already there. Safe to repeat."""
+    assets = Path(assets); game = assets / 'game'
+    index_data = (game / 'index.json').read_bytes()
+    index = json.loads(index_data)['portraits']
+    try:record = json.loads((assets / 'sources.json').read_text())
+    except (OSError, ValueError):record = {}
+    if not isinstance(record, dict):record = {}
+    try:atlas = (assets / 'portraits.rgba').read_bytes()
+    except OSError:atlas = b''
+    digest = hashlib.sha256(index_data).hexdigest()
+    if record.get('game_index_sha256') == digest and atlas and record.get('atlas_sha256') == hashlib.sha256(atlas).hexdigest():
+        return False
+    stride = COLUMNS * SIZE * 4
+    kept = []
+    if len(atlas) >= 8:
+        width, height = struct.unpack_from('<II', atlas)
+        if width * 4 == stride and len(atlas) == 8 + width * height * 4:
+            kept = [s for s in record.get('sources', []) if isinstance(s, dict) and s.get('kind') in ('villain', 'element')
+                    and type(s.get('cell')) is int and 0 <= s['cell'] < height // SIZE * COLUMNS]
+    # Villain cells are fixed; trap element icons move up behind them (element-index.txt follows).
+    moved = {}; free = max([-1] + [e['cell'] for e in kept if e['kind'] == 'villain']) + 1
+    for entry in sorted((e for e in kept if e['kind'] == 'element'), key=lambda e: e['cell']):
+        moved[entry['cell']] = free; free += 1
+    first = max(RESERVED, free)
+    keys = sorted(index, key=lambda key: tuple(map(int, key.split(':'))))
+    rows = -(-(first + len(keys)) // COLUMNS)
+    if rows > 64:raise ValueError('Too many portraits for the portal atlas')
+    pixels = bytearray(stride * rows * SIZE)
+    def place(cell, lines):
+        x = cell % COLUMNS * SIZE * 4; y = cell // COLUMNS * SIZE
+        for row in range(SIZE):pixels[(y + row) * stride + x:(y + row) * stride + x + SIZE * 4] = lines[row]
+    def place_old(cell, old):
+        x = cell % COLUMNS * SIZE * 4; y = cell // COLUMNS * SIZE; ox = old % COLUMNS * SIZE * 4; oy = old // COLUMNS * SIZE
+        for row in range(SIZE):
+            at = 8 + (oy + row) * stride + ox
+            pixels[(y + row) * stride + x:(y + row) * stride + x + SIZE * 4] = atlas[at:at + SIZE * 4]
+    sources = []
+    for entry in kept:
+        cell = moved.get(entry['cell'], entry['cell']); place_old(cell, entry['cell']); sources.append(dict(entry, cell=cell))
+    mapping = {}
+    for cell, key in enumerate(keys, first):
+        data = (game / index[key]).read_bytes()
+        width, lines = unpng(data)
+        if width != SIZE or len(lines) != SIZE:raise ValueError('unexpected portrait size')
+        place(cell, lines); mapping[tuple(map(int, key.split(':')))] = cell
+        sources.append(dict(cell=cell, kind='figure', cache='game/' + index[key], sha256=hashlib.sha256(data).hexdigest()))
+    # A swapper's bottom half (1xxx) shows its top half (2xxx) when the game has no picture of its own.
+    for (identity, variant), cell in list(mapping.items()):
+        if 2000 <= identity < 3000 and not any(i == identity - 1000 for i, _ in mapping):
+            mapping.setdefault((identity - 1000, variant), cell)
+    content = struct.pack('<II', COLUMNS * SIZE, rows * SIZE) + bytes(pixels)
+    if moved:
+        try:lines = (assets / 'element-index.txt').read_text().split()
+        except OSError:lines = []
+        pairs = [(int(lines[i]), int(lines[i + 1])) for i in range(0, len(lines) - 1, 2)]
+        write(assets / 'element-index.txt', ''.join(f'{e} {moved.get(c, c)}\n' for e, c in pairs))
+    write(assets / 'portraits.rgba', content)
+    write(assets / 'portrait-index.txt', '\n'.join([f'SKYPORTRAITS1 {COLUMNS} {rows}'] +
+          [f'{i} {v} {c}' for (i, v), c in sorted(mapping.items())]) + '\n')
+    record.update(schema_version=2, atlas_sha256=hashlib.sha256(content).hexdigest(), dimensions=[COLUMNS * SIZE, rows * SIZE],
+                  columns=COLUMNS, rows=rows, figure_portraits=len(keys), game_index_sha256=digest, sources=sources)
+    write(assets / 'sources.json', json.dumps(record, indent=2) + '\n')
+    return True
 
 
 def main():

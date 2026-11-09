@@ -6,7 +6,7 @@ import math
 import time
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer, QPropertyAnimation
 from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen, QFontDatabase
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QFrame, QProgressBar, QGraphicsOpacityEffect)
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QFrame, QProgressBar, QGraphicsOpacityEffect, QSizePolicy)
 try:
     from . import game_library
     from . import launcher_library as library
@@ -315,7 +315,8 @@ def renovated(base):
             self.session_stop = self.button(bottom, 'Stop', self.stop_game)
             self.session_stop.setVisible(False)
             self.primary = self.button(bottom, 'INSTALL', self.primary_action)
-            self.primary.setObjectName('libraryPlay'); self.primary.setMinimumSize(190,56)
+            self.primary.setObjectName('libraryPlay'); self.primary.setMinimumSize(190,56); self.primary.setMaximumWidth(240)
+            self.primary.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             more=self.button(bottom, '•••', self.game_menu);more.setObjectName('moreButton');more.setFixedSize(56,56)
             main.addWidget(panel)
             self.setStyleSheet(self.styleSheet() + '''

@@ -127,8 +127,12 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .scene::before { display:none; }
 #trap-rail-demo .portal-panel { position:absolute; top:24px; right:18px; max-height:calc(100% - 48px); overflow-y:auto; }
 #trap-rail-demo .settings-panel { max-height:calc(100vh - 32px); overflow-y:auto; }
-#trap-rail-demo .portal-panel::-webkit-scrollbar,#trap-rail-demo .settings-panel::-webkit-scrollbar { width:5px; }
+/* Thin overlay scroll bars everywhere: no browser arrows or grey track. */
+#trap-rail-demo ::-webkit-scrollbar { width:5px; height:5px; background:transparent; }
+#trap-rail-demo ::-webkit-scrollbar-track,#trap-rail-demo ::-webkit-scrollbar-corner { background:transparent; }
+#trap-rail-demo ::-webkit-scrollbar-button { display:none; width:0; height:0; }
 #trap-rail-demo ::-webkit-scrollbar-thumb { border-radius:5px; background:#525258; }
+#trap-rail-demo ::-webkit-scrollbar-thumb:hover { background:#6a6a72; }
 #trap-rail-demo h3 { line-height:21.78px; }
 #trap-rail-demo .slot-strip.coop { grid-template-columns:repeat(2,minmax(0,1fr)); }
 #trap-rail-demo .slot img { object-fit:cover; }

@@ -51,7 +51,9 @@ class Portraits:
             if isinstance(sources,dict):sources=sources.get('sources',[])
             for entry in sources:
                 cell=entry.get('cell',entry.get('index',-1));name=entry.get('cache','')
-                if type(cell)is int and 0<=cell<2048 and isinstance(name,str) and name==Path(name).name and name not in ('','.','..'):
+                # Plain cache names, or the game's own pictures under game/.
+                local=name[5:] if isinstance(name,str) and name.startswith('game/') else name
+                if type(cell)is int and 0<=cell<2048 and isinstance(local,str) and local==Path(local).name and local not in ('','.','..'):
                     self.cells[cell]=(name,entry.get('sha256'))
         except (OSError,ValueError,TypeError):pass
     def get(self,cell):
@@ -59,7 +61,7 @@ class Portraits:
         if cell in self.cache:return self.cache[cell]
         name,digest=self.cells[cell];path=self.directory/name
         try:
-            if path.is_symlink() or path.resolve().parent!=self.directory.resolve() or path.stat().st_size>4*1024*1024:return ''
+            if path.is_symlink() or path.resolve().parent not in (self.directory.resolve(),(self.directory/'game').resolve()) or path.stat().st_size>4*1024*1024:return ''
             data=path.read_bytes()
             if digest and hashlib.sha256(data).hexdigest()!=digest:return ''
             mime='image/png' if data.startswith(b'\x89PNG\r\n\x1a\n') else 'image/jpeg' if data.startswith(b'\xff\xd8') else 'image/webp' if data.startswith(b'RIFF') and data[8:12]==b'WEBP' else None

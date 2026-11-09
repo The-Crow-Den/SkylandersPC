@@ -11,6 +11,7 @@ import os
 import re
 from pathlib import Path
 import signal
+import struct
 import subprocess
 import threading
 import time
@@ -662,6 +663,14 @@ def run(argv,sessions):
         env['SKY_PORTAL_FIGURE_WRITES'] = '1' if args.allow_figure_writes else '0'
     else:
         env.setdefault('SKY_VIRTUAL_PORTAL', '1')
+        # The game's own pictures in the in-game portal; repeats after a re-download replaced the atlas.
+        if (ROOT/'.local/portal-assets/game/index.json').is_file():
+            try:
+                try:from . import game_portraits
+                except ImportError:import game_portraits
+                game_portraits.install(ROOT/'.local/portal-assets')
+            except (OSError,ValueError,KeyError,TypeError,struct.error) as error:
+                print('Portal pictures not updated:',error,file=sys.stderr)
     if args.figure:
         env['SKY_PORTAL_FIGURE'] = str(args.figure.resolve())
         if args.figure_bottom:
