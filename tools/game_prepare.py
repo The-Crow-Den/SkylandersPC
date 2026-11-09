@@ -343,7 +343,7 @@ def prepare(root, entry, progress=json_progress, optional=()):
         for name in optional:prepare_optional(root,entry,name,progress)
         try:check_dependencies(runtime_paths(root)[0])
         except (OSError,ValueError) as error:
-            pipeline.record['failure'] = dict(name='runtime',message=str(error));pipeline.save()
+            pipeline.record['failure'] = dict(name='runtime',message=str(error),platform=os.name);pipeline.save()
             progress(event('runtime','failed',1,str(error)));raise
         progress(event('ready','complete',1,'Game setup is complete.'))
         return result
@@ -400,6 +400,14 @@ def required_steps(variant):
     return ['verify-executable','recipes',*([] if WINDOWS else ['renderer']),'runtime','pack.'+variant]
 
 
+def blocking_failure(record):
+    """Runtime files belong to one OS. Windows and Linux share this record on a
+    dual-boot drive, so a missing runtime on one must not block the other."""
+    failure = record.get('failure')
+    if not failure:return False
+    return not (failure.get('name')=='runtime' and failure.get('platform')!=os.name)
+
+
 def shallow_ready(root, entry, variant):
     """Metadata changes from hard links are harmless when the recorded bytes still match."""
     required = required_steps(variant)
@@ -420,7 +428,7 @@ def shallow_ready(root, entry, variant):
                 except (OSError,ValueError) as error:raise PreparationError(name) from error
                 if actual!=digest:raise PreparationError(name)
                 marker['stamps'][path] = stamp(root/path);changed = True
-        if record.get('failure'):raise PreparationError(record['failure'].get('name','verify-executable'))
+        if blocking_failure(record):raise PreparationError(record['failure'].get('name','verify-executable'))
         return changed if refresh else True
     record = read_state(root,entry)
     try:
@@ -461,7 +469,7 @@ def require_ready(root, entry, variant='60-delta', *, deep=True):
                 if not pipeline.valid(marker,key):missing(name)
             except (OSError,ValueError,KeyError,TypeError):missing(name)
         elif any(stamp(root/path)!=value for path,value in marker['stamps'].items()):missing(name)
-    if record.get('failure'):missing(record['failure']['name'])
+    if blocking_failure(record):missing(record['failure']['name'])
     if deep:check_dependencies(runtime_paths(root)[0])
     return record
 

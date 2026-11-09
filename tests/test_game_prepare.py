@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -214,3 +215,12 @@ class PreparationTests(unittest.TestCase):
             events=[];prepare.prepare(self.root,self.entry,progress=events.append,optional=('controller-art',))
         self.assertTrue(any(e['state']=='optional-failed' for e in events))
         prepare.require_ready(self.root,self.entry)
+
+
+class FailureScopeTest(unittest.TestCase):
+    def test_runtime_failure_from_the_other_os_does_not_block(self):
+        other = 'posix' if os.name == 'nt' else 'nt'
+        self.assertFalse(prepare.blocking_failure({}))
+        self.assertFalse(prepare.blocking_failure({'failure': dict(name='runtime', message='', platform=other)}))
+        self.assertTrue(prepare.blocking_failure({'failure': dict(name='runtime', message='', platform=os.name)}))
+        self.assertTrue(prepare.blocking_failure({'failure': dict(name='recipes', message='')}))
