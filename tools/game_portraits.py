@@ -26,6 +26,8 @@ except ImportError:
 ARCHIVES = ('misc/ui_collection_champions.arc', 'misc/ui_collection_traps.arc')
 NAME = re.compile(r'/(\d{1,5})_(\d{1,5})(?:_[a-z0-9_]*)?\.png/[^/]*\.tex\.igz$')
 SIZE = 96
+# Bump when the decoded pictures change, so older caches are rebuilt.
+SCHEMA = 2
 
 
 def members(data):
@@ -69,7 +71,8 @@ def alpha(block):
 
 
 def picture(texture):
-    """RGBA rows at half size (2x2 average) from a 192x192 BC3 collection texture."""
+    """RGBA rows at half size (2x2 average) from a 192x192 BC3 collection texture.
+    The game stores them bottom row first."""
     sections = struct.unpack_from('<I', texture, 0x28)[0]
     width, height = struct.unpack_from('<HH', texture, sections + 0x110)
     if (width, height) != (192, 192) or len(texture) < width * height:raise ValueError('unexpected portrait texture')
@@ -87,7 +90,7 @@ def picture(texture):
             quad = (full[y][x], full[y][x + 1], full[y + 1][x], full[y + 1][x + 1])
             row += bytes(sum(p[c] for p in quad) // 4 for c in range(4))
         rows.append(bytes(row))
-    return rows
+    return rows[::-1]
 
 
 def png(rows):
@@ -109,6 +112,8 @@ def find(games, relative):
 def prepare(destination, games):
     destination = Path(destination); destination.mkdir(parents=True, exist_ok=True)
     index = {}
+    try:current = json.loads((destination / 'index.json').read_text()).get('schema_version') == SCHEMA
+    except (OSError, ValueError, AttributeError):current = False
     for relative in ARCHIVES:
         data = find(games, relative).read_bytes()
         for name, offset, size, mode, align in members(data):
@@ -117,11 +122,11 @@ def prepare(destination, games):
             key = f'{int(match[1])}:{int(match[2])}'; filename = key.replace(':', '_') + '.png'
             target = destination / filename
             if target.is_symlink():raise ValueError('redirected portrait cache')
-            if not target.is_file():
+            if not current or not target.is_file():
                 target.write_bytes(png(picture(extract(data, offset, size, mode, align))))
             index[key] = filename
     if not index:raise ValueError('No portraits were found in the installed game')
-    (destination / 'index.json').write_text(json.dumps(dict(schema_version=1, portraits=index), indent=1, sort_keys=True) + '\n')
+    (destination / 'index.json').write_text(json.dumps(dict(schema_version=SCHEMA, portraits=index), indent=1, sort_keys=True) + '\n')
     return index
 
 
