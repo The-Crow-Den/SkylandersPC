@@ -18,10 +18,18 @@ CELL = 96
 
 
 class Portraits:
-    """Identification portraits: the original cached pictures, else the drawer atlas."""
+    """Identification portraits: the game's own collection pictures first, then the
+    optional downloaded pictures, else the drawer atlas."""
     def __init__(self, root):
-        self.cells = {}; self.files = {}; self.atlas = QImage(); self.cache = {}
+        self.cells = {}; self.files = {}; self.atlas = QImage(); self.cache = {}; self.game = {}
         folder = Path(root) / '.local/portal-assets'
+        try:
+            index = json.loads((folder / 'game/index.json').read_text())['portraits']
+            for key, filename in index.items():
+                identity, variant = map(int, key.split(':'))
+                if '/' not in filename and '\\' not in filename:self.game[(identity, variant)] = folder / 'game' / filename
+        except (OSError, ValueError, KeyError, AttributeError):
+            pass
         try:
             lines = (folder / 'portrait-index.txt').read_text().split('\n')
             for line in lines[1:]:
@@ -37,7 +45,20 @@ class Portraits:
         except (OSError, ValueError, KeyError, struct.error):
             pass
 
+    def from_game(self, identity, variant):
+        if (identity, variant) in self.game:return self.game[(identity, variant)]
+        # A swapper's bottom half shows its top half's picture.
+        for candidate in ([identity, identity + 1000] if 1000 <= identity < 2000 else [identity]):
+            variants = sorted(v for i, v in self.game if i == candidate)
+            if variants:return self.game[(candidate, variant if variant in variants else variants[0])]
+        return None
+
     def get(self, identity, variant):
+        path = self.from_game(identity, variant)
+        if path is not None:
+            key = ('game', identity, variant)
+            if key not in self.cache:self.cache[key] = QPixmap(str(path))
+            if not self.cache[key].isNull():return self.cache[key]
         cell = self.cells.get((identity, variant), self.cells.get((identity, 0)))
         if cell is None: return QPixmap()
         if cell not in self.cache:

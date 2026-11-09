@@ -340,7 +340,7 @@ def prepare(root, entry, progress=json_progress, optional=()):
             path = root/('.local/controller-glyphs/manifest.json' if name=='controller-art' else '.local/portal-assets/variant-art/sources.json' if name=='variant-art' else '.local/portal-assets/sources.json')
             progress(event('optional.'+name,'available' if path.is_file() else 'optional',1,
                 name+' is optional and does not affect whether the game can start.'))
-        for name in optional:prepare_optional(root,entry,name,progress)
+        for name in ('game-portraits',*optional):prepare_optional(root,entry,name,progress)
         try:check_dependencies(runtime_paths(root)[0])
         except (OSError,ValueError) as error:
             pipeline.record['failure'] = dict(name='runtime',message=str(error),platform=os.name);pipeline.save()
@@ -371,6 +371,11 @@ def prepare_optional(root, entry, name, progress):
             try:from . import fetch_portal_portraits as importer
             except ImportError:import fetch_portal_portraits as importer
             destination = root/'.local/portal-assets'
+        elif name=='game-portraits':
+            try:from . import game_portraits as importer
+            except ImportError:import game_portraits as importer
+            destination = root/'.local/portal-assets/game'
+            games = [Path(entry[key]) for key in ('update_path','base_path') if entry.get(key)]
         elif name=='variant-art':
             try:from . import fetch_variant_art as importer
             except ImportError:import fetch_variant_art as importer
@@ -385,9 +390,11 @@ def prepare_optional(root, entry, name, progress):
                     for filename,digest in manifest['files'].items():
                         path = game_build.relative(destination,filename)
                         if file_hash(path)!=digest:raise ValueError('Optional controller artwork needs repair')
+                elif name=='game-portraits':importer.prepare(destination,games)
                 else:importer.prepare(destination)
             return sorted(p for p in destination.rglob('*') if p.is_file())
         inputs = dict(files=[Path(importer.__file__),*sorted(source.glob('*.png'))] if source else [Path(importer.__file__)],values={'optional':name})
+        if name=='game-portraits':inputs['files'] += [importer.find(games,relative) for relative in importer.ARCHIVES]
         if name=='portraits':inputs['files'].append(root/'profiles/trap-team-portal.json')
         worker.run([Step('optional.'+name,inputs,action,'Adding optional artwork…')])
     except (OSError,ValueError,ImportError,KeyError,TypeError) as error:
