@@ -16,10 +16,10 @@ import sys
 import uuid
 
 try:
-    from . import game_library, game_build, link_native, patches, resolution
+    from . import game_library, game_build, link_native, patches, resolution, host_process
     from .file_integrity import VerifiedDigests
 except ImportError:
-    import game_library, game_build, link_native, patches, resolution
+    import game_library, game_build, link_native, patches, resolution, host_process
     from file_integrity import VerifiedDigests
 
 PREPARATION_VERSION = 1  # Bump only when output contracts or verification rules change.
@@ -167,13 +167,21 @@ def runtime_paths(root):
     return (root/'.local/native-gpu-build/skylanders-native-host',root/'out/dependency-build/renderer/libskyrender.so')
 
 
+def renderer_root(root):
+    """The renderer in this repository (renderer/); older checkouts kept a private copy."""
+    return root/'renderer' if (root/'renderer/gpu/CMakeLists.txt').is_file() else root/'.local/skyrender'
+
+
 def renderer_step(pipeline):
-    root = pipeline.root;_,library = runtime_paths(root);source = root/'.local/skyrender/gpu'
+    root = pipeline.root;_,library = runtime_paths(root);source = renderer_root(root)/'gpu'
     def build(key):
         if not library.is_file() or 'renderer' in pipeline.record['steps']:
             if not (source/'CMakeLists.txt').is_file():
                 raise PreparationError('Renderer source is missing. Restore the runtime files supplied with this project, then choose Repair.')
             prefix = root/'.local/deps/prefix'
+            # A build folder configured from the old private copy refuses the new source.
+            cache = library.parent/'CMakeCache.txt'
+            if cache.is_file() and f'CMAKE_HOME_DIRECTORY:INTERNAL={source}' not in cache.read_text(errors='replace'):cache.unlink()
             run_command(['cmake','-S',source,'-B',library.parent,'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo',
                 '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',f'-DCMAKE_PREFIX_PATH={prefix}',f'-DVulkan_INCLUDE_DIR={prefix}/include',
                 '-DSKY_RENDERER_LTO=OFF','-DSKY_RENDERER_PGO=off','-DFETCHCONTENT_FULLY_DISCONNECTED=ON'],root)
@@ -185,6 +193,9 @@ def renderer_step(pipeline):
 
 
 def portal_source(root):
+    # The MPL portal sources now live in the repository.
+    bundled = root/'native/third_party/cemu'
+    if (bundled/'src/runtime/cemu_portal.cpp').is_file():return bundled
     cache = root/'.local/native-gpu-build/CMakeCache.txt'
     if not cache.is_file():return None
     for line in cache.read_text().splitlines():
@@ -212,7 +223,7 @@ def runtime_step(pipeline):
         if not host.is_file() or 'runtime' in pipeline.record['steps']:
             if not (root/'native/CMakeLists.txt').is_file():raise PreparationError('Native runtime source is missing. Restore the runtime files, then choose Repair.')
             args = ['cmake','-S',root/'native','-B',build_dir,'-DCMAKE_BUILD_TYPE=RelWithDebInfo',
-                f'-DSKY_RENDERER_ROOT={root/".local/skyrender"}',f'-DSKY_RENDERER_LIBRARY={library}',
+                f'-DSKY_RENDERER_ROOT={renderer_root(root)}',f'-DSKY_RENDERER_LIBRARY={library}',
                 f'-DCMAKE_PREFIX_PATH={root/".local/deps/prefix"}']
             # Preserve the configured portal provider, including after relocation.
             portal = portal_source(root)
@@ -228,7 +239,7 @@ def runtime_step(pipeline):
         if WINDOWS:return dict(files=[host] if host.is_file() else [],values={'prebuilt':True})
         portal = portal_source(root)
         portal_files = [portal/p for p in ('src/runtime/cemu_portal.cpp','Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp','Cemu-main/src/Common/unix/FileStream_unix.cpp')] if portal else []
-        return dict(files=[*source_files(root/'native'),*source_files(root/'.local/skyrender/src'),*portal_files,library],values={'source_available':(root/'native').exists(),'portal':str(portal) if portal else None})
+        return dict(files=[*source_files(root/'native'),*source_files(renderer_root(root)/'src'),*portal_files,library],values={'source_available':(root/'native').exists(),'portal':str(portal) if portal else None})
     return Step('runtime',inputs,build,'Checking the game runtime…')
 
 
@@ -440,11 +451,17 @@ def shallow_ready(root, entry, variant):
     record = read_state(root,entry)
     try:
         if check(record):return record
-        with game_library.locked(root/'.local/game-preparation'):
-            record = read_state(root,entry)
-            if check(record,True):game_library.write_json(state_path(root,entry),record)
+        # Never wait here: the launcher calls this while drawing, and a running
+        # setup holds the lock for minutes.
+        try:
+            with host_process.exclusive_lock(root/'.local/game-preparation/.library.lock'):
+                record = read_state(root,entry)
+                if check(record,True):game_library.write_json(state_path(root,entry),record)
+        except BlockingIOError:
+            raise PreparationError('Game setup is running. It will be ready when setup finishes.') from None
         return record
     except PreparationError as error:
+        if 'is running' in str(error):raise
         raise PreparationError(f'Game setup needs {error}. Choose Repair in the launcher to finish setup.') from error
 
 

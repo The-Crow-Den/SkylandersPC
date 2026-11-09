@@ -162,6 +162,9 @@ def check_recipe(recipe, where):
             if 'copy_from' in edit:
                 if type(edit.get('length')) is not int or edit['length'] <= 0:
                     raise ModError(f'{where} has an invalid copy edit')
+            elif 'add' in edit:
+                if type(edit.get('add')) is not int or type(edit.get('width')) is not int or not 1 <= edit['width'] <= 8:
+                    raise ModError(f'{where} has an invalid add edit')
             else:
                 before = hex_bytes(edit.get('expected_hex'), f'{where} expected_hex')
                 after = hex_bytes(edit.get('replacement_hex'), f'{where} replacement_hex')
@@ -327,7 +330,7 @@ WHOLE = float('inf')
 def recipe_ranges(recipe):
     for chunk in recipe['chunks']:
         for edit in chunk['edits']:
-            size = edit['length'] if 'copy_from' in edit else len(bytes.fromhex(edit['expected_hex']))
+            size = edit['length'] if 'copy_from' in edit else edit['width'] if 'add' in edit else len(bytes.fromhex(edit['expected_hex']))
             # Edits address decoded chunk bytes; key ranges by archive and chunk.
             yield (recipe['asset'], chunk['offset'], edit['offset'], edit['offset'] + size)
 
