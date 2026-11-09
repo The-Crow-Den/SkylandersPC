@@ -166,3 +166,34 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .quick-figure img { width:36px; height:36px; object-fit:cover; border-radius:8px; }
 #trap-rail-demo .quick-figure span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #trap-rail-demo .quick-figure[aria-pressed="true"] { border-color:var(--accent); }
+
+/* Touch-ups: calmer surfaces, tidy action chips, a pinned header and lettered tiles. */
+#trap-rail-demo { --panel:#161619f2; --card:#232327; --card-hover:#2e2e33; }
+#trap-rail-demo .portal-panel, #trap-rail-demo .settings-panel { border:1px solid #ffffff12; backdrop-filter:blur(18px); box-shadow:0 24px 70px #0000008c, inset 0 1px 0 #ffffff0d; }
+#trap-rail-demo .portal-panel { padding-top:0; scrollbar-gutter:stable; }
+#trap-rail-demo .portal-panel > .head { position:sticky; top:0; z-index:5; margin:0 -22px 14px; padding:18px 22px 12px; background:linear-gradient(#18181b 78%,#18181b00); }
+#trap-rail-demo .head h2 { font-size:19px; font-weight:700; letter-spacing:.2px; }
+#trap-rail-demo .icon-button { border-radius:10px; transition:background 120ms ease; }
+#trap-rail-demo .icon-button:hover { background:#ffffff14; }
+#trap-rail-demo .rail { background:#121215e6; border:1px solid #ffffff10; backdrop-filter:blur(14px); }
+#trap-rail-demo .slot { background:var(--card); border-color:#ffffff14; transition:background 120ms ease,border-color 120ms ease; }
+#trap-rail-demo .slot.is-empty { background:transparent; border-style:dashed; border-color:#4a4a52; }
+#trap-rail-demo .slot.is-empty .empty { background:transparent; color:#7c7c86; }
+#trap-rail-demo .slot[aria-pressed="true"] { border-color:var(--accent); border-style:solid; background:#1f2c31; box-shadow:inset 0 -3px 0 var(--accent); }
+#trap-rail-demo .slot > span:not(.slot-name):not(.empty):not(.placeholder) { font-weight:600; font-size:12px; letter-spacing:.3px; }
+#trap-rail-demo .small-row:not(.section-title) { justify-content:flex-start; gap:6px; min-height:0; margin-bottom:4px; }
+#trap-rail-demo .small-row .text-button { min-height:34px; padding:7px 12px; border-radius:999px; background:#2a2a2f; border:1px solid #ffffff10; font-size:12px; font-weight:500; transition:background 120ms ease; }
+#trap-rail-demo .small-row .text-button:hover { text-decoration:none; background:#36363c; }
+#trap-rail-demo .small-row .text-button[data-coop] { background:#1f2c31; border-color:#98dfef40; color:#cdf2fa; }
+#trap-rail-demo .section-title h3 { font-size:15px; font-weight:700; }
+#trap-rail-demo .section-title p { font-size:12px; color:var(--quiet); }
+#trap-rail-demo .search { border-radius:12px; background:#202024; border:1px solid #ffffff12; }
+#trap-rail-demo .search:focus-within { border-color:#98dfef80; }
+#trap-rail-demo .figure, #trap-rail-demo .saved-trap, #trap-rail-demo .quick-figure, #trap-rail-demo .element-button { background:var(--card); transition:background 120ms ease,border-color 120ms ease,transform 120ms ease; }
+#trap-rail-demo .figure:hover, #trap-rail-demo .saved-trap:hover, #trap-rail-demo .quick-figure:hover { background:var(--card-hover); transform:translateY(-1px); }
+#trap-rail-demo .figure span:not(.placeholder):not(.swapper-half) { text-align:center; color:#e4e4ea; }
+#trap-rail-demo .placeholder, #trap-rail-demo .figure span.placeholder { display:grid; place-items:center; width:100%; aspect-ratio:1.12; margin-bottom:7px; border-radius:9px; background:linear-gradient(145deg,#2f4552,#1f2a33); color:#cdeff8; font-size:22px; font-weight:800; letter-spacing:1px; }
+#trap-rail-demo .slot .placeholder { max-width:88px; aspect-ratio:1; margin:0; }
+#trap-rail-demo .quick-figure .placeholder { width:36px; height:36px; aspect-ratio:auto; margin:0; font-size:13px; border-radius:8px; }
+#trap-rail-demo .collection-actions { padding-top:12px; border-top:1px solid #ffffff10; }
+#trap-rail-demo .pad-hints { background:#121215e6; border:1px solid #ffffff12; backdrop-filter:blur(12px); }

@@ -42,11 +42,16 @@
   const slotLabel=slot=>{if(slot!==0&&slot!==3)return selected(slot)?.name;const {main,bottom}=halves(slot);
     if(bottom)return (isTop(main)?halfName(main.name):'?')+' + '+halfName(bottom.name);return isTop(main)?halfName(main.name)+' + ?':main?.name;};
   const send=(verb,...args)=>bridge?.command([verb,...args].join(' '));
-  function portrait(cell){
+  // A figure without a picture gets a lettered tile instead of a blank card.
+  function placeholder(name){const tile=document.createElement('span');tile.className='placeholder';tile.setAttribute('aria-hidden','true');
+    tile.textContent=(name||'?').split(/[\s-]+/).filter(Boolean).slice(0,2).map(word=>word[0]).join('').toUpperCase();return tile;}
+  function portrait(cell,name){
     const image=document.createElement('img');image.alt='';
-    if(cell<0){image.hidden=true;return image;}
+    const missing=()=>{if(!name){image.hidden=true;return;}if(image.isConnected)image.replaceWith(placeholder(name));else setTimeout(()=>image.isConnected?image.replaceWith(placeholder(name)):image.hidden=true,0);};
+    if(cell<0){if(name)return placeholder(name);image.hidden=true;return image;}
     if(images.has(cell))image.src=images.get(cell);
-    else if(bridge)bridge.portrait(cell,value=>{if(value){images.set(cell,value);image.src=value;}else image.hidden=true;});
+    else if(bridge)bridge.portrait(cell,value=>{if(value){images.set(cell,value);image.src=value;}else{images.set(cell,'');missing();}});
+    if(images.get(cell)==='')return name?placeholder(name):(image.hidden=true,image);
     return image;
   }
   function button(className,label){const result=document.createElement('button');result.type='button';result.className=className+' cursor-interaction';if(label)result.setAttribute('aria-label',label);return result;}
@@ -55,7 +60,7 @@
     for(const slot of slotOrder()){
       const item=slot===0||slot===3?halves(slot).main||halves(slot).bottom:selected(slot);const title=slotLabel(slot)||'Empty';const card=button('slot',slotNames[slot]+': '+title);card.setAttribute('aria-pressed',String(ui.slot===slot));
       let cell=item?.portrait??-1;if(slot===1&&item&&cell<0)cell=ui.snapshot?.elements?.[item.element]?.portrait??-1;
-      if(cell>=0)card.append(portrait(cell));else{const empty=document.createElement('span');empty.className='empty';empty.innerHTML='<i data-lucide="orbit" aria-hidden="true"></i>';card.append(empty);}
+      const occupied=item||title!=='Empty';if(cell>=0||occupied)card.append(portrait(cell,item?.name||(occupied?title:'')));else{card.classList.add('is-empty');const empty=document.createElement('span');empty.className='empty';empty.innerHTML='<i data-lucide="orbit" aria-hidden="true"></i>';card.append(empty);}
       const label=document.createElement('span');label.textContent=slotNames[slot];const name=document.createElement('span');name.className='slot-name';name.textContent=title;card.append(label,name);
       card.onclick=()=>{ui.slot=slot;search.value='';root.querySelector('.figure-creator').hidden=true;render();};strip.append(card);
     }
@@ -90,7 +95,7 @@
     for(const name of names.slice(0,10)){
       const item=list.find(entry=>entry.name===name);if(!item)continue;
       const chip=button('quick-figure',(favourites.includes(name)?'Favourite: ':'Recent: ')+'place '+name+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(!!(item.state&2)));
-      chip.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+name;chip.append(label);
+      chip.append(portrait(item.portrait,name));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+name;chip.append(label);
       chip.onclick=()=>place(category,item);row.append(chip);
     }
     row.hidden=!row.children.length||!!search.value.trim();
@@ -106,7 +111,7 @@
     const category=kind();const list=collection(ui.slot).filter(item=>item.name.toLowerCase().includes(search.value.trim().toLowerCase()));
     const text=words(category);root.querySelector('[data-collection-title]').textContent=text[1];root.querySelector('[data-current-slot]').textContent=slotNames[ui.slot];search.placeholder=text[2];
     const grid=root.querySelector('.portrait-grid');grid.replaceChildren();
-    for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait));const label=document.createElement('span');label.textContent=item.detail.startsWith('Swapper ')?halfName(item.name):item.name;card.append(label);
+    for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait,item.name));const label=document.createElement('span');label.textContent=item.detail.startsWith('Swapper ')?halfName(item.name):item.name;card.append(label);
       if(item.detail.startsWith('Swapper ')){const half=document.createElement('span');half.className='swapper-half';half.textContent=isTop(item)?'Top':'Bottom';card.append(half);}
       if(item.state&2){const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);}
       card.onclick=()=>place(category,item);grid.append(card);}
