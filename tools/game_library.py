@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import shutil
 import uuid
@@ -149,6 +149,16 @@ def make_entry(base, update=None, source_packages=()):
         source_packages=[Path(name).name for name in source_packages if name])
 
 
+def foreign_absolute(raw):
+    """An absolute path written by the other OS (dual boot sharing one drive)."""
+    return isinstance(raw, str) and not Path(raw).is_absolute() and (
+        bool(PureWindowsPath(raw).drive and PureWindowsPath(raw).root) or raw.startswith('/'))
+
+
+def foreign_path(raw):
+    return PureWindowsPath(raw) if PureWindowsPath(raw).drive else PurePosixPath(raw)
+
+
 def validate_entry(entry):
     if not isinstance(entry, dict) or entry.get('schema_version') != 1:
         raise ValueError('Invalid installation manifest schema')
@@ -172,7 +182,7 @@ def validate_entry(entry):
                 # Check the stored text: on Windows str(Path(...)) turns the
                 # library-relative 'CUSA.../base' into backslashes.
                 raw = entry[key]
-                path = Path(raw)
+                path = Path(raw) if isinstance(raw, str) and not foreign_absolute(raw) else foreign_path(raw)
                 if not isinstance(raw, str) or not raw or '..' in path.parts or (not path.is_absolute() and ('\\' in raw or ':' in raw)):
                     raise ValueError('Invalid manifest game path')
         if bool(entry['update_path']) != bool(entry['update_version']):
@@ -208,7 +218,13 @@ def load_entry(path):
     library = path.parents[2]
     for key,kind,version_key in (('base_path','base','base_version'),('update_path','update','update_version')):
         if not entry[key]:continue
-        location = Path(entry[key])
+        if foreign_absolute(entry[key]):
+            # Written by Windows and read on Linux (or the reverse) from the same
+            # drive: find the project folder in the stored path and rebase it here.
+            parts = foreign_path(entry[key]).parts; project = library.parent
+            names = [i for i,part in enumerate(parts) if part == project.name]
+            location = project.joinpath(*parts[names[-1]+1:]) if names else Path(entry[key])
+        else:location = Path(entry[key])
         if not location.is_absolute():location = library/location
         elif not location.exists():
             # Upgrade old absolute managed manifests after a checkout relocation.

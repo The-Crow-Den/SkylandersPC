@@ -223,6 +223,15 @@ class GameLibraryTests(unittest.TestCase):
         self.assertTrue(base.exists());self.assertTrue(update.exists())
         self.assertEqual(library.read_entries(self.library),[])
 
+    def test_manifest_written_by_the_other_os_is_read_without_repair(self):
+        project=self.root/'SkylandersPS4';self.dump('SkylandersPS4/Game/external')
+        entry=library.entries(project)[0];manifest=library.manifest_path(library.directory(project),entry)
+        for foreign in ('H:\\Skylanders\\SkylandersPS4\\Game\\external','/mnt/drive/SkylandersPS4/Game/external'):
+            raw=json.loads(manifest.read_text());raw['base_path']=foreign;manifest.write_text(json.dumps(raw))
+            issues=[];library.register(project,issues)
+            self.assertEqual(issues,[])
+            self.assertEqual(library.resolve(project,'CUSA00626').base,project/'Game/external')
+
     def test_managed_paths_survive_project_move_and_external_references_reregister(self):
         origin=self.root/'original';moved=self.root/'renamed'
         base=self.dump('original/incoming')
