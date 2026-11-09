@@ -149,6 +149,9 @@ def make_entry(base, update=None, source_packages=()):
         source_packages=[Path(name).name for name in source_packages if name])
 
 
+PROJECT = '@project/'
+
+
 def foreign_absolute(raw):
     """An absolute path written by the other OS (dual boot sharing one drive)."""
     return isinstance(raw, str) and not Path(raw).is_absolute() and (
@@ -195,14 +198,17 @@ def validate_entry(entry):
 
 
 def store_entry(library, entry):
-    """On disk, managed paths are relative to the library, never the checkout."""
+    """On disk, managed paths are relative to the library and folders inside the
+    project are '@project/...', so Windows and Linux write identical manifests."""
     library = Path(library).resolve()
     stored = dict(entry)
     for key in ('base_path','update_path'):
         if stored[key]:
             path = Path(stored[key])
             try:stored[key] = path.relative_to(library).as_posix()
-            except ValueError:stored[key] = str(path)
+            except ValueError:
+                try:stored[key] = PROJECT+path.relative_to(library.parent).as_posix()
+                except ValueError:stored[key] = str(path)
     validate_entry(stored)
     path = manifest_path(library,stored)
     content = json.dumps(stored,indent=2)+'\n'
@@ -218,7 +224,8 @@ def load_entry(path):
     library = path.parents[2]
     for key,kind,version_key in (('base_path','base','base_version'),('update_path','update','update_version')):
         if not entry[key]:continue
-        if foreign_absolute(entry[key]):
+        if entry[key].startswith(PROJECT):location = library.parent/entry[key][len(PROJECT):]
+        elif foreign_absolute(entry[key]):
             # Written by Windows and read on Linux (or the reverse) from the same
             # drive: find the project folder in the stored path and rebase it here.
             parts = foreign_path(entry[key]).parts; project = library.parent
@@ -301,6 +308,10 @@ def register(project, issues=None):
         return
     with locked(library):
         existing = {selector(e['title_id'],e['app_version']):e for e in read_entries(library,issues)}
+        for entry in existing.values():
+            # Rewrite older absolute or other-OS paths in the shared form once.
+            try:store_entry(library,entry)
+            except (OSError,ValueError) as error:report(issues,manifest_path(library,entry),error,entry['title_id'],entry['app_version'])
         def add(entry):
             key = selector(entry['title_id'],entry['app_version'])
             if key in removed(project):return

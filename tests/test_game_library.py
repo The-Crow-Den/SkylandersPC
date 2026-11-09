@@ -231,6 +231,7 @@ class GameLibraryTests(unittest.TestCase):
             issues=[];library.register(project,issues)
             self.assertEqual(issues,[])
             self.assertEqual(library.resolve(project,'CUSA00626').base,project/'Game/external')
+            self.assertEqual(json.loads(manifest.read_text())['base_path'],'@project/Game/external')
 
     def test_managed_paths_survive_project_move_and_external_references_reregister(self):
         origin=self.root/'original';moved=self.root/'renamed'
