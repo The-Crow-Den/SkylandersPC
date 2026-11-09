@@ -16,7 +16,6 @@ Upstream source headers and additional nested notices remain authoritative.
 | LibAtrac9 | MIT | Audio codec compiled into native host |
 | Dear ImGui | MIT | In-game PC menu, with project modifications in provider patch |
 | DejaVu / Bitstream Vera / Arev | Full DejaVu notice | Embedded provider menu font; retain all supplied font notices |
-| Lilita One (Juan Montoreano) | SIL OFL 1.1, `tools/fonts/LilitaOne-OFL.txt` | Launcher display font; unmodified |
 | sirit | BSD-3-Clause | SPIR-V emitter |
 | SPIRV-Headers / Vulkan-Headers | Retained Khronos notices, MIT / Apache-2.0 as applicable | Graphics build inputs |
 | AMD GCN / FidelityFX FSR1 headers | MIT notices retained | GPU definitions / shader headers |
