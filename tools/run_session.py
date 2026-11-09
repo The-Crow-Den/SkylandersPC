@@ -51,6 +51,20 @@ KEPT_LOGS = ('runtime.log', 'session.json', 'exit.json', 'pc-overlay.log',
              'frames.csv', 'frame-profile.csv')
 
 
+
+def nvidia_problem(proc=Path('/proc/driver/nvidia/version'), libraries=Path('/usr/lib')):
+    """Why the NVIDIA driver cannot be used right now, or None. After a driver
+    update the loaded kernel module stays old until a reboot, and Vulkan then
+    finds no GPUs at all."""
+    import re
+    try:text = proc.read_text()
+    except OSError:return 'kernel module not loaded'
+    loaded = re.search(r'Kernel Module.*?\s(\d+\.\d+(?:\.\d+)?)\s', text)
+    installed = sorted(p.name.split('.so.', 1)[1] for p in libraries.glob('libnvidia-glcore.so.*'))
+    if loaded and installed and loaded[1] not in installed:
+        return f'kernel module {loaded[1]} but libraries {installed[-1]}; reboot to finish the driver update'
+    return None
+
 def latest_log(last=None):
     """The previous session's runtime log, kept for crash reports, or None."""
     path = Path(last or LAST_SESSION) / 'runtime.log'
@@ -596,7 +610,11 @@ def run(argv,sessions):
         icd = Path('/usr/share/vulkan/icd.d/nvidia_icd.json')
         if not icd.is_file():
             parser.error('NVIDIA Vulkan driver manifest is missing')
-        env['VK_DRIVER_FILES'] = str(icd)
+        problem = nvidia_problem()
+        if problem:
+            print(f'NVIDIA driver unusable ({problem}); using the default GPU instead', file=sys.stderr)
+        else:
+            env['VK_DRIVER_FILES'] = str(icd)
     if args.hud_pci_device:
         try:
             env['MANGOHUD_CONFIGFILE'] = str(overlay_pci_configuration(session, args.hud_pci_device))
