@@ -114,7 +114,8 @@ class NavigationTests(unittest.TestCase):
         self.press(14)  # D-pad right: INSTALL → game menu
         self.assertEqual(self.window.focusWidget().text(), '•••')
         ring = self.window.gamepad.rings[self.window]
-        self.assertTrue(ring.isVisible()); self.assertTrue(ring.geometry().contains(self.window.focusWidget().geometry().center()))
+        focused = self.window.focusWidget(); centre = focused.mapTo(ring.parentWidget(), focused.rect().center())
+        self.assertTrue(ring.isVisible()); self.assertTrue(ring.geometry().contains(centre))
 
     def test_settings_page_tabs_and_back(self):
         self.window.game_settings(); self.app.processEvents(); self.window.settings_page.nav[0].setFocus()

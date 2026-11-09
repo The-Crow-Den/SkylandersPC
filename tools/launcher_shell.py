@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer
 from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget)
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QMessageBox, QMenu, QStackedWidget, QFrame, QProgressBar)
 try:
     from . import game_library
     from . import launcher_library as library
@@ -261,12 +261,12 @@ def renovated(base):
             top = QHBoxLayout()
             heading = QLabel('Library'); heading.setStyleSheet('font-size: 22px; font-weight: 600;')
             top.addWidget(heading); top.addStretch()
-            self.button(top, 'Open games folder', self.open_games_folder)
             for title, callback in [('Skylanders Manager', self.manager), ('Settings', self.game_settings)]:
                 pill = self.button(top, title, callback)
                 if title == 'Settings':
                     pill.setObjectName('gameSettings');pill.setToolTip('Settings and tweaks for the selected game')
-                pill.setStyleSheet('background: rgba(20,20,26,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 18px; font-size: 14px;')
+                pill.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+                pill.setStyleSheet('background: transparent; border: none; border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #c8c8d0;')
             main.addLayout(top); main.addStretch(3)
             self.brand = QLabel('SKYLANDERS'); self.brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.brand.setStyleSheet('font-size: 64px; font-weight: 900; color: white;')
@@ -276,23 +276,28 @@ def renovated(base):
             main.addWidget(self.subtitle)
             self.canvas.anchor = self.brand
             main.addStretch(3)
-            self.game_info=QLabel();self.game_info.setStyleSheet('color: #e6e6ec; font-size: 13px; font-weight: 600;');self.game_info.setWordWrap(True)
-            bottom = QHBoxLayout()
-            self.trophies = self.button(bottom, 'Trophies  —%', self.trophy_tracker)
-            self.trophies.setIcon(utility_icon('trophy'));self.trophies.setIconSize(QSize(24,24))
-            self.trophies.setStyleSheet('background: transparent; border: none; text-align: left; color: #a9a9b1; padding: 12px 0; font-size: 14px;')
-            self.install_note = QLabel(); self.install_note.setWordWrap(True)
-            self.install_note.setStyleSheet('color: #a9a9b1; font-size: 12px;'); self.install_note.setMaximumWidth(460)
-            information=QVBoxLayout();information.setSpacing(3);information.addWidget(self.game_info);information.addWidget(self.install_note);bottom.addLayout(information,1)
-            bottom.addStretch()
+            panel=QFrame();panel.setObjectName('infoPanel')
+            bottom = QHBoxLayout(panel); bottom.setContentsMargins(26,18,18,18); bottom.setSpacing(18)
+            information=QVBoxLayout();information.setSpacing(4)
+            self.game_title=QLabel();self.game_title.setObjectName('gameTitle');information.addWidget(self.game_title)
+            self.game_info=QLabel();self.game_info.setObjectName('gameInfo');self.game_info.setWordWrap(True);information.addWidget(self.game_info)
+            self.install_note = QLabel(); self.install_note.setObjectName('installNote'); self.install_note.setWordWrap(True)
+            self.install_note.setMaximumWidth(460);information.addWidget(self.install_note)
+            bottom.addLayout(information,1)
+            trophy_column=QVBoxLayout();trophy_column.setSpacing(6)
+            self.trophies = self.button(trophy_column, 'Trophies  —%', self.trophy_tracker)
+            self.trophies.setObjectName('trophyLink');self.trophies.setIcon(utility_icon('trophy'));self.trophies.setIconSize(QSize(20,20))
+            self.trophy_bar=QProgressBar();self.trophy_bar.setObjectName('trophyBar');self.trophy_bar.setTextVisible(False)
+            self.trophy_bar.setFixedSize(170,4);trophy_column.addWidget(self.trophy_bar)
+            bottom.addLayout(trophy_column)
             self.loading_wheel=LoadingWheel();bottom.addWidget(self.loading_wheel)
             self.launch_status=QLabel();self.launch_status.setStyleSheet('color: #a9a9b1;');self.launch_status.hide();bottom.addWidget(self.launch_status)
             self.session_stop = self.button(bottom, 'Stop', self.stop_game)
             self.session_stop.setVisible(False)
             self.primary = self.button(bottom, 'INSTALL', self.primary_action)
             self.primary.setObjectName('libraryPlay'); self.primary.setMinimumSize(190,56)
-            self.button(bottom, '•••', self.game_menu)
-            main.addLayout(bottom)
+            more=self.button(bottom, '•••', self.game_menu);more.setObjectName('moreButton');more.setFixedSize(56,56)
+            main.addWidget(panel)
             self.setStyleSheet(self.styleSheet() + '''
                 QWidget#libraryRail { background: rgba(14,14,18,0.62); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; }
                 QPushButton#gameIcon { border: 1px solid transparent; background: rgba(255,255,255,0.05); border-radius: 16px; padding: 6px; font-size: 14px; font-weight: 600; }
@@ -301,6 +306,15 @@ def renovated(base):
                 QPushButton#libraryPlay { background: #fafafa; color: #10121a; border: none; border-radius: 14px; font-family: "Cantarell", "DejaVu Sans", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
                 QPushButton#libraryPlay:hover { background: #e4f7fb; }
                 QPushButton#libraryPlay:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.14); }
+                QFrame#infoPanel { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(8,10,16,0.82), stop:1 rgba(8,10,16,0.55)); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; }
+                QLabel#gameTitle { font-size: 24px; font-weight: 800; color: #ffffff; }
+                QLabel#gameInfo { color: #d6d6de; font-size: 13px; font-weight: 600; }
+                QLabel#installNote { color: #9a9aa6; font-size: 12px; }
+                QPushButton#trophyLink { background: transparent; border: none; text-align: left; color: #d6d6de; padding: 0; font-size: 14px; font-weight: 600; }
+                QPushButton#trophyLink:hover { color: #ffffff; }
+                QProgressBar#trophyBar { background: rgba(255,255,255,0.10); border: none; border-radius: 2px; }
+                QPushButton#moreButton { background: rgba(255,255,255,0.06); border: none; border-radius: 14px; min-width: 56px; min-height: 56px; font-size: 16px; }
+                QPushButton#moreButton:hover { background: rgba(255,255,255,0.14); }
                 QDialog { background: #171719; }
                 QListWidget { background: #222225; color: #f5f5f7; border: 1px solid #343438; border-radius: 12px; padding: 10px; }
                 QListWidget::item { padding: 12px; border-radius: 6px; }
@@ -431,6 +445,7 @@ def renovated(base):
             else:self.refresh_readiness()
             themed = supplied_artwork(self.root, self.game)
             self.canvas.game = themed
+            self.apply_accent()
             reference = supplied_artwork(self.root, {'id': 'swap-force'}).get('logo', '')
             self.canvas.portal_logo_width = logo_size(reference, reference).width() if Path(reference).is_file() else None
             self.canvas.update()
@@ -462,7 +477,8 @@ def renovated(base):
             progress=f"{round(data['fraction']*100)}%" if data.get('fraction') is not None else ''
             self.game_info.setText(' · '.join(part for part in (data['state'],progress,data['version'],size) if part))
             self.install_note.setText(data['message'])
-            self.trophies.setVisible(data['state']!='Coming soon')
+            self.game_title.setText('Skylanders '+self.game['name'] if self.game['id'] in dict((g[0],1) for g in library.GAMES) else self.game['name'])
+            self.trophies.setVisible(data['state']!='Coming soon');self.trophy_bar.setVisible(data['state']!='Coming soon')
             try:
                 try:
                     from .launcher_trophies import snapshot
@@ -470,10 +486,10 @@ def renovated(base):
                     from launcher_trophies import snapshot
                 data=snapshot(self.root,self.game)
                 percent=f"{data['percent']}%" if data['percent'] is not None else '—%'
-                self.trophies.setText('Trophies  '+percent)
+                self.trophies.setText('Trophies  '+percent);self.trophy_bar.setValue(data['percent'] or 0)
                 self.trophies.setToolTip(f"{data['total']} available trophies. Click to browse.\n"+data['message'])
             except (OSError,ValueError,UnicodeError) as error:
-                self.trophies.setText('Trophies  —%');self.trophies.setToolTip(str(error))
+                self.trophies.setText('Trophies  —%');self.trophies.setToolTip(str(error));self.trophy_bar.setValue(0)
 
         def trophy_tracker(self):
             try:
@@ -544,6 +560,17 @@ def renovated(base):
         def settings(self):
             self.settings_page.open()
 
+        def apply_accent(self):
+            # The game's own colours from its logo, also used by the portal glow.
+            primary,accent=self.canvas.colors()
+            glow=shade(accent,1.0,.9);edge=shade(primary,1.0,1.0)
+            self.primary.setStyleSheet(f'QPushButton#libraryPlay {{ background: #fafafa; color: #0c0e14; border: 3px solid {glow.name()}; }}'
+                                       f'QPushButton#libraryPlay:hover {{ background: #ffffff; border-color: #ffffff; }}'
+                                       'QPushButton#libraryPlay:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.14); }')
+            self.trophy_bar.setStyleSheet(f'QProgressBar#trophyBar::chunk {{ background: {glow.name()}; border-radius: 2px; }}')
+            for key,button in getattr(self,'game_buttons',{}).items():
+                button.setStyleSheet(f'QPushButton#gameIcon:checked {{ border: 2px solid {glow.name()}; background: {shade(edge,.35,.8,200).name(QColor.NameFormat.HexArgb)}; }}' if key==self.game['id'] else '')
+
         def install(self):
             if self.process:
                 QMessageBox.information(self, 'Session active', 'Stop the game before installing packages.'); return
@@ -563,6 +590,7 @@ def renovated(base):
             state=getattr(self,'game_state',{})
             busy=self.process is not None or bool(self.game.get('operation')) or getattr(self,'library_transfer',False)
             menu.addAction('Repair game setup',self.repair_game).setEnabled(not busy and state.get('state') in ('Ready','Needs repair'))
+            menu.addAction('Open games folder',self.open_games_folder)
             menu.addAction('Open game folder',self.open_game_folder).setEnabled(not busy and state.get('entry') is not None)
             menu.addAction('Remove game…',self.remove_game).setEnabled(not busy and state.get('entry') is not None)
             extras = menu.addMenu('Optional extras')
