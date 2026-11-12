@@ -111,10 +111,32 @@
     const category=kind();const list=collection(ui.slot).filter(item=>item.name.toLowerCase().includes(search.value.trim().toLowerCase()));
     const text=words(category);root.querySelector('[data-collection-title]').textContent=text[1];root.querySelector('[data-current-slot]').textContent=slotNames[ui.slot];search.placeholder=text[2];
     const grid=root.querySelector('.portrait-grid');grid.replaceChildren();
-    for(const item of list){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait,item.name));const label=document.createElement('span');label.textContent=item.detail.startsWith('Swapper ')?halfName(item.name):item.name;card.append(label);
-      if(item.detail.startsWith('Swapper ')){const half=document.createElement('span');half.className='swapper-half';half.textContent=isTop(item)?'Top':'Bottom';card.append(half);}
-      if(item.state&2){const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);}
-      card.onclick=()=>place(category,item);grid.append(card);}
+    // A swapper is one card; choosing it opens its Top half / Bottom half choice beneath.
+    const swappers=new Map();const entries=[];
+    for(const item of list){
+      if(!item.detail.startsWith('Swapper ')){entries.push({item});continue;}
+      const name=halfName(item.name);let group=swappers.get(name);
+      if(!group){group={name,halves:{}};swappers.set(name,group);entries.push({group});}
+      group.halves[isTop(item)?'top':'bottom']=item;
+    }
+    const mark=card=>{const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);};
+    for(const {item,group} of entries){
+      if(item){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait,item.name));const label=document.createElement('span');label.textContent=item.name;card.append(label);
+        if(item.state&2)mark(card);card.onclick=()=>place(category,item);grid.append(card);continue;}
+      const {top,bottom}=group.halves;const shown=top||bottom;const open=ui.swapperOpen===group.name;const placed=[top,bottom].some(half=>half&&half.state&2);
+      const card=button('figure swapper-card','Choose a half of '+group.name);card.setAttribute('aria-pressed',String(placed));card.setAttribute('aria-expanded',String(open));
+      card.append(portrait(shown.portrait,group.name));const label=document.createElement('span');label.textContent=group.name;card.append(label);
+      const tag=document.createElement('span');tag.className='swapper-half';tag.textContent='Swapper';card.append(tag);if(placed)mark(card);
+      card.onclick=()=>{ui.swapperOpen=open?null:group.name;figures();icon();const first=root.querySelector('.half-choice button');if(!open&&first)focus(first);};grid.append(card);
+      if(open){const choice=document.createElement('div');choice.className='half-choice';choice.setAttribute('role','group');choice.setAttribute('aria-label',group.name+' halves');
+        for(const [key,text] of [['top','Top half'],['bottom','Bottom half']]){const half=group.halves[key];const option=button('half-option',half?'Place '+group.name+' '+text.toLowerCase()+' in '+slotNames[ui.slot]:undefined);
+          option.textContent=text;option.disabled=!half;if(half){option.setAttribute('aria-pressed',String(!!(half.state&2)));option.onclick=()=>{ui.swapperOpen=null;place(category,half);};}choice.append(option);}
+        choice.dataset.after=String(grid.children.length-1);grid.append(choice);}
+    }
+    // The choice opens below the whole row of the card chosen, not between it and its neighbours.
+    const choice=grid.querySelector('.half-choice');
+    if(choice){const columns=getComputedStyle(grid).gridTemplateColumns.split(' ').length||3;choice.remove();
+      const rowEnd=Math.min(grid.children.length,Math.floor(Number(choice.dataset.after)/columns)*columns+columns);grid.insertBefore(choice,grid.children[rowEnd]||null);}
     if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a '+text[0]+' to start your collection.';grid.append(empty);}
     const selector=root.querySelector('#trap-create-character');const saved=selector.value;selector.replaceChildren();
     for(const item of ui.snapshot?.creation||[]){if(item.kind!==category)continue;const option=document.createElement('option');option.value=String(item.index);option.textContent=item.name;selector.append(option);}if([...selector.options].some(option=>option.value===saved))selector.value=saved;
