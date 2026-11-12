@@ -576,9 +576,17 @@ def run(argv,sessions):
     gameplay_metadata=None
     if recipes:
         try:
+            staged_from=time.time()-1
             gameplay_metadata=asset_mod.prepare(original_game,game_root,session,asset_mod.combine_profiles(recipes),enabled=True,cache_directory=ROOT/'out/asset-mod-cache')
         except (OSError,ValueError,lzma.LZMAError) as error:
             parser.error(str(error))
+        try:
+            try:from .asset_cache import prune
+            except ImportError:from asset_cache import prune
+            freed=prune(ROOT/'out/asset-mod-cache',staged_from)
+            if freed:print(f'Asset cache: removed {freed/1024**3:.1f} GiB of unused mod output',file=sys.stderr)
+        except OSError as error:
+            print('Asset cache cleanup skipped:',error,file=sys.stderr)
     preparation_checkpoint('gameplay_and_glyph_assets')
     try:
         trophy_metadata=trophy_store.prepare(ROOT,installation,session,key_config=args.trophy_config)

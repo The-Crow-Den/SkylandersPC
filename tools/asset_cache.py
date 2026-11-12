@@ -41,6 +41,7 @@ def stage(cache,source_data,recipe,destination,patch):
                 digest_file(data_path)!=record['output_sha256']):record=None
         except (OSError,ValueError,KeyError,TypeError):record=None
     if record is not None:
+        os.utime(manifest)  # last use, for prune()
         os.link(data_path,destination)
         return dict(source_sha256=source_hash,output_sha256=record['output_sha256'],cache='hit')
     modified,metadata=patch(source_data,recipe)
@@ -56,3 +57,36 @@ def stage(cache,source_data,recipe,destination,patch):
     # A corrupt cache is bypassed, rather than trusted or modified in place.
     Path(destination).write_bytes(modified)
     return dict(metadata,cache='miss')
+
+
+# Old results pile up: each change to a mod or its settings writes new copies
+# of the levels it touches (about 250 MB each), and before pruning none left.
+MAX_BYTES=8*1024**3
+MAX_AGE_DAYS=14
+
+
+def prune(cache,used_since,*,max_bytes=MAX_BYTES,max_age_days=MAX_AGE_DAYS,now=None):
+    """Remove entries not used since `used_since` (this session's start) that are
+    older than max_age_days, then the least recently used ones over max_bytes.
+    Entries this session used are kept; sessions hold hard links to their files,
+    so removing an entry never takes a file from a running game. Returns bytes freed."""
+    import shutil,time
+    cache=Path(cache).absolute()
+    if not cache.is_dir() or cache.is_symlink() or cache.resolve()!=cache:return 0
+    now=time.time() if now is None else now
+    entries=[]
+    for entry in cache.iterdir():
+        if entry.is_symlink() or not entry.is_dir() or len(entry.name)!=64:continue
+        try:
+            used=(entry/'manifest.json').stat().st_mtime
+            size=sum(p.stat().st_size for p in entry.iterdir() if p.is_file() and not p.is_symlink())
+        except OSError:used,size=0,0
+        entries.append((used,size,entry))
+    entries.sort()
+    total=sum(size for _,size,_ in entries);freed=0
+    for used,size,entry in entries:
+        if used>=used_since:continue
+        if used<now-max_age_days*86400 or total>max_bytes:
+            shutil.rmtree(entry,ignore_errors=True)
+            if not entry.exists():total-=size;freed+=size
+    return freed
