@@ -88,6 +88,9 @@ bool startup_service(std::string_view name) {
            name == "fZJQzFK4Gv4#libSceVideoRecording#libSceVideoRecording" ||
            name == "OOFxrMY+mfI#libSceVideoRecording#libSceVideoRecording" ||
            name == "KHvkPQJDMLk#libSceVideoRecording#libSceVideoRecording" ||
+           name == "ZvWzS2wTIMc#libSceVideoRecording#libSceVideoRecording" ||
+           name == "7QoTYzVuzto#libSceVideoRecording#libSceVideoRecording" ||
+           name == "tWoe9IlGAhs#libSceVideoRecording#libSceVideoRecording" ||
            name == "uoUpLGNkygk#libSceCommonDialog#libSceCommonDialog";
 }
 }
@@ -243,6 +246,12 @@ struct GuestRuntime::Impl {
             else if (identity == "OOFxrMY+mfI#libSceVideoRecording#libSceVideoRecording") result = 0x80a80008;
             // sceVideoRecordingClose: no recording resource was opened here.
             else if (identity == "KHvkPQJDMLk#libSceVideoRecording#libSceVideoRecording") result = 0x80a80008;
+            // sceVideoRecordingQueryMemSize: asked before opening a recording; unsupported
+            // like the rest, so the game skips recording (it stopped the game when unknown).
+            else if (identity == "ZvWzS2wTIMc#libSceVideoRecording#libSceVideoRecording") result = 0x80a80008;
+            // sceVideoRecordingOpen / sceVideoRecordingStart: no recording backend.
+            else if (identity == "7QoTYzVuzto#libSceVideoRecording#libSceVideoRecording" ||
+                     identity == "tWoe9IlGAhs#libSceVideoRecording#libSceVideoRecording") result = 0x80a80008;
             else if (identity == "g8cM39EUZ6o#libSceSysmodule#libSceSysmodule" ||
                      identity == "fMP5NHUOaMk#libSceSysmodule#libSceSysmodule" ||
                      identity == "eR2bZFAAU0Q#libSceSysmodule#libSceSysmodule") {
