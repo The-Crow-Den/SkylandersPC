@@ -127,16 +127,14 @@
       const card=button('figure swapper-card','Choose a half of '+group.name);card.setAttribute('aria-pressed',String(placed));card.setAttribute('aria-expanded',String(open));
       card.append(portrait(shown.portrait,group.name));const label=document.createElement('span');label.textContent=group.name;card.append(label);
       const tag=document.createElement('span');tag.className='swapper-half';tag.textContent='Swapper';card.append(tag);if(placed)mark(card);
-      card.onclick=()=>{ui.swapperOpen=open?null:group.name;figures();icon();const first=root.querySelector('.half-choice button');if(!open&&first)focus(first);};grid.append(card);
+      card.onclick=()=>{ui.swapperOpen=open?null:group.name;figures();icon();const first=root.querySelector('.half-choice button');if(!open&&first)focus(first);};
+      // The card and its pop-up share a cell, so the pop-up sits over the card.
+      const cell=document.createElement('div');cell.className='swapper-cell';cell.append(card);grid.append(cell);
       if(open){const choice=document.createElement('div');choice.className='half-choice';choice.setAttribute('role','group');choice.setAttribute('aria-label',group.name+' halves');
         for(const [key,text] of [['top','Top half'],['bottom','Bottom half']]){const half=group.halves[key];const option=button('half-option',half?'Place '+group.name+' '+text.toLowerCase()+' in '+slotNames[ui.slot]:undefined);
-          option.textContent=text;option.disabled=!half;if(half){option.setAttribute('aria-pressed',String(!!(half.state&2)));option.onclick=()=>{ui.swapperOpen=null;place(category,half);};}choice.append(option);}
-        choice.dataset.after=String(grid.children.length-1);grid.append(choice);}
+          option.textContent=text;option.disabled=!half;if(half){option.setAttribute('aria-pressed',String(!!(half.state&2)));option.onclick=()=>{ui.swapperOpen=null;place(category,half);figures();icon();focus(card.isConnected?card:root.querySelector('[aria-label="Choose a half of '+group.name+'"]'));};}choice.append(option);}
+        cell.append(choice);}
     }
-    // The choice opens below the whole row of the card chosen, not between it and its neighbours.
-    const choice=grid.querySelector('.half-choice');
-    if(choice){const columns=getComputedStyle(grid).gridTemplateColumns.split(' ').length||3;choice.remove();
-      const rowEnd=Math.min(grid.children.length,Math.floor(Number(choice.dataset.after)/columns)*columns+columns);grid.insertBefore(choice,grid.children[rowEnd]||null);}
     if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a '+text[0]+' to start your collection.';grid.append(empty);}
     const selector=root.querySelector('#trap-create-character');const saved=selector.value;selector.replaceChildren();
     for(const item of ui.snapshot?.creation||[]){if(item.kind!==category)continue;const option=document.createElement('option');option.value=String(item.index);option.textContent=item.name;selector.append(option);}if([...selector.options].some(option=>option.value===saved))selector.value=saved;

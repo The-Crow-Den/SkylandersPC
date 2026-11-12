@@ -198,8 +198,10 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .collection-actions { padding-top:12px; border-top:1px solid #ffffff10; }
 #trap-rail-demo .pad-hints { background:#121215e6; border:1px solid #ffffff12; backdrop-filter:blur(12px); }
 #trap-rail-demo .swapper-card[aria-expanded="true"] { border-color:var(--accent); background:#1f2c31; }
-#trap-rail-demo .half-choice { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px; border-radius:13px; background:#1c1c20; border:1px solid #98dfef40; }
-#trap-rail-demo .half-option { min-height:40px; border-radius:10px; border:1px solid #ffffff14; background:var(--card); color:var(--ink); font-size:13px; font-weight:600; }
+#trap-rail-demo .swapper-cell { position:relative; min-width:0; display:grid; }
+#trap-rail-demo .half-choice { position:absolute; z-index:4; left:4px; right:4px; bottom:4px; display:grid; gap:5px; padding:6px; border-radius:11px; background:#18181bf2; border:1px solid #98dfef66; box-shadow:0 8px 22px #000a; animation:half-pop 110ms ease-out; }
+@keyframes half-pop { from { opacity:0; transform:translateY(4px) scale(.97); } }
+#trap-rail-demo .half-option { min-height:32px; padding:4px 6px; white-space:nowrap; font-size:12px; border-radius:10px; border:1px solid #ffffff14; background:var(--card); color:var(--ink); font-weight:600; }
 #trap-rail-demo .half-option:hover:not(:disabled) { background:var(--card-hover); }
 #trap-rail-demo .half-option[aria-pressed="true"] { border-color:var(--accent); background:#233338; }
 #trap-rail-demo .half-option:disabled { opacity:.4; }
