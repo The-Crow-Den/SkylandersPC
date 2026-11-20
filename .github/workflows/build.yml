@@ -227,6 +227,10 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+      - name: Tag matches launcher version
+        run: |
+          version=$(python3 -c "import sys;sys.path.insert(0,'tools');import version;print(version.VERSION)")
+          test "$GITHUB_REF_NAME" = "v$version" || { echo "Tag $GITHUB_REF_NAME does not match tools/version.py ($version)"; exit 1; }
       - name: Corresponding source archive
         run: |
           name="SkylandersPC-${GITHUB_REF_NAME}-source"

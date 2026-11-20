@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 import math
+import os
 import time
 from PyQt6.QtCore import Qt, QSize, QRectF, QTimer, QPropertyAnimation
 from PyQt6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPixmap, QIcon, QRadialGradient, QPen, QFontDatabase
@@ -281,6 +282,8 @@ def renovated(base):
             top = QHBoxLayout()
             heading = QLabel('Library'); heading.setStyleSheet('font-size: 22px; font-weight: 600;')
             top.addWidget(heading); top.addStretch()
+            self.update_pill = self.button(top, 'Update available', lambda: None)
+            self.update_pill.setObjectName('updatePill');self.update_pill.setFocusPolicy(Qt.FocusPolicy.TabFocus)
             for title, callback in [('Skylanders Manager', self.manager), ('Settings', self.game_settings)]:
                 pill = self.button(top, title, callback)
                 if title == 'Settings':
@@ -335,6 +338,8 @@ def renovated(base):
                 QPushButton#trophyLink:hover { color: #ffffff; }
                 QProgressBar#trophyBar { background: rgba(255,255,255,0.10); border: none; border-radius: 2px; }
                 QPushButton#moreButton { background: rgba(255,255,255,0.06); border: none; border-radius: 14px; min-width: 56px; min-height: 56px; font-size: 16px; }
+                QPushButton#updatePill { background: rgba(152,223,239,0.16); color: #c9f1fa; border: 1px solid rgba(152,223,239,0.45); border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; }
+                QPushButton#updatePill:hover { background: rgba(152,223,239,0.28); }
                 QPushButton#moreButton:hover { background: rgba(255,255,255,0.14); }
                 QDialog { background: #171719; }
                 QListWidget { background: #222225; color: #f5f5f7; border: 1px solid #343438; border-radius: 12px; padding: 10px; }
@@ -360,6 +365,13 @@ def renovated(base):
             except ImportError:
                 from launcher_gamepad import GamepadNavigator
             self.gamepad = GamepadNavigator.attach(self)
+            try:
+                from .launcher_update import UpdateControl
+            except ImportError:
+                from launcher_update import UpdateControl
+            if not os.environ.get('SKY_NO_UPDATE_CHECK'):
+                self.updates = UpdateControl(self, self.update_pill)
+            else:self.update_pill.hide()
 
         # Controller hooks (tools/launcher_gamepad.py): B leaves a page, LB/RB switch tabs or
         # games, Y opens the game menu, Start plays.
