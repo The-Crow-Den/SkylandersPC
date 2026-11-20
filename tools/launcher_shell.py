@@ -711,6 +711,7 @@ def renovated(base):
 
         def closeEvent(self, event):
             if getattr(self,'library_transfer',False) or any(game.get('operation') for game in getattr(self,'library',{}).get('games',[])):
+                QMessageBox.information(self,'Still working','An installation or file move is in progress. Wait for it to finish or cancel it, then close the launcher.')
                 event.ignore();return
             if self.process is None: self.persist()
             super().closeEvent(event)

@@ -108,6 +108,48 @@ def latest_log(last=None):
     return path if path.is_file() else None
 
 
+def hold_session(session):
+    """Lock a live session folder so sweep_sessions leaves it alone; keep the result open."""
+    stream = (Path(session) / '.live').open('w')
+    try:
+        import fcntl
+        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except ImportError:
+        pass
+    return stream
+
+
+def sweep_sessions(folder=None, keep=None, now=None, stale_after=86400):
+    """Delete session folders left by a crash or a killed launcher.
+
+    A folder is removed when nothing holds its lock (or, where locks are
+    unavailable, when it is older than stale_after seconds). User data never
+    lives in a session folder (finish_session refuses those), and the game copy
+    is hard-linked, so this frees only temporary space."""
+    folder = Path(folder or SESSION_TEMP); removed = []
+    if not folder.is_dir():
+        return removed
+    now = time.time() if now is None else now
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None
+    for session in folder.iterdir():
+        if not session.is_dir() or session.is_symlink() or (keep and session == Path(keep)):
+            continue
+        lock = session / '.live'
+        if fcntl and lock.is_file():
+            try:
+                with lock.open('a') as stream:
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                continue  # a running game holds it
+        elif now - session.stat().st_mtime < stale_after:
+            continue
+        shutil.rmtree(session, ignore_errors=True); removed.append(session.name)
+    return removed
+
+
 def finish_session(session, protected=(), last=None):
     """Keep the session's logs as the latest, then delete the session folder.
 
@@ -507,6 +549,9 @@ def run(argv,sessions):
     # Same filesystem as the game library: the working copy is hard-linked.
     session = SESSION_TEMP / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     session.mkdir(parents=True)
+    live = hold_session(session)  # noqa: F841 (held until this process exits)
+    for name in sweep_sessions(keep=session):
+        print('Removed leftover session folder', name, file=sys.stderr)
     protected=[preferences,ROOT/'out/ps4-saves',ROOT/'out/native-gpu-user',args.figure,args.figure_bottom,args.trophy_config]
     sessions.append((session,protected))
     preparation_started=time.monotonic()
