@@ -132,6 +132,7 @@ class Launcher(QMainWindow):
         mods.addRow(text_label('Choose Nightmare when creating a save. Existing games keep their difficulty.','muted'))
         self.check(mods,'Record level events · diagnostic only','level_events')
         self.check(mods,'Save compiled shaders','save_shaders')
+        self.combo(mods,'Cache size limit','cache_limit_gb',[(f'{n} GB',n) for n in model.CACHE_LIMITS])
         mods.addRow(text_label('Original game files are preserved. Level-event diagnostics do not control FPS yet.','muted'))
         self.log=QTextEdit();self.log.setReadOnly(True);self.log.document().setMaximumBlockCount(400)
         self.tabs.addWidget(self.log)

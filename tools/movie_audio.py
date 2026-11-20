@@ -189,7 +189,7 @@ def _replace(original_game, session_game, session, profile, cache, items, transf
 
 # Every narration language and game version writes its own copies (about 6 GB
 # for one game in one language), so cap the cache and drop the least recently used.
-MAX_CACHE_BYTES=4*1024**3
+MAX_CACHE_BYTES=8*1024**3  # default; the launcher's cache size limit overrides it
 
 
 def prune_cache(cache,used_since,*,max_bytes=MAX_CACHE_BYTES):

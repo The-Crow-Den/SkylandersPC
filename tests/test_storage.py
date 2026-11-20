@@ -41,3 +41,11 @@ class StorageTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CacheLimitTest(unittest.TestCase):
+    def test_limit_passed_and_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            argv = launcher_model.command(tmp, 'python', dict(launcher_model.DEFAULTS, cache_limit_gb=32))
+            self.assertEqual(argv[argv.index('--cache-limit-gb') + 1], '32')
+        with self.assertRaises(ValueError):launcher_model.validate(dict(launcher_model.DEFAULTS, cache_limit_gb=3))

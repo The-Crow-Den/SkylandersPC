@@ -17,10 +17,11 @@ DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=50,
                 motion_blur=True, anti_aliasing=True, gpu='auto', mangohud=False,
                 unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US', aspect='16:9',
-                portal_device='auto', save_shaders=True)
+                portal_device='auto', save_shaders=True, cache_limit_gb=8)
 FLAGS = ('motion_blur', 'anti_aliasing', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro', 'save_shaders')
 # 'auto' follows the display in fullscreen and the window size otherwise.
 ASPECTS = ('16:9', 'auto', '16:10', '21:9', '32:9')
+CACHE_LIMITS = (4, 8, 16, 32, 64)  # GB per rebuildable cache (mod output, movie audio)
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
 
 
@@ -51,6 +52,8 @@ def validate(value):
         raise ValueError('Invalid frame policy')
     if any(not isinstance(value[key], str) or '\0' in value[key] for key in ('figure', 'figure_bottom')):
         raise ValueError('Invalid figure path')
+    if type(value['cache_limit_gb']) is not int or value['cache_limit_gb'] not in CACHE_LIMITS:
+        raise ValueError('Invalid cache size limit')
     if value['gpu'] not in GPU_CHOICES:
         raise ValueError('Invalid GPU choice')
     if not portal_devices.valid_choice(value['portal_device']):
@@ -94,6 +97,8 @@ def load(path):
         value['aspect']='16:9'
     if isinstance(value,dict) and 'anti_aliasing' not in value:
         value['anti_aliasing']=True
+    if isinstance(value,dict) and 'cache_limit_gb' not in value:
+        value['cache_limit_gb']=8
     if isinstance(value,dict) and 'save_shaders' not in value:
         value['save_shaders']=True
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
@@ -154,6 +159,7 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv.append('--level-events')
     if not value['save_shaders']:
         argv.append('--no-shader-cache')
+    argv += ['--cache-limit-gb', str(value['cache_limit_gb'])]
     if value['portal_device'] != portal_devices.VIRTUAL:
         argv += ['--portal-device', value['portal_device']]
     # Automatic falls back to the virtual portal, which needs the figure files.

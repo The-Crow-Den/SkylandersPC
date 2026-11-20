@@ -16,7 +16,7 @@ AREAS = {
     'shaders': ('Saved shaders', ('out/native-gpu-user/cache',), True,
                 'New areas compile shaders again on their first visit, which can stutter.'),
     'caches': ('Rebuildable caches', ('out/asset-mod-cache', 'out/movie-audio-cache'), True,
-               'Mods and movie audio are prepared again on the next start, which takes longer once.'),
+               'Mods and movie audio are prepared again on the next start, which takes longer once. Each is capped by the cache size limit above.'),
     'temporary': ('Temporary files', ('out/session-temp', '.local/pkg-imports', 'out/last-session'), True,
                   'Leftovers from earlier sessions and installs. The last crash report is removed too.'),
 }

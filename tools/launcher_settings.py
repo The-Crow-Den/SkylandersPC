@@ -15,7 +15,7 @@ GROUPS = [
  ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('aspect','Aspect ratio'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('gpu','Graphics card'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
- ('Storage','Disk space used by games, shaders and caches.', [('save_shaders','Save compiled shaders')]),
+ ('Storage','Disk space used by games, shaders and caches.', [('save_shaders','Save compiled shaders'),('cache_limit_gb','Cache size limit')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('skip_intro','Skip startup logos'),('unlock_nightmare','Nightmare available by default')]),
 ]
 
@@ -90,6 +90,7 @@ class SettingsPage(QWidget):
             'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'Automatic uses a plugged-in PS3/PS4/Wii/Wii U portal and otherwise the virtual portal with figure files. Physical portals are experimental.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',
             'level_events':'Record events for troubleshooting.',
+            'cache_limit_gb':'Largest size for each rebuildable cache (mod output, movie audio). Past it, the least recently used files are deleted at game start.',
             'save_shaders':'Keep shaders after compiling them, so areas you have visited load smoothly next time. Off: nothing is saved and every visit compiles again.'}
         for name,description,entries in GROUPS:
             entries = [e for e in entries if e[0] not in model.LINUX_ONLY or e[0] in model.platform_settings()]

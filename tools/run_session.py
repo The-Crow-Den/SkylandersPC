@@ -366,6 +366,8 @@ def run(argv,sessions):
                              'summarize with tools/frame_profile.py')
     parser.add_argument('--cold-cache', action='store_true',
                         help='start from empty renderer and driver shader caches inside the session')
+    parser.add_argument('--cache-limit-gb', type=int, default=8,
+                        help='size cap for each rebuildable cache; least recently used files go first')
     parser.add_argument('--no-shader-cache', action='store_true',
                         help='do not load or save compiled shaders (every area compiles on each visit)')
     parser.add_argument('--level-events', action='store_true',
@@ -536,6 +538,8 @@ def run(argv,sessions):
         parser.error('figure file is missing')
     if args.figure_bottom and not args.figure_bottom.is_file():
         parser.error('bottom half figure file is missing')
+    if args.cache_limit_gb < 1:
+        parser.error('--cache-limit-gb must be at least 1')
     if args.portal_device == portal_devices.AUTO:
         # Automatic: a plugged-in, usable portal; otherwise the virtual one with figure files.
         chosen = portal_devices.automatic(portal_devices.list_portals())
@@ -641,13 +645,13 @@ def run(argv,sessions):
         try:
             try:from .asset_cache import prune
             except ImportError:from asset_cache import prune
-            freed=prune(ROOT/'out/asset-mod-cache',staged_from)
+            freed=prune(ROOT/'out/asset-mod-cache',staged_from,max_bytes=args.cache_limit_gb*1024**3)
             if freed:print(f'Asset cache: removed {freed/1024**3:.1f} GiB of unused mod output',file=sys.stderr)
         except OSError as error:
             print('Asset cache cleanup skipped:',error,file=sys.stderr)
     preparation_checkpoint('gameplay_and_glyph_assets')
     try:
-        freed=movie_audio.prune_cache(ROOT/'out/movie-audio-cache',session_started)
+        freed=movie_audio.prune_cache(ROOT/'out/movie-audio-cache',session_started,max_bytes=args.cache_limit_gb*1024**3)
         if freed:print(f'Movie cache: removed {freed/1024**3:.1f} GiB of least recently used movies',file=sys.stderr)
     except OSError as error:
         print('Movie cache cleanup skipped:',error,file=sys.stderr)
@@ -854,7 +858,7 @@ def run(argv,sessions):
                    '--performance-profile',args.performance_profile,
                    '--motion-blur' if args.motion_blur else '--no-motion-blur',
                    '--anti-aliasing' if args.anti_aliasing else '--no-anti-aliasing',
-                   *(['--no-shader-cache'] if args.no_shader_cache else []),
+                   *(['--no-shader-cache'] if args.no_shader_cache else []),'--cache-limit-gb',str(args.cache_limit_gb),
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
                    '--movie-audio',args.movie_audio,'--skip-intro' if args.skip_intro else '--no-skip-intro','--language',args.language,
