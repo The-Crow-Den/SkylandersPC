@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import hashlib
 import hmac
 import json
+import shutil
 from pathlib import Path, PurePosixPath
 import re
 import struct
@@ -286,6 +287,15 @@ def extract(pkg, destination, keys=None, progress=print):
         raise ValueError('Extraction destination cannot contain symlinks')
     if destination.exists():
         raise ValueError('Extraction destination already exists')
+    try:
+        _extract(pkg, destination, keys, progress)
+    except BaseException:
+        # Leave nothing half-written behind; the destination did not exist before.
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
+
+
+def _extract(pkg, destination, keys, progress):
     with Path(pkg).open('rb') as stream:
         package = Package(stream)
         dk3 = package.unlock(load_keys() if keys is None else keys)

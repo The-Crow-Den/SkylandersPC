@@ -2,6 +2,7 @@
 """Choose a game and optional update; unpack both with visible progress."""
 import sys
 from pathlib import Path
+import shutil
 import uuid
 from PyQt6.QtCore import QProcess, QTimer, Qt
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor
@@ -46,6 +47,13 @@ def file_icon():
     painter.drawLine(18,15,26,15);painter.drawLine(26,15,30,19);painter.drawLine(18,15,14,19)
     painter.drawLine(23,30,33,30);painter.drawLine(28,25,28,35);painter.end()
     return pixmap
+
+
+def sweep_imports(root):
+    """Remove import folders left by a crash or a killed launcher."""
+    folder = Path(root)/'.local/pkg-imports'
+    if folder.is_dir():
+        for child in folder.iterdir():shutil.rmtree(child,ignore_errors=True)
 
 
 class InstallDialog(QDialog):
@@ -259,7 +267,10 @@ class InstallDialog(QDialog):
         # Unpacked folders only: register them where they are, no copy.
         self.in_place = {kind:path for kind,path in jobs if packages.unpacked(path)} if all(packages.unpacked(path) for _,path in jobs) else None
         self.jobs = [] if self.in_place else jobs;self.total_jobs = len(jobs);self.completed_jobs = 0
-        self.staging = self.owner.root / '.local/pkg-imports' / uuid.uuid4().hex
+        sweep_imports(self.owner.root)
+        token = uuid.uuid4().hex
+        self.staging = self.owner.root / '.local/pkg-imports' / token
+        self.log_path = self.owner.root / '.local/logs' / ('install-'+token+'.log')
         try:self.staging.mkdir(parents=True)
         except OSError as error:
             QMessageBox.warning(self,'Cannot start installation',str(error));return
@@ -277,6 +288,7 @@ class InstallDialog(QDialog):
                     entry = game_library.publish(library,self.in_place.get('base'),self.in_place.get('update'),self.source_packages,in_place=True)
                 else:
                     entry = packages.publish(self.staging,library,self.source_packages)
+                self.discard_staging()
                 hidden=game_library.removed(self.owner.root)
                 restored={game_library.selector(entry['title_id'],version) for version in (entry['base_version'],entry['app_version'])}
                 hidden=[key for key in hidden if key not in restored]
@@ -324,7 +336,7 @@ class InstallDialog(QDialog):
         self.open_folder.hide();self.progress.setRange(0,100);self.progress.setValue(0)
         worker = PreparationProcess(self);self.preparation = worker
         worker.log.connect(self.append_log)
-        self.owner.log.append('Full setup log: '+str(self.staging/'setup.log'))
+        self.owner.log.append('Full setup log: '+str(self.log_path))
         def update(value):
             self.game['operation']={'state':'Preparing','message':value['message'],'fraction':value['fraction']}
             self.owner.refresh_game()
@@ -344,10 +356,10 @@ class InstallDialog(QDialog):
 
     def append_log(self, text):
         self.output.insertPlainText(text);self.owner.log.insertPlainText(text)
-        if hasattr(self,'staging'):
+        if getattr(self,'log_path',None):
             try:
-                self.staging.mkdir(parents=True,exist_ok=True)
-                with (self.staging/'setup.log').open('a') as stream:stream.write(text)
+                self.log_path.parent.mkdir(parents=True,exist_ok=True)
+                with self.log_path.open('a') as stream:stream.write(text)
             except OSError:pass
 
     def read_output(self):
@@ -383,7 +395,13 @@ class InstallDialog(QDialog):
 
     def fail(self,message):
         self.phase.setText(message if 'cancelled' in message.lower() else 'Installation could not finish. Check your files and available space, then try again. Your existing games were kept.')
-        self.append_log('\n'+message+'\nImport folder: '+str(self.staging));self.done_state()
+        self.discard_staging()
+        self.append_log('\n'+message+'\nSetup log: '+str(self.log_path));self.done_state()
+
+    def discard_staging(self):
+        # Extracted leftovers are useless once published or abandoned; the log lives in .local/logs.
+        if getattr(self,'staging',None) and self.staging.parent.name=='pkg-imports':
+            shutil.rmtree(self.staging,ignore_errors=True)
 
     def reject(self):
         if getattr(self,'preparation',None) and self.preparation.process:
@@ -403,7 +421,7 @@ class RepairDialog(InstallDialog):
         super().__init__(owner)
         self.setWindowTitle('Repair '+self.game['name'])
         self.show_step(3);self.heading.setText('Checking your game')
-        self.staging = owner.root/'.local/game-preparation'
+        self.staging = owner.root/'.local/game-preparation';self.log_path = self.staging/'setup.log'
         def begin():
             try:self.start_preparation(game_library.resolve_entry(owner.root,game=self.game),optional)
             except (OSError,ValueError) as error:self.preparation_finished(False,str(error))
