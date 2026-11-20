@@ -47,7 +47,7 @@ def allowed(name,record):
     path=PurePosixPath(name)
     if path.is_absolute() or '..' in path.parts or '\\' in name or path.as_posix()!=name:return False
     if name in record['withheld']:return False
-    if name in ROOT_FILES:return True
+    if name in ROOT_FILES or name in REVIEWED_BINARY:return True
     # The GPL-2.0-or-later renderer is an upstream-derived tree with its own
     # notices; it keeps its file types, while the content checks still apply.
     if path.parts[0]=='renderer' and len(path.parts)>1:

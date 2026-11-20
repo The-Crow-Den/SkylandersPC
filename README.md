@@ -41,6 +41,9 @@ that folder in your file manager. Existing installations stay where they are.
 After installing a supported game, setup runs automatically. If it needs
 attention, choose **Repair game setup** from the game’s menu. Controller artwork
 and portrait downloads are optional extras; they never block setup.
+When a newer release is published, an **Update available** button appears at the
+top of the library. In a git checkout it updates with a fast-forward pull (rebuild
+the native parts afterwards); otherwise it opens the release page.
 The library shows setup status, installed versions and size. Use **Repair** to
 finish setup, **Open folder** to find the files, or **Remove** to unregister the
 game. Removal keeps saves, figures and settings; managed game files are retained
