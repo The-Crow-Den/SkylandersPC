@@ -230,7 +230,7 @@ class Launcher(QMainWindow):
         field=self.fields['portal_device']
         selected=selected or field.currentData() or 'virtual'
         portals=portal_devices.list_portals()
-        field.clear();field.addItem('Virtual portal · figure files','virtual')
+        field.clear();field.addItem('Automatic · real portal when plugged in','auto');field.addItem('Virtual portal · figure files','virtual')
         for portal in portals: field.addItem(portal_devices.label(portal),portal['id'])
         if field.findData(selected)<0: field.addItem(f'{selected} · not connected',selected)
         field.setCurrentIndex(field.findData(selected))

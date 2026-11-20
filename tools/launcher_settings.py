@@ -87,7 +87,7 @@ class SettingsPage(QWidget):
             'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
             'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'gpu':'Automatic uses NVIDIA when its driver works, otherwise the built-in GPU.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
-            'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'A connected physical portal, or the virtual portal with figure files. Real portals are listed when the launcher opens.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
+            'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'Automatic uses a plugged-in PS3/PS4/Wii/Wii U portal and otherwise the virtual portal with figure files. Physical portals are experimental.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',
             'level_events':'Record events for troubleshooting.',
             'save_shaders':'Keep shaders after compiling them, so areas you have visited load smoothly next time. Off: nothing is saved and every visit compiles again.'}
@@ -123,6 +123,12 @@ class SettingsPage(QWidget):
             if name=='Storage':
                 self.storage_rows=QVBoxLayout();self.storage_rows.setSpacing(8);rows.addLayout(self.storage_rows)
                 self.free_label=QLabel();self.free_label.setStyleSheet('color: #92929e; font-size: 13px;');rows.addWidget(self.free_label)
+            if name=='Portal & audio':
+                card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,12,20,12);line.setSpacing(12)
+                self.portal_status=QLabel();self.portal_status.setWordWrap(True);self.portal_status.setStyleSheet('font-size: 12px; color: #93939e;');line.addWidget(self.portal_status,1)
+                self.portal_access=QPushButton('Set up portal access');self.portal_access.clicked.connect(self.setup_portal_access);line.addWidget(self.portal_access)
+                rescan=QPushButton('Refresh');rescan.clicked.connect(lambda:self.refresh_portals());line.addWidget(rescan)
+                rows.addWidget(card)
             if name=='Tweaks':
                 card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
                 copy=QVBoxLayout();heading=QLabel('Any portal');heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
@@ -174,7 +180,7 @@ class SettingsPage(QWidget):
             from game_library import directory
         self.games_row.setVisible(game is None);self.games_path.setText(str(directory(self.owner.root)))
         self.change_games.setEnabled(self.owner.process is None)
-        self.refresh_backups();self.refresh_storage()
+        self.refresh_backups();self.refresh_storage();self.refresh_portals(keep=False)
         self.scope.blockSignals(True);self.scope.clear();self.scope.addItem('General settings',None)
         for entry in self.owner.library['games']:self.scope.addItem(entry['name'],entry['id'])
         self.scope.setCurrentIndex(self.scope.findData(game['id']) if game else 0);self.scope.blockSignals(False)
@@ -281,6 +287,44 @@ class SettingsPage(QWidget):
         title=(self.game or {}).get('title_id')
         if not title:return None,None
         return save_profile.select(self.owner.root,title)[0],title
+
+    def refresh_portals(self,keep=True):
+        """Rescan portals and copy the launcher's list into this page's chooser."""
+        try:
+            from . import portal_devices
+        except ImportError:
+            import portal_devices
+        mine=self.fields['portal_device'];chosen=mine.currentData() if keep else None
+        self.owner.refresh_portals(chosen or self.owner.fields['portal_device'].currentData())
+        original=self.owner.fields['portal_device'];mine.blockSignals(True);mine.clear()
+        for i in range(original.count()):mine.addItem(original.itemText(i),original.itemData(i))
+        mine.setCurrentIndex(max(0,mine.findData(chosen or original.currentData())));mine.blockSignals(False)
+        portals=portal_devices.list_portals()
+        blocked=[p for p in portals if not p['accessible']]
+        xbox=[p for p in portals if p['family']!='hid']
+        if blocked:text='A portal is plugged in, but this account cannot open it yet. Set up access once (asks for your password), then unplug and replug the portal.'
+        elif [p for p in portals if p['family']=='hid']:text='Portal ready. Place figures on it; the game reads them directly. Figure writes stay off unless allowed.'
+        elif xbox:text='Xbox portals are detected but not supported yet. Use a PS3/PS4/Wii/Wii U portal or the virtual portal.'
+        else:text='No physical portal found. Plug one in and press Refresh, or use the virtual portal.'
+        self.portal_status.setText(text)
+        self.portal_access.setVisible(bool(blocked) and portal_devices.install_rule_command() is not None)
+
+    def setup_portal_access(self):
+        try:
+            from . import portal_devices
+        except ImportError:
+            import portal_devices
+        import subprocess
+        command=portal_devices.install_rule_command()
+        if not command:
+            QMessageBox.information(self,'Portal access',portal_devices.access_help());return
+        try:result=subprocess.run(command,capture_output=True,text=True,timeout=120)
+        except (OSError,subprocess.TimeoutExpired) as error:
+            QMessageBox.warning(self,'Portal access',str(error));return
+        if result.returncode!=0:
+            QMessageBox.warning(self,'Portal access','Access was not set up.\n\n'+(result.stderr.strip() or portal_devices.access_help()));return
+        QMessageBox.information(self,'Portal access','Done. Unplug the portal, plug it back in, then press Refresh.')
+        self.refresh_portals()
 
     def refresh_storage(self):
         try:

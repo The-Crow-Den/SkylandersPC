@@ -17,7 +17,7 @@ DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=50,
                 motion_blur=True, anti_aliasing=True, gpu='auto', mangohud=False,
                 unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US', aspect='16:9',
-                portal_device='virtual', save_shaders=True)
+                portal_device='auto', save_shaders=True)
 FLAGS = ('motion_blur', 'anti_aliasing', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro', 'save_shaders')
 # 'auto' follows the display in fullscreen and the window size otherwise.
 ASPECTS = ('16:9', 'auto', '16:10', '21:9', '32:9')
@@ -156,7 +156,8 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv.append('--no-shader-cache')
     if value['portal_device'] != portal_devices.VIRTUAL:
         argv += ['--portal-device', value['portal_device']]
-    elif value['figure']:
+    # Automatic falls back to the virtual portal, which needs the figure files.
+    if value['portal_device'] in (portal_devices.VIRTUAL, portal_devices.AUTO) and value['figure']:
         argv += ['--figure', value['figure']]
         if value['figure_bottom']:
             argv += ['--figure-bottom', value['figure_bottom']]

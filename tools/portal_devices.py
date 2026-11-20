@@ -63,6 +63,23 @@ def list_portals(sysfs='/sys'):
     return found
 
 
+def automatic(portals):
+    """The portal Automatic uses: the first accessible HID portal (the family the
+    game's PS4 USB path supports), or None for the virtual portal."""
+    return next((p for p in portals if p['family'] == 'hid' and p.get('accessible')), None)
+
+
+def install_rule_command():
+    """argv that installs the udev rule with a graphical password prompt (pkexec), or None."""
+    import shutil
+    if os.name == 'nt' or not shutil.which('pkexec'):
+        return None
+    target = '/etc/udev/rules.d/' + UDEV_RULE_NAME
+    script = (f"printf '%s' \"$1\" > {target} && udevadm control --reload && "
+              "udevadm trigger --subsystem-match=hidraw --subsystem-match=usb")
+    return ['pkexec', 'sh', '-c', script, 'sh', UDEV_RULE]
+
+
 def valid_choice(value):
     return isinstance(value, str) and '\0' not in value and (
         value in (VIRTUAL, AUTO) or value.startswith('hid:/dev/hidraw') or value.startswith('xbox:'))

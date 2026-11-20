@@ -49,7 +49,7 @@ class PortalDevicesTest(unittest.TestCase):
         argv = model.command('/project', 'python', dict(model.DEFAULTS, portal_device='hid:/dev/hidraw4', figure='/f.sky'))
         self.assertEqual(argv[argv.index('--portal-device') + 1], 'hid:/dev/hidraw4')
         self.assertNotIn('--figure', argv)  # Starting figures belong to the virtual portal.
-        self.assertNotIn('--portal-device', model.command('/project', 'python', model.DEFAULTS))
+        self.assertNotIn('--portal-device', model.command('/project', 'python', dict(model.DEFAULTS, portal_device='virtual')))
         with self.assertRaises(ValueError):
             model.validate(dict(model.DEFAULTS, portal_device='usb:anything'))
 

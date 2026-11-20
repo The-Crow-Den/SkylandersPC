@@ -536,6 +536,16 @@ def run(argv,sessions):
         parser.error('figure file is missing')
     if args.figure_bottom and not args.figure_bottom.is_file():
         parser.error('bottom half figure file is missing')
+    if args.portal_device == portal_devices.AUTO:
+        # Automatic: a plugged-in, usable portal; otherwise the virtual one with figure files.
+        chosen = portal_devices.automatic(portal_devices.list_portals())
+        if chosen:
+            print('Using the connected portal:', chosen['name'], file=sys.stderr)
+            if args.figure or args.figure_bottom:
+                print('Starting figure files are ignored with a real portal; place figures on it instead.', file=sys.stderr)
+            args.portal_device, args.figure, args.figure_bottom = chosen['id'], None, None
+        else:
+            args.portal_device = portal_devices.VIRTUAL
     real_portal = args.portal_device != portal_devices.VIRTUAL
     if not portal_devices.valid_choice(args.portal_device):
         parser.error('unknown portal device '+repr(args.portal_device))
@@ -551,6 +561,7 @@ def run(argv,sessions):
     # Same filesystem as the game library: the working copy is hard-linked.
     session = SESSION_TEMP / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
     session.mkdir(parents=True)
+    session_started = time.time() - 1
     live = hold_session(session)  # noqa: F841 (held until this process exits)
     for name in sweep_sessions(keep=session):
         print('Removed leftover session folder', name, file=sys.stderr)
@@ -635,6 +646,11 @@ def run(argv,sessions):
         except OSError as error:
             print('Asset cache cleanup skipped:',error,file=sys.stderr)
     preparation_checkpoint('gameplay_and_glyph_assets')
+    try:
+        freed=movie_audio.prune_cache(ROOT/'out/movie-audio-cache',session_started)
+        if freed:print(f'Movie cache: removed {freed/1024**3:.1f} GiB of least recently used movies',file=sys.stderr)
+    except OSError as error:
+        print('Movie cache cleanup skipped:',error,file=sys.stderr)
     try:
         trophy_metadata=trophy_store.prepare(ROOT,installation,session,key_config=args.trophy_config)
     except (OSError,ValueError,ImportError) as error:

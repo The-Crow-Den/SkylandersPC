@@ -157,6 +157,8 @@ def _replace(original_game, session_game, session, profile, cache, items, transf
         if cached.exists():
             if checked_digest(cached)!=output:
                 raise ValueError('cached movie failed integrity check')
+            try:os.utime(cached)  # Mark as used, for prune_cache's oldest-first order.
+            except OSError:pass
         else:
             data=source.read_bytes()
             if digest(data)!=recipe['source_sha256']:raise ValueError('movie changed during preparation')
@@ -183,6 +185,31 @@ def _replace(original_game, session_game, session, profile, cache, items, transf
             os.replace(temporary,target)
         report.append({'asset':str(relative),'source_sha256':recipe['source_sha256'],'output_sha256':output})
     return report
+
+
+# Every narration language and game version writes its own copies (about 6 GB
+# for one game in one language), so cap the cache and drop the least recently used.
+MAX_CACHE_BYTES=4*1024**3
+
+
+def prune_cache(cache,used_since,*,max_bytes=MAX_CACHE_BYTES):
+    """Delete least recently used cached movies until the cache fits max_bytes.
+    Movies used since `used_since` (this session) are always kept, and sessions hold
+    hard links, so a running game never loses a file. Returns bytes freed."""
+    cache=Path(cache)
+    if not cache.is_dir() or cache.is_symlink():return 0
+    files=[]
+    for path in cache.iterdir():
+        if path.is_file() and not path.is_symlink():
+            try:info=path.stat();files.append((info.st_mtime,info.st_size,path))
+            except OSError:pass
+    files.sort();total=sum(size for _,size,_ in files);freed=0
+    for used,size,path in files:
+        if total<=max_bytes:break
+        if used>=used_since:continue
+        try:path.unlink();total-=size;freed+=size
+        except OSError:pass
+    return freed
 
 
 def cache_for(profile_path):
