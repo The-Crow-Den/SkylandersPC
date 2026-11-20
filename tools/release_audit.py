@@ -134,7 +134,7 @@ def audit(root,names,loader=None):
             errors.append('Missing/changed canonical provider patch')
     except (OSError,ValueError,KeyError,TypeError) as error:errors.append('Notice/provenance inventory unreadable: '+str(error))
     return dict(schema_version=1,kind='source-publication-audit',ok=not errors,files=files,errors=errors,
-                withheld=record['withheld'],binary_release_ready=False,binary_release_blockers=record['binary_release_blockers'])
+                withheld=record['withheld'],binary_release_ready=record.get('binary_release_ready') is True and not record['binary_release_blockers'],binary_release_blockers=record['binary_release_blockers'])
 
 
 def git_selection(root,staged):
@@ -174,7 +174,7 @@ def export_source(root,result,destination):
                 info=tarfile.TarInfo('SkylandersPS4/'+row['path']);info.size=len(data)
                 info.mode=0o755 if path.stat().st_mode&0o111 else 0o644;info.mtime=0
                 archive.addfile(info,io.BytesIO(data))
-            manifest=json.dumps(dict(project_license='GPL-3.0-or-later',files=result['files'],withheld=result['withheld'],binary_release_ready=False),indent=2).encode()+b'\n'
+            manifest=json.dumps(dict(project_license='GPL-3.0-or-later',files=result['files'],withheld=result['withheld'],binary_release_ready=result['binary_release_ready']),indent=2).encode()+b'\n'
             info=tarfile.TarInfo('SkylandersPS4/SOURCE_MANIFEST.json');info.size=len(manifest);info.mode=0o644;info.mtime=0
             archive.addfile(info,io.BytesIO(manifest))
         # Publish without replacing an existing user file.
@@ -194,7 +194,7 @@ def main(argv=None):
         if args.report:
             args.report.parent.mkdir(parents=True,exist_ok=True);args.report.write_text(json.dumps(result,indent=2)+'\n')
         for error in result['errors']:print(error)
-        print(f"Source audit: {'PASS' if result['ok'] else 'FAIL'} ({len(result['files'])} files; {len(result['withheld'])} withheld). Binary release readiness: not established.")
+        print(f"Source audit: {'PASS' if result['ok'] else 'FAIL'} ({len(result['files'])} files; {len(result['withheld'])} withheld). Binary release readiness: {'ready' if result['binary_release_ready'] else 'not established'}.")
         if args.export:print('Source export:',export_source(ROOT,result,args.export))
         return 0 if result['ok'] else 1
     except (OSError,ValueError,subprocess.CalledProcessError) as error:parser.error(str(error))

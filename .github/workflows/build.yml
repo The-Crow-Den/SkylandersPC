@@ -142,6 +142,24 @@ jobs:
           # Every MSYS2 DLL the host loads; Windows system DLLs are not copied.
           ldd "$host" | awk '$3 ~ /^\/clang64\// {print $3}' | sort -u | xargs -r -I{} cp {} "$dist/.local/native-gpu-build/"
           ls "$dist/.local/native-gpu-build"
+          # License inventory for those DLLs: owning package, version and license
+          # from pacman, plus each package's license texts.
+          mkdir -p "$dist/LICENSES/msys2"
+          {
+            echo '['; first=1
+            for dll in "$dist"/.local/native-gpu-build/*.dll; do
+              owner=$(pacman -Qoq "/clang64/bin/$(basename "$dll")")
+              version=$(pacman -Q "$owner" | awk '{print $2}')
+              license=$(pacman -Qi "$owner" | sed -n 's/^Licenses *: //p')
+              url=$(pacman -Qi "$owner" | sed -n 's/^URL *: //p')
+              [ -d "/clang64/share/licenses/${owner#mingw-w64-clang-x86_64-}" ] && cp -r "/clang64/share/licenses/${owner#mingw-w64-clang-x86_64-}" "$dist/LICENSES/msys2/" || true
+              [ $first = 1 ] || echo ','; first=0
+              printf '{"file": ".local/native-gpu-build/%s", "package": "%s", "version": "%s", "license": "%s", "source": "%s"}' \
+                "$(basename "$dll")" "$owner" "$version" "$license" "$url"
+            done
+            echo; echo ']'
+          } > "$dist/LICENSES/msys2-runtime.json"
+          python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))), 'MSYS2 DLLs inventoried')" "$dist/LICENSES/msys2-runtime.json"
       - uses: actions/setup-python@v6
         if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
         with:
@@ -168,6 +186,8 @@ jobs:
           $out = & out/SkylandersPC-windows/SkylandersPC.exe "$env:RUNNER_TEMP\probe.py" | Out-String
           Write-Output $out
           if ($out -notmatch 'imports ok') { exit 1 }
+          python tools/windows_inventory_check.py out/SkylandersPC-windows
+          if ($LASTEXITCODE) { exit 1 }
           # The PC menu's web engine must be inside the bundle, not on the player's PC.
           if (-not (Get-ChildItem -Recurse out/SkylandersPC-windows -Filter QtWebEngineProcess.exe)) { Write-Output 'QtWebEngineProcess.exe missing'; exit 1 }
       - uses: actions/upload-artifact@v5
