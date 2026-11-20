@@ -17,8 +17,8 @@ DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=50,
                 motion_blur=True, anti_aliasing=True, gpu='auto', mangohud=False,
                 unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US', aspect='16:9',
-                portal_device='virtual')
-FLAGS = ('motion_blur', 'anti_aliasing', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro')
+                portal_device='virtual', save_shaders=True)
+FLAGS = ('motion_blur', 'anti_aliasing', 'mangohud', 'unlock_nightmare', 'level_events', 'skip_intro', 'save_shaders')
 # 'auto' follows the display in fullscreen and the window size otherwise.
 ASPECTS = ('16:9', 'auto', '16:10', '21:9', '32:9')
 PC_KEYS = ('resolution', 'quality', 'fullscreen', 'fps_counter', 'frame_limit', 'portal_volume', 'frame_policy')
@@ -94,6 +94,8 @@ def load(path):
         value['aspect']='16:9'
     if isinstance(value,dict) and 'anti_aliasing' not in value:
         value['anti_aliasing']=True
+    if isinstance(value,dict) and 'save_shaders' not in value:
+        value['save_shaders']=True
     if isinstance(value,dict) and set(value)==set(DEFAULTS)-{'frame_policy'}:
         value['frame_policy']='auto'
     return validate(value)
@@ -150,6 +152,8 @@ def command(root, python, value, mods=None, game=None, mod_settings=None):
         argv += mod_arguments(mods, mod_settings)
     if value['level_events']:
         argv.append('--level-events')
+    if not value['save_shaders']:
+        argv.append('--no-shader-cache')
     if value['portal_device'] != portal_devices.VIRTUAL:
         argv += ['--portal-device', value['portal_device']]
     elif value['figure']:

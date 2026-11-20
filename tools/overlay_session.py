@@ -35,6 +35,9 @@ def overlay_python(environment):
             return sys.executable
     except ModuleNotFoundError:
         pass
+    if getattr(sys,'frozen',False):
+        # The Windows exe bundles WebEngine; never fall back to a Python on the player's PC.
+        raise RuntimeError('PyQt6 WebEngine is missing from this build')
     checked={os.path.realpath(sys.executable)}
     # An explicitly configured interpreter comes first (on Windows, PATH's
     # python3 is usually the Microsoft Store stub, without WebEngine).

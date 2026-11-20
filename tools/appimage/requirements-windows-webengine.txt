@@ -1,0 +1,6 @@
+# Qt WebEngine for the in-game PC menu, frozen into the Windows exe so players need
+# no Python. Pinned to match pyqt6==6.11.0 / pyqt6-qt6==6.11.2 in requirements.txt.
+pyqt6-webengine==6.11.0 \
+    --hash=sha256:5596ea8f7fd94a6b443c47f3c12dac619bedf5fabb646d2b8b4de1d73ec531cb
+pyqt6-webengine-qt6==6.11.2 \
+    --hash=sha256:af13f13e6620de6d904b268343d901caeb7a39b15ead92f5dde8cdd69dac179b

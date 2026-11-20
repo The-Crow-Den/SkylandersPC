@@ -57,6 +57,8 @@ def redact(text, home=None, user=None):
     if home and home not in ('/', ''):
         text = text.replace(home.rstrip('/'), '~')
     text = re.sub(r'/(home|Users)/[^/\s"\']+', r'/\1/<user>', text)
+    # Windows profiles, also as escaped in JSON (C:\\Users\\name).
+    text = re.sub(r'([A-Za-z]:(?:\\+|/)(?:Users|Documents and Settings)(?:\\+|/))[^\\/\s"\']+', r'\1<user>', text, flags=re.I)
     if user and len(user) > 1:
         text = re.sub(r'(?<![\w-])' + re.escape(user) + r'(?![\w-])', '<user>', text)
     return text

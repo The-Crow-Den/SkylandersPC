@@ -15,6 +15,7 @@ GROUPS = [
  ('Display','Picture and window preferences.', [('language','Game language'),('resolution','Resolution'),('aspect','Aspect ratio'),('quality','Shadow quality'),('fullscreen','Fullscreen'),('motion_blur','Motion blur'),('anti_aliasing','Anti-aliasing')]),
  ('Performance','Frame pacing and optional overlays.', [('fps_counter','Show FPS counter'),('trophy_popups','Show trophy popups'),('gpu','Graphics card'),('mangohud','MangoHud overlay'),('level_events','Record level events (diagnostic)')]),
  ('Portal & audio','Starting figure and portal speaker preferences.', [('portal_device','Portal'),('figure','Starting figure'),('portal_volume','Portal speaker volume')]),
+ ('Storage','Disk space used by games, shaders and caches.', [('save_shaders','Save compiled shaders')]),
  ('Tweaks','Optional game behavior changes and diagnostic tools.', [('skip_intro','Skip startup logos'),('unlock_nightmare','Nightmare available by default')]),
 ]
 
@@ -88,7 +89,8 @@ class SettingsPage(QWidget):
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
             'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'A connected physical portal, or the virtual portal with figure files. Real portals are listed when the launcher opens.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',
-            'level_events':'Record events for troubleshooting.'}
+            'level_events':'Record events for troubleshooting.',
+            'save_shaders':'Keep shaders after compiling them, so areas you have visited load smoothly next time. Off: nothing is saved and every visit compiles again.'}
         for name,description,entries in GROUPS:
             entries = [e for e in entries if e[0] not in model.LINUX_ONLY or e[0] in model.platform_settings()]
             page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)
@@ -118,6 +120,9 @@ class SettingsPage(QWidget):
                     line.addWidget(controls)
                 else:line.addWidget(field)
                 rows.addWidget(row)
+            if name=='Storage':
+                self.storage_rows=QVBoxLayout();self.storage_rows.setSpacing(8);rows.addLayout(self.storage_rows)
+                self.free_label=QLabel();self.free_label.setStyleSheet('color: #92929e; font-size: 13px;');rows.addWidget(self.free_label)
             if name=='Tweaks':
                 card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
                 copy=QVBoxLayout();heading=QLabel('Any portal');heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
@@ -169,7 +174,7 @@ class SettingsPage(QWidget):
             from game_library import directory
         self.games_row.setVisible(game is None);self.games_path.setText(str(directory(self.owner.root)))
         self.change_games.setEnabled(self.owner.process is None)
-        self.refresh_backups()
+        self.refresh_backups();self.refresh_storage()
         self.scope.blockSignals(True);self.scope.clear();self.scope.addItem('General settings',None)
         for entry in self.owner.library['games']:self.scope.addItem(entry['name'],entry['id'])
         self.scope.setCurrentIndex(self.scope.findData(game['id']) if game else 0);self.scope.blockSignals(False)
@@ -276,6 +281,46 @@ class SettingsPage(QWidget):
         title=(self.game or {}).get('title_id')
         if not title:return None,None
         return save_profile.select(self.owner.root,title)[0],title
+
+    def refresh_storage(self):
+        try:
+            from . import storage
+        except ImportError:
+            import storage
+        while self.storage_rows.count():
+            item=self.storage_rows.takeAt(0)
+            if item.widget():item.widget().deleteLater()
+        try:rows,free=storage.usage(self.owner.root)
+        except OSError as error:
+            self.free_label.setText('Could not measure disk space: '+str(error));return
+        for row in rows:
+            card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,12,20,12);line.setSpacing(16)
+            copy=QVBoxLayout();copy.setSpacing(2)
+            heading=QLabel(row['label']);heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
+            if row['note']:
+                note=QLabel(row['note']);note.setWordWrap(True);note.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(note)
+            line.addLayout(copy,1)
+            amount=QLabel(storage.human(row['bytes']));amount.setStyleSheet('font-size: 14px; color: #d6d6de;');line.addWidget(amount)
+            if row['clearable']:
+                button=QPushButton('Clear');button.setEnabled(self.owner.process is None and row['bytes']>0)
+                button.setToolTip('Stop the game first.' if self.owner.process else '')
+                button.clicked.connect(lambda checked=False,row=row:self.clear_storage(row));line.addWidget(button)
+            self.storage_rows.addWidget(card)
+        self.free_label.setText('Free space on this drive: '+storage.human(free) if free is not None else '')
+
+    def clear_storage(self,row):
+        try:
+            from . import storage
+        except ImportError:
+            import storage
+        if self.owner.process is not None:return
+        answer=QMessageBox.question(self,'Clear '+row['label'].lower(),
+            f"Delete {storage.human(row['bytes'])} of {row['label'].lower()}?\n\n{row['note']}")
+        if answer!=QMessageBox.StandardButton.Yes:return
+        try:freed=storage.clear(self.owner.root,row['key'])
+        except (OSError,ValueError) as error:
+            QMessageBox.warning(self,'Could not clear',str(error));return
+        self.feedback.setText('Freed '+storage.human(freed)+'.');self.refresh_storage()
 
     def refresh_backups(self):
         try:from . import save_backup

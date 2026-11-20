@@ -366,6 +366,8 @@ def run(argv,sessions):
                              'summarize with tools/frame_profile.py')
     parser.add_argument('--cold-cache', action='store_true',
                         help='start from empty renderer and driver shader caches inside the session')
+    parser.add_argument('--no-shader-cache', action='store_true',
+                        help='do not load or save compiled shaders (every area compiles on each visit)')
     parser.add_argument('--level-events', action='store_true',
                         help='enable the exact-build engine lifecycle mod')
     parser.add_argument('--frame-policy', choices=('manual','auto'), default='manual',
@@ -748,6 +750,8 @@ def run(argv,sessions):
         env['SKY_GPU_USER_DIR'] = str(cold)
         env['__GL_SHADER_DISK_CACHE_PATH'] = str(session/'driver-shader-cache')
         env['MESA_SHADER_CACHE_DIR'] = str(session/'driver-shader-cache')
+    if args.no_shader_cache:
+        env['SKY_RENDERER_PIPELINE_CACHE'] = '0'
     if args.present_limit is not None:
         env['SKY_RENDERER_FPS_LIMIT'] = args.present_limit
     command = [str(host), '--trace-start', *map(str, files),
@@ -834,6 +838,7 @@ def run(argv,sessions):
                    '--performance-profile',args.performance_profile,
                    '--motion-blur' if args.motion_blur else '--no-motion-blur',
                    '--anti-aliasing' if args.anti_aliasing else '--no-anti-aliasing',
+                   *(['--no-shader-cache'] if args.no_shader_cache else []),
                    '--memory-mode',args.memory_mode,
                    '--renderer-idle',args.renderer_idle,
                    '--movie-audio',args.movie_audio,'--skip-intro' if args.skip_intro else '--no-skip-intro','--language',args.language,
