@@ -113,3 +113,75 @@ def encode_bc3(pixels):
     """Sixteen RGBA pixels to one BC3 block (alpha, then opaque-mode colour)."""
     if len(pixels)!=16:raise ValueError('BC3 encoder requires sixteen pixels')
     return encode_alpha([p[3] for p in pixels])+encode_color([tuple(p[:3]) for p in pixels])
+
+
+def decode_alpha(block):
+    if len(block)!=8:raise ValueError('BC alpha block must be eight bytes')
+    a0,a1=block[0],block[1];bits=int.from_bytes(block[2:8],'little')
+    if a0>a1:palette=[a0,a1]+[((7-i)*a0+i*a1)//7 for i in range(1,7)]
+    else:palette=[a0,a1]+[((5-i)*a0+i*a1)//5 for i in range(1,5)]+[0,255]
+    return [palette[bits>>(3*i)&7] for i in range(16)]
+
+
+def decode_prompt(raw):
+    """A 128x128 BC3 prompt as display-oriented RGBA rows (the stored sprite is flipped)."""
+    if len(raw)!=16384:raise ValueError('unsupported BC3 prompt layout')
+    image=[[(0,0,0,0)]*128 for _ in range(128)]
+    for by in range(32):
+        for bx in range(32):
+            at=block_offset(bx,by);alpha=decode_alpha(raw[at:at+8]);color=decode_color(raw[at+8:at+16])
+            for i in range(16):image[127-(by*4+i//4)][bx*4+i%4]=(*color[i],alpha[i])
+    return image
+
+
+def encode_prompt(image):
+    """Inverse of decode_prompt: display-oriented RGBA rows to the stored BC3 layout."""
+    if len(image)!=128 or any(len(row)!=128 for row in image):raise ValueError('prompt image must be 128x128')
+    out=bytearray(16384)
+    for by in range(32):
+        for bx in range(32):
+            pixels=[tuple(image[127-(by*4+i//4)][bx*4+i%4]) for i in range(16)]
+            at=block_offset(bx,by);out[at:at+16]=encode_bc3(pixels)
+    return bytes(out)
+
+
+def opaque_bounds(image,threshold=128):
+    """Smallest (left, top, right, bottom) box around pixels at least this opaque, or None."""
+    xs=[x for row in image for x,p in enumerate(row) if p[3]>=threshold]
+    ys=[y for y,row in enumerate(image) if any(p[3]>=threshold for p in row)]
+    return (min(xs),min(ys),max(xs)+1,max(ys)+1) if xs else None
+
+
+def luminance(image,threshold=128):
+    values=[0.299*p[0]+0.587*p[1]+0.114*p[2] for row in image for p in row if p[3]>=threshold]
+    return sum(values)/len(values) if values else 0.0
+
+
+def replace_prompt(image,art,width,height,brightness=1.0,margin=2):
+    """Draw controller art over a prompt frame's button, fitted to its opaque box.
+
+    The whole button is replaced (not only its symbol); the frame's box keeps the
+    game's press/mash scaling, and brightness keeps its darker pressed frames.
+    Pixels well outside the button (glow, rings) are kept."""
+    box=opaque_bounds(image)
+    if box is None:return [list(row) for row in image]
+    left,top,right,bottom=box;bw,bh=right-left,bottom-top
+    scale=min(bw/width,bh/height);dw,dh=max(1,round(width*scale)),max(1,round(height*scale))
+    ox,oy=left+(bw-dw)//2,top+(bh-dh)//2
+    out=[list(row) for row in image]
+    for y in range(max(0,top-margin),min(128,bottom+margin)):
+        for x in range(max(0,left-margin),min(128,right+margin)):out[y][x]=(0,0,0,0)
+    for y in range(dh):
+        for x in range(dw):
+            # Area-average the art onto the target pixel.
+            x0,x1=x/scale,(x+1)/scale;y0,y1=y/scale,(y+1)/scale;total=[0.0]*4;weight=0.0
+            for sy in range(int(y0),min(height,int(y1-1e-9)+1)):
+                wy=min(sy+1,y1)-max(sy,y0)
+                for sx in range(int(x0),min(width,int(x1-1e-9)+1)):
+                    w=wy*(min(sx+1,x1)-max(sx,x0));i=(sy*width+sx)*4;a=art[i+3]*w
+                    total[0]+=art[i]*a;total[1]+=art[i+1]*a;total[2]+=art[i+2]*a;total[3]+=a;weight+=w
+            if not total[3]:continue
+            rgb=tuple(max(0,min(255,round(total[c]/total[3]*brightness))) for c in range(3))
+            tx,ty=ox+x,oy+y
+            if 0<=tx<128 and 0<=ty<128:out[ty][tx]=(*rgb,max(0,min(255,round(total[3]/weight))))
+    return out

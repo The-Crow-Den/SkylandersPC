@@ -55,3 +55,20 @@ class BlockTextureTests(unittest.TestCase):
         modified,_=asset_mod.patch_asset(source,glyph.prompt_recipe(source,profile,'nintendo'))
         self.assertEqual(modified[:start],source[:start]);self.assertEqual(modified[start+16384:],source[start+16384:])
         self.assertNotEqual(modified,source)
+
+
+class WholePromptReplacementTests(unittest.TestCase):
+    def test_button_replaced_scaled_to_frame_and_dimmed(self):
+        # A grey disc-ish square button (PlayStation style) in a transparent frame.
+        image=[[(0,0,0,0)]*128 for _ in range(128)]
+        for y in range(30,90):
+            for x in range(30,90):image[y][x]=(60,60,60,255)
+        art=bytes((0,200,0,255))*(8*8)  # solid green 8x8 artwork
+        bright=bc.replace_prompt(image,art,8,8)
+        self.assertEqual(bc.opaque_bounds(bright),(30,30,90,90))
+        self.assertTrue(all(bright[y][x]==(0,200,0,255) for y in range(30,90) for x in range(30,90)))
+        dim=bc.replace_prompt(image,art,8,8,brightness=.5)
+        self.assertEqual(dim[60][60],(0,100,0,255))
+        # Round trip through the stored BC3 layout keeps the shape.
+        again=bc.decode_prompt(bc.encode_prompt(bright))
+        self.assertEqual(bc.opaque_bounds(again),(30,30,90,90))
