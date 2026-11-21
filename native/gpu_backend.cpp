@@ -61,7 +61,7 @@ void (*portal_remove)() = nullptr;
 void (*portal_trap)(const char*) = nullptr;
 void (*portal_remove_trap)() = nullptr;
 int trap_dialog_tag,second_dialog_tag;
-std::atomic<int> portal_volume{30};
+std::atomic<int> portal_volume{50};
 SDL_AudioStream* portal_audio_stream=nullptr;
 std::mutex portal_audio_mutex;
 extern "C" int sky_portal_volume(){return portal_volume.load();}

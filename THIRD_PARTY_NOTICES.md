@@ -30,6 +30,8 @@ Upstream source headers and additional nested notices remain authoritative.
 | Qt | Module-specific GPL/LGPL/commercial and third-party terms | System GUI libraries; the AppImage's bundled Qt modules, plugins and ICU are listed in `LICENSES/bundled-components.json` |
 | CPython (python-build-standalone) | PSF-2.0 and bundled-library notices | Interpreter in the optional standalone launcher AppImage only |
 | cryptography / cffi / pycparser | Apache-2.0 or BSD-3-Clause / MIT-0 / BSD-3-Clause | Python packages in the standalone launcher AppImage |
+| PyInstaller bootloader | GPL-2.0-or-later with the PyInstaller bootloader exception | Starter of the Windows `SkylandersPC.exe`; bundled components listed in `LICENSES/windows-bundled-components.json` |
+| MSYS2 / MinGW-w64 runtime libraries | Their respective package terms, generated into `msys2-runtime.json` at build time | C/C++ runtime DLLs of the Windows game host |
 | AppImage type-2 runtime / appimagetool | MIT | Build tool and runtime of the standalone launcher AppImage |
 | Pillow | Full Pillow notice retained | Optional one-time image import tools |
 | FFmpeg | Build-dependent LGPL/GPL terms | Native provider links installed libav*; inspect the exact binary build before bundling |
@@ -84,5 +86,6 @@ The offline HTML PC overlay includes Lucide 1.17.0 in
 `tools/pc_menu/lucide.js` (ISC, with Feather-derived icons under MIT). Both
 notices are retained in `LICENSES/third-party/Lucide-ISC.txt`. The source
 export includes the HTML, CSS and JavaScript, excluding private portrait assets.
-QtWebEngine/PyQt6-WebEngine are system runtime dependencies for the optional
-HTML overlay; exact binary-bundle terms remain part of the outstanding inventory.
+QtWebEngine/PyQt6-WebEngine (Chromium-based, with its own third-party notices)
+run the HTML overlay. They are system libraries on Linux and bundled in the
+Windows zip, where they are listed in `LICENSES/windows-bundled-components.json`.
