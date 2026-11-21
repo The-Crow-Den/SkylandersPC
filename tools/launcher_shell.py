@@ -321,6 +321,9 @@ def renovated(base):
             self.primary.setObjectName('libraryPlay'); self.primary.setMinimumSize(190,56); self.primary.setMaximumWidth(240)
             self.primary.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             more=self.button(bottom, '•••', self.game_menu);more.setObjectName('moreButton');more.setFixedSize(56,56)
+            for index in range(bottom.count()):
+                item=bottom.itemAt(index)
+                if item.widget() is not None:item.setAlignment(Qt.AlignmentFlag.AlignVCenter)
             main.addWidget(panel)
             self.setStyleSheet(self.styleSheet() + '''
                 QWidget#libraryRail { background: rgba(14,14,18,0.62); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; }
@@ -337,7 +340,7 @@ def renovated(base):
                 QPushButton#trophyLink { background: transparent; border: none; text-align: left; color: #d6d6de; padding: 0; font-size: 14px; font-weight: 600; }
                 QPushButton#trophyLink:hover { color: #ffffff; }
                 QProgressBar#trophyBar { background: rgba(255,255,255,0.10); border: none; border-radius: 2px; }
-                QPushButton#moreButton { background: rgba(255,255,255,0.06); border: none; border-radius: 14px; min-width: 56px; min-height: 56px; font-size: 16px; }
+                QPushButton#moreButton { background: rgba(255,255,255,0.06); border: none; border-radius: 14px; min-width: 56px; min-height: 56px; max-width: 56px; max-height: 56px; padding: 0; font-size: 16px; }
                 QPushButton#updatePill { background: rgba(152,223,239,0.16); color: #c9f1fa; border: 1px solid rgba(152,223,239,0.45); border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; }
                 QPushButton#updatePill:hover { background: rgba(152,223,239,0.28); }
                 QPushButton#moreButton:hover { background: rgba(255,255,255,0.14); }
@@ -507,8 +510,17 @@ def renovated(base):
             self.primary.setEnabled(not busy and data['state'] in ('Ready','Needs repair','Not installed'))
             size='' if data['size'] is None else f"{data['size']/1024**3:.1f} GB" if data['size']>=1024**3 else f"{data['size']/1024**2:.1f} MB"
             progress=f"{round(data['fraction']*100)}%" if data.get('fraction') is not None else ''
-            self.game_info.setText(' · '.join(part for part in (data['state'],progress,data['version'],size) if part))
-            self.install_note.setText(data['message'])
+            if ready:
+                # Ready needs no words: the PLAY button says it. Show only the version in use and size.
+                import re
+                versions=re.findall(r'\d+\.\d+',data['version'] or '')
+                self.game_info.setText(' · '.join(part for part in (('v'+versions[-1]) if versions else '',size) if part))
+                self.game_info.setToolTip(data['version'] or '')
+                self.install_note.setText('');self.install_note.hide()
+            else:
+                self.game_info.setText(' · '.join(part for part in (data['state'],progress,data['version'],size) if part))
+                self.game_info.setToolTip('')
+                self.install_note.setText(data['message']);self.install_note.setVisible(bool(data['message']))
             self.game_title.setText('Skylanders '+self.game['name'] if self.game['id'] in dict((g[0],1) for g in library.GAMES) else self.game['name'])
             self.trophies.setVisible(data['state']!='Coming soon');self.trophy_bar.setVisible(data['state']!='Coming soon')
             try:
