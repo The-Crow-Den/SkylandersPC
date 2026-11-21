@@ -13,6 +13,8 @@ def letter_mask(width,height):
 class BlockTextureTests(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(glyph.controller_art,'letter',side_effect=lambda mode,index,w,h:letter_mask(w,h)))
+        # Prompts are redrawn from full-colour art; tests must not need the private Steam cache.
+        self.enterContext(patch.object(glyph.controller_art,'glyph',side_effect=lambda mode,index,w,h:bytes((0,200,0,255))*(w*h)))
 
     def test_color_decode_uses_spec_endpoint_order_and_index_bits(self):
         # RGB565 red/blue endpoints and indices 0,1,2,3 repeated.

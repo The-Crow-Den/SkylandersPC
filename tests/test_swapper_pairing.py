@@ -3,8 +3,11 @@ import sys, unittest
 from pathlib import Path
 from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from launcher_portal import pair_swappers, Swapper
 import figure_data
+try:
+    from launcher_portal import pair_swappers, Swapper
+except ImportError:  # optional PyQt6 is not installed (source-only CI)
+    pair_swappers = None
 
 
 def entry(name, identity):
@@ -12,6 +15,7 @@ def entry(name, identity):
     return SimpleNamespace(name=name, figure=figure, path=Path(f'/{name}.sky'), created=True, working=None)
 
 
+@unittest.skipUnless(pair_swappers, 'optional PyQt6 is not installed')
 class SwapperPairingTest(unittest.TestCase):
     def test_halves_of_one_swapper_become_one_figure(self):
         figures = pair_swappers([entry('Spyro', 1), entry('Blast Zone (Top)', 2000), entry('Blast Zone (Bottom)', 1000),
