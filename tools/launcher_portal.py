@@ -150,6 +150,35 @@ class CreateDialog(QDialog):
         self.choice = item.data(Qt.ItemDataRole.UserRole); super().accept()
 
 
+class Swapper:
+    """A swapper's top and bottom halves shown as one figure (either may be missing)."""
+    def __init__(self, top, bottom):
+        self.top, self.bottom = top, bottom
+        self.halves = [half for half in (top, bottom) if half]
+        first = self.halves[0]
+        self.path, self.figure, self.created, self.working = first.path, first.figure, first.created, first.working
+        self.name = PortalPage.display_name(first)
+
+    def has(self, path):
+        return path is not None and any(half.path == Path(path) for half in self.halves)
+
+
+def pair_swappers(entries):
+    """Entries with each swapper's halves (tops 2000+n, bottoms 1000+n) combined."""
+    tops, bottoms, others = {}, {}, []
+    for entry in entries:
+        half = entry.figure.half
+        if half == 'top':tops.setdefault(entry.figure.identity - 2000, entry)
+        elif half == 'bottom':bottoms.setdefault(entry.figure.identity - 1000, entry)
+        else:others.append(entry)
+    # Extra copies of a half (duplicates) stay listed on their own.
+    paired = {id(e) for e in [*tops.values(), *bottoms.values()]}
+    extras = [e for e in entries if e.figure.half and id(e) not in paired]
+    swappers = [Swapper(tops.get(n), bottoms.get(n)) for n in sorted(set(tops) | set(bottoms))]
+    swappers += [Swapper(e, None) if e.figure.half == 'top' else Swapper(None, e) for e in extras]
+    return others + sorted(swappers, key=lambda s: s.name.lower())
+
+
 class PortalPage(QWidget):
     def __init__(self, owner):
         super().__init__(); self.owner = owner; self.collection = None; self.entries = []; self.entry = None; self.loading = False
@@ -195,7 +224,7 @@ class PortalPage(QWidget):
         self.name = QLabel(); self.name.setStyleSheet('font-size: 26px; font-weight: 700;'); self.name.setWordWrap(True); form.addWidget(self.name)
         self.kind = QLabel(); self.kind.setStyleSheet('color: #98dfef; font-size: 12px; font-weight: 700; letter-spacing: 1px;'); form.addWidget(self.kind)
         self.notice = QLabel(); self.notice.setWordWrap(True); self.notice.setObjectName('portalNotice'); form.addWidget(self.notice)
-        stats = QFrame(); stats.setObjectName('portalStats'); form.addWidget(stats)
+        self.stats = stats = QFrame(); stats.setObjectName('portalStats'); form.addWidget(stats)
         grid = QGridLayout(stats); grid.setContentsMargins(18, 16, 18, 16); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(12)
         def label(text):
             widget = QLabel(text); widget.setStyleSheet('color: #aaaab5; font-weight: 600;'); return widget
@@ -221,7 +250,7 @@ class PortalPage(QWidget):
         for field in (self.xp, self.gold): field.valueChanged.connect(self.mark)
         self.feedback = QLabel(); self.feedback.setStyleSheet('color: #92929e; font-size: 12px;'); self.feedback.setWordWrap(True)
         form.addWidget(self.feedback)
-        save_row = QHBoxLayout(); save_row.addStretch()
+        self.save_row = save_row = QHBoxLayout(); save_row.addStretch()
         self.revert = QPushButton('Revert'); self.revert.clicked.connect(lambda: self.show_entry(self.entry)); save_row.addWidget(self.revert)
         self.save_button = QPushButton('Save changes'); self.save_button.setObjectName('portalPrimary'); self.save_button.clicked.connect(self.save)
         save_row.addWidget(self.save_button); form.addLayout(save_row)
@@ -282,6 +311,7 @@ class PortalPage(QWidget):
             self.entries = []; problem = str(error)
         current = select or (self.entry.path if self.entry else None) or self.starting()
         self.list.blockSignals(True); self.list.clear(); self.rows = []
+        self.figures = pair_swappers(self.entries)
         for section, members in self.sections():
             header = QListWidgetItem(section.upper()); header.setFlags(Qt.ItemFlag.NoItemFlags)
             header.setForeground(QColor('#7d7d88')); font = header.font(); font.setBold(True); font.setPointSizeF(max(7.0, font.pointSizeF() * .8)); header.setFont(font)
@@ -289,12 +319,13 @@ class PortalPage(QWidget):
             for entry in members:
                 self.list.addItem(self.item(entry)); self.rows.append(entry)
         self.list.blockSignals(False)
-        figures = len(self.entries); self.count.setText(f'{figures} figure' + ('' if figures == 1 else 's')); self.count.setVisible(bool(figures))
+        figures = len(self.figures); self.count.setText(f'{figures} figure' + ('' if figures == 1 else 's')); self.count.setVisible(bool(figures))
         self.list.setVisible(bool(self.entries)); self.empty.setVisible(not self.entries)
         if problem: self.empty.setText(problem)
         self.lock.setVisible(self.locked())
         for button in (self.create_button, self.import_button): button.setEnabled(not self.locked() and self.collection is not None)
-        index = next((i for i, e in enumerate(self.rows) if not isinstance(e, str) and current and e.path == Path(current)),
+        index = next((i for i, e in enumerate(self.rows) if not isinstance(e, str) and current and
+                      (e.has(current) if isinstance(e, Swapper) else e.path == Path(current))),
                      next((i for i, e in enumerate(self.rows) if not isinstance(e, str)), -1))
         self.entry = None; self.list.setCurrentRow(index)
         if index < 0: self.show_entry(None)
@@ -309,6 +340,7 @@ class PortalPage(QWidget):
         return Path(value) if value else None
 
     def on_portal(self, entry):
+        if isinstance(entry, Swapper):return entry.has(self.starting()) or entry.has(self.starting_bottom())
         return entry.path in (self.starting(), self.starting_bottom())
 
     SECTIONS = (('Skylanders', 'character'), ('Swappers', 'swapper'), ('Magic items', 'item'), ('Vehicles', 'vehicle'))
@@ -316,13 +348,15 @@ class PortalPage(QWidget):
     def sections(self):
         def kind(entry):
             figure = entry.figure
-            return 'swapper' if figure.half else figure.kind if figure.kind in ('item', 'vehicle') else 'character'
-        return [(title, [e for e in self.entries if kind(e) == key]) for title, key in self.SECTIONS
-                if any(kind(e) == key for e in self.entries)]
+            return 'swapper' if isinstance(entry, Swapper) else figure.kind if figure.kind in ('item', 'vehicle') else 'character'
+        figures = getattr(self, 'figures', None) or pair_swappers(self.entries)
+        return [(title, [e for e in figures if kind(e) == key]) for title, key in self.SECTIONS
+                if any(kind(e) == key for e in figures)]
 
     @staticmethod
     def display_name(entry):
-        # Swapper halves read "Blast Zone", with the half on the second line.
+        # Swapper halves read "Blast Zone".
+        if isinstance(entry, Swapper):return entry.name
         name = entry.name; half = entry.figure.half
         suffix = f' ({half.capitalize()})' if half else ''
         return name[:-len(suffix)] if suffix and name.endswith(suffix) else name
@@ -332,6 +366,8 @@ class PortalPage(QWidget):
         lines = [self.display_name(entry) + ('   ◉' if self.on_portal(entry) else '')]
         if figure.kind == 'item': lines.append('Magic item')
         elif figure.kind == 'vehicle': lines.append('SuperChargers vehicle')
+        elif isinstance(entry, Swapper):
+            lines.append('Swapper' if entry.top and entry.bottom else f'Swapper · {"top" if entry.top else "bottom"} half only')
         elif figure.half: lines.append(f'{figure.half.capitalize()} half')
         elif figure.editable:
             detail = f'Level {figure.level}  ·  {figure.gold:,} gold'
@@ -373,7 +409,7 @@ class PortalPage(QWidget):
             on_portal = self.on_portal(entry)
             self.stage.show_figure(self.portraits.get(figure.identity, figure.variant), entry.name, on_portal)
             self.name.setText(self.display_name(entry))
-            kind = 'MAGIC ITEM' if figure.kind == 'item' else 'VEHICLE' if figure.kind == 'vehicle' else f'SWAPPER {figure.half.upper()} HALF' if figure.half else 'SKYLANDER'
+            kind = 'SWAPPER' if isinstance(entry, Swapper) else 'MAGIC ITEM' if figure.kind == 'item' else 'VEHICLE' if figure.kind == 'vehicle' else f'SWAPPER {figure.half.upper()} HALF' if figure.half else 'SKYLANDER'
             self.kind.setText(kind + ('  ·  CREATED' if entry.created else '  ·  IMPORTED'))
             self.place.setText('Remove from portal' if on_portal else 'Place on portal')
             self.place_hint.setText('Starts on the portal when you press Play.' if on_portal else
@@ -385,6 +421,9 @@ class PortalPage(QWidget):
             self.played.setText(f'{seconds // 3600} h {seconds // 60 % 60} min' if seconds else '—')
             if figure.kind == 'item': notice = 'Magic items have no level or gold to edit.'
             elif figure.kind == 'vehicle': notice = 'Vehicles are used in the SuperChargers portal menu. Their progress is kept by the game.'
+            elif isinstance(entry, Swapper):
+                notice = ('Placing this swapper puts both halves on the portal. Mix halves from different swappers in game with F6. Its progress is kept by the game.'
+                          if entry.top and entry.bottom else 'Only one half of this swapper is in your collection. Create or import the other half to place it.')
             elif figure.half: notice = 'Swapper halves are placed together: start with a top half, then add a bottom half. Their progress is kept by the game.'
             elif not figure.editable: notice = 'Not played yet. Place it on the portal in game once, then its level, gold and nickname can be edited here.'
             else: notice = ''
@@ -395,8 +434,12 @@ class PortalPage(QWidget):
         for widget in (self.nickname, self.level, self.max_level, self.xp, self.gold, self.max_gold): widget.setEnabled(editable)
         has = entry is not None and not self.locked()
         for widget in (self.duplicate_button, self.export_button, self.remove_button, self.place): widget.setEnabled(has)
-        self.duplicate_button.setEnabled(has and figure.kind == 'character')
-        self.export_button.setEnabled(entry is not None)
+        swapper = isinstance(entry, Swapper)
+        self.duplicate_button.setEnabled(has and figure.kind == 'character' and not swapper)
+        self.export_button.setEnabled(entry is not None and not swapper)
+        if swapper: self.place.setEnabled(has and entry.top is not None and entry.bottom is not None)
+        # A swapper has no stats to edit here; hide the card and its save buttons.
+        for widget in (self.stats, self.revert, self.save_button): widget.setVisible(not swapper)
         self.update_progress(); self.loading = False; self.mark()
         if entry: self.feedback.setText('Saved to the game’s working copy.' if entry.working else 'Never placed in game yet.')
         else: self.feedback.clear()
@@ -512,16 +555,23 @@ class PortalPage(QWidget):
         if QMessageBox.question(self, 'Remove Skylander', f'Remove {name} from your collection?\n\n'
                 'The figure and its progress are moved to out/portal-library/removed and can be restored from there.') != QMessageBox.StandardButton.Yes:
             return
-        if self.starting() == self.entry.path: self.set_starting(None)
-        elif self.starting_bottom() == self.entry.path: self.set_starting(self.starting())
+        halves = self.entry.halves if isinstance(self.entry, Swapper) else [self.entry]
+        for half in halves:
+            if self.starting() == half.path: self.set_starting(None)
+            elif self.starting_bottom() == half.path: self.set_starting(self.starting())
         try:
-            self.collection.remove(self.entry)
+            for half in halves: self.collection.remove(half)
         except OSError as error:
             self.failure('Could not remove this Skylander', error); return
         self.entry = None; self.refresh()
 
     def toggle_portal(self):
         if not self.entry or not self.guard(): return
+        if isinstance(self.entry, Swapper):
+            entry = self.entry
+            if self.on_portal(entry): self.set_starting(None)
+            else: self.set_starting(entry.top.path, entry.bottom.path)
+            self.refresh(entry.path); return
         path, half = self.entry.path, self.entry.figure.half
         top = self.starting(); top_entry = next((e for e in self.entries if e.path == top), None)
         if path == self.starting_bottom(): self.set_starting(top, None)
