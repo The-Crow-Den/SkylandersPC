@@ -384,7 +384,7 @@ class LauncherUITests(unittest.TestCase):
         with patch.object(game_library,'supported',return_value=True),patch('tools.game_prepare.require_ready'):
             self.window.refresh_game()
             self.assertEqual(self.window.game_state['state'],'Ready');self.assertTrue(self.window.primary.isEnabled());self.assertTrue(self.window.play.isEnabled())
-            self.assertIn('Base 01.00',self.window.game_info.text());self.assertIn('MB',self.window.game_info.text())
+            self.assertIn('Base 01.00',self.window.game_info.toolTip());self.assertIn('v01.0',self.window.game_info.text());self.assertNotIn('Ready',self.window.game_info.text());self.assertIn('MB',self.window.game_info.text())
             game['operation']={'state':'Installing','message':'Unpacking files'};self.window.refresh_game()
             self.assertEqual(self.window.primary.text(),'INSTALLING');self.assertFalse(self.window.play.isEnabled())
             game['operation']={'state':'Preparing','message':'Checking files','fraction':.5};self.window.refresh_game()
