@@ -206,9 +206,9 @@ class LauncherUITests(unittest.TestCase):
         self.window.manager();page=self.window.portal_page
         self.assertIs(self.window.views.currentWidget(),page)
         self.assertEqual([e.name for e in page.entries],['Gill Grunt','Spyro'])
-        page.list.setCurrentRow(1)
+        page.list.setCurrentRow(page.rows.index(page.entries[1]))
         self.assertFalse(page.gold.isEnabled());self.assertFalse(page.notice.isHidden())
-        page.list.setCurrentRow(0)
+        page.list.setCurrentRow(page.rows.index(page.entries[0]))
         self.assertFalse(page.save_button.isEnabled())
         page.nickname.setText('Splashy');page.level.setValue(12);page.gold.setValue(4321)
         self.assertTrue(page.save_button.isEnabled())

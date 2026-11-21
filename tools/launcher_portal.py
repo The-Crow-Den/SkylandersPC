@@ -171,6 +171,7 @@ class PortalPage(QWidget):
         left = QVBoxLayout(side); left.setContentsMargins(16, 16, 16, 16); left.setSpacing(12)
         self.search = QLineEdit(); self.search.setPlaceholderText('Search your collection'); self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.filter); left.addWidget(self.search)
+        self.count = QLabel(); self.count.setObjectName('portalCount'); left.addWidget(self.count)
         self.list = QListWidget(); self.list.setObjectName('portalList'); self.list.setIconSize(QSize(52, 52))
         self.list.currentRowChanged.connect(self.select); left.addWidget(self.list, 1)
         self.empty = QLabel('No virtual Skylanders yet.\nCreate one or import a figure dump.'); self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -184,7 +185,7 @@ class PortalPage(QWidget):
         right = QHBoxLayout(detail); right.setContentsMargins(26, 22, 26, 22); right.setSpacing(26)
         stage_column = QVBoxLayout(); stage_column.setSpacing(10)
         self.stage = PortalStage(); stage_column.addWidget(self.stage, 1)
-        self.place = QPushButton('Place on portal'); self.place.clicked.connect(self.toggle_portal); stage_column.addWidget(self.place)
+        self.place = QPushButton('Place on portal'); self.place.setObjectName('portalPlace'); self.place.clicked.connect(self.toggle_portal); stage_column.addWidget(self.place)
         self.place_hint = QLabel(''); self.place_hint.setWordWrap(True); self.place_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.place_hint.setStyleSheet('color: #92929e; font-size: 12px;'); stage_column.addWidget(self.place_hint)
         right.addLayout(stage_column, 4)
@@ -194,7 +195,8 @@ class PortalPage(QWidget):
         self.name = QLabel(); self.name.setStyleSheet('font-size: 26px; font-weight: 700;'); self.name.setWordWrap(True); form.addWidget(self.name)
         self.kind = QLabel(); self.kind.setStyleSheet('color: #98dfef; font-size: 12px; font-weight: 700; letter-spacing: 1px;'); form.addWidget(self.kind)
         self.notice = QLabel(); self.notice.setWordWrap(True); self.notice.setObjectName('portalNotice'); form.addWidget(self.notice)
-        grid = QGridLayout(); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(12); form.addLayout(grid)
+        stats = QFrame(); stats.setObjectName('portalStats'); form.addWidget(stats)
+        grid = QGridLayout(stats); grid.setContentsMargins(18, 16, 18, 16); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(12)
         def label(text):
             widget = QLabel(text); widget.setStyleSheet('color: #aaaab5; font-weight: 600;'); return widget
         self.nickname = QLineEdit(); self.nickname.setMaxLength(figure_data.NICKNAME_LENGTH); self.nickname.setPlaceholderText('No nickname')
@@ -217,13 +219,13 @@ class PortalPage(QWidget):
         grid.setColumnStretch(1, 1)
         for field in (self.nickname,): field.textChanged.connect(self.mark)
         for field in (self.xp, self.gold): field.valueChanged.connect(self.mark)
-        form.addStretch()
         self.feedback = QLabel(); self.feedback.setStyleSheet('color: #92929e; font-size: 12px;'); self.feedback.setWordWrap(True)
         form.addWidget(self.feedback)
         save_row = QHBoxLayout(); save_row.addStretch()
         self.revert = QPushButton('Revert'); self.revert.clicked.connect(lambda: self.show_entry(self.entry)); save_row.addWidget(self.revert)
         self.save_button = QPushButton('Save changes'); self.save_button.setObjectName('portalPrimary'); self.save_button.clicked.connect(self.save)
         save_row.addWidget(self.save_button); form.addLayout(save_row)
+        form.addStretch()
         manage = QHBoxLayout()
         self.duplicate_button = QPushButton('Duplicate'); self.duplicate_button.setToolTip('A second copy with its own progress, e.g. for player 2')
         self.duplicate_button.clicked.connect(self.duplicate)
@@ -245,6 +247,11 @@ class PortalPage(QWidget):
             QLabel#portalLock { color: #f1d59a; background: #2b2416; border: 1px solid #5c4a24; border-radius: 10px; padding: 6px 12px; }
             QLabel#portalNotice { color: #cfe9f2; background: #15303b; border: 1px solid #275567; border-radius: 10px; padding: 10px 12px; }
             QListWidget#portalList { background: transparent; border: none; padding: 0; }
+            QLabel#portalCount { color: #7d7d88; font-size: 12px; padding: 0 4px; }
+            QFrame#portalStats { background: #1e1e23; border: 1px solid #2c2c33; border-radius: 14px; }
+            QPushButton#portalPlace { background: #1f3a46; color: #e6f8fd; border: 1px solid #3f7387; border-radius: 10px; padding: 10px 18px; font-weight: 700; }
+            QPushButton#portalPlace:hover { background: #28505f; }
+            QPushButton#portalPlace:disabled { background: #222228; color: #6d6d75; border-color: #303037; }
             QListWidget#portalList::item { padding: 8px; border-radius: 10px; margin: 1px 0; }
             QListWidget#portalList::item:selected { background: #2a3a44; color: white; }
             QListWidget#portalList::item:hover:!selected { background: #222228; }
@@ -274,15 +281,21 @@ class PortalPage(QWidget):
         except (OSError, figure_data.FigureError) as error:
             self.entries = []; problem = str(error)
         current = select or (self.entry.path if self.entry else None) or self.starting()
-        self.list.blockSignals(True); self.list.clear()
-        for entry in self.entries:
-            self.list.addItem(self.item(entry))
+        self.list.blockSignals(True); self.list.clear(); self.rows = []
+        for section, members in self.sections():
+            header = QListWidgetItem(section.upper()); header.setFlags(Qt.ItemFlag.NoItemFlags)
+            header.setForeground(QColor('#7d7d88')); font = header.font(); font.setBold(True); font.setPointSizeF(max(7.0, font.pointSizeF() * .8)); header.setFont(font)
+            self.list.addItem(header); self.rows.append(section)
+            for entry in members:
+                self.list.addItem(self.item(entry)); self.rows.append(entry)
         self.list.blockSignals(False)
+        figures = len(self.entries); self.count.setText(f'{figures} figure' + ('' if figures == 1 else 's')); self.count.setVisible(bool(figures))
         self.list.setVisible(bool(self.entries)); self.empty.setVisible(not self.entries)
         if problem: self.empty.setText(problem)
         self.lock.setVisible(self.locked())
         for button in (self.create_button, self.import_button): button.setEnabled(not self.locked() and self.collection is not None)
-        index = next((i for i, e in enumerate(self.entries) if current and e.path == Path(current)), 0 if self.entries else -1)
+        index = next((i for i, e in enumerate(self.rows) if not isinstance(e, str) and current and e.path == Path(current)),
+                     next((i for i, e in enumerate(self.rows) if not isinstance(e, str)), -1))
         self.entry = None; self.list.setCurrentRow(index)
         if index < 0: self.show_entry(None)
         self.filter(self.search.text())
@@ -298,12 +311,28 @@ class PortalPage(QWidget):
     def on_portal(self, entry):
         return entry.path in (self.starting(), self.starting_bottom())
 
+    SECTIONS = (('Skylanders', 'character'), ('Swappers', 'swapper'), ('Magic items', 'item'), ('Vehicles', 'vehicle'))
+
+    def sections(self):
+        def kind(entry):
+            figure = entry.figure
+            return 'swapper' if figure.half else figure.kind if figure.kind in ('item', 'vehicle') else 'character'
+        return [(title, [e for e in self.entries if kind(e) == key]) for title, key in self.SECTIONS
+                if any(kind(e) == key for e in self.entries)]
+
+    @staticmethod
+    def display_name(entry):
+        # Swapper halves read "Blast Zone", with the half on the second line.
+        name = entry.name; half = entry.figure.half
+        suffix = f' ({half.capitalize()})' if half else ''
+        return name[:-len(suffix)] if suffix and name.endswith(suffix) else name
+
     def item(self, entry):
         figure = entry.figure
-        lines = [entry.name + ('   ◉' if self.on_portal(entry) else '')]
+        lines = [self.display_name(entry) + ('   ◉' if self.on_portal(entry) else '')]
         if figure.kind == 'item': lines.append('Magic item')
         elif figure.kind == 'vehicle': lines.append('SuperChargers vehicle')
-        elif figure.half: lines.append(f'Swapper {figure.half} half')
+        elif figure.half: lines.append(f'{figure.half.capitalize()} half')
         elif figure.editable:
             detail = f'Level {figure.level}  ·  {figure.gold:,} gold'
             lines.append(detail + (f'  ·  “{figure.nickname}”' if figure.nickname else ''))
@@ -314,15 +343,25 @@ class PortalPage(QWidget):
 
     def filter(self, text):
         needle = text.strip().lower()
-        for i, entry in enumerate(self.entries):
-            self.list.item(i).setHidden(bool(needle) and needle not in (entry.name + ' ' + entry.figure.nickname).lower())
+        visible = set()
+        for i, entry in enumerate(self.rows):
+            if isinstance(entry, str):continue
+            hidden = bool(needle) and needle not in (entry.name + ' ' + entry.figure.nickname).lower()
+            self.list.item(i).setHidden(hidden)
+            if not hidden:visible.add(i)
+        # A section header shows only while one of its figures does.
+        for i, entry in enumerate(self.rows):
+            if isinstance(entry, str):
+                following = next((j for j in range(i + 1, len(self.rows)) if isinstance(self.rows[j], str)), len(self.rows))
+                self.list.item(i).setHidden(not any(j in visible for j in range(i + 1, following)))
 
     def select(self, row):
         if self.loading: return
-        target = self.entries[row] if 0 <= row < len(self.entries) else None
+        rows = getattr(self, 'rows', [])
+        target = rows[row] if 0 <= row < len(rows) and not isinstance(rows[row], str) else None
         if self.entry is not None and target is not self.entry and self.dirty():
             if QMessageBox.question(self, 'Unsaved changes', 'Discard the changes to this Skylander?') != QMessageBox.StandardButton.Yes:
-                self.list.blockSignals(True); self.list.setCurrentRow(self.entries.index(self.entry)); self.list.blockSignals(False); return
+                self.list.blockSignals(True); self.list.setCurrentRow(self.rows.index(self.entry)); self.list.blockSignals(False); return
         self.show_entry(target)
 
     # -- detail -------------------------------------------------------------
@@ -333,7 +372,7 @@ class PortalPage(QWidget):
         if entry:
             on_portal = self.on_portal(entry)
             self.stage.show_figure(self.portraits.get(figure.identity, figure.variant), entry.name, on_portal)
-            self.name.setText(entry.name)
+            self.name.setText(self.display_name(entry))
             kind = 'MAGIC ITEM' if figure.kind == 'item' else 'VEHICLE' if figure.kind == 'vehicle' else f'SWAPPER {figure.half.upper()} HALF' if figure.half else 'SKYLANDER'
             self.kind.setText(kind + ('  ·  CREATED' if entry.created else '  ·  IMPORTED'))
             self.place.setText('Remove from portal' if on_portal else 'Place on portal')

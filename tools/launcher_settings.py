@@ -69,15 +69,6 @@ class SettingsPage(QWidget):
         self.change_games=QPushButton('Change…');self.change_games.clicked.connect(self.change_games_folder);folder_line.addWidget(self.change_games)
         self.open_games=QPushButton('Open');self.open_games.clicked.connect(self.open_games_folder);folder_line.addWidget(self.open_games)
         layout.addWidget(self.games_row)
-        # Per-game restore list: verified snapshots only (tools/save_backup.py).
-        self.backup_row=QWidget();self.backup_row.setObjectName('settingRow')
-        backup_line=QHBoxLayout(self.backup_row);backup_line.setContentsMargins(20,16,20,16)
-        backup_copy=QVBoxLayout();backup_title=QLabel('Save snapshots');backup_title.setStyleSheet('font-size: 14px; font-weight: 600;');backup_copy.addWidget(backup_title)
-        backup_hint=QLabel('Restore a verified snapshot. Your current saves are snapshotted first, so a restore can be undone.')
-        backup_hint.setWordWrap(True);backup_hint.setStyleSheet('color: #93939e; font-size: 12px;');backup_copy.addWidget(backup_hint);backup_line.addLayout(backup_copy,1)
-        self.backups=SettingCombo();self.backups.setFixedWidth(340);self.backups.setAccessibleName('Save snapshot');backup_line.addWidget(self.backups)
-        self.restore_button=QPushButton('Restore');self.restore_button.clicked.connect(self.restore_backup);backup_line.addWidget(self.restore_button)
-        layout.addWidget(self.backup_row)
         navigation=QHBoxLayout();navigation.setSpacing(6);layout.addLayout(navigation)
         self.pages=QStackedWidget();layout.addWidget(self.pages,1)
         hints={
@@ -155,6 +146,7 @@ class SettingsPage(QWidget):
             QPushButton#settingsNav:hover { background: #222227; color: #f5f5f7; }
             QPushButton#settingsNav:checked { background: #303037; color: #f5f5f7; }
             QPushButton#settingsSave { background: #f5f5f7; color: #171719; padding: 12px 24px; border: none; border-radius: 10px; }
+            QLabel#modTag { color: #a9a9b4; background: #26262c; border: 1px solid #34343c; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 600; }
             QComboBox { background: #29292f; border: 1px solid #3b3b44; border-radius: 8px; padding: 4px 12px; }
             QComboBox:disabled { color: #686872; border-color: #29292f; }
             QComboBox::drop-down { border: none; width: 26px; }
@@ -181,7 +173,7 @@ class SettingsPage(QWidget):
             from game_library import directory
         self.games_row.setVisible(game is None);self.games_path.setText(str(directory(self.owner.root)))
         self.change_games.setEnabled(self.owner.process is None)
-        self.refresh_backups();self.refresh_storage();self.refresh_portals(keep=False)
+        self.refresh_storage();self.refresh_portals(keep=False)
         self.scope.blockSignals(True);self.scope.clear();self.scope.addItem('General settings',None)
         for entry in self.owner.library['games']:self.scope.addItem(entry['name'],entry['id'])
         self.scope.setCurrentIndex(self.scope.findData(game['id']) if game else 0);self.scope.blockSignals(False)
@@ -228,14 +220,18 @@ class SettingsPage(QWidget):
             card=QWidget();card.setObjectName('settingRow');outer=QVBoxLayout(card);outer.setContentsMargins(20,16,20,16);outer.setSpacing(10)
             line=QHBoxLayout();line.setSpacing(24);outer.addLayout(line)
             copy=QVBoxLayout();copy.setSpacing(4)
-            heading=QLabel(mod['name']);heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
+            title=QHBoxLayout();title.setSpacing(8)
+            heading=QLabel(mod['name']);heading.setStyleSheet('font-size: 14px; font-weight: 600;');title.addWidget(heading)
+            ready=mod['status']=='ready'
+            origin=QLabel('Built in' if mod['builtin'] else 'Your mod');origin.setObjectName('modTag');title.addWidget(origin)
+            title.addStretch();copy.addLayout(title)
             if mod['description']:
                 detail=QLabel(mod['description']);detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail)
-            ready=mod['status']=='ready'
-            origin='Built in' if mod['builtin'] else 'From your mods folder'
-            facts=QLabel(' · '.join([status_text[mod['status']],f"Version {mod['version']}",mod['author'],origin]))
-            facts.setWordWrap(True);facts.setStyleSheet('font-size: 12px; color: %s;'%('#9fe5ab' if ready else '#e1bb70'))
-            facts.setToolTip('Made for: '+', '.join(mod['targets']));copy.addWidget(facts)
+            card.setToolTip(f"Version {mod['version']} · {mod['author']}\nMade for: "+', '.join(mod['targets']))
+            if not ready:
+                # Only problems need a line; a working mod says nothing extra.
+                problem=QLabel('⚠  '+status_text[mod['status']]);problem.setWordWrap(True)
+                problem.setStyleSheet('font-size: 12px; color: #e1bb70;');copy.addWidget(problem)
             line.addLayout(copy,1)
             if mod['controlled']:
                 note=QLabel(mod['controlled']);note.setWordWrap(True);note.setFixedWidth(240);note.setStyleSheet('font-size: 12px; color: #93939e;');line.addWidget(note)
@@ -281,13 +277,6 @@ class SettingsPage(QWidget):
             from PyQt6.QtGui import QDesktopServices
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
         except OSError as error:QMessageBox.warning(self,'Cannot open mods folder',str(error))
-
-    def backup_target(self):
-        try:from . import save_profile
-        except ImportError:import save_profile
-        title=(self.game or {}).get('title_id')
-        if not title:return None,None
-        return save_profile.select(self.owner.root,title)[0],title
 
     def refresh_portals(self,keep=True):
         """Rescan portals and copy the launcher's list into this page's chooser."""
@@ -366,34 +355,6 @@ class SettingsPage(QWidget):
         except (OSError,ValueError) as error:
             QMessageBox.warning(self,'Could not clear',str(error));return
         self.feedback.setText('Freed '+storage.human(freed)+'.');self.refresh_storage()
-
-    def refresh_backups(self):
-        try:from . import save_backup
-        except ImportError:import save_backup
-        self.backups.clear();rows=[]
-        try:
-            root,title=self.backup_target()
-            if title:rows=save_backup.snapshots(root,title)
-        except (OSError,ValueError) as error:
-            self.backups.addItem(f'Unavailable: {error}',None)
-        for path,record in reversed(rows):self.backups.addItem(save_backup.describe(record),str(path))
-        if not rows and not self.backups.count():self.backups.addItem('No snapshots yet',None)
-        self.backup_row.setVisible(self.game is not None)
-        self.restore_button.setEnabled(self.owner.process is None and bool(rows))
-
-    def restore_backup(self):
-        if self.owner.process:return
-        try:from . import save_backup
-        except ImportError:import save_backup
-        path=self.backups.currentData()
-        if not path:return
-        if QMessageBox.question(self,'Restore saves',f'Replace the current saves with the snapshot from {self.backups.currentText()}?\n\nYour current saves are snapshotted first.')!=QMessageBox.StandardButton.Yes:return
-        try:
-            root,title=self.backup_target()
-            result=save_backup.restore(path,root,title)
-        except (OSError,ValueError) as error:
-            QMessageBox.warning(self,'Could not restore saves',f'Your saves were not changed: {error}');return
-        self.refresh_backups();self.feedback.setText(f"Saves restored ({result['files']} files). The previous saves are listed as Before restore.")
 
     def set_field(self,key,value):
         field=self.fields[key]
