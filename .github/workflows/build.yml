@@ -252,6 +252,7 @@ jobs:
           persist-credentials: false
       - name: Tag matches launcher version
         run: |
+          grep -q "^## SkylandersPC ${GITHUB_REF_NAME#v} " RELEASE_NOTES.md || { echo "RELEASE_NOTES.md has no section for ${GITHUB_REF_NAME#v}"; exit 1; }
           version=$(python3 -c "import sys;sys.path.insert(0,'tools');import version;print(version.VERSION)")
           test "$GITHUB_REF_NAME" = "v$version" || { echo "Tag $GITHUB_REF_NAME does not match tools/version.py ($version)"; exit 1; }
       - name: Corresponding source archive
@@ -285,4 +286,4 @@ jobs:
           (cd out/release && sha256sum * > SHA256SUMS)
           gh release create "$GITHUB_REF_NAME" out/release/* --draft --verify-tag \
             --title "SkylandersPC $GITHUB_REF_NAME" \
-            --notes "Beta. Bring your own game. Source for these binaries: SkylandersPC-${GITHUB_REF_NAME}-source.tar.gz."
+            --notes-file RELEASE_NOTES.md

@@ -18,7 +18,7 @@ import tempfile
 import os
 
 ROOT=Path(__file__).resolve().parents[1]
-ROOT_FILES={'LICENSE','LICENSE_SCOPE.md','NOTICE.md','THIRD_PARTY_NOTICES.md','README.md','CONTRIBUTING.md',
+ROOT_FILES={'LICENSE','LICENSE_SCOPE.md','NOTICE.md','THIRD_PARTY_NOTICES.md','README.md','CONTRIBUTING.md','RELEASE_NOTES.md',
             'AGENTS.md','SOURCE_MANIFEST.json','references.lock.json','release-policy.json','.gitignore','.gitattributes','.gitmodules'}
 SCOPES={'renderer','docs','native','tools','tests','profiles','patches','LICENSES','.github'}
 SUFFIXES={'.md','.txt','.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.json','.patch','.yml','.yaml','.toml','.html','.css','.js'}

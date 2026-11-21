@@ -50,8 +50,10 @@ game. Removal keeps saves, figures and settings; managed game files are retained
 for recovery, so this does not immediately reclaim their disk space.
 Unrecognized titles can be installed and are labelled “not supported yet”.
 
-Builds will be published on the [Releases](https://github.com/The-Crow-Den/SkylandersPC/releases)
-page, each with patch notes. There is no release yet.
+Builds are published on the [Releases](https://github.com/The-Crow-Den/SkylandersPC/releases)
+page, each with patch notes ([RELEASE_NOTES.md](RELEASE_NOTES.md) for the coming
+0.1.0 beta). Windows gets a ready-to-run bundle; on Linux, build the native host
+from source (below) and use the launcher AppImage or `python3 tools/launcher.py`.
 
 ## Features
 
