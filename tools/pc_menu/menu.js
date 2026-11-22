@@ -171,7 +171,7 @@
   }
   // Controller and keyboard navigation. Keys from the host: 1-4 up/down/left/right, 5 activate,
   // 6 close the overlay (Start/Select), 7 back (B), 8 left side: tab rail (LB), 9 right side: open panel (RB).
-  const tabs=()=>[...root.querySelectorAll('.rail [data-view],.rail [data-snapshot],.rail [data-quit]')];
+  const tabs=()=>[...root.querySelectorAll('.rail [data-view],.rail [data-quit]')];
   const currentTab=()=>tabs().find(node=>node.dataset.view===ui.view&&(!node.dataset.page||node.dataset.page===ui.page))||tabs()[0];
   const openPanel=()=>root.querySelector(ui.view==='portal'?'.portal-panel':'.settings-panel');
   const usable=node=>!node.disabled&&node.getClientRects().length&&!node.closest('[hidden]');
@@ -195,11 +195,18 @@
   // The overlay window may not hold OS focus while the game does, so :focus is unreliable:
   // the controller highlight is a class on the current control.
   function mark(node){root.querySelectorAll('.pad-current').forEach(other=>other!==node&&other.classList.remove('pad-current'));node?.classList.add('pad-current');updateHints();}
+  // scrollIntoView ignores a sticky panel header, so a control reached by
+  // scrolling up could sit underneath it; nudge the panel until it is clear.
+  function unhide(node){
+    const panel=node.closest('.portal-panel,.settings-panel');const head=panel?.querySelector(':scope > .head');
+    if(!head||head.contains(node)||getComputedStyle(head).position!=='sticky')return;
+    const hidden=head.getBoundingClientRect().bottom-node.getBoundingClientRect().top+8;if(hidden>0)panel.scrollTop-=hidden;
+  }
   function focus(node){
-    if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});mark(node);node.scrollIntoView({block:'nearest',inline:'nearest'});
+    if(!node)return;root.classList.add('pad-focus');node.focus({preventScroll:true});mark(node);node.scrollIntoView({block:'nearest',inline:'nearest'});unhide(node);
     if(!node.closest('.rail'))remembered.set(panelKey(),identity(node));
   }
-  function openTab(tab){if(!tab)return;if(!tab.matches('[data-quit],[data-snapshot]'))tab.click();focus(tab);}
+  function openTab(tab){if(!tab)return;if(!tab.matches('[data-quit]'))tab.click();focus(tab);}
   function enterPanel(){
     const area=openPanel();if(!area||area.hidden){focus(currentTab());return;}
     const list=targets(area);const last=remembered.get(panelKey());const pressed=area.querySelector('[aria-pressed="true"]');
@@ -234,7 +241,7 @@
     if(!active||active===document.body||!root.contains(active)){enterPanel();return;}
     if(inRail){
       if(key===1||key===2){const list=tabs();const index=list.indexOf(active);openTab(list[Math.min(list.length-1,Math.max(0,index+(key===2?1:-1)))]);return;}
-      if(active.matches('[data-quit],[data-snapshot]')){if(key===5)active.click();return;}
+      if(active.matches('[data-quit]')){if(key===5)active.click();return;}
       if(key===4||key===5)enterPanel();
       return;
     }
@@ -249,12 +256,6 @@
   // Quit to launcher asks for a second press, so a stray A on the rail cannot end the session.
   const quit=root.querySelector('[data-quit]');const quitLabel=quit.querySelector('.nav-label');
   quit.onclick=()=>{if(quit.dataset.armed){send('quit');return;}quit.dataset.armed='1';quitLabel.textContent='Press again to quit';setTimeout(()=>{delete quit.dataset.armed;quitLabel.textContent='Quit to launcher';},4000);};
-  // Snapshot runs in the menu host (it holds no game state); the label reports the outcome briefly.
-  const snap=root.querySelector('[data-snapshot]');const snapLabel=snap.querySelector('.nav-label');
-  snap.onclick=()=>{if(snap.dataset.busy||!bridge)return;snap.dataset.busy='1';snapLabel.textContent='Snapshotting…';
-    bridge.snapshotSaves(text=>{let reply={label:'Snapshot failed',message:''};try{reply=JSON.parse(text);}catch{}
-      snapLabel.textContent=reply.label;snap.title=reply.message;message.textContent=reply.message;
-      setTimeout(()=>{delete snap.dataset.busy;snapLabel.textContent='Snapshot saves';},4000);});};
   root.querySelectorAll('[data-close]').forEach(node=>node.onclick=()=>{ui.view='none';render();});
   root.querySelector('[data-coop]').onclick=()=>{ui.coop=!ui.coop;if(ui.coop)ui.slot=3;else{send('portal',7,0);if(ui.slot===3)ui.slot=0;}render();};
   root.querySelector('[data-remove-top]').onclick=()=>send('portal',ui.slot===3?16:15,0);

@@ -66,6 +66,11 @@ class RunSessionTests(unittest.TestCase):
         self.assertEqual(env['MANGOHUD'], '1')
         self.assertNotIn('MANGOHUD', original)
 
+    def test_overlay_off_overrides_a_global_mangohud(self):
+        env = overlay_environment({'MANGOHUD': '1'}, enabled=False)
+        self.assertEqual((env['MANGOHUD'], env['DISABLE_MANGOHUD']), ('0', '1'))
+        self.assertNotIn('DISABLE_MANGOHUD', overlay_environment({'DISABLE_MANGOHUD': '1'}))
+
     def test_manual_phase_starts_at_30_and_removes_old_cap(self):
         env = overlay_environment({'MANGOHUD_CONFIG': 'fps,fps_limit=120,0,gpu_stats'}, phase_switch=True)
         self.assertEqual(env['MANGOHUD_CONFIG'], 'fps,gpu_stats,fps_limit_method=early,fps_limit=30+60,toggle_fps_limit=Shift_L+F1')

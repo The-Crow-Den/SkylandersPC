@@ -26,9 +26,17 @@ LABELS={
  'nintendo':('B','Y','A','X','L','R','ZR','ZL','-','+'),
 }
 
+def sdl_library():
+    """The SDL3 the game host uses: the copy beside the Windows build first, then the system one."""
+    import sys
+    for folder in (Path(__file__).resolve().parents[1]/'.local/native-gpu-build',Path(sys.executable).resolve().parent):
+        if (folder/'SDL3.dll').is_file():return str(folder/'SDL3.dll')
+    return ctypes.util.find_library('SDL3') or ('libSDL3.so.0' if sys.platform.startswith('linux') else None)
+
+
 def detect():
     """Probe SDL's mapped pad type at launch, without creating a window."""
-    library=ctypes.util.find_library('SDL3')
+    library=sdl_library()
     if not library:return 'playstation','SDL3 unavailable'
     try:
         sdl=ctypes.CDLL(library)
@@ -42,8 +50,9 @@ def detect():
             try:
                 if not ids or not 0<count.value<=64:return 'playstation','no mapped controller'
                 kind=sdl.SDL_GetGamepadTypeForID(ids[0])
-                # Enum values are checked against the bundled SDL3 header.
-                return ('xbox' if kind in (2,3) else 'nintendo' if kind in (7,8,9,10) else 'playstation'),f'SDL pad type {kind}'
+                # Enum values are checked against the bundled SDL3 header. A
+                # generic (standard) pad has an Xbox layout, so it gets Xbox prompts.
+                return ('xbox' if kind in (1,2,3) else 'nintendo' if kind in (7,8,9,10) else 'playstation'),f'SDL pad type {kind}'
             finally:
                 sdl.SDL_free(ids)
         finally:

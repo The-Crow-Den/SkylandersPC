@@ -90,7 +90,9 @@ def game_mode(environ=os.environ):
 class SdlGamepads:
     """Minimal SDL3 gamepad event reader. poll() returns [('down'|'up'|'axis', a, b)]."""
     def __init__(self, library=None):
-        name = library or ctypes.util.find_library('SDL3') or 'libSDL3.so.0'
+        try: from . import controller_glyphs
+        except ImportError: import controller_glyphs
+        name = library or controller_glyphs.sdl_library() or 'libSDL3.so.0'
         self.sdl = ctypes.CDLL(name)
         self.sdl.SDL_SetHint.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
         self.sdl.SDL_Init.argtypes = [ctypes.c_uint32]; self.sdl.SDL_Init.restype = ctypes.c_bool

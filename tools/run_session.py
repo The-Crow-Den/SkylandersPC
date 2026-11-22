@@ -196,6 +196,10 @@ def exclusive_session(path):
 def overlay_environment(environment, enabled=True, phase_switch=False):
     result = dict(environment)
     result['MANGOHUD'] = '1' if enabled else '0'
+    if not enabled:
+        # The layer's own off switch also wins over a global MANGOHUD=1, a
+        # `mangohud` wrapper or Steam launch options, so off really means off.
+        result['DISABLE_MANGOHUD'] = '1'
     if enabled:
         result.pop('DISABLE_MANGOHUD', None)
         result.setdefault('MANGOHUD_CONFIG',

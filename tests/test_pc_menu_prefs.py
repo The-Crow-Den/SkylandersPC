@@ -34,15 +34,16 @@ class PcMenuPreferenceTests(unittest.TestCase):
             file.write_text(json.dumps({'trap-team':{'recent':{'0':['Ok',5,None],'7':['Bad']}},'BAD TITLE':{}}))
             self.assertEqual(pc_menu_prefs.load(file),{'trap-team':{'favourites':{},'recent':{'0':['Ok']}}})
 
-    def test_menu_wires_snapshot_and_quick_row(self):
+    def test_menu_has_quick_row_and_no_snapshot(self):
         page=(ROOT/'tools/pc_menu/index.html').read_text();script=(ROOT/'tools/pc_menu/menu.js').read_text()
         host=(ROOT/'tools/pc_overlay.py').read_text()
-        for marker in ('data-snapshot','data-quick','data-favourite'):self.assertIn(marker,page)
-        # Moving along the rail must not trigger a snapshot; only A/Enter does.
-        self.assertIn("matches('[data-quit],[data-snapshot]')",script)
-        for slot in ('snapshotSaves','toggleFavourite','placed','preferences'):
+        for marker in ('data-quick','data-favourite'):self.assertIn(marker,page)
+        self.assertNotIn('data-snapshot',page)
+        # Moving along the rail must not quit; only A/Enter does.
+        self.assertIn("matches('[data-quit]')",script)
+        for slot in ('toggleFavourite','placed','preferences'):
             self.assertRegex(script,rf'bridge\??\.{slot}\(');self.assertIn(f'def {slot}(',host)
-        self.assertIn("reason='menu'",host)
+        self.assertNotIn('snapshotSaves',host+script)
 
 
 if __name__=='__main__':
