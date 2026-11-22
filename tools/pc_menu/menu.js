@@ -93,19 +93,31 @@
     const row=root.querySelector('[data-quick]');row.replaceChildren();
     const list=collection(ui.slot);const favourites=prefList('favourites',category);const names=[...favourites,...prefList('recent',category).filter(name=>!favourites.includes(name))];
     for(const name of names.slice(0,10)){
-      const item=list.find(entry=>entry.name===name);if(!item)continue;
-      const chip=button('quick-figure',(favourites.includes(name)?'Favourite: ':'Recent: ')+'place '+name+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(!!(item.state&2)));
-      chip.append(portrait(item.portrait,name));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+name;chip.append(label);
-      chip.onclick=()=>place(category,item);row.append(chip);
+      // A swapper combination is saved as "Top half name + Bottom half name".
+      const parts=name.split(' + ').map(part=>list.find(entry=>entry.name===part));if(parts.some(part=>!part)||parts.length>2)continue;
+      const item=parts[0];const shown=parts.length===2?parts.map(part=>halfName(part.name)).join(' + '):name;
+      const chip=button('quick-figure',(favourites.includes(name)?'Favourite: ':'Recent: ')+'place '+shown+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(parts.every(part=>part.state&2)));
+      chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+shown;chip.append(label);
+      chip.onclick=()=>parts.length===2?placeCombo(category,parts):place(category,item);row.append(chip);
     }
     row.hidden=!row.children.length||!!search.value.trim();
   }
   function place(category,item){send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);bridge?.placed(category,item.name,applyPrefs);}
+  // Top half first, then the bottom half under it, as when placing them one at a time.
+  function placeCombo(category,parts){for(const part of parts)send('portal',ui.slot===3?6:0,part.index);bridge?.placed(category,parts.map(part=>part.name).join(' + '),applyPrefs);}
+  // An odd action left over before the player 2 button takes the whole row.
+  function tidyActions(){const shown=[...root.querySelectorAll('.slot-actions .text-button:not(.coop-button)')].filter(node=>!node.hidden);
+    shown.forEach((node,index)=>node.classList.toggle('wide',shown.length%2===1&&index===shown.length-1));}
   function favouriteButton(category){
-    const node=root.querySelector('[data-favourite]');const item=ui.slot===0||ui.slot===3?halves(ui.slot).main:selected(ui.slot);
-    node.hidden=!item;if(!item)return;const on=prefList('favourites',category).includes(item.name);
-    node.textContent=(on?'★ Unfavourite ':'☆ Favourite ')+(item.detail?.startsWith('Swapper ')?halfName(item.name):item.name);
-    node.onclick=()=>bridge?.toggleFavourite(category,item.name,applyPrefs);
+    const node=root.querySelector('[data-favourite]');const player=ui.slot===0||ui.slot===3;const {main,bottom}=player?halves(ui.slot):{};
+    const item=player?main||bottom:selected(ui.slot);node.hidden=!item;if(!item)return;
+    // A full swapper (top and bottom) is favourited as that combination.
+    const combo=player&&isTop(main)&&bottom;const key=combo?main.name+' + '+bottom.name:item.name;
+    const on=prefList('favourites',category).includes(key);
+    node.textContent=(on?'★ Unfavourite':'☆ Favourite')+(combo?' combo':'');
+    node.title=combo?halfName(main.name)+' + '+halfName(bottom.name):item.detail?.startsWith('Swapper ')?halfName(item.name):item.name;
+    node.setAttribute('aria-label',(on?'Unfavourite ':'Favourite ')+node.title);
+    node.onclick=()=>bridge?.toggleFavourite(category,key,applyPrefs);
   }
   function figures(){
     const category=kind();const list=collection(ui.slot).filter(item=>item.name.toLowerCase().includes(search.value.trim().toLowerCase()));
@@ -138,7 +150,7 @@
     if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a '+text[0]+' to start your collection.';grid.append(empty);}
     const selector=root.querySelector('#trap-create-character');const saved=selector.value;selector.replaceChildren();
     for(const item of ui.snapshot?.creation||[]){if(item.kind!==category)continue;const option=document.createElement('option');option.value=String(item.index);option.textContent=item.name;selector.append(option);}if([...selector.options].some(option=>option.value===saved))selector.value=saved;
-    quickRow(category);favouriteButton(category);
+    quickRow(category);favouriteButton(category);tidyActions();
     root.querySelector('.figure-creator h3').textContent=text[3];root.querySelector('label[for="trap-create-character"]').textContent=category===9?'Vehicle':category===2?'Item':'Character';root.querySelector('[data-add]').textContent=text[4];
   }
   function render(){
@@ -149,7 +161,7 @@
     root.querySelector('[data-setting-title]').textContent={display:'Display',graphics:'Graphics',controls:'Controls',audio:'Audio'}[ui.page];
     const old=root.querySelector('[data-setting-icon]');const next=document.createElement('i');next.dataset.settingIcon='';next.dataset.lucide={display:'monitor',graphics:'sliders-horizontal',controls:'gamepad-2',audio:'volume-2'}[ui.page];next.setAttribute('aria-hidden','true');old.replaceWith(next);
     slots();const isTrap=ui.slot===1;
-    root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;if(isTrap){root.querySelector('[data-quick]').hidden=true;root.querySelector('[data-favourite]').hidden=true;}root.querySelector('.section-title').hidden=isTrap;
+    root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;if(isTrap){root.querySelector('[data-quick]').hidden=true;root.querySelector('[data-favourite]').hidden=true;tidyActions();}root.querySelector('.section-title').hidden=isTrap;
     if(isTrap)traps();else figures();message.textContent=ui.snapshot?.status||'Waiting for the game…';icon();
     if(focused){const match=[...root.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')===focused);if(match){match.focus({preventScroll:true});mark(match);}}
   }

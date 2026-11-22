@@ -44,6 +44,8 @@ class PcMenuPreferenceTests(unittest.TestCase):
         for slot in ('toggleFavourite','placed','preferences'):
             self.assertRegex(script,rf'bridge\??\.{slot}\(');self.assertIn(f'def {slot}(',host)
         self.assertNotIn('snapshotSaves',host+script)
+        # A full swapper is favourited as "Top + Bottom" and placed top first.
+        self.assertIn("main.name+' + '+bottom.name",script);self.assertIn('function placeCombo(',script)
 
 
 if __name__=='__main__':

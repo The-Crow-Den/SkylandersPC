@@ -205,3 +205,9 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .half-option:hover:not(:disabled) { background:var(--card-hover); }
 #trap-rail-demo .half-option[aria-pressed="true"] { border-color:var(--accent); background:#233338; }
 #trap-rail-demo .half-option:disabled { opacity:.4; }
+/* Slot actions: an even two-column grid; player 2 spans the row beneath. */
+#trap-rail-demo .slot-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:12px 0 4px; }
+#trap-rail-demo .slot-actions .text-button { min-height:40px; padding:8px 12px; border-radius:11px; background:#2a2a2f; border:1px solid #ffffff10; font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:background 120ms ease; }
+#trap-rail-demo .slot-actions .text-button:hover { text-decoration:none; background:#36363c; }
+#trap-rail-demo .slot-actions .coop-button { grid-column:1 / -1; background:#1f2c31; border-color:#98dfef40; color:#cdf2fa; }
+#trap-rail-demo .slot-actions .text-button.wide { grid-column:1 / -1; }
