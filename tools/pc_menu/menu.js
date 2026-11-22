@@ -105,17 +105,18 @@
   function place(category,item){send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);bridge?.placed(category,item.name,applyPrefs);}
   // Top half first, then the bottom half under it, as when placing them one at a time.
   function placeCombo(category,parts){for(const part of parts)send('portal',ui.slot===3?6:0,part.index);bridge?.placed(category,parts.map(part=>part.name).join(' + '),applyPrefs);}
-  // An odd action left over before the player 2 button takes the whole row.
+  // The favourite and an odd action out (Remove, so the two Lift buttons pair) take a whole row.
   function tidyActions(){const shown=[...root.querySelectorAll('.slot-actions .text-button:not(.coop-button)')].filter(node=>!node.hidden);
-    shown.forEach((node,index)=>node.classList.toggle('wide',shown.length%2===1&&index===shown.length-1));}
+    const favourite=shown.find(node=>node.matches('[data-favourite]'));const rest=shown.filter(node=>node!==favourite);
+    if(favourite)favourite.classList.add('wide');rest.forEach((node,index)=>node.classList.toggle('wide',rest.length%2===1&&index===0));}
   function favouriteButton(category){
     const node=root.querySelector('[data-favourite]');const player=ui.slot===0||ui.slot===3;const {main,bottom}=player?halves(ui.slot):{};
     const item=player?main||bottom:selected(ui.slot);node.hidden=!item;if(!item)return;
     // A full swapper (top and bottom) is favourited as that combination.
     const combo=player&&isTop(main)&&bottom;const key=combo?main.name+' + '+bottom.name:item.name;
     const on=prefList('favourites',category).includes(key);
-    node.textContent=(on?'★ Unfavourite':'☆ Favourite')+(combo?' combo':'');
-    node.title=combo?halfName(main.name)+' + '+halfName(bottom.name):item.detail?.startsWith('Swapper ')?halfName(item.name):item.name;
+    const shown=combo?halfName(main.name)+' + '+halfName(bottom.name):item.detail?.startsWith('Swapper ')?halfName(item.name):item.name;
+    node.textContent=(on?'★ Unfavourite ':'☆ Favourite ')+shown;node.title=shown;
     node.setAttribute('aria-label',(on?'Unfavourite ':'Favourite ')+node.title);
     node.onclick=()=>bridge?.toggleFavourite(category,key,applyPrefs);
   }
