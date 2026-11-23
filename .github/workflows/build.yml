@@ -249,6 +249,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
+      # The build's Qt check (offscreen) still loads Qt's GL and font libraries.
+      - name: Install Qt runtime libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgl1 libopengl0 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64
       - name: Build launcher AppImage
         run: tools/appimage/build-launcher-appimage.sh "$PWD/out/dist/Skylanders-Launcher-x86_64.AppImage"
       - name: Smoke test
