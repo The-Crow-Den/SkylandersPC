@@ -100,6 +100,12 @@ def select(root, title_id, explicit=None, environment=None):
             not isinstance(record.get('save_root'), str) or not record['save_root']):
         raise ValueError('invalid save profile')
     path = Path(record['save_root'])
+    # Profiles written by older versions name the old `skylanders-pc` folder;
+    # its contents were copied into the SkylandersPC folder, so use that copy.
+    old = user_data.legacy_home(environment)
+    if old is not None and path.is_absolute() and path.is_relative_to(old):
+        moved = user_data.base(environment)/path.relative_to(old)
+        if moved.is_dir():path = moved
     if (not path.is_absolute() or path.is_symlink() or path.resolve() != path or
             not (path.is_relative_to(root/'out') or path.is_relative_to(user_data.base(environment)) or path == home_root(environment)) or not (path/title_id).is_dir() or
             (path/title_id).is_symlink() or (path/title_id).resolve() != path/title_id):

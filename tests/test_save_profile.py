@@ -24,6 +24,19 @@ class SaveProfileTests(unittest.TestCase):
             self.assertEqual(save_profile.select(root, 'CUSA00016', environment={}), (save_profile.home_root({}), 'home-default'))
             self.assertEqual(payload.read_bytes(), b'existing progress')
 
+    def test_profile_naming_old_folder_uses_migrated_copy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            env = {'HOME': str(root/'home')}
+            old = root/'home/.local/share/skylanders-pc/saves'
+            new = root/'home/.local/share/SkylandersPC/saves'
+            (old/'CUSA00626').mkdir(parents=True);(new/'CUSA00626').mkdir(parents=True)
+            profiles = root/'out/play-profiles';profiles.mkdir(parents=True)
+            (profiles/'CUSA00626.json').write_text(json.dumps(dict(
+                schema_version=1, title_id='CUSA00626', save_root=str(old))))
+            with patch.object(save_profile.user_data,'WINDOWS',False):
+                self.assertEqual(save_profile.select(root, 'CUSA00626', environment=env), (new, 'saved-profile'))
+
     def test_large_save_verification_does_not_load_whole_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory).resolve()
