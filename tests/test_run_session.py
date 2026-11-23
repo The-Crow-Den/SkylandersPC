@@ -123,6 +123,17 @@ class RunSessionTests(unittest.TestCase):
                 self.assertFalse(announce_window(log, Exited()))
             self.assertEqual(output.getvalue(), '')
 
+    def test_window_marker_followed_by_a_burst_of_output_is_seen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / 'runtime.log'
+            log.write_text('booting\nWindow backend: x11\n' + 'x' * 20000 + '\n')
+            class Running:
+                def poll(self): return None
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertTrue(announce_window(log, Running()))
+            self.assertIn('SKYLANDERS_RUNTIME_STARTED', output.getvalue())
+
     def test_requested_timeout_is_distinguished_from_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

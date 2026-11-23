@@ -650,12 +650,8 @@ def renovated(base):
             state=getattr(self,'game_state',{})
             busy=self.process is not None or bool(self.game.get('operation')) or getattr(self,'library_transfer',False)
             menu.addAction('Repair game setup',self.repair_game).setEnabled(not busy and state.get('state') in ('Ready','Needs repair'))
-            menu.addAction('Open games folder',self.open_games_folder)
             menu.addAction('Open game folder',self.open_game_folder).setEnabled(not busy and state.get('entry') is not None)
             menu.addAction('Remove game…',self.remove_game).setEnabled(not busy and state.get('entry') is not None)
-            extras = menu.addMenu('Optional extras')
-            for title,name in [('Controller artwork (optional)','controller-art'),('Download portal portraits (optional)','portraits'),('Download variant artwork (optional)','variant-art')]:
-                extras.addAction(title,lambda checked=False,name=name:self.repair_game(optional=(name,)))
             menu.exec(self.primary.mapToGlobal(self.primary.rect().topRight()))
 
         def repair_game(self, checked=False, optional=(), then_play=False):

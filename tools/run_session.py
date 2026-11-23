@@ -273,10 +273,12 @@ def announce_window(log_path, process, marker=WINDOW_READY, interval=0.1):
         while True:
             chunk = log.read()
             if chunk:
-                seen = (seen + chunk)[-4096:]
+                # Check before trimming: a burst of output after the marker must not cut it off.
+                seen += chunk
                 if marker in seen:
                     print('SKYLANDERS_RUNTIME_STARTED', flush=True)
                     return True
+                seen = seen[-len(marker):]
             elif process.poll() is not None:
                 return False
             else:
