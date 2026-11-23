@@ -6,11 +6,11 @@ from pathlib import Path
 
 try:
     from .pc_settings import validate_settings
-    from .run_session import PACKS, GPU_CHOICES, installed_gpus
+    from .run_session import GPU_CHOICES, installed_gpus
     from . import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 except ImportError:
     from pc_settings import validate_settings
-    from run_session import PACKS, GPU_CHOICES, installed_gpus
+    from run_session import GPU_CHOICES, installed_gpus
     import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 
 DEFAULTS = dict(resolution='1080p', quality='high', fullscreen=False,

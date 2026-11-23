@@ -7,7 +7,6 @@ identity, host description, chosen settings and the tail of runtime.log.
 """
 import getpass
 import json
-import os
 import platform
 import re
 import subprocess

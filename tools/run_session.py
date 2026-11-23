@@ -10,7 +10,6 @@ import lzma
 import os
 import re
 from pathlib import Path
-import signal
 import struct
 import subprocess
 import threading
@@ -26,7 +25,7 @@ try:
     from . import level_events_mod, trophy_store
     from . import mod_manifest
     from . import portal_devices
-    from . import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
+    from . import game_library, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 except ImportError:
     from overlay_session import html_overlay
     import host_process
@@ -35,7 +34,7 @@ except ImportError:
     import level_events_mod, trophy_store
     import mod_manifest
     import portal_devices
-    import game_library, game_install, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
+    import game_library, game_build, game_prepare, save_profile, gameplay_mods, asset_mod, movie_audio, save_backup, controller_glyphs, controller_art, game_language
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKS = {'original': 'native-linked-boot-weak',

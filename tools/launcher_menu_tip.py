@@ -42,7 +42,7 @@ def mark(root, tip=TIP):
 
 try:
     from PyQt6.QtCore import QPointF, QRectF, Qt
-    from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
+    from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
     from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 except ImportError:  # source checks run without Qt
     QDialog = object

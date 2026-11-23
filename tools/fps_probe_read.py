@@ -11,7 +11,7 @@ import json
 import os
 import struct
 import time
-from .fps_probe_mod import MAGIC, CAPACITY, RECORD_SIZE, MAILBOX_SIZE
+from .fps_probe_mod import MAGIC, CAPACITY, RECORD_SIZE
 
 
 def snapshot(read, address, consumed=0, previous_dropped=0, *, allow_loss=False):

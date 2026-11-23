@@ -378,7 +378,7 @@ class LauncherUITests(unittest.TestCase):
         dialog.close()
 
     def test_game_states_gate_play_and_show_version_and_size(self):
-        from tools import launcher_game_state,game_library
+        from tools import game_library
         self.make_library_base();self.window.rebuild_rail();self.window.select_game('title-cusa00626')
         game=self.window.game
         with patch.object(game_library,'supported',return_value=True),patch('tools.game_prepare.require_ready'):

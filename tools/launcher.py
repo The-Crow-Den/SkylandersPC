@@ -3,11 +3,10 @@
 """Local Skylanders library launcher. Requires PyQt6; the runtime does not."""
 import os
 from pathlib import Path
-import signal
 import sys
 
 try:
-    from PyQt6.QtCore import QProcess, Qt, QSize
+    from PyQt6.QtCore import QProcess, Qt
     from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog,
         QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
         QPushButton, QSlider, QStackedWidget, QTextEdit, QVBoxLayout, QWidget, QScrollArea)
@@ -17,13 +16,13 @@ except ImportError:
 try:
     from . import launcher_model as model, portal_devices
     from . import host_process
-    from .launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
+    from .launcher_theme import STYLE, Hero, PortraitStrip, feature_card, text_label
     from .pc_settings import load_settings, save_settings
     from .resolution import PRESETS
 except ImportError:
     import launcher_model as model, portal_devices
     import host_process
-    from launcher_theme import STYLE, Hero, PortraitStrip, crystal_icon, feature_card, text_label
+    from launcher_theme import STYLE, Hero, PortraitStrip, feature_card, text_label
     from pc_settings import load_settings, save_settings
     from resolution import PRESETS
 

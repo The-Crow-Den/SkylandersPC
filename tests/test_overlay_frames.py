@@ -2,7 +2,6 @@
 import struct
 import tempfile
 import unittest
-from pathlib import Path
 
 from tools.overlay_frames import Frames, HEADER, MAGIC, SIZE
 

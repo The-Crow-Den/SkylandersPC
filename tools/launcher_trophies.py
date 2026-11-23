@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Read-only trophy catalogue and per-user unlock records. Never infer from gameplay."""
 from pathlib import Path
-import os
 import re
 import struct
 import xml.etree.ElementTree as ET

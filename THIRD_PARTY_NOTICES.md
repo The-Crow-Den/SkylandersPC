@@ -52,10 +52,9 @@ pinned original; do not also apply the historical incremental patches. The
 upstream shadPS4 ancestry recorded by bbport is
 `b4e7ae776071ceb1dd35004577a8719481e1d258`.
 
-`LICENSES/portal-source.json` records hashes of the local Cemu/adapter inputs.
-Hashes identify those files but do not establish an upstream revision or publish
-their corresponding source. That gap remains open for a portal-enabled binary.
-Source adapters and notices can be published without claiming it resolved.
+`LICENSES/portal-source.json` records the Cemu upstream revision and the hash and
+origin of each Cemu file used. Those files, modified ones included, are published
+in `native/third_party/cemu` as their corresponding source.
 
 Reference-only bbhost, bloodborne-recomp and the historical shadPS4 AppImage are
 not distributed by this repository. Private igArchiveExtractor/IGZ research

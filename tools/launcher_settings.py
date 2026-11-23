@@ -4,8 +4,8 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, QSize, QRectF
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,
-    QStackedWidget,QScrollArea,QFormLayout,QComboBox,QCheckBox,QSlider,QLineEdit,
-    QTextEdit,QFileDialog,QMessageBox,QProgressDialog,QSpinBox,QDoubleSpinBox)
+    QStackedWidget,QScrollArea,QComboBox,QCheckBox,QSlider,QLineEdit,
+    QTextEdit,QMessageBox,QProgressDialog,QSpinBox,QDoubleSpinBox)
 try:
     from . import launcher_model as model
 except ImportError:

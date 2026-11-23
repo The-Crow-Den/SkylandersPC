@@ -3,7 +3,7 @@
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QIcon,QPixmap
 from PyQt6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QLineEdit,
-    QComboBox,QListWidget,QListWidgetItem,QFileDialog,QMessageBox,QInputDialog,QApplication)
+    QComboBox,QListWidget,QListWidgetItem,QMessageBox,QInputDialog,QApplication)
 from PyQt6.QtCore import Qt
 try:
     from . import launcher_trophies as trophies
@@ -30,8 +30,6 @@ class TrophyDialog(QDialog):
     def from_psn(self):
         try:from . import psn_trophies,game_library
         except ImportError:import psn_trophies,game_library
-        import os
-        from pathlib import Path
         npsso,ok=QInputDialog.getText(self,'Get names from PSN',
             'Sign in at playstation.com, then open\nhttps://ca.account.sony.com/api/v1/ssocookie\n'
             'and paste the npsso value. It is used once and never saved.',QLineEdit.EchoMode.Password)

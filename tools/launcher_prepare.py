@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Responsive JSONL preparation worker shared by installation and Repair."""
 import json
-import os
 from pathlib import Path
-import signal
 import sys
 from PyQt6.QtCore import QObject, QProcess, QTimer, pyqtSignal
 try:

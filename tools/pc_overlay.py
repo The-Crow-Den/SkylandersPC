@@ -5,9 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
-import signal
 import sys
-import time
 try:
     from .overlay_protocol import Commands,Portraits,private_directory,read_snapshot
 except ImportError:

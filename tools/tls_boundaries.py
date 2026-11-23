@@ -13,7 +13,6 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import struct
 
 try:
     from . import executable, audit_imports, link_native, module_graph

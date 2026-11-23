@@ -1,14 +1,15 @@
 # Project instructions
 
 Build a reusable PS4 compatibility framework, first Trap Team, then Swap Force.
-Start with the pinned shadPS4 baseline. Do not modify the sibling Wii U project.
+The runtime builds on bbport (itself derived from shadPS4). Do not modify the sibling Wii U project.
 Keep game-specific behavior in profiles; keep correct shared platform contracts
 in the common runtime. A second title must exercise shared changes early.
 
 Never track game dumps, console modules, keys, firmware, generated game code,
 figure/save contents, private traces or reference binaries. Keep local data in
 ignored .local/ or out/. Do not copy decompiled game implementation into source.
-No reference source has been integrated; retain component licenses on adoption.
+Adopted sources (the bbport renderer, Cemu portal code) keep their licenses;
+record any new one in THIRD_PARTY_NOTICES.md.
 
 Do not infer playability from process exit, archive opens, draw counts or a
 title screenshot. Verify visible gameplay, input, saves and device behavior.

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os, sys, tempfile, unittest
 from pathlib import Path
-from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import storage, launcher_model, crash_report
 
