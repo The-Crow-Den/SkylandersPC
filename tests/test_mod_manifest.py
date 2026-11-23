@@ -142,11 +142,18 @@ class ManifestTest(unittest.TestCase):
         with self.assertRaises(mods.ModError):
             manifest(operations=[dict(type='generated', handler='Bad Handler', target=BUILD)])
 
+    def test_adventure_pack_mod_carries_both_recipes(self):
+        available = mods.discover(ROOT)
+        self.assertNotIn('replay-expansion-intros', available)
+        profiles = [operation['profile'] for operation in available['unlock-expansions']['operations']]
+        self.assertEqual(len(profiles), 2)
+        self.assertTrue(any('replay-expansion-intros' in name for name in profiles))
+
     def test_builtin_manifests_parse(self):
         available = mods.discover(ROOT)
         self.assertNotIn('movie-audio', available)  # a fix, not a mod
         for ident in ('nightmare', 'level-events', 'controller-glyphs', 'element-gates',
-                      'traptanium', 'unlock-expansions', 'replay-expansion-intros'):
+                      'traptanium', 'unlock-expansions'):
             self.assertTrue(available[ident]['builtin'], ident)
         us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
         self.assertTrue(mods.supports(available, 'nightmare', us))

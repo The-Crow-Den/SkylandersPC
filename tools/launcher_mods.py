@@ -20,7 +20,9 @@ def validate(value):
     if (not isinstance(value,dict) or any(not isinstance(k,str) or not mod_manifest.IDENTIFIER.fullmatch(k) for k in value)
             or any(type(v) is not bool for v in value.values())):
         raise ValueError('Invalid per-game mods')
-    return dict(value)
+    try:from .gameplay_mods import fold
+    except ImportError:from gameplay_mods import fold
+    return fold(value)
 
 
 def validate_settings(value):

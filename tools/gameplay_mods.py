@@ -6,7 +6,17 @@ import json
 from pathlib import Path
 import re
 
-NAMES = ('element-gates', 'traptanium', 'unlock-expansions', 'replay-expansion-intros')
+NAMES = ('element-gates', 'traptanium', 'unlock-expansions')
+# Folded into unlock-expansions; older saved choices still read.
+LEGACY = {'replay-expansion-intros': 'unlock-expansions'}
+
+
+def fold(choices):
+    """Merge retired mod names into the mod that now carries them."""
+    result = {name: value for name, value in choices.items() if name not in LEGACY}
+    for old, new in LEGACY.items():
+        if choices.get(old):result[new] = True
+    return result
 
 
 def selection(root, title_id, overrides=None):
@@ -22,11 +32,11 @@ def selection(root, title_id, overrides=None):
                 type(record['schema_version']) is not int or record['schema_version']!=1 or
                 record['title_id']!=title_id or not isinstance(record['enabled'],dict) or
                 not {'element-gates','traptanium'}.issubset(record['enabled']) or
-                not set(record['enabled']).issubset(NAMES) or
+                not set(record['enabled']).issubset(set(NAMES)|set(LEGACY)) or
                 any(type(value) is not bool for value in record['enabled'].values())):
             raise ValueError('invalid gameplay mod selection')
-        selected.update(record['enabled'])
-    for name,value in (overrides or {}).items():
+        selected.update(fold(record['enabled']))
+    for name,value in fold(overrides or {}).items():
         if name not in NAMES or (value is not None and type(value) is not bool):
             raise ValueError('invalid gameplay mod override')
         if value is not None:selected[name]=value

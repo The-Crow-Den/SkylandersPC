@@ -2,10 +2,10 @@
   "schema_version": 1,
   "id": "unlock-expansions",
   "name": "Unlock adventure packs",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "SkylandersPS4 contributors",
   "licence": "GPL-3.0-or-later",
-  "description": "Experimental: access all four adventure packs without toys after the island introduction following Chapter 2.",
+  "description": "Experimental: access all four adventure packs without toys after the island introduction following Chapter 2, and play a pack's introduction after confirming travel at its Academy statue.",
   "targets": [
     {
       "title_id": "CUSA00626",
@@ -21,6 +21,11 @@
       "type": "asset-patch",
       "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
       "profile": "profiles/patches/trap-team-us-01.01-unlock-expansions.experimental.json"
+    },
+    {
+      "type": "asset-patch",
+      "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+      "profile": "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json"
     }
   ]
 }

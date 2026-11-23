@@ -29,8 +29,7 @@ now just select the mod:
 | `controller-glyphs` | `--controller-glyphs xbox\|nintendo\|auto` | Xbox or Nintendo button prompts from imported Steam artwork |
 | `element-gates` | `--element-gates` | Experimental gate change |
 | `traptanium` | `--traptanium` | Experimental; recipe withheld from public checkouts |
-| `unlock-expansions` | `--unlock-expansions` | Experimental adventure pack access |
-| `replay-expansion-intros` | `--replay-expansion-intros` | Experimental; recipe withheld from public checkouts |
+| `unlock-expansions` | `--unlock-expansions` | Experimental: adventure pack access, and each pack's introduction replays from its Academy statue (replaces `replay-expansion-intros`) |
 | `skip-cutscenes` | `--mod skip-cutscenes` | Cross or Options ends any movie (US 01.01 host hook) |
 
 The launcher's **Mods** page (in a game's settings) lists every mod found in

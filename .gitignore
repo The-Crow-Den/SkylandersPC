@@ -19,7 +19,6 @@ __pycache__/
 *.log
 eboot.bin
 .DS_Store
-# Private experimental recipe currently contains bulk game-asset literals.
 # Distribution inputs and private device/save data.
 *.rar
 *.zip
