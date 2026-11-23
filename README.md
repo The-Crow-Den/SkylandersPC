@@ -129,6 +129,8 @@ Unknown system calls are reported, never answered with a fake success.
 - [shadPS4](https://github.com/shadps4-emu/shadPS4): the PS4 GPU and system-library work bbport
   builds on.
 - [Cemu](https://github.com/cemu-project/Cemu): the Skylanders portal implementation.
+- [skylanders-portal](https://github.com/TheBiemGamer/skylanders-portal) by TheBiemGamer: the Xbox 360
+  portal frame format the Xbox portal transport follows.
 - Mew00, SuperSamus and Winner Nombre: the Wii U Trap Team FPS graphics pack, whose delta-time
   clamp change the `60-delta` patch adapts.
 - Valve's Steam client: the Xbox and Nintendo button artwork used for the game's prompts. It is

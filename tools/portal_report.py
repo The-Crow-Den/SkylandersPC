@@ -30,9 +30,9 @@ from pathlib import Path
 ACTIVISION = 0x1430
 HID_PORTAL = 0x0150
 REPORT_SIZE = 32
-# Candidate frame headers (out, in) for Xbox 360 portals; the native transport
-# assumes the first. The probe tries each and records what answers.
-XBOX360_HEADERS = [(b'\x0b\x17', b'\x0b\x14'), (b'', b'')]
+# Xbox 360 portals: 32-byte frames, header 0B 14 both ways. The bare form is
+# tried too, so the report shows what an unusual portal answers to.
+XBOX360_HEADERS = [(b'\x0b\x14', b'\x0b\x14'), (b'', b'')]
 # GIP (Xbox One): the generic power-on message every GIP device accepts.
 GIP_POWER_ON = bytes([0x05, 0x20, 0x00, 0x01, 0x00])
 
@@ -146,7 +146,7 @@ def _hex(value):
 
 def _drain(usb, endpoint, log, label, reads=4):
     for _ in range(reads):
-        reply = usb.transfer(endpoint, timeout=300)
+        reply = usb.transfer(endpoint, length=32, timeout=300)
         log.append({'read': label, 'reply': _hex(reply)})
         if reply is None or isinstance(reply, dict):
             break
@@ -176,10 +176,10 @@ def probe(device):
         headers = XBOX360_HEADERS if kind != 'hid' else [(b'', b'')]
         for out, _ in headers:
             for command in (b'R', b'A\x01', b'S'):
-                frame = out + command.ljust(REPORT_SIZE, b'\0')
+                frame = (out + command).ljust(REPORT_SIZE, b'\0')
                 log.append({'write': frame.hex(), 'result': _hex(usb.transfer(ep_out, frame))})
                 _drain(usb, ep_in, log, f'after {command[:1].decode()}', reads=3)
-        frame = headers[0][0] + b'A\x00'.ljust(REPORT_SIZE, b'\0')  # deactivate again
+        frame = (headers[0][0] + b'A\x00').ljust(REPORT_SIZE, b'\0')  # deactivate again
         usb.transfer(ep_out, frame)
     finally:
         usb.close()

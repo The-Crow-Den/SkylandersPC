@@ -14,9 +14,10 @@ written.
   - `hid`: PS3/PS4/Wii/Wii U portals, `1430:0150`, through
     `native/platform/hid.hpp` (hidraw on Linux, the Windows HID API in
     `hid_windows.cpp`, which has not been built or tested yet).
-  - `xbox`: Xbox 360 portals over libusb, with a two-byte frame header
-    removed. The header values are unconfirmed, and frames that don't match
-    are logged. Xbox One portals are detected but refused: their GIP
+  - `xbox`: Xbox 360 portals over libusb, in 32-byte frames with the
+    header `0B 14` both ways (format documented by skylanders-portal). Not yet
+    tried on hardware here; frames that don't match are logged. Speaker audio
+    (`0B 17`, G.726) is not mapped. Xbox One portals are detected but refused: their GIP
     handshake has not been recorded.
 - `native/portal_device/virtual_transport.cpp`: the virtual portal (the
   Cemu portal core used by `SKY_VIRTUAL_PORTAL`) behind the same interface.

@@ -23,27 +23,30 @@ private:
     std::unique_ptr<Platform::Hid::Device> device_;
 };
 
-// Xbox 360 portals wrap each report in a two-byte header on vendor interrupt
-// endpoints. The header values are unconfirmed: frames that do not match are
-// passed through unchanged and logged once so a hardware transcript can settle it.
-constexpr std::uint8_t xbox_in[]{0x0b, 0x14}, xbox_out[]{0x0b, 0x17};
+// Xbox 360 portals exchange fixed 32-byte frames on vendor interrupt endpoints:
+// the header 0B 14, then a 30-byte report, in both directions. (0B 17 frames
+// carry G.726 speaker audio, which is not mapped yet.) Format as documented by
+// skylanders-portal (TheBiemGamer, MIT), from Xenia, RPCS3 and Dolphin.
+constexpr std::size_t xbox_frame = 32;
+constexpr std::uint8_t xbox_header[]{0x0b, 0x14};
 class XboxTransport final : public Transport {
 public:
     XboxTransport(Info info, libusb_context* context, libusb_device_handle* handle, std::uint8_t in, std::uint8_t out)
         : Transport(std::move(info)), context_(context), handle_(handle), in_(in), out_(out) {}
     ~XboxTransport() override { libusb_release_interface(handle_, 0); libusb_close(handle_); libusb_exit(context_); }
     bool write_report(std::span<const std::uint8_t> report) override {
-        std::vector<std::uint8_t> frame(xbox_out, xbox_out + 2); frame.insert(frame.end(), report.begin(), report.end());
+        std::uint8_t frame[xbox_frame]{xbox_header[0], xbox_header[1]};
+        std::copy_n(report.begin(), std::min(report.size(), xbox_frame - 2), frame + 2);
         int sent = 0;
-        return libusb_interrupt_transfer(handle_, out_, frame.data(), static_cast<int>(frame.size()), &sent, 100) == 0;
+        return libusb_interrupt_transfer(handle_, out_, frame, static_cast<int>(sizeof(frame)), &sent, 100) == 0;
     }
     int read_report(std::span<std::uint8_t> output, int timeout_ms) override {
-        std::uint8_t frame[64]; int got = 0;
+        std::uint8_t frame[xbox_frame]; int got = 0;  // one frame per read: a longer read can drop replies
         const int status = libusb_interrupt_transfer(handle_, in_, frame, sizeof(frame), &got, static_cast<unsigned>(timeout_ms));
         if (status == LIBUSB_ERROR_TIMEOUT) return 0;
         if (status) return -1;
         std::size_t skip = 0;
-        if (got >= 2 && frame[0] == xbox_in[0] && frame[1] == xbox_in[1]) skip = 2;
+        if (got >= 2 && frame[0] == xbox_header[0] && frame[1] == xbox_header[1]) skip = 2;
         else if (!warned_) { warned_ = true; std::fprintf(stderr, "Portal (Xbox): unrecognised frame header %02x %02x\n", frame[0], frame[1]); }
         const auto count = std::min<std::size_t>(output.size(), got - skip);
         std::copy_n(frame + skip, count, output.begin());
