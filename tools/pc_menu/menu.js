@@ -198,7 +198,7 @@
   }
   function initializeSettings(settings){
     if(ui.dirty)return;
-    for(const [id,key] of [['trap-demo-res','resolution'],['trap-demo-quality','quality'],['trap-demo-fps','framePolicy'],['trap-demo-pad','layout'],['trap-demo-glyphs','glyphs']])root.querySelector('#'+id).selectedIndex=settings[key]??0;
+    for(const [id,key] of [['trap-demo-res','resolution'],['trap-demo-quality','quality'],['trap-demo-fps','framePolicy'],['trap-demo-glyphs','glyphs']])root.querySelector('#'+id).selectedIndex=settings[key]??0;
     root.querySelector('#trap-demo-fullscreen').checked=!!settings.fullscreen;root.querySelector('#trap-demo-counter').checked=!!settings.counter;root.querySelector('#trap-demo-audio').value=String(settings.volume??50);root.querySelector('[data-volume]').textContent=(settings.volume??50)+'%';
   }
   function receive(text){
@@ -315,7 +315,7 @@
   root.querySelector('#trap-demo-fps').onchange=event=>{ui.dirty=true;send('fps',event.target.selectedIndex);};
   root.querySelector('#trap-demo-audio').oninput=event=>{ui.dirty=true;root.querySelector('[data-volume]').textContent=event.target.value+'%';send('volume',event.target.value);};
   root.querySelector('#trap-demo-counter').onchange=event=>send('counter',Number(event.target.checked));
-  root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('#trap-demo-fullscreen').checked),Number(root.querySelector('#trap-demo-counter').checked),root.querySelector('#trap-demo-pad').selectedIndex,root.querySelector('#trap-demo-glyphs').selectedIndex);
+  root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('#trap-demo-fullscreen').checked),Number(root.querySelector('#trap-demo-counter').checked),0,root.querySelector('#trap-demo-glyphs').selectedIndex);
   document.addEventListener('keydown',event=>{
     if(selectPopup&&['ArrowUp','ArrowDown','Enter','Escape','Tab'].includes(event.key)){
       event.preventDefault();event.stopPropagation();

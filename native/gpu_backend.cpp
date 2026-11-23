@@ -109,8 +109,7 @@ void update_gamepad(const SDL_Event* event = nullptr) {
     int count=0;auto* ids=SDL_GetGamepads(&count);
     for(int i=0;i<count;++i) {
         if(std::any_of(physical_gamepads.begin(),physical_gamepads.end(),[&](auto* pad){return pad && SDL_GetGamepadID(pad)==ids[i];}))continue;
-        const auto* mode=std::getenv("SKY_CONTROLLER_LAYOUT");
-        const bool keyboard_and_pad=mode && !std::strcmp(mode,"keyboard-and-pad");
+        const bool keyboard_and_pad=false; // keyboard play was removed; controllers fill players 1 and 2
         std::array<std::uint32_t,2> assigned{};
         for(unsigned slot=0;slot<physical_gamepads.size();++slot)
             if(physical_gamepads[slot])assigned[slot]=SDL_GetGamepadID(physical_gamepads[slot]);
@@ -274,39 +273,10 @@ int keyboard_event(const void* raw_event, void* raw_window) {
         }
         return 0; // The renderer routes this event into the PC menu.
     }
-    if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
-        if (event.key.scancode == SDL_SCANCODE_F2 && portal_load) {
-            static const SDL_DialogFileFilter filters[]{{"Skylander figure dump", "sky;bin"}};
-            SDL_ShowOpenFileDialog(&portal_dialog,nullptr,nullptr,filters,1,nullptr,false);
-            return 0;
-        }
-        if (event.key.scancode == SDL_SCANCODE_F3 && portal_remove) { PortalLibrary::remove(0); return 0; }
-        if (event.key.scancode == SDL_SCANCODE_F4 && portal_trap) {
-            static const SDL_DialogFileFilter filters[]{{"Trap dump", "sky;bin"}};
-            SDL_ShowOpenFileDialog(&portal_dialog,&trap_dialog_tag,nullptr,filters,1,nullptr,false);return 0;
-        }
-        if(event.key.scancode==SDL_SCANCODE_F5 && portal_remove_trap){PortalLibrary::remove(1);return 0;}
-    }
+    // The game is played with controllers only: keyboard keys are not mapped to the pad.
     if (event.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && event.type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) {
         update_gamepad(&event); return 0;
     }
-    if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) { pressed_keys.fill(false); keyboard_pad->release_keys(); return 0; }
-    if (event.type != SDL_EVENT_KEY_DOWN && event.type != SDL_EVENT_KEY_UP) return 0;
-    const auto code = static_cast<std::size_t>(event.key.scancode);
-    if (code >= pressed_keys.size()) return 0;
-    pressed_keys[code] = event.type == SDL_EVENT_KEY_DOWN;
-    constexpr std::pair<SDL_Scancode, std::uint32_t> mappings[]{
-        {SDL_SCANCODE_N, 0x4000}, {SDL_SCANCODE_SPACE, 0x4000}, {SDL_SCANCODE_RETURN, 0x4000},
-        {SDL_SCANCODE_ESCAPE, 0x2000}, {SDL_SCANCODE_Z, 0x8000}, {SDL_SCANCODE_X, 0x1000},
-        {SDL_SCANCODE_UP, 0x10}, {SDL_SCANCODE_RIGHT, 0x20}, {SDL_SCANCODE_DOWN, 0x40}, {SDL_SCANCODE_LEFT, 0x80},
-        {SDL_SCANCODE_Q, 0x400}, {SDL_SCANCODE_E, 0x800}, {SDL_SCANCODE_TAB, 0x8},
-        {SDL_SCANCODE_LSHIFT, 0x2}, {SDL_SCANCODE_LCTRL, 0x4},
-        {SDL_SCANCODE_A, 1u << 24}, {SDL_SCANCODE_D, 1u << 25},
-        {SDL_SCANCODE_W, 1u << 26}, {SDL_SCANCODE_S, 1u << 27},
-    };
-    std::uint32_t keys = 0;
-    for (const auto& [scan, mask] : mappings) if (pressed_keys[scan]) keys |= mask;
-    keyboard_pad->set_keys(keys);
     return 0;
 }
 thread_local std::int32_t background_errno = 0;
