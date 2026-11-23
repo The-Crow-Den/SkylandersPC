@@ -21,6 +21,12 @@ except ImportError:
 NAME_PATTERN = re.compile(r'\{\{(\d+),\s*0x([0-9A-Fa-f]{1,4})\},\s*"([^"]+)"\}')
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def fnv1a64(data):
     value = 14695981039346656037
     for byte in data:
@@ -104,10 +110,11 @@ class Entry:
 class Collection:
     def __init__(self, root):
         self.root = Path(root)
-        self.characters = self.root / 'out/portal-library/characters'
-        self.figures = self.root / 'out/figures'
-        self.backups = self.root / 'out/figure-backups'
-        self.removed = self.root / 'out/portal-library/removed'
+        library = user_data.path(self.root, 'out/portal-library')
+        self.characters = library / 'characters'
+        self.figures = user_data.path(self.root, 'out/figures')
+        self.backups = user_data.path(self.root, 'out/figure-backups')
+        self.removed = library / 'removed'
         self.seed = figure_data.load_seed(root)
         self.names = names(root)
 

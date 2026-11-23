@@ -23,6 +23,12 @@ except ImportError:
     from workspace import read_sfo
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def directory(project):
     try:
         from .library_preferences import locations
@@ -352,7 +358,7 @@ def register(project, issues=None):
 
 
 def removed(project):
-    path=Path(project)/'.local/removed-games.json'
+    path=user_data.path(project,'.local/removed-games.json')
     try:
         value=json.loads(path.read_text())
         return value if isinstance(value,list) and all(isinstance(v,str) for v in value) else []
@@ -398,7 +404,7 @@ def resolve_entry(project, choice=None, game=None):
             choice = json.loads(saved.read_text()).get('selected')
         else:
             # Read the launcher's per-game selection, including a deliberately empty one.
-            launcher = Path(project) / '.local/launcher-library.json'
+            launcher = user_data.path(project, '.local/launcher-library.json')
             if launcher.exists():
                 value = json.loads(launcher.read_text())
                 selected = next((g for g in value.get('games', []) if g['id'] == value.get('selected')), None)

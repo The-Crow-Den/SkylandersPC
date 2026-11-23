@@ -10,6 +10,12 @@ except ImportError:
     import host_process
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def read_xml(path):
     path=Path(path)
     if path.stat().st_size>2*1024*1024:raise ValueError('Trophy XML is too large')
@@ -79,7 +85,7 @@ def game_sources(root,game):
             candidate=home/'home'/str(game.get('trophy_user','1000'))/'trophy'/(npwr+'.xml')
             if not progress and candidate.is_file():progress=str(candidate)
     if npwr and installation:
-        native=host_process.data_home()/('skylanders-pc/trophies/'+installation.title_id)
+        native=user_data.base()/'trophies'/installation.title_id
         record=native/'users'/str(game.get('native_trophy_user','4096'))/(npwr+'.xml')
         if not game.get('trophy_progress') and record.is_file():progress=str(record)
         if not definitions:

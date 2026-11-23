@@ -104,7 +104,7 @@
     },
     {
       "path": "src/runtime/cemu_portal.cpp",
-      "sha256": "9b37a7accd044b4811cfd2ffcc6e67bb2b9a53669356379b5746629e23af6ca9",
+      "sha256": "92fab27d0ac9f052a0c5c60f0206a17a9c0362a347128a5ad0f7da7e40a52e70",
       "origin": "project adapter"
     },
     {

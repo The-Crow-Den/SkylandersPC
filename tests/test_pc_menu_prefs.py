@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 class PcMenuPreferenceTests(unittest.TestCase):
     def test_stored_beside_saves_outside_the_repository(self):
         path=pc_menu_prefs.path({'XDG_DATA_HOME':'/data','HOME':'/home/user'})
-        self.assertEqual(path,Path('/data/skylanders-pc/pc-menu-preferences.json'))
+        self.assertEqual(path,Path('/data/SkylandersPC/pc-menu-preferences.json'))
 
     def test_recent_figures_rotate_and_favourites_toggle(self):
         with tempfile.TemporaryDirectory() as directory:

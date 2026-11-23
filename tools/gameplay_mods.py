@@ -12,6 +12,12 @@ LEGACY = {'replay-expansion-intros': 'unlock-expansions',
           'element-gates': 'trap-master', 'traptanium': 'trap-master'}
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def fold(choices):
     """Merge retired mod names into the mod that now carries them."""
     result = {name: value for name, value in choices.items() if name not in LEGACY}
@@ -36,7 +42,7 @@ def selection(root, title_id, overrides=None):
     if not isinstance(title_id,str) or not re.fullmatch(r'CUSA\d{5}',title_id):
         raise ValueError('invalid gameplay mod title')
     selected = dict.fromkeys(NAMES,False)  # may also gain folded ids such as trap-master
-    path = Path(root).resolve()/'out/mod-profiles'/f'{title_id}.json'
+    path = user_data.path(Path(root).resolve(),'out/mod-profiles')/f'{title_id}.json'
     if path.exists() or path.is_symlink():
         if path.is_symlink() or path.resolve()!=path or path.stat().st_size>16384:
             raise ValueError('redirected or oversized gameplay mod selection')

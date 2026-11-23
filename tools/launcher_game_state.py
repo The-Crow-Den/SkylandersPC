@@ -9,6 +9,12 @@ except ImportError:
     import game_library,game_prepare,launcher_library
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def snapshot(root,game,active=None):
     if game.get('id') not in launcher_library.AVAILABLE:
         return dict(state='Coming soon',message=game.get('name','This game')+' is not available in this release yet.',entry=None,size=None,version='')
@@ -78,7 +84,7 @@ def remove(root,game):
                     target=path.with_name('.removed-'+uuid.uuid4().hex+'.json')
                     os.rename(path,target);manifests.append((path,target))
         game_library.write_json(recovery/'recovery.json',dict(paths=[dict(original=str(a),recovery=str(b)) for a,b in moved],entries=choices))
-        game_library.write_json(root/'.local/removed-games.json',list(dict.fromkeys([*tombstones,*[game_library.selector(e['title_id'],e['app_version']) for e in choices]])))
+        game_library.write_json(user_data.path(root,'.local/removed-games.json'),list(dict.fromkeys([*tombstones,*[game_library.selector(e['title_id'],e['app_version']) for e in choices]])))
     except BaseException:
         for source,target in reversed(manifests):os.rename(target,source)
         for source,target in reversed(moved):os.rename(target,source)

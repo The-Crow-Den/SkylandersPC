@@ -58,6 +58,12 @@ GPU_DRIVERS = {'nvidia': ('nvidia_icd',), 'amd': ('radeon_icd', 'amd_icd', 'amd_
 GPU_CHOICES = ('auto', *GPU_DRIVERS)
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def gpu_manifest(vendor, folder=ICD_FOLDER):
     for stem in GPU_DRIVERS[vendor]:
         for path in sorted(folder.glob(stem + '*.json')):
@@ -421,7 +427,7 @@ def run(argv,sessions):
                         help='diagnostic renderer pacing comparison; does not alter vblank frequency')
     parser.add_argument('--seconds', type=float, default=0,
                         help='explicit test duration; default has no time limit')
-    preferences = ROOT / 'out/pc-settings.json'
+    preferences = user_data.path(ROOT, 'out/pc-settings.json')
     try:
         saved = load_settings(preferences)
     except (OSError,ValueError,TypeError) as error:
@@ -679,6 +685,11 @@ def run(argv,sessions):
         env['SKY_CONTROLLER_GLYPH_ATLAS']=str(controller_art.atlas_path(faces))
     glyph_metadata['artwork_provider']='Steam client' if controller_art.available() else 'original game'
 
+    env.pop('SKY_FIGURES_DIR',None);env.pop('SKY_PORTAL_LIBRARY',None)
+    if user_data.adopted(ROOT):
+        # Figures live in the per-user SkylandersPC folder (tools/user_data.py).
+        env['SKY_FIGURES_DIR'] = str(user_data.path(ROOT,'out/figures'))
+        env['SKY_PORTAL_LIBRARY'] = str(user_data.path(ROOT,'out/portal-library'))
     if selected_save is not None:
         env['SKY_SAVE_DATA_ROOT'] = str(selected_save)
         env['SKY_SAVE_TITLE_ID'] = installation.title_id

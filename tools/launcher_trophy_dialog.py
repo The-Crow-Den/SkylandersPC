@@ -11,6 +11,12 @@ except ImportError:
     import launcher_trophies as trophies
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 class TrophyDialog(QDialog):
     def __init__(self,owner):
         super().__init__(owner);self.owner=owner;self.game=owner.game
@@ -39,7 +45,7 @@ class TrophyDialog(QDialog):
             npwr=trophies.game_sources(self.owner.root,self.game)[3]
             if not npwr:raise ValueError('This game has no trophy set.')
             title_id=game_library.resolve(self.owner.root,game=self.game).title_id
-            store=trophies.host_process.data_home()/'skylanders-pc/trophies'/title_id
+            store=user_data.base()/'trophies'/title_id
             title,rows=psn_trophies.fetch(npwr,psn_trophies.access_token(npsso))
             psn_trophies.write_catalogue(store,npwr,title,rows)
         except (OSError,ValueError,KeyError) as error:

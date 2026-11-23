@@ -50,7 +50,7 @@ class SaveProfileTests(unittest.TestCase):
                 save_profile.migrate(source, destination, 'CUSA00626')
             self.assertEqual((destination/'CUSA00626/Save_Slot1').read_bytes(), b'newer progress')
             self.assertEqual(save_profile.home_root({'HOME':str(root), 'XDG_DATA_HOME':'relative'}), destination)
-            self.assertEqual(save_profile.home_root({'XDG_DATA_HOME':str(root)}), root/'skylanders-pc/saves')
+            self.assertEqual(save_profile.home_root({'XDG_DATA_HOME':str(root)}), root/'SkylandersPC/saves')
 
     def test_saved_home_profile_and_symlink_refusal(self):
         with tempfile.TemporaryDirectory() as directory:

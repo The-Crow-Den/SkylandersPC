@@ -29,6 +29,12 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def launcher_icon(root):
     folder = Path(root) / '.local/app-icon'
     return folder / 'launcher.png' if (folder / 'launcher.png').is_file() else folder / 'crystal@2x.png'
@@ -38,7 +44,7 @@ class Launcher(QMainWindow):
     def __init__(self, root=ROOT):
         super().__init__()
         self.root = Path(root)
-        self.preferences = self.root / '.local/launcher-settings.json'
+        self.preferences = user_data.path(self.root, '.local/launcher-settings.json')
         self.process = None
         self.stopping = False
         self.output_buffer = ''
@@ -147,7 +153,7 @@ class Launcher(QMainWindow):
             if self.preferences.exists():
                 value.update(model.load(self.preferences))
             # In-game applied graphics choices win over a stale launcher copy.
-            value.update(load_settings(self.root / 'out/pc-settings.json'))
+            value.update(load_settings(user_data.path(self.root, 'out/pc-settings.json')))
         except (OSError, ValueError, TypeError) as error:
             self.log.append(f'Saved settings could not be loaded: {error}')
         self.refresh_portals(value.get('portal_device'))
@@ -257,7 +263,7 @@ class Launcher(QMainWindow):
             if value['figure_bottom'] and not Path(value['figure_bottom']).is_file():
                 value['figure_bottom'] = ''
             model.save(self.preferences, value)
-            pc_path = self.root / 'out/pc-settings.json'
+            pc_path = user_data.path(self.root, 'out/pc-settings.json')
             pc_path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 pc_value = load_settings(pc_path)
@@ -308,7 +314,7 @@ class Launcher(QMainWindow):
         self.tabs.setEnabled(True)
         self.stop.setEnabled(False)
         try:
-            self.apply_values(load_settings(self.root / 'out/pc-settings.json'))
+            self.apply_values(load_settings(user_data.path(self.root, 'out/pc-settings.json')))
         except (OSError, ValueError, TypeError) as error:
             self.log.append(f'Applied PC settings could not be loaded: {error}')
         self.refresh_readiness()
@@ -356,6 +362,18 @@ except ImportError:
 
 Launcher = renovated(Launcher)
 
+def adopt_user_data(root):
+    """Move older saves, figures and settings into the per-user SkylandersPC folder once."""
+    try:
+        report = user_data.migrate(root)
+    except OSError as error:
+        print(f'Could not move your data to the SkylandersPC folder: {error}', file=sys.stderr)
+        return
+    if report['conflicts']:
+        print('Kept in their old place because the SkylandersPC folder already has different copies:\n  '
+              + '\n  '.join(report['conflicts']), file=sys.stderr)
+
+
 def main():
     if os.name == 'nt':
         # Windows groups a pythonw window under Python's icon unless the
@@ -373,6 +391,7 @@ def main():
     if icon.is_file():
         from PyQt6.QtGui import QIcon
         app.setWindowIcon(QIcon(str(icon)))
+    adopt_user_data(ROOT)
     window = Launcher(ROOT)
     try:
         from .launcher_gamepad import game_mode

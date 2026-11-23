@@ -72,11 +72,18 @@ void mark_starting(int kind,int index) {
 fs::path trap_path(int index) {return traps[static_cast<unsigned>(index)].file;}
 // The Cemu safety adapter preserves writes in a content-addressed private
 // working copy. Metadata must follow that copy, never the original template.
+// The launcher passes the per-user folders (SkylandersPC/figures/...); without
+// them, the install folder's own out/ folders are used as before.
+fs::path user_folder(const char* variable,const char* fallback) {
+    const auto* value=std::getenv(variable);std::error_code ec;
+    if(value && *value && fs::path(value).is_absolute()){auto canonical=fs::weakly_canonical(value,ec);return ec?fs::path{}:canonical;}
+    return fs::current_path(ec)/fallback;
+}
 bool read_trap_progress(const Trap& trap,std::array<unsigned char,1024>& bytes) {
     if(!read_figure(trap.file,bytes))return false;
     std::uint64_t hash=14695981039346656037ull;for(auto byte:bytes){hash^=byte;hash*=1099511628211ull;}
     std::ostringstream name;name<<"import-"<<std::hex<<std::setw(16)<<std::setfill('0')<<hash<<".sky";
-    const auto directory=fs::current_path()/"out/figures";std::error_code ec;
+    const auto directory=user_folder("SKY_FIGURES_DIR","out/figures");std::error_code ec;
     if(fs::weakly_canonical(directory,ec)!=directory||ec)return false;
     const auto working=directory/name.str();
     const auto status=fs::symlink_status(working,ec);
@@ -106,7 +113,7 @@ namespace PortalLibrary {
 void initialize(const char* initial,const char* initial_bottom) {
     {
         std::lock_guard lock(library_mutex);
-        root=fs::current_path()/"out/portal-library";
+        root=user_folder("SKY_PORTAL_LIBRARY","out/portal-library");
         std::error_code ec;
         if(fs::weakly_canonical(root,ec)!=root || ec){root.clear();feedback="Portal library path is unavailable.";return;}
         fs::create_directories(root/"characters",ec);fs::create_directories(root/"traps",ec);

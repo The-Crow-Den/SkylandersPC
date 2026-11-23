@@ -16,6 +16,12 @@ except ImportError:
     import launcher_library as library
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 class LoadingWheel(QWidget):
     def __init__(self):
         super().__init__();self.angle=0;self.setFixedSize(26,26)
@@ -258,7 +264,7 @@ def renovated(base):
                     self.apply_values(launcher_model.load(self.preferences))
                 except (OSError, ValueError) as error:
                     self.log.append(str(error))
-            self.library_path = self.root / '.local/launcher-library.json'
+            self.library_path = user_data.path(self.root, '.local/launcher-library.json')
             try:
                 self.library = library.load(self.library_path)
             except (OSError, ValueError) as error:

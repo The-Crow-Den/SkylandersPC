@@ -7,6 +7,12 @@ import uuid
 KEYS = ('games_folder','previous_games_folders')
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def raw(path):
     path = Path(path)
     if not path.exists():return {}
@@ -27,7 +33,7 @@ def resolve(project, value):
 def locations(project):
     project = Path(project).absolute()
     try:
-        value = raw(project/'.local/launcher-settings.json')
+        value = raw(user_data.path(project,'.local/launcher-settings.json'))
         current = resolve(project,value.get('games_folder',''))
         previous = value.get('previous_games_folders',[])
         if not isinstance(previous,list):raise ValueError('Invalid library history')
@@ -37,7 +43,7 @@ def locations(project):
 
 
 def save_location(project, current, previous):
-    project = Path(project).absolute();path = project/'.local/launcher-settings.json'
+    project = Path(project).absolute();path = user_data.path(project,'.local/launcher-settings.json')
     try:
         from .launcher_model import DEFAULTS
     except ImportError:

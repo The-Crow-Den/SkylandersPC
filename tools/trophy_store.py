@@ -16,6 +16,12 @@ try:from . import launcher_trophies,psn_trophies
 except ImportError:import launcher_trophies,psn_trophies
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def entries(path):
     path=Path(path);size=path.stat().st_size;result={}
     with path.open('rb') as source:
@@ -83,7 +89,7 @@ def prepare(root,install,session,*,store=None,key_config=None):
     if len(identifiers)!=1:raise ValueError('no unique trophy communication ID')
     npwr=identifiers.pop().decode();table=entries(trp)
     title_id=install.title_id
-    store=Path(store).absolute() if store else launcher_trophies.host_process.data_home()/'skylanders-pc/trophies'/title_id
+    store=Path(store).absolute() if store else user_data.base()/'trophies'/title_id
     if store.resolve()!=store.absolute() or store.is_symlink():raise ValueError('redirected native trophy store')
     cache=store/'catalogues'
     if cache.resolve()!=cache or cache.is_symlink():raise ValueError('redirected trophy catalogue cache')

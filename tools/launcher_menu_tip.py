@@ -11,8 +11,14 @@ from pathlib import Path
 TIP = 'pc-menu'
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def path(root):
-    return Path(root)/'.local/launcher-tips.json'
+    return user_data.path(root,'.local/launcher-tips.json')
 
 
 def seen(root, tip=TIP):

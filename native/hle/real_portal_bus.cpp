@@ -232,7 +232,7 @@ std::filesystem::path default_backups() {
     if (data_home && std::filesystem::path(data_home).is_absolute()) base = data_home;
     else if (home && std::filesystem::path(home).is_absolute()) base = std::filesystem::path(home) / ".local/share";
     else return {};
-    return base / "skylanders-pc/portal-backups";
+    return base / "SkylandersPC/portal-backups";
 }
 }
 

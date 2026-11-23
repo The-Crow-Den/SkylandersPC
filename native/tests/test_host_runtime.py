@@ -75,13 +75,14 @@ class RuntimeHostTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'data_λ'
             env = os.environ.copy()
+            env.pop('SKYLANDERS_DATA', None)
             if os.name == 'nt':
-                env['LOCALAPPDATA'] = str(root)
-                expected = root / 'skylanders-pc' / 'saves'
+                env['SKYLANDERS_DATA'] = str(root / 'SkylandersPC')
+                expected = root / 'SkylandersPC' / 'saves'
             else:
                 env['XDG_DATA_HOME'] = str(root)
                 env['HOME'] = directory
-                expected = root / 'skylanders-pc' / 'saves'
+                expected = root / 'SkylandersPC' / 'saves'
             result = self.run_native('--save-root', env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(Path(result.stdout.strip()), expected)
@@ -90,13 +91,14 @@ class RuntimeHostTests(unittest.TestCase):
                 env['XDG_DATA_HOME'] = 'relative'
                 result = self.run_native('--save-root', env)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(Path(result.stdout.strip()), Path(directory) / '.local/share/skylanders-pc/saves')
-            for key in ('LOCALAPPDATA', 'HOME', 'XDG_DATA_HOME'):
+                self.assertEqual(Path(result.stdout.strip()), Path(directory) / '.local/share/SkylandersPC/saves')
+            for key in ('SKYLANDERS_DATA', 'HOME', 'XDG_DATA_HOME'):
                 env.pop(key, None)
-            result = self.run_native('--save-root', env)
-            self.assertEqual(result.returncode, 1, result.stderr)
+            if os.name != 'nt':  # Windows falls back to the Saved Games known folder.
+                result = self.run_native('--save-root', env)
+                self.assertEqual(result.returncode, 1, result.stderr)
             if os.name == 'nt':
-                env['LOCALAPPDATA'] = 'relative'
+                env['SKYLANDERS_DATA'] = 'relative'
                 result = self.run_native('--save-root', env)
                 self.assertEqual(result.returncode, 1, result.stderr)
 

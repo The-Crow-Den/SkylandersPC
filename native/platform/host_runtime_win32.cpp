@@ -7,6 +7,8 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <knownfolders.h>
+#include <shlobj.h>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -39,15 +41,26 @@ bool module_owner(std::uint64_t pc, ModuleOwner& output) {
     output = std::move(result);
     return true;
 }
+// Saves go in Saved Games\SkylandersPC (tools/user_data.py); SKYLANDERS_DATA overrides it.
 std::filesystem::path default_save_root() {
-    const auto size = GetEnvironmentVariableW(L"LOCALAPPDATA",nullptr,0);
-    if (!size) throw std::runtime_error("an absolute LOCALAPPDATA is required for saves");
-    std::vector<wchar_t> buffer(size);
-    const auto length = GetEnvironmentVariableW(L"LOCALAPPDATA",buffer.data(),size);
-    if (!length || length >= size) throw std::runtime_error("cannot read LOCALAPPDATA for saves");
-    const std::filesystem::path path(std::wstring(buffer.data(),length));
-    if (!path.is_absolute()) throw std::runtime_error("an absolute LOCALAPPDATA is required for saves");
-    return path/L"skylanders-pc"/L"saves";
+    std::filesystem::path base;
+    if (const auto size = GetEnvironmentVariableW(L"SKYLANDERS_DATA",nullptr,0)) {
+        std::vector<wchar_t> buffer(size);
+        const auto length = GetEnvironmentVariableW(L"SKYLANDERS_DATA",buffer.data(),size);
+        if (!length || length >= size) throw std::runtime_error("cannot read SKYLANDERS_DATA");
+        base = std::wstring(buffer.data(),length);
+        if (!base.is_absolute()) throw std::runtime_error("SKYLANDERS_DATA must be an absolute path");
+    } else {
+        PWSTR folder = nullptr;
+        if (FAILED(SHGetKnownFolderPath(FOLDERID_SavedGames,KF_FLAG_DONT_VERIFY,nullptr,&folder)) || !folder) {
+            CoTaskMemFree(folder);
+            throw std::runtime_error("cannot find the Saved Games folder for saves");
+        }
+        base = std::filesystem::path(folder)/L"SkylandersPC";
+        CoTaskMemFree(folder);
+        if (!base.is_absolute()) throw std::runtime_error("the Saved Games folder is not an absolute path");
+    }
+    return base/L"saves";
 }
 namespace {
 RuntimeFaultReport reporter = nullptr;

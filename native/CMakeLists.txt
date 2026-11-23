@@ -30,7 +30,7 @@ if(CMAKE_DL_LIBS)
 endif()
 if(WIN32)
   # winmm: timeBeginPeriod (host_clock_win32.cpp), 1 ms timer for guest timed waits.
-  target_link_libraries(sky-host-platform PUBLIC bcrypt ntdll advapi32 winmm)
+  target_link_libraries(sky-host-platform PUBLIC bcrypt ntdll advapi32 winmm shell32 ole32 uuid)
 endif()
 target_compile_options(sky-host-platform PRIVATE -Wall -Wextra -Wconversion -Wshadow)
 include(CTest)

@@ -500,7 +500,7 @@ class PortalPage(QWidget):
             self.failure('Could not save this Skylander', error); return
         if self.starting() == self.entry.path and saved.path != self.entry.path: self.set_starting(saved.path, self.starting_bottom())
         if self.starting_bottom() == self.entry.path and saved.path != self.entry.path: self.set_starting(self.starting(), saved.path)
-        self.entry = None; self.refresh(saved.path); self.feedback.setText('Saved. The previous state was backed up to out/figure-backups.')
+        self.entry = None; self.refresh(saved.path); self.feedback.setText('Saved. The previous state was backed up to the figure backups folder.')
 
     def create(self):
         if not self.guard(): return
@@ -553,7 +553,7 @@ class PortalPage(QWidget):
         if not self.entry or not self.guard(): return
         name = self.entry.figure.nickname or self.entry.name
         if QMessageBox.question(self, 'Remove Skylander', f'Remove {name} from your collection?\n\n'
-                'The figure and its progress are moved to out/portal-library/removed and can be restored from there.') != QMessageBox.StandardButton.Yes:
+                'The figure and its progress are moved to the removed figures folder and can be restored from there.') != QMessageBox.StandardButton.Yes:
             return
         halves = self.entry.halves if isinstance(self.entry, Swapper) else [self.entry]
         for half in halves:

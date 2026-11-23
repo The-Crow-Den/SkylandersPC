@@ -9,17 +9,15 @@ from pathlib import Path
 import re
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def home_root(environment=None):
-    environment = os.environ if environment is None else environment
-    if os.name == 'nt':
-        # Matches the native host's default_save_root (host_runtime_win32.cpp).
-        local = environment.get('LOCALAPPDATA')
-        if not local or not Path(local).is_absolute():
-            raise OSError('an absolute LOCALAPPDATA is required for saves')
-        return Path(local)/'skylanders-pc/saves'
-    data = environment.get('XDG_DATA_HOME')
-    base = Path(data) if data and Path(data).is_absolute() else Path(environment.get('HOME', str(Path.home())))/'.local/share'
-    return base/'skylanders-pc/saves'
+    # Matches the native host's default_save_root (host_runtime_*.cpp).
+    return user_data.base(environment)/'saves'
 
 
 def _manifest(directory):
@@ -89,7 +87,7 @@ def select(root, title_id, explicit=None, environment=None):
         return Path(explicit).expanduser().resolve(), 'command-line'
     if environment.get('SKY_SAVE_DATA_ROOT'):
         return Path(environment['SKY_SAVE_DATA_ROOT']).expanduser().resolve(), 'environment'
-    profile = root/'out/play-profiles'/f'{title_id}.json'
+    profile = user_data.path(root,'out/play-profiles')/f'{title_id}.json'
     if not profile.exists():
         if profile.is_symlink():raise ValueError('redirected save profile')
         return home_root(environment), 'home-default'
@@ -103,7 +101,7 @@ def select(root, title_id, explicit=None, environment=None):
         raise ValueError('invalid save profile')
     path = Path(record['save_root'])
     if (not path.is_absolute() or path.is_symlink() or path.resolve() != path or
-            not (path.is_relative_to(root/'out') or path == home_root(environment)) or not (path/title_id).is_dir() or
+            not (path.is_relative_to(root/'out') or path.is_relative_to(user_data.base(environment)) or path == home_root(environment)) or not (path/title_id).is_dir() or
             (path/title_id).is_symlink() or (path/title_id).resolve() != path/title_id):
         raise ValueError('save profile must select an existing private title directory')
     return path, 'saved-profile'

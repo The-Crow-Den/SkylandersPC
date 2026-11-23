@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 // Host adapter for the supplied Cemu SkylanderUSB implementation.
+#include <cstdlib>
 #include "runtime/cemu_portal.hpp"
 #include <algorithm>
 #include <fstream>
@@ -23,8 +24,10 @@ bool cemu_portal_load_figure(const std::filesystem::path& source,PortalFigure* f
   std::uint64_t fingerprint=14695981039346656037ULL;
   for(auto byte:bytes) {fingerprint^=byte;fingerprint*=1099511628211ULL;}
   std::ostringstream name;name<<"import-"<<std::hex<<std::setw(16)<<std::setfill('0')<<fingerprint<<".sky";
-  const auto root=fs::current_path(ec)/"out/figures";
-  if(ec || fs::weakly_canonical(root,ec)!=root || ec) return fail("Figure directory must not redirect outside the project");
+  // SKY_FIGURES_DIR: the per-user figures folder the launcher passes.
+  const auto* chosen=std::getenv("SKY_FIGURES_DIR");
+  const auto root=chosen && *chosen && fs::path(chosen).is_absolute() ? fs::weakly_canonical(chosen,ec) : fs::current_path(ec)/"out/figures";
+  if(ec || fs::weakly_canonical(root,ec)!=root || ec) return fail("Figure directory must not redirect elsewhere");
   fs::create_directories(root,ec);if(ec) return fail("Cannot create private figure directory");
   const auto working=root/name.str();
   if(fs::is_symlink(working,ec)) return fail("Refusing a symlinked figure working copy");

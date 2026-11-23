@@ -50,7 +50,7 @@ sudo udevadm control --reload && sudo udevadm trigger
 Writes to real figures are refused unless `--allow-figure-writes` is given
 (`SKY_PORTAL_FIGURE_WRITES=1`). Before the first write to a figure in a
 session, the bus reads all 64 blocks and saves them, with mode 0600, to
-`$XDG_DATA_HOME/skylanders-pc/portal-backups/<uid>-<time>.sky` (folder mode
+`$XDG_DATA_HOME/SkylandersPC/portal-backups/<uid>-<time>.sky` (folder mode
 0700). If the backup fails, the write is refused. These files are private
 figure data and must never be tracked.
 

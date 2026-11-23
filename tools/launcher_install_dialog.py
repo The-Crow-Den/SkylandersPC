@@ -36,6 +36,12 @@ QProgressBar::chunk { background: #f5f5f7; border-radius: 5px; }
 """
 
 
+try:
+    from . import user_data
+except ImportError:
+    import user_data
+
+
 def file_icon():
     """Small native-drawn folder symbol, without adding an image dependency."""
     pixmap = QPixmap(56,56);pixmap.fill(Qt.GlobalColor.transparent)
@@ -292,7 +298,7 @@ class InstallDialog(QDialog):
                 hidden=game_library.removed(self.owner.root)
                 restored={game_library.selector(entry['title_id'],version) for version in (entry['base_version'],entry['app_version'])}
                 hidden=[key for key in hidden if key not in restored]
-                game_library.write_json(self.owner.root/'.local/removed-games.json',hidden)
+                game_library.write_json(user_data.path(self.owner.root,'.local/removed-games.json'),hidden)
                 launcher_library.sync_installations(self.owner.root,self.owner.library)
                 profile = game_library.profile_for(self.owner.root,entry)
                 key = profile['id'] if profile else 'title-'+entry['title_id'].lower()

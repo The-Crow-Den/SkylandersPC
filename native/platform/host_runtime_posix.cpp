@@ -34,10 +34,15 @@ std::filesystem::path default_save_root() {
     std::filesystem::path path;
     const auto* data = std::getenv("XDG_DATA_HOME");
     const auto* home = std::getenv("HOME");
+    const auto* chosen = std::getenv("SKYLANDERS_DATA");  // tools/user_data.py
+    if (chosen && *chosen) {
+        if (!std::filesystem::path(chosen).is_absolute()) throw std::runtime_error("SKYLANDERS_DATA must be an absolute path");
+        return std::filesystem::path(chosen)/"saves";
+    }
     if (data && std::filesystem::path(data).is_absolute()) path = data;
     else if (home && std::filesystem::path(home).is_absolute()) path = std::filesystem::path(home)/".local/share";
     else throw std::runtime_error("HOME or an absolute XDG_DATA_HOME is required for saves");
-    return path/"skylanders-pc/saves";
+    return path/"SkylandersPC/saves";
 }
 namespace {
 RuntimeFaultReport reporter = nullptr;
