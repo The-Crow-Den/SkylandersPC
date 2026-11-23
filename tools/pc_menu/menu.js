@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const root=document.getElementById('trap-rail-demo');
-  const ui={view:'portal',slot:0,coop:false,page:'display',snapshot:null,dirty:false,sequence:-1,prefs:{}};
+  const ui={listMode:'all',view:'portal',slot:0,coop:false,page:'display',snapshot:null,dirty:false,sequence:-1,prefs:{}};
   const slotNames={0:'Player 1',3:'Player 2',1:'Trap',2:'Item',9:'Vehicle'};
   const images=new Map();let bridge=null;let previous='';
   let selectPopup=null;
@@ -98,10 +98,10 @@
   // Favourites first, then recently placed, by name within the current collection (per-user, outside the repo).
   const prefList=(field,category)=>ui.prefs?.[field]?.[String(category)]||[];
   const applyPrefs=text=>{try{ui.prefs=JSON.parse(text)||{};}catch{return;}render();};
-  // Favourites and recent figures are separate, labelled groups: every favourite
-  // in a wrapping grid, then the last few figures placed that aren't favourites.
+  // All / Favourites / Recent tabs switch what the figure list shows, so favourites
+  // never push the full collection further down.
   function quickRow(category){
-    const row=root.querySelector('[data-quick]');row.replaceChildren();
+    const row=root.querySelector('[data-quick]');const tabs=root.querySelector('[data-list-tabs]');const grid=root.querySelector('.portrait-grid');row.replaceChildren();
     const list=collection(ui.slot);const favourites=prefList('favourites',category);
     const recent=prefList('recent',category).filter(name=>!favourites.includes(name));
     const chipFor=(name,favourite)=>{
@@ -112,15 +112,17 @@
       chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=shown;chip.append(label);
       chip.onclick=()=>parts.length===2?placeCombo(category,parts):place(category,item);return chip;
     };
-    const group=(title,names,favourite,limit)=>{
-      const chips=names.map(name=>chipFor(name,favourite)).filter(Boolean).slice(0,limit);if(!chips.length)return;
-      const section=document.createElement('div');section.className='quick-group'+(favourite?' favourites':' recent');
-      const heading=document.createElement('h3');heading.className='quick-title';heading.textContent=title;
-      const chipsBox=document.createElement('div');chipsBox.className='quick-list';chipsBox.setAttribute('role','group');chipsBox.setAttribute('aria-label',title);chipsBox.append(...chips);
-      section.append(heading,chipsBox);row.append(section);
-    };
-    group('★ Favourites',favourites,true,24);group('Recently placed',recent,false,4);
-    row.hidden=!row.children.length||!!search.value.trim();
+    const chips={favourites:favourites.map(name=>chipFor(name,true)).filter(Boolean),recent:recent.map(name=>chipFor(name,false)).filter(Boolean).slice(0,8)};
+    const searching=!!search.value.trim();
+    if(searching||!chips[ui.listMode]?.length)ui.listMode='all';
+    for(const tab of tabs.querySelectorAll('[data-mode]')){
+      const mode=tab.dataset.mode;tab.hidden=mode!=='all'&&!chips[mode].length;
+      tab.setAttribute('aria-selected',String(mode===ui.listMode));tab.classList.toggle('active',mode===ui.listMode);
+      tab.onclick=()=>{ui.listMode=mode;quickRow(category);};
+    }
+    tabs.hidden=searching||(!chips.favourites.length&&!chips.recent.length);
+    if(ui.listMode!=='all'){row.append(...chips[ui.listMode]);}
+    row.hidden=ui.listMode==='all';grid.hidden=ui.listMode!=='all';
   }
   function place(category,item){send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);bridge?.placed(category,item.name,applyPrefs);}
   // Top half first, then the bottom half under it, as when placing them one at a time.
@@ -182,7 +184,7 @@
     root.querySelector('[data-setting-title]').textContent={display:'Display',graphics:'Graphics',controls:'Controls',audio:'Audio'}[ui.page];
     const old=root.querySelector('[data-setting-icon]');const next=document.createElement('i');next.dataset.settingIcon='';next.dataset.lucide={display:'monitor',graphics:'sliders-horizontal',controls:'gamepad-2',audio:'volume-2'}[ui.page];next.setAttribute('aria-hidden','true');old.replaceWith(next);
     slots();const isTrap=ui.slot===1;
-    root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;if(isTrap){root.querySelector('[data-quick]').hidden=true;root.querySelector('[data-favourite]').hidden=true;tidyActions();}root.querySelector('.section-title').hidden=isTrap;
+    root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;if(isTrap){root.querySelector('[data-quick]').hidden=true;root.querySelector('[data-list-tabs]').hidden=true;root.querySelector('[data-favourite]').hidden=true;tidyActions();}root.querySelector('.section-title').hidden=isTrap;
     if(isTrap)traps();else figures();message.textContent=ui.snapshot?.status||'Waiting for the game…';icon();
     if(focused){const match=[...root.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')===focused);if(match){match.focus({preventScroll:true});mark(match);}}
   }
