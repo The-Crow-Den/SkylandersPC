@@ -145,11 +145,7 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 @media(max-width:640px) { #trap-rail-demo .portal-panel { position:absolute; left:12px; right:12px; top:92px; margin:0; width:auto; max-height:calc(100% - 110px); } #trap-rail-demo .settings-panel { max-height:calc(100vh - 110px); } }
 
 #trap-rail-demo .settings-panel input[type="range"] { width:100%; accent-color:#98dfef; }
-#trap-rail-demo .volume-steps { display:flex; align-items:flex-end; gap:6px; height:40px; margin-top:6px; }
-#trap-rail-demo .volume-step { flex:1 1 0; min-width:0; border:0; border-radius:4px; background:#3a3a40; padding:0; }
-#trap-rail-demo .volume-step:nth-child(1){height:30%}#trap-rail-demo .volume-step:nth-child(2){height:37%}#trap-rail-demo .volume-step:nth-child(3){height:44%}#trap-rail-demo .volume-step:nth-child(4){height:51%}#trap-rail-demo .volume-step:nth-child(5){height:58%}
-#trap-rail-demo .volume-step:nth-child(6){height:65%}#trap-rail-demo .volume-step:nth-child(7){height:72%}#trap-rail-demo .volume-step:nth-child(8){height:79%}#trap-rail-demo .volume-step:nth-child(9){height:86%}#trap-rail-demo .volume-step:nth-child(10){height:100%}
-#trap-rail-demo .volume-step.on { background:var(--accent); }
+#trap-rail-demo .settings-panel input[type="range"].editing { outline:2px solid var(--accent); outline-offset:4px; border-radius:6px; }
 #trap-rail-demo .embedded-options { position:fixed; z-index:20; max-height:260px; overflow-y:auto; padding:5px; border:1px solid #414146; border-radius:10px; background:#29292d; box-shadow:0 10px 24px #0008; }
 #trap-rail-demo .embedded-options button { display:block; width:100%; padding:8px; border:0; border-radius:6px; background:transparent; color:var(--ink); text-align:left; font-size:13px; }
 #trap-rail-demo .embedded-options button:hover,#trap-rail-demo .embedded-options button[aria-selected="true"] { background:#45454c; }
