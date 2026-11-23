@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "transport.hpp"
+#include "g726.hpp"
 #include "../platform/hid.hpp"
 #include <chrono>
 #include <cstdio>
@@ -25,7 +26,7 @@ private:
 
 // Xbox 360 portals exchange fixed 32-byte frames on vendor interrupt endpoints:
 // the header 0B 14, then a 30-byte report, in both directions. (0B 17 frames
-// carry G.726 speaker audio, which is not mapped yet.) Format as documented by
+// carry G.726 speaker audio; see g726.hpp.) Format as documented by
 // skylanders-portal (TheBiemGamer, MIT), from Xenia, RPCS3 and Dolphin.
 constexpr std::size_t xbox_frame = 32;
 constexpr std::uint8_t xbox_header[]{0x0b, 0x14};
@@ -50,6 +51,7 @@ public:
         : Transport(std::move(info)), context_(context), handle_(handle), in_(in), out_(out) {}
     ~XboxTransport() override { libusb_release_interface(handle_, 0); libusb_close(handle_); libusb_exit(context_); }
     bool write_report(std::span<const std::uint8_t> report) override {
+        if (!report.empty() && report[0] == 'M') speaker_.reset();  // speaker switched: a new stream starts
         std::uint8_t frame[xbox_frame]{xbox_header[0], xbox_header[1]};
         std::copy_n(report.begin(), std::min(report.size(), xbox_frame - 2), frame + 2);
         int sent = 0;
@@ -67,12 +69,21 @@ public:
         std::copy_n(frame + skip, count, output.begin());
         return static_cast<int>(count);
     }
-    bool write_audio(std::span<const std::uint8_t>) override { return false; }  // Not mapped for Xbox portals yet.
+    // The game sends plain PCM; the Xbox 360 portal takes G.726 in 0B 17 frames.
+    bool write_audio(std::span<const std::uint8_t> pcm) override {
+        bool ok = true;
+        speaker_.add(pcm, [this](const SpeakerEncoder::Frame& frame) {
+            int sent = 0;
+            return libusb_interrupt_transfer(handle_, out_, const_cast<std::uint8_t*>(frame.data()), static_cast<int>(frame.size()), &sent, 100) == 0;
+        }, ok);
+        return ok;
+    }
 private:
     libusb_context* context_;
     libusb_device_handle* handle_;
     std::uint8_t in_, out_;
     bool warned_ = false;
+    SpeakerEncoder speaker_;
 };
 
 void enumerate_xbox(std::vector<Info>& result) {

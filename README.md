@@ -64,7 +64,7 @@ from source (below) and use the launcher AppImage or `python3 tools/launcher.py`
   the in-game PC menu (F6, Insert or L3+R3), which works with a controller.
 - **Physical portals (experimental)**: PS3, PS4, Wii and Wii U portals are
   passed to the game; *Automatic* uses one when it is plugged in. Wired Xbox
-  360 portals can be chosen on the Portal page (no trap speaker yet).
+  360 portals can be chosen on the Portal page.
 - **PC settings**: internal resolution up to 2160p (the game renders natively
   at it), aspect ratios up to 32:9, shadow quality (High by default),
   fullscreen, and a 30 or 60 FPS cap or an automatic mode that keeps cutscenes

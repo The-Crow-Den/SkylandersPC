@@ -340,7 +340,7 @@ if(SKY_PORTAL_SOURCE_ROOT)
   pkg_check_modules(SkyUSB REQUIRED IMPORTED_TARGET libusb-1.0)
   # sky-portal-core comes from sky_add_portal_core() above.
   # Real portals: one protocol core, a transport per portal family.
-  add_library(sky-portal-device STATIC portal_device/protocol.cpp portal_device/transports.cpp
+  add_library(sky-portal-device STATIC portal_device/protocol.cpp portal_device/transports.cpp portal_device/g726.cpp
     portal_device/virtual_transport.cpp $<IF:$<BOOL:${WIN32}>,platform/hid_windows.cpp,platform/hid_linux.cpp>)
   target_compile_features(sky-portal-device PUBLIC cxx_std_20)
   target_link_libraries(sky-portal-device PUBLIC sky-portal-core PkgConfig::SkyUSB $<$<BOOL:${WIN32}>:hid;setupapi>)
@@ -366,6 +366,9 @@ if(SKY_PORTAL_SOURCE_ROOT)
     target_link_libraries(portal-figure-copy-test PRIVATE sky-portal-core)
     target_link_options(portal-figure-copy-test PRIVATE -Wl,--gc-sections)
     add_test(NAME native-portal-figure-copy COMMAND portal-figure-copy-test)
+    add_executable(g726-test tests/test_g726.cpp portal_device/g726.cpp)
+    target_compile_features(g726-test PRIVATE cxx_std_20)
+    add_test(NAME native-g726 COMMAND g726-test)
   endif()
 endif()
 if(BUILD_TESTING)
