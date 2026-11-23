@@ -98,17 +98,28 @@
   // Favourites first, then recently placed, by name within the current collection (per-user, outside the repo).
   const prefList=(field,category)=>ui.prefs?.[field]?.[String(category)]||[];
   const applyPrefs=text=>{try{ui.prefs=JSON.parse(text)||{};}catch{return;}render();};
+  // Favourites and recent figures are separate, labelled groups: every favourite
+  // in a wrapping grid, then the last few figures placed that aren't favourites.
   function quickRow(category){
     const row=root.querySelector('[data-quick]');row.replaceChildren();
-    const list=collection(ui.slot);const favourites=prefList('favourites',category);const names=[...favourites,...prefList('recent',category).filter(name=>!favourites.includes(name))];
-    for(const name of names.slice(0,10)){
+    const list=collection(ui.slot);const favourites=prefList('favourites',category);
+    const recent=prefList('recent',category).filter(name=>!favourites.includes(name));
+    const chipFor=(name,favourite)=>{
       // A swapper combination is saved as "Top half name + Bottom half name".
-      const parts=name.split(' + ').map(part=>list.find(entry=>entry.name===part));if(parts.some(part=>!part)||parts.length>2)continue;
+      const parts=name.split(' + ').map(part=>list.find(entry=>entry.name===part));if(parts.some(part=>!part)||parts.length>2)return null;
       const item=parts[0];const shown=parts.length===2?swapperName(parts[0].name,parts[1].name):name;
-      const chip=button('quick-figure',(favourites.includes(name)?'Favourite: ':'Recent: ')+'place '+shown+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(parts.every(part=>part.state&2)));
-      chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+shown;chip.append(label);
-      chip.onclick=()=>parts.length===2?placeCombo(category,parts):place(category,item);row.append(chip);
-    }
+      const chip=button('quick-figure',(favourite?'Favourite: ':'Recent: ')+'place '+shown+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(parts.every(part=>part.state&2)));
+      chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=shown;chip.append(label);
+      chip.onclick=()=>parts.length===2?placeCombo(category,parts):place(category,item);return chip;
+    };
+    const group=(title,names,favourite,limit)=>{
+      const chips=names.map(name=>chipFor(name,favourite)).filter(Boolean).slice(0,limit);if(!chips.length)return;
+      const section=document.createElement('div');section.className='quick-group'+(favourite?' favourites':' recent');
+      const heading=document.createElement('h3');heading.className='quick-title';heading.textContent=title;
+      const chipsBox=document.createElement('div');chipsBox.className='quick-list';chipsBox.setAttribute('role','group');chipsBox.setAttribute('aria-label',title);chipsBox.append(...chips);
+      section.append(heading,chipsBox);row.append(section);
+    };
+    group('★ Favourites',favourites,true,24);group('Recently placed',recent,false,4);
     row.hidden=!row.children.length||!!search.value.trim();
   }
   function place(category,item){send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);bridge?.placed(category,item.name,applyPrefs);}
