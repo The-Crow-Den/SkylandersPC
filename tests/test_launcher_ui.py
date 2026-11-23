@@ -112,7 +112,6 @@ class LauncherUITests(unittest.TestCase):
         page.open(trap)
         self.assertTrue(page.mod_fields['sample'].isChecked())
         self.assertEqual(page.mod_setting_fields[('sample','strength')].currentData(),'high')
-        self.assertFalse(page.portal_field.isEnabled())
         page.open();self.assertIsNone(page.game)
         self.assertEqual(self.window.values(),general)
 

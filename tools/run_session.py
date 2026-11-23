@@ -399,7 +399,7 @@ def run(argv,sessions):
     parser.add_argument('--memory-mode', choices=('standard','compact'), default='standard')
     parser.add_argument('--renderer-idle', choices=('adaptive','sleep'), default='adaptive',
                         help='sleep avoids speculative renderer idle spinning; experimental')
-    parser.add_argument('--quality', choices=QUALITY, default='balanced', help='shadow-detail quality preset')
+    parser.add_argument('--quality', choices=QUALITY, default='high', help='shadow-detail quality preset')
     parser.add_argument('--controller-glyphs',choices=controller_glyphs.MODES,default='auto',
                         help='shared in-game button font; auto detects the first mapped controller at launch; restart to change')
     parser.add_argument('--controller-layout',choices=('auto','keyboard-and-pad'),default='auto',

@@ -121,12 +121,6 @@ class SettingsPage(QWidget):
                 self.portal_access=QPushButton('Set up portal access');self.portal_access.clicked.connect(self.setup_portal_access);line.addWidget(self.portal_access)
                 rescan=QPushButton('Refresh');rescan.clicked.connect(lambda:self.refresh_portals());line.addWidget(rescan)
                 rows.addWidget(card)
-            if name=='Tweaks':
-                card=QWidget();card.setObjectName('settingRow');line=QHBoxLayout(card);line.setContentsMargins(20,16,20,16)
-                copy=QVBoxLayout();heading=QLabel('Any portal');heading.setStyleSheet('font-size: 14px; font-weight: 600;');copy.addWidget(heading)
-                detail=QLabel('Physical HID portals (PS3/PS4/Wii/Wii U) can be chosen under Portal & audio; Xbox portals are detected but not yet usable in game.');detail.setWordWrap(True);detail.setStyleSheet('font-size: 12px; color: #93939e;');copy.addWidget(detail);line.addLayout(copy,1)
-                self.portal_field=SettingSwitch();self.portal_field.setFixedSize(44,28);self.portal_field.setAccessibleName('Any portal');self.portal_field.setEnabled(False);line.addWidget(self.portal_field)
-                self.mod_rows.append(card);rows.addWidget(card)
             rows.addStretch();scroll.setWidget(sheet);column.addWidget(scroll,1);self.pages.addWidget(page)
             self.add_nav(navigation,name)
         page=QWidget();column=QVBoxLayout(page);column.setContentsMargins(0,4,0,0);column.setSpacing(14)

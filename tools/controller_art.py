@@ -33,10 +33,33 @@ def _read(name,width,height,channels):
     return data[8:]
 
 
+# Xbox face buttons are drawn like the Nintendo ones: a dark button, with the
+# letter in the button's colour instead of white on a coloured disc.
+BUTTON=(14,18,24)
+
+
+def dark_button(pixels,width,height,box=None):
+    """Swap a coloured disc with a white letter for a dark disc with a coloured letter."""
+    x0,y0,x1,y1=box or (0,0,width,height);out=bytearray(pixels)
+    solid=[tuple(out[i:i+3]) for y in range(y0,y1) for x in range(x0,x1)
+           for i in [(y*width+x)*4] if out[i+3]==255 and max(out[i:i+3])-min(out[i:i+3])>80]
+    if not solid:return bytes(out)
+    colour=tuple(sorted(value[channel] for value in solid)[len(solid)//2] for channel in range(3))
+    floor=min(colour)
+    for y in range(y0,y1):
+        for x in range(x0,x1):
+            i=(y*width+x)*4
+            if not out[i+3]:continue
+            white=max(0.0,min(1.0,(min(out[i:i+3])-floor)/max(1,255-floor)))
+            out[i:i+3]=bytes(round(BUTTON[c]*(1-white)+colour[c]*white) for c in range(3))
+    return bytes(out)
+
+
 def glyph(mode,index,width,height):
     if mode not in ('xbox','nintendo') or type(index) is not int or not 0<=index<10:
         raise ValueError('invalid controller art selection')
-    return _read(f'{mode}-{index}.rgba',width,height,4)
+    pixels=_read(f'{mode}-{index}.rgba',width,height,4)
+    return dark_button(pixels,width,height) if mode=='xbox' and index<4 else pixels
 
 
 def letter(mode,index,width,height):
@@ -46,8 +69,14 @@ def letter(mode,index,width,height):
 
 
 def atlas_path():
-    _read('menu-atlas.rgba',512,256,4)
-    return ROOT/'menu-atlas.rgba'
+    """The menu atlas with the Xbox face buttons (top-left 4 x 64 px cells) restyled."""
+    pixels=_read('menu-atlas.rgba',512,256,4)
+    for cell in range(4):pixels=dark_button(pixels,512,256,(cell*64,0,cell*64+64,64))
+    styled=ROOT/'menu-atlas-styled.rgba';data=struct.pack('<II',512,256)+pixels
+    if styled.is_symlink():raise ValueError('redirected controller artwork')
+    if not styled.is_file() or styled.read_bytes()!=data:
+        temporary=styled.with_name(styled.name+'.tmp');temporary.write_bytes(data);temporary.replace(styled)
+    return styled
 
 
 def available():

@@ -13,7 +13,7 @@ except ImportError:
     from run_session import PACKS, GPU_CHOICES, installed_gpus
     import game_install, game_build, game_library, game_prepare, game_language, portal_devices
 
-DEFAULTS = dict(resolution='1080p', quality='balanced', fullscreen=False,
+DEFAULTS = dict(resolution='1080p', quality='high', fullscreen=False,
                 fps_counter=True, frame_limit=30, portal_volume=50,
                 motion_blur=True, anti_aliasing=True, gpu='auto', mangohud=False,
                 unlock_nightmare=True, level_events=False, trophy_popups=True, frame_policy='auto', figure='', figure_bottom='', skip_intro=False, language='en-US', aspect='16:9',
