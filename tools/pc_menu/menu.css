@@ -153,10 +153,6 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .portal-panel, #trap-rail-demo .settings-panel, #trap-rail-demo .rail { transition:opacity 120ms ease; }
 #trap-rail-demo.pad-focus.zone-rail :is(.portal-panel,.settings-panel) { opacity:.55; }
 #trap-rail-demo.pad-focus.zone-panel .rail { opacity:.6; }
-#trap-rail-demo .pad-hints { display:none; position:absolute; z-index:6; left:50%; bottom:18px; transform:translateX(-50%); gap:16px; padding:8px 16px; border-radius:999px; background:#111111e6; box-shadow:0 8px 26px #00000055; font-size:13px; line-height:20px; white-space:nowrap; pointer-events:none; }
-#trap-rail-demo.pad-focus .pad-hints { display:flex; }
-#trap-rail-demo .pad-hints span { display:flex; align-items:center; gap:6px; color:#d8d8de; }
-#trap-rail-demo .pad-hints kbd { font:inherit; font-weight:600; min-width:22px; padding:0 6px; text-align:center; border-radius:6px; background:#ffffff; color:#171313; }
 #trap-rail-demo.zone-rail .rail { width:var(--rail-open); }
 #trap-rail-demo.zone-rail .nav-label { opacity:1; }
 #trap-rail-demo .quick-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
@@ -194,7 +190,6 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 #trap-rail-demo .slot .placeholder { max-width:88px; aspect-ratio:1; margin:0; }
 #trap-rail-demo .quick-figure .placeholder { width:36px; height:36px; aspect-ratio:auto; margin:0; font-size:13px; border-radius:8px; }
 #trap-rail-demo .collection-actions { padding-top:12px; border-top:1px solid #ffffff10; }
-#trap-rail-demo .pad-hints { background:#121215e6; border:1px solid #ffffff12; backdrop-filter:blur(12px); }
 #trap-rail-demo .swapper-card[aria-expanded="true"] { border-color:var(--accent); background:#1f2c31; }
 #trap-rail-demo .swapper-cell { position:relative; min-width:0; display:grid; }
 #trap-rail-demo .half-choice { position:absolute; z-index:4; left:4px; right:4px; bottom:4px; display:grid; gap:5px; padding:6px; border-radius:11px; background:#18181bf2; border:1px solid #98dfef66; box-shadow:0 8px 22px #000a; animation:half-pop 110ms ease-out; }

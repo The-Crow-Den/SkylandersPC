@@ -131,6 +131,8 @@ Unknown system calls are reported, never answered with a fake success.
 - [Cemu](https://github.com/cemu-project/Cemu): the Skylanders portal implementation.
 - Mew00, SuperSamus and Winner Nombre: the Wii U Trap Team FPS graphics pack, whose delta-time
   clamp change the `60-delta` patch adapts.
+- Valve's Steam client: the Xbox and Nintendo button artwork used for the game's prompts. It is
+  imported from your own Steam installation on your machine, restyled locally, and never shipped.
 - Dear ImGui, SDL3, Qt/PyQt6, Lucide icons, the Montserrat font and the other libraries listed
   in the [third-party notices](THIRD_PARTY_NOTICES.md).
 

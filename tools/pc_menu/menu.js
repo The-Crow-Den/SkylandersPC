@@ -17,7 +17,11 @@
     if(!select){if(selectPopup&&!selectPopup.node.contains(event.target))closeSelect();return;}
     event.preventDefault();event.stopPropagation();
     const same=selectPopup?.select===select;closeSelect();if(same)return;
-    select.focus();const node=document.createElement('div');node.className='embedded-options';node.setAttribute('role','listbox');
+    openSelect(select);
+  },true);
+  // The option list, drawn in the page: used for the mouse in the game frame and for A on a controller.
+  function openSelect(select){
+    select.focus({preventScroll:true});const node=document.createElement('div');node.className='embedded-options';node.setAttribute('role','listbox');
     const rect=select.getBoundingClientRect();node.style.left=rect.left+'px';node.style.width=rect.width+'px';
     for(const [index,option] of [...select.options].entries()){
       const item=document.createElement('button');item.type='button';item.textContent=option.text;item.setAttribute('role','option');item.setAttribute('aria-selected',String(index===select.selectedIndex));
@@ -25,7 +29,7 @@
     }
     root.append(node);const height=Math.min(node.scrollHeight,260);node.style.top=(rect.bottom+height<innerHeight-12?rect.bottom+4:Math.max(12,rect.top-height-4))+'px';
     selectPopup={node,select,index:select.selectedIndex};moveSelect(0);
-  },true);
+  }
   const search=root.querySelector('[data-search]');const message=root.querySelector('[data-message]');
   const icon=()=>window.lucide?.createIcons({attrs:{width:18,height:18}});
   const collection=kind=>ui.snapshot?.collections?.[String(kind)]||[];
@@ -195,20 +199,13 @@
   const usable=node=>!node.disabled&&node.getClientRects().length&&!node.closest('[hidden]');
   // The corner X and the search box are mouse/keyboard only: a controller backs out with B.
   const targets=area=>[...area.querySelectorAll('button,input,select')].filter(node=>usable(node)&&!node.matches('[data-close],[data-search]'));
-  const hints=root.querySelector('.pad-hints');
-  // Button names match the prompts the game was started with, so menu and game always agree;
-  // a changed "Button icons" setting takes effect for both after Apply and restart.
-  const glyphs=()=>({xbox:{a:'A',b:'B',lb:'LB',rb:'RB',start:'Start'},nintendo:{a:'B',b:'A',lb:'L',rb:'R',start:'+'}})[ui.snapshot?.settings?.activeGlyphs]||{a:'✕',b:'○',lb:'L1',rb:'R1',start:'Options'};
   const remembered=new Map(); // panel → last focused control, restored by RB
   const identity=node=>node.id||node.getAttribute('aria-label')||node.textContent.trim();
   const panelKey=()=>ui.view==='portal'?'portal':'settings:'+ui.page;
+  // Marks which zone (tabs or panel) has the controller; no button hint bar is shown.
   function updateHints(){
-    const active=document.activeElement;const inRail=!!active?.closest('.rail');const g=glyphs();
+    const active=document.activeElement;const inRail=!!active?.closest('.rail');
     root.classList.toggle('zone-rail',inRail);root.classList.toggle('zone-panel',!inRail&&!!active?.closest('.portal-panel,.settings-panel'));
-    const value=active instanceof HTMLSelectElement||active?.type==='range';
-    const items=inRail?[['▲▼','Switch tab'],[g.a+' / '+g.rb,'Enter'],[g.b,'Close'],[g.start,'Close']]
-      :[[value?'◀▶':'✚',value?'Change':'Move'],[g.a,value?'Next':'Select'],[g.lb,'Tabs'],[g.b,'Back'],[g.start,'Close']];
-    hints.replaceChildren(...items.map(([button,label])=>{const item=document.createElement('span');const key=document.createElement('kbd');key.textContent=button;item.append(key,label);return item;}));
   }
   // The overlay window may not hold OS focus while the game does, so :focus is unreliable:
   // the controller highlight is a class on the current control.
@@ -264,9 +261,10 @@
       if(key===4||key===5)enterPanel();
       return;
     }
-    const value=active instanceof HTMLSelectElement||active.type==='range';
-    if(key===5){if(active instanceof HTMLSelectElement)adjust(active,1);else{active.click();updateHints();}return;}
-    if(value&&(key===3||key===4)){adjust(active,key===4?1:-1);return;}
+    if(key===5){if(active instanceof HTMLSelectElement)openSelect(active);else{active.click();updateHints();}return;}
+    // Sliders change with left/right; a drop-down changes only with A (its list), so the d-pad
+    // moves on: down to the next option, left back to the tabs.
+    if(active.type==='range'&&(key===3||key===4)){adjust(active,key===4?1:-1);return;}
     const next=area?nearest(targets(area),active,key):null;
     if(next){focus(next);return;}
     if(key===3)focus(currentTab()); // past the panel's left edge: back to the tabs
