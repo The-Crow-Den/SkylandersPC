@@ -13,7 +13,8 @@ class GameplayModTests(unittest.TestCase):
             profile=root/'out/mod-profiles/CUSA00626.json';profile.parent.mkdir(parents=True)
             self.assertEqual(gameplay_mods.selection(root,'CUSA00626'),dict.fromkeys(gameplay_mods.NAMES,False))
             profile.write_text(json.dumps(dict(schema_version=1,title_id='CUSA00626',enabled={'element-gates':True,'traptanium':False})))
-            self.assertEqual(gameplay_mods.selection(root,'CUSA00626',{'element-gates':False,'traptanium':True}),{'element-gates':False,'traptanium':True,'unlock-expansions':False})
+            self.assertEqual(gameplay_mods.selection(root,'CUSA00626',{'unlock-expansions':False}),{'unlock-expansions':False,'trap-master':True})
+            self.assertTrue(gameplay_mods.selection(root,'CUSA00626',{'traptanium':True})['trap-master'])
             self.assertTrue(gameplay_mods.selection(root,'CUSA00626',{'unlock-expansions':True})['unlock-expansions'])
             # The retired replay mod now turns on the adventure pack mod that carries it.
             self.assertTrue(gameplay_mods.selection(root,'CUSA00626',{'replay-expansion-intros':True})['unlock-expansions'])

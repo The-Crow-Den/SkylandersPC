@@ -51,7 +51,8 @@ def build(root,game):
 def available(manifest,digest):
     """Whether every recipe file the mod needs for this build is present."""
     for operation in manifest['operations']:
-        if operation.get('target',digest)==digest and 'profile' in operation:
+        # A part behind a setting may be missing; choosing it then reports that at launch.
+        if operation.get('target',digest)==digest and 'profile' in operation and 'when' not in operation:
             try:
                 if not mod_manifest.locate(manifest,operation['profile']).is_file():return False
             except mod_manifest.ModError:
@@ -100,6 +101,9 @@ def selection(root,game):
 def arguments(mods,settings=None):
     """run_session options for saved choices; the gameplay mods keep their own switches."""
     argv=[]
+    try:from .gameplay_mods import fold_settings
+    except ImportError:from gameplay_mods import fold_settings
+    settings=fold_settings(mods,settings or {});mods=validate(mods)
     for ident,enabled in validate(mods).items():
         if ident in NAMES:argv.append(('--' if enabled else '--no-')+ident)
         elif enabled:argv+=['--mod',ident]

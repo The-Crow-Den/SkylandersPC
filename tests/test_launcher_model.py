@@ -72,13 +72,15 @@ class LauncherModelTests(unittest.TestCase):
 
     def test_gameplay_mod_switches_are_forwarded_explicitly(self):
         argv=model.command('/project','python',model.DEFAULTS,mods={'element-gates':True,'traptanium':False})
-        self.assertIn('--element-gates',argv);self.assertIn('--no-traptanium',argv)
+        # The two old Trap Master mods become one mod with matching settings.
+        self.assertIn('trap-master',argv);self.assertIn('trap-master.elemental-gates=true',argv);self.assertIn('trap-master.traptanium=false',argv)
         for enabled, flag in ((True,'--unlock-expansions'),(False,'--no-unlock-expansions')):
             argv=model.command('/project','python',model.DEFAULTS,mods={'unlock-expansions':enabled})
             self.assertIn(flag,argv)
         # A saved replay-intros choice now selects the adventure pack mod.
         argv=model.command('/project','python',model.DEFAULTS,mods={'replay-expansion-intros':True})
         self.assertIn('--unlock-expansions',argv);self.assertNotIn('--replay-expansion-intros',argv)
+        self.assertIn('unlock-expansions.unlock-adventure-packs=false',argv);self.assertIn('unlock-expansions.replay-introductions=true',argv)
         argv=model.command('/project','python',model.DEFAULTS,mods={'sample':True,'off':False},
                            mod_settings={'sample':{'strength':'high'},'off':{'x':1}})
         self.assertEqual(argv[argv.index('--mod'):][:4],['--mod','sample','--mod-setting','sample.strength="high"'])
@@ -109,7 +111,8 @@ class LauncherModelTests(unittest.TestCase):
             game=next(g for g in library['games'] if g['id']=='trap-team')
             selected=launcher_mods.selection(root,game)
             # The 60 FPS mod starts on, as automatic FPS did before it.
-            self.assertEqual(selected,{'element-gates':True,'traptanium':False,'unlock-expansions':False,'sixty-fps':True})
+            self.assertEqual(selected,{'trap-master':True,'unlock-expansions':False,'sixty-fps':True})
+            self.assertEqual(game['mod_settings']['trap-master'],{'elemental-gates':True,'traptanium':False})
             selected['unlock-expansions']=True
             game['mods']=selected;launcher_library.save(path,library)
             game=next(g for g in launcher_library.load(path)['games'] if g['id']=='trap-team')

@@ -27,9 +27,8 @@ now just select the mod:
 | `sixty-fps` | `--mod sixty-fps`, or `--frame-policy auto` (on by default in the launcher) | 60 FPS with elapsed-time simulation; setting `automatic` (default `true`) keeps menus, cutscenes and portal arrival at 30, `false` caps everything at 60 |
 | `level-events` | `--level-events`, or required by `sixty-fps` | Level-switch hooks for automatic FPS |
 | `controller-glyphs` | `--controller-glyphs xbox\|nintendo\|auto` | Xbox or Nintendo button prompts from imported Steam artwork |
-| `element-gates` | `--element-gates` | Experimental gate change |
-| `traptanium` | `--traptanium` | Experimental; recipe withheld from public checkouts |
-| `unlock-expansions` | `--unlock-expansions` | Experimental: adventure pack access, and each pack's introduction replays from its Academy statue (replaces `replay-expansion-intros`) |
+| `trap-master` | `--mod trap-master` | Experimental: no Trap Master needed, with settings `elemental-gates` and `traptanium` (both on); replaces `element-gates` and `traptanium`. The Traptanium recipe is left out of source exports |
+| `unlock-expansions` | `--unlock-expansions` | Experimental, with settings `unlock-adventure-packs` (pack access without toys) and `replay-introductions` (a pack's introduction replays from its Academy statue), both on; replaces `replay-expansion-intros` |
 | `skip-cutscenes` | `--mod skip-cutscenes` | Cross or Options ends any movie (US 01.01 host hook) |
 
 The launcher's **Mods** page (in a game's settings) lists every mod found in

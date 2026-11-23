@@ -381,12 +381,13 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
         if target is None:
             raise ModError(f"mod {ident} does not support this game build (executable sha256 {executable_sha256[:12]}…)")
         chosen = resolve_settings(manifest, settings.get(ident))
-        operations = []
+        operations, skipped = [], False
         for operation in manifest['operations']:
             if operation.get('target', executable_sha256) != executable_sha256:
                 continue
             when = operation.get('when')
             if when and chosen[when['setting']] != when['equals']:
+                skipped = True
                 continue
             if operation['type'] == 'code-patch':
                 if executable is None:
@@ -417,6 +418,8 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
             else:
                 claim(writes, ident, list(edit_ranges(operation)))
             operations.append(operation)
+        if not operations and skipped:
+            continue  # every part this mod offers is switched off in its settings
         if not operations:
             raise ModError(f'mod {ident} has no operations for this game build')
         applied.append(dict(id=ident, name=manifest['name'], version=manifest['version'],

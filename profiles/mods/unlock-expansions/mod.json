@@ -5,7 +5,7 @@
   "version": "2.0.0",
   "author": "SkylandersPS4 contributors",
   "licence": "GPL-3.0-or-later",
-  "description": "Experimental: access all four adventure packs without toys after the island introduction following Chapter 2, and play a pack's introduction after confirming travel at its Academy statue.",
+  "description": "Experimental: the adventure pack parts you turn on below. Unlock adventure packs opens all four packs without toys after the island introduction following Chapter 2; Replay introductions plays a pack's introduction after confirming travel at its Academy statue.",
   "targets": [
     {
       "title_id": "CUSA00626",
@@ -15,17 +15,34 @@
   ],
   "requires": [],
   "conflicts": [],
-  "settings": {},
+  "settings": {
+    "unlock-adventure-packs": {
+      "type": "bool",
+      "default": true
+    },
+    "replay-introductions": {
+      "type": "bool",
+      "default": true
+    }
+  },
   "operations": [
     {
       "type": "asset-patch",
       "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
-      "profile": "profiles/patches/trap-team-us-01.01-unlock-expansions.experimental.json"
+      "profile": "profiles/patches/trap-team-us-01.01-unlock-expansions.experimental.json",
+      "when": {
+        "setting": "unlock-adventure-packs",
+        "equals": true
+      }
     },
     {
       "type": "asset-patch",
       "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
-      "profile": "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json"
+      "profile": "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json",
+      "when": {
+        "setting": "replay-introductions",
+        "equals": true
+      }
     }
   ]
 }

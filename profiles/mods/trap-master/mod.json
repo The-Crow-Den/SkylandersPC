@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "trap-master",
+  "name": "No Trap Master required",
+  "version": "1.0.0",
+  "author": "SkylandersPS4 contributors",
+  "licence": "GPL-3.0-or-later",
+  "description": "Experimental: any Skylander does the Trap Master jobs you turn on below. Elemental gates open for a Skylander of the matching element; Traptanium breaks for any Skylander.",
+  "targets": [
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.01",
+      "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    }
+  ],
+  "requires": [],
+  "conflicts": [],
+  "settings": {
+    "elemental-gates": {
+      "type": "bool",
+      "default": true
+    },
+    "traptanium": {
+      "type": "bool",
+      "default": true
+    }
+  },
+  "operations": [
+    {
+      "type": "asset-patch",
+      "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+      "when": {
+        "setting": "elemental-gates",
+        "equals": true
+      },
+      "profile": "profiles/patches/trap-team-us-01.01-element-gates.experimental.json"
+    },
+    {
+      "type": "asset-patch",
+      "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
+      "when": {
+        "setting": "traptanium",
+        "equals": true
+      },
+      "profile": "profiles/patches/trap-team-us-01.01-traptanium.experimental.json"
+    }
+  ]
+}

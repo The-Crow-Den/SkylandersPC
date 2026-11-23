@@ -42,6 +42,11 @@ def load(path):
             from .launcher_mods import validate as validate_mods, validate_settings as validate_mod_settings
         except ImportError:
             from launcher_mods import validate as validate_mods, validate_settings as validate_mod_settings
+        try:from .gameplay_mods import fold_settings
+        except ImportError:from gameplay_mods import fold_settings
+        if isinstance(game.get('mods'),dict) and isinstance(game.get('mod_settings',{}),dict):
+            game['mod_settings']=fold_settings(game['mods'],game.get('mod_settings',{}))
+            game['mods']=validate_mods(game['mods'])
         validate_mods(game.get('mods',{}))
         validate_mod_settings(game.get('mod_settings',{}))
         if 'installation' in game:

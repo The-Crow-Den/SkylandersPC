@@ -73,8 +73,8 @@ class ManifestTest(unittest.TestCase):
         options = [dict(type='host-option', environment={'SKY_X': '1'}, when=dict(setting='mode', equals='on'))]
         a, b = manifest('a', operations=options), manifest('b', operations=[dict(type='host-option', environment={'SKY_X': '2'})])
         self.assertEqual(mods.host_environment(mods.plan({'a': a}, ['a'], BUILD)), {'SKY_X': '1'})
-        with self.assertRaisesRegex(mods.ModError, 'has no operations'):
-            mods.plan({'a': a}, ['a'], BUILD, settings={'a': {'mode': 'off'}})
+        # Every part switched off in its settings: the mod applies nothing, without an error.
+        self.assertEqual(mods.plan({'a': a}, ['a'], BUILD, settings={'a': {'mode': 'off'}}), [])
         with self.assertRaisesRegex(mods.ModError, 'invalid value'):
             mods.plan({'a': a}, ['a'], BUILD, settings={'a': {'mode': 'maybe'}})
         with self.assertRaisesRegex(mods.ModError, 'mods a and b both set SKY_X'):
@@ -142,18 +142,31 @@ class ManifestTest(unittest.TestCase):
         with self.assertRaises(mods.ModError):
             manifest(operations=[dict(type='generated', handler='Bad Handler', target=BUILD)])
 
+    def test_trap_master_mod_has_two_switches(self):
+        available = mods.discover(ROOT)
+        manifest = available['trap-master']
+        self.assertEqual(set(manifest['settings']), {'elemental-gates', 'traptanium'})
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        gates_only = mods.plan(available, ['trap-master'], us, settings={'trap-master': {'traptanium': False}})
+        self.assertEqual([op['profile'] for op in gates_only[0]['operations']],
+                         ['profiles/patches/trap-team-us-01.01-element-gates.experimental.json'])
+
     def test_adventure_pack_mod_carries_both_recipes(self):
         available = mods.discover(ROOT)
         self.assertNotIn('replay-expansion-intros', available)
         profiles = [operation['profile'] for operation in available['unlock-expansions']['operations']]
         self.assertEqual(len(profiles), 2)
         self.assertTrue(any('replay-expansion-intros' in name for name in profiles))
+        self.assertEqual(set(available['unlock-expansions']['settings']), {'unlock-adventure-packs', 'replay-introductions'})
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        replay_only = mods.plan(available, ['unlock-expansions'], us, settings={'unlock-expansions': {'unlock-adventure-packs': False}})
+        self.assertEqual([op['profile'] for op in replay_only[0]['operations']],
+                         ['profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json'])
 
     def test_builtin_manifests_parse(self):
         available = mods.discover(ROOT)
         self.assertNotIn('movie-audio', available)  # a fix, not a mod
-        for ident in ('nightmare', 'level-events', 'controller-glyphs', 'element-gates',
-                      'traptanium', 'unlock-expansions'):
+        for ident in ('nightmare', 'level-events', 'controller-glyphs', 'trap-master', 'unlock-expansions'):
             self.assertTrue(available[ident]['builtin'], ident)
         us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
         self.assertTrue(mods.supports(available, 'nightmare', us))
@@ -171,7 +184,8 @@ class ManifestTest(unittest.TestCase):
             status = {row['id']: row for row in launcher_mods.catalogue(ROOT, {'id': 'trap-team'})[0]}
         self.assertEqual(status['nightmare']['status'], 'ready')
         self.assertTrue(status['nightmare']['controlled'])
-        self.assertIsNone(status['element-gates']['controlled'])
+        self.assertIsNone(status['trap-master']['controlled'])
+        self.assertNotIn('element-gates', status)
         with patch.object(launcher_mods, 'build', return_value=('CUSA00000', '01.00', BUILD)):
             self.assertEqual({row['status'] for row in launcher_mods.catalogue(ROOT, {'id': 'x'})[0]}, {'other-build'})
 
