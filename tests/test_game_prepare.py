@@ -165,6 +165,25 @@ class PreparationTests(unittest.TestCase):
         self.assertTrue(any('skylanders-native-host' in args for args in calls))
         self.assertEqual(executable.read_bytes(),before)
 
+    @unittest.skipIf(prepare.WINDOWS,'Linux release layout')
+    def test_linux_release_uses_prebuilt_runtime_and_never_compiles(self):
+        host,renderer=prepare.runtime_paths(self.root)
+        (host.parent/'prebuilt.json').write_text('{"commit": "synthetic"}')
+        (self.root/'native').mkdir(parents=True,exist_ok=True);(self.root/'native/CMakeLists.txt').write_text('# would rebuild')
+        calls=[]
+        def run(argv,**kwargs):
+            calls.append(argv[0]);self.assertNotEqual(argv[0],'cmake')
+            return subprocess.CompletedProcess(argv,0,stdout='ok',stderr='')
+        with patch.object(prepare.subprocess,'run',side_effect=run):self.run_prepare()
+        self.assertIn('ldd',calls)
+
+    @unittest.skipIf(prepare.WINDOWS,'Linux release layout')
+    def test_old_glibc_is_explained(self):
+        host,_=prepare.runtime_paths(self.root);(host.parent/'glibc-required.txt').write_text('GLIBC_2.43\n')
+        missing=f"{host}: /lib/libc.so.6: version `GLIBC_2.43' not found"
+        with patch.object(prepare.subprocess,'run',return_value=subprocess.CompletedProcess(['ldd'],1,stdout=missing,stderr='')):
+            with contextlib.redirect_stderr(io.StringIO()),self.assertRaisesRegex(prepare.PreparationError,'glibc 2.43 or newer'):prepare.check_dependencies(host)
+
     def test_optional_artwork_cache_has_independent_skippable_markers(self):
         self.run_prepare();destination=self.root/'.local/controller-glyphs';destination.mkdir()
         atlas=destination/'menu-atlas.rgba';atlas.write_bytes(b'synthetic cached artwork')

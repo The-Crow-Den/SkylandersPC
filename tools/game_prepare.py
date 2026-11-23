@@ -167,6 +167,12 @@ def runtime_paths(root):
     return (root/'.local/native-gpu-build/skylanders-native-host',root/'out/dependency-build/renderer/libskyrender.so')
 
 
+def prebuilt(root):
+    """Whether this copy came with a built host (every Windows release, and the
+    Linux release archive), so setup checks it instead of compiling."""
+    return WINDOWS or (root/'.local/native-gpu-build/prebuilt.json').is_file()
+
+
 def renderer_root(root):
     """The renderer in this repository (renderer/); older checkouts kept a private copy."""
     return root/'renderer' if (root/'renderer/gpu/CMakeLists.txt').is_file() else root/'.local/skyrender'
@@ -175,7 +181,9 @@ def renderer_root(root):
 def renderer_step(pipeline):
     root = pipeline.root;_,library = runtime_paths(root);source = renderer_root(root)/'gpu'
     def build(key):
-        if not library.is_file() or 'renderer' in pipeline.record['steps']:
+        if prebuilt(root):
+            if not library.is_file():raise PreparationError('Renderer library is missing. Restore the runtime files supplied with this release, then choose Repair.')
+        elif not library.is_file() or 'renderer' in pipeline.record['steps']:
             if not (source/'CMakeLists.txt').is_file():
                 raise PreparationError('Renderer source is missing. Restore the runtime files supplied with this project, then choose Repair.')
             prefix = root/'.local/deps/prefix'
@@ -189,7 +197,10 @@ def renderer_step(pipeline):
         with library.open('rb') as stream:
             if stream.read(4)!=b'\x7fELF':raise PreparationError('Renderer library is missing or invalid')
         return [library]
-    return Step('renderer',lambda:dict(files=source_files(source),values={'source_available':source.exists()}),build,'Checking the graphics runtime…')
+    def inputs():
+        if prebuilt(root):return dict(files=[library] if library.is_file() else [],values={'prebuilt':True})
+        return dict(files=source_files(source),values={'source_available':source.exists()})
+    return Step('renderer',inputs,build,'Checking the graphics runtime…')
 
 
 def portal_source(root):
@@ -220,7 +231,9 @@ def runtime_step(pipeline):
             with host.open('rb') as stream:
                 if stream.read(2)!=b'MZ':raise PreparationError('Native runtime is missing or invalid')
             return [host]
-        if not host.is_file() or 'runtime' in pipeline.record['steps']:
+        if prebuilt(root):
+            if not host.is_file():raise PreparationError('Native runtime is missing. Restore the runtime files supplied with this release, then choose Repair.')
+        elif not host.is_file() or 'runtime' in pipeline.record['steps']:
             if not (root/'native/CMakeLists.txt').is_file():raise PreparationError('Native runtime source is missing. Restore the runtime files, then choose Repair.')
             args = ['cmake','-S',root/'native','-B',build_dir,'-DCMAKE_BUILD_TYPE=RelWithDebInfo',
                 f'-DSKY_RENDERER_ROOT={renderer_root(root)}',f'-DSKY_RENDERER_LIBRARY={library}',
@@ -236,7 +249,7 @@ def runtime_step(pipeline):
         check_dependencies(host)
         return [host]
     def inputs():
-        if WINDOWS:return dict(files=[host] if host.is_file() else [],values={'prebuilt':True})
+        if prebuilt(root):return dict(files=[host] if host.is_file() else [],values={'prebuilt':True})
         portal = portal_source(root)
         portal_files = [portal/p for p in ('src/runtime/cemu_portal.cpp','Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp','Cemu-main/src/Common/unix/FileStream_unix.cpp')] if portal else []
         return dict(files=[*source_files(root/'native'),*source_files(renderer_root(root)/'src'),*portal_files,library],values={'source_available':(root/'native').exists(),'portal':str(portal) if portal else None})
@@ -250,6 +263,10 @@ def check_dependencies(host):
     except OSError as error:raise PreparationError('runtime: The runtime checker is unavailable. Restore the runtime tools, then choose Repair.') from error
     if dependencies.returncode or 'not found' in dependencies.stdout:
         print(dependencies.stdout+dependencies.stderr,file=sys.stderr)
+        if re.search(r'GLIBC_[0-9.]+\' not found',dependencies.stdout+dependencies.stderr):
+            required = host.with_name('glibc-required.txt')
+            needed = required.read_text().strip().replace('GLIBC_','') if required.is_file() else 'a newer version'
+            raise PreparationError(f'runtime: This build needs glibc {needed} or newer, which your Linux system does not have yet. Update your system, or build the game host from source (see the README).')
         raise PreparationError('runtime: A runtime dependency is missing. Restore the runtime files, then choose Repair.')
 
 
