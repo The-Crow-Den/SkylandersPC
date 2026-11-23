@@ -417,12 +417,19 @@ class InstallDialog(QDialog):
 
 class RepairDialog(InstallDialog):
     """Reuse the accepted installer presentation for setup and optional extras."""
-    def __init__(self, owner, optional=()):
+    def __init__(self, owner, optional=(), then_play=False):
         super().__init__(owner)
-        self.setWindowTitle('Repair '+self.game['name'])
+        self.then_play=then_play
+        self.setWindowTitle(('Updating ' if then_play else 'Repair ')+self.game['name'])
         self.show_step(3);self.heading.setText('Checking your game')
         self.staging = owner.root/'.local/game-preparation';self.log_path = self.staging/'setup.log'
         def begin():
             try:self.start_preparation(game_library.resolve_entry(owner.root,game=self.game),optional)
             except (OSError,ValueError) as error:self.preparation_finished(False,str(error))
         QTimer.singleShot(0,begin)
+
+    def preparation_finished(self, success, message):
+        super().preparation_finished(success,message)
+        # Play asked for this: start the game as soon as the host is rebuilt.
+        if success and self.then_play:
+            self.accept();QTimer.singleShot(0,self.owner.launch)

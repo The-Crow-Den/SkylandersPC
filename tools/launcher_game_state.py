@@ -27,10 +27,17 @@ def snapshot(root,game,active=None):
                 if key not in seen:size+=info.st_size;seen.add(key)
     state='Not supported';message='Your files are installed. This game is not supported yet.'
     if game_library.supported(root,entry):
+        rebuild=False
         try:game_prepare.require_ready(root,entry,deep=False);state='Ready';message='Ready to play.'
-        except (OSError,ValueError):state='Needs repair';message='Setup needs attention. Choose Repair to check and finish it.'
+        except (OSError,ValueError) as error:
+            # Updated game host sources (after an update, or a local build) only need the
+            # host rebuilt: Play does that first, with no Repair needed. Game files are untouched.
+            if os.name!='nt' and 'needs runtime.' in str(error):
+                state='Ready';message='Ready to play. The game host is rebuilt first.';rebuild=True
+            else:state='Needs repair';message='Setup needs attention. Choose Repair to check and finish it.'
+    else:rebuild=False
     version='Base '+entry['base_version']+(' · Update '+entry['update_version'] if entry['update_version'] else '')
-    return dict(state=state,message=message,entry=entry,size=size,version=version)
+    return dict(state=state,message=message,entry=entry,size=size,version=version,rebuild=rebuild)
 
 
 def remove(root,game):

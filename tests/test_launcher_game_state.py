@@ -3,7 +3,8 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
-from tools import game_library,launcher_game_state
+import os
+from tools import game_library,game_prepare,launcher_game_state
 from test_game_install import sfo
 
 
@@ -38,3 +39,19 @@ class RemovalTests(unittest.TestCase):
                 launcher_game_state.remove(root,{'id':'title-cusa99999','title_id':'CUSA99999'})
             self.assertEqual(manifest.read_bytes(),before);self.assertTrue(Path(entry['base_path']).is_dir())
             self.assertEqual(len(game_library.entries(root,[])),1)
+
+
+class StaleHostTests(unittest.TestCase):
+    def snapshot(self, error):
+        entry=dict(base_path='',update_path='',base_version='01.00',update_version='01.01')
+        with patch.object(game_library,'resolve_entry',return_value=entry),patch.object(game_library,'supported',return_value=True),\
+             patch.object(game_prepare,'require_ready',side_effect=error),patch.object(os,'name','posix'):
+            return launcher_game_state.snapshot('/x',{'id':'trap-team','name':'Trap Team'})
+
+    def test_changed_game_host_is_rebuilt_by_play_not_repair(self):
+        state=self.snapshot(game_prepare.PreparationError('Game setup needs runtime. Choose Repair in the launcher to finish setup.'))
+        self.assertEqual((state['state'],state['rebuild']),('Ready',True))
+
+    def test_changed_game_files_still_need_repair(self):
+        state=self.snapshot(game_prepare.PreparationError('Game setup needs pack.60-delta. Choose Repair in the launcher to finish setup.'))
+        self.assertEqual((state['state'],state['rebuild']),('Needs repair',False))

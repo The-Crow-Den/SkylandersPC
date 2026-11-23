@@ -553,6 +553,9 @@ def renovated(base):
 
         def launch(self):
             if self.process is not None: return
+            if getattr(self,'game_state',{}).get('rebuild'):
+                # Rebuild the game host (setup reruns only the changed step), then play.
+                self.repair_game(then_play=True);return
 
             universal = self.values()
             self.session_universal = universal
@@ -642,14 +645,14 @@ def renovated(base):
                 extras.addAction(title,lambda checked=False,name=name:self.repair_game(optional=(name,)))
             menu.exec(self.primary.mapToGlobal(self.primary.rect().topRight()))
 
-        def repair_game(self, checked=False, optional=()):
+        def repair_game(self, checked=False, optional=(), then_play=False):
             if self.process:
                 QMessageBox.information(self,'Session active','Stop the game before repairing its setup.');return
             try:
                 from .launcher_install_dialog import RepairDialog
             except ImportError:
                 from launcher_install_dialog import RepairDialog
-            RepairDialog(self,optional).exec()
+            RepairDialog(self,optional,then_play=then_play).exec()
 
         def open_game_folder(self):
             try:
