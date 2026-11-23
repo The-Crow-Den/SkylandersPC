@@ -556,6 +556,13 @@ def renovated(base):
             if getattr(self,'game_state',{}).get('rebuild'):
                 # Rebuild the game host (setup reruns only the changed step), then play.
                 self.repair_game(then_play=True);return
+            try:
+                from . import launcher_menu_tip as menu_tip
+            except ImportError:
+                import launcher_menu_tip as menu_tip
+            if not menu_tip.seen(self.root):
+                # Once, before the first game: how to reach the PC menu with a controller.
+                menu_tip.MenuTipDialog(self).exec();menu_tip.mark(self.root)
 
             universal = self.values()
             self.session_universal = universal

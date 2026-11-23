@@ -27,6 +27,7 @@ class LauncherUITests(unittest.TestCase):
 
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory();self.root=Path(self.temporary.name)
+        from tools import launcher_menu_tip;launcher_menu_tip.mark(self.root)  # the one-time card is modal
         # Library behaviour is shared by every game; open them all here.
         from tools import launcher_library
         everything=type('Everything',(),{'__contains__':lambda self,item:True})()
