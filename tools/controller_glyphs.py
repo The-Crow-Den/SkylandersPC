@@ -373,6 +373,26 @@ def title_recipe(source,profile,mode):
     return _write_blocks(profile,blocks)
 
 
+def game_faces(source_root,profile_path):
+    """The game's own PlayStation face buttons (cross, circle, square, triangle) as
+    84x84 RGBA, read from the verified font, for menus drawn outside the game."""
+    profile=json.loads(Path(profile_path).read_text())
+    relative=Path(profile['asset'])
+    if relative.is_absolute() or '..' in relative.parts:raise ValueError('invalid glyph asset path')
+    source=Path(source_root)/relative
+    if source.is_symlink() or source.resolve()!=source:raise ValueError('redirected glyph source')
+    blocks=_read_blocks(source.read_bytes(),profile);faces=[]
+    for index in (0,2,1,3):
+        _,left,top,width,height=CELLS[index];inside=disc(width,height);pixels=bytearray()
+        for y in range(height):
+            for x in range(width):
+                at=profile['texture_offset']+tiled_offset(left+x,top+y);base=at//32768*32768
+                if base not in blocks:raise ValueError('glyph exceeds verified font blocks')
+                _,plain,_=blocks[base];pixels+=plain[at-base:at-base+3]+(b'\xff' if inside[y][x] else b'\0')
+        faces.append(bytes(pixels))
+    return faces
+
+
 def build_profile(source_root,profile_path,mode,executable_sha256):
     profile=json.loads(Path(profile_path).read_text())
     if profile['executable_sha256']!=executable_sha256:raise ValueError('controller glyphs require the verified executable')

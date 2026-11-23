@@ -111,9 +111,27 @@ def letter(mode,index,width,height):
     return _read(f'{mode}-{index}.alpha',width,height,1)
 
 
-def atlas_path():
-    """The menu atlas with the Xbox face buttons (top-left 4 x 64 px cells) restyled."""
+def _place(pixels,art,size,cell):
+    """Area-resample a size x size RGBA image into a 64 x 64 atlas cell (8 x 4 grid)."""
+    out=bytearray(pixels);x0,y0=cell%8*64,cell//8*64;scale=size/64
+    for y in range(64):
+        for x in range(64):
+            total=[0.0]*4;count=0
+            for sy in range(int(y*scale),max(int(y*scale)+1,int((y+1)*scale))):
+                for sx in range(int(x*scale),max(int(x*scale)+1,int((x+1)*scale))):
+                    i=(sy*size+sx)*4;a=art[i+3]/255;count+=1
+                    for c in range(3):total[c]+=art[i+c]*a
+                    total[3]+=a
+            j=((y0+y)*512+x0+x)*4;alpha=total[3]/count
+            out[j:j+4]=bytes([round(total[c]/total[3]) if total[3] else 0 for c in range(3)]+[round(alpha*255)])
+    return bytes(out)
+
+
+def atlas_path(playstation=None):
+    """The menu atlas with the Xbox buttons restyled. playstation: the game's own
+    face buttons (84 x 84 RGBA each), used instead of the imported PlayStation art."""
     pixels=_read('menu-atlas.rgba',512,256,4)
+    for cell,art in enumerate(playstation or ()):pixels=_place(pixels,art,84,20+cell)
     for cell in range(4):pixels=dark_button(pixels,512,256,(cell*64,0,cell*64+64,64))
     for cell in (6,7):pixels=lift_black(pixels,512,256,(cell*64,0,cell*64+64,64))  # RT, LT
     for cell in (4,5):pixels=dark_shape(pixels,512,256,(cell*64,0,cell*64+64,64))  # LS, RS

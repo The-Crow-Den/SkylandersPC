@@ -674,7 +674,10 @@ def run(argv,sessions):
         env.update(SKY_TROPHY_STORE=trophy_metadata['store'],SKY_TROPHY_CATALOGUES=trophy_metadata['catalogues'],SKY_TROPHY_ICONS=trophy_metadata['icons'])
     env.pop('SKY_CONTROLLER_GLYPH_ATLAS',None)
     if controller_art.available():
-        env['SKY_CONTROLLER_GLYPH_ATLAS']=str(controller_art.atlas_path())
+        # PlayStation buttons in the PC menu are the game's own, read from its font.
+        try:faces=controller_glyphs.game_faces(original_game,ROOT/'profiles/patches/trap-team-us-01.01-controller-glyphs.json')
+        except (OSError,ValueError,KeyError,lzma.LZMAError):faces=None
+        env['SKY_CONTROLLER_GLYPH_ATLAS']=str(controller_art.atlas_path(faces))
     glyph_metadata['artwork_provider']='Steam client' if controller_art.available() else 'original game'
 
     if selected_save is not None:
