@@ -28,7 +28,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed git cmake ninja python python-cryptography python-pillow \
             sdl3 fmt boost robin-map zydis miniz spirv-headers vulkan-headers vulkan-icd-loader \
-            glslang xxhash ffmpeg libx11 libusb openssl glm patchelf
+            glslang xxhash ffmpeg libx11 libusb openssl glm
       - uses: actions/checkout@v7
         with:
           submodules: recursive
@@ -64,47 +64,27 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 tools/release_audit.py
           python3 tools/release_audit.py --tracked
-      - name: Linux runtime bundle (prebuilt host, renderer and their libraries)
-        # Players don't compile: the host and renderer ship with every library
-        # they load except the system's own (glibc, graphics drivers, audio and
-        # display servers), found through relative RUNPATHs.
+
+  # The Linux release runtime is built on Ubuntu 22.04 so it runs on glibc 2.35
+  # and newer (Ubuntu 22.04+, Debian 12, Fedora, Arch, SteamOS); see the script.
+  linux-runtime:
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    steps:
+      - name: Git for checkout
+        run: apt-get update -qq && apt-get install -y -qq git ca-certificates
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: out/ubuntu-deps
+          key: ubuntu-deps-${{ hashFiles('tools/linux-release/build-ubuntu.sh') }}
+      - name: Build and bundle
         run: |
-          dist=out/linux-runtime
-          host_dir="$dist/.local/native-gpu-build"; renderer_dir="$dist/out/dependency-build/renderer"
-          mkdir -p "$host_dir/lib" "$renderer_dir"
-          cp .local/native-gpu-build/skylanders-native-host "$host_dir/"
-          cp .local/renderer-build/libskyrender.so "$renderer_dir/"
-          system='^(ld-linux|libc|libm|libdl|libpthread|librt|libresolv|libutil|libvulkan|libGL|libEGL|libGLX|libGLdispatch|libdrm|libgbm|libX|libxcb|libwayland|libasound|libpulse|libpipewire|libdbus|libudev|libsystemd)[.-]'
-          for binary in "$host_dir/skylanders-native-host" "$renderer_dir/libskyrender.so"; do
-            ldd "$binary" | awk '$3 ~ /^\// {print $3}'
-          done | sort -u | while read -r lib; do
-            name=$(basename "$lib")
-            if echo "$name" | grep -Eq "$system"; then continue; fi
-            cp -L "$lib" "$host_dir/lib/$name"; echo "$lib" >> "$RUNNER_TEMP/bundled.txt"
-          done
-          patchelf --set-rpath '$ORIGIN/lib:$ORIGIN/../../out/dependency-build/renderer' "$host_dir/skylanders-native-host"
-          patchelf --set-rpath '$ORIGIN/../../../.local/native-gpu-build/lib' "$renderer_dir/libskyrender.so"
-          for lib in "$host_dir"/lib/*.so*; do patchelf --set-rpath '$ORIGIN' "$lib"; done
-          printf '{"commit": "%s"}\n' "$GITHUB_SHA" > "$host_dir/prebuilt.json"
-          # Nothing may resolve from the build tree, and the newest glibc needed is recorded.
-          env -i PATH=/usr/bin ldd "$host_dir/skylanders-native-host" | tee "$RUNNER_TEMP/ldd.txt"
-          if grep -q 'not found\|native-gpu-build/\.\.\|renderer-build' "$RUNNER_TEMP/ldd.txt"; then echo 'unresolved or build-tree library'; exit 1; fi
-          glibc=$( { objdump -T "$host_dir/skylanders-native-host" "$renderer_dir/libskyrender.so" "$host_dir"/lib/*.so* 2>/dev/null; } | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
-          echo "Needs $glibc or newer"; echo "$glibc" > "$host_dir/glibc-required.txt"
-          # License inventory: owning Arch package, version and license of each bundled library.
-          mkdir -p "$dist/LICENSES/arch"
-          {
-            echo '['; first=1
-            while read -r lib; do
-              owner=$(pacman -Qoq "$lib")
-              version=$(pacman -Q "$owner" | awk '{print $2}'); license=$(pacman -Qi "$owner" | sed -n 's/^Licenses *: //p'); url=$(pacman -Qi "$owner" | sed -n 's/^URL *: //p')
-              [ -d "/usr/share/licenses/$owner" ] && cp -r "/usr/share/licenses/$owner" "$dist/LICENSES/arch/" || true
-              [ $first = 1 ] || echo ','; first=0
-              printf '{"file": ".local/native-gpu-build/lib/%s", "package": "%s", "version": "%s", "license": "%s", "source": "%s"}' "$(basename "$lib")" "$owner" "$version" "$license" "$url"
-            done < "$RUNNER_TEMP/bundled.txt"
-            echo; echo ']'
-          } > "$dist/LICENSES/arch-runtime.json"
-          ls -la "$host_dir/lib"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          tools/linux-release/build-ubuntu.sh
       - uses: actions/upload-artifact@v5
         with:
           name: SkylandersPC-linux-runtime
@@ -288,7 +268,7 @@ jobs:
   # pinned header-only dependencies, as one archive.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [native, windows-renderer, appimage]
+    needs: [native, linux-runtime, windows-renderer, appimage]
     runs-on: ubuntu-latest
     permissions:
       contents: write

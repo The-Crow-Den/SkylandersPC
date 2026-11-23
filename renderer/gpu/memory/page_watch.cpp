@@ -12,6 +12,14 @@
 #ifndef _WIN32
 #include <fcntl.h>
 #include <linux/userfaultfd.h>
+// Older kernel headers (Ubuntu 22.04, the Steam Deck build) lack these. Values are the
+// kernel's uapi bits; an older running kernel rejects UFFDIO_API and page protection is used.
+#ifndef UFFD_FEATURE_WP_HUGETLBFS_SHMEM
+#define UFFD_FEATURE_WP_HUGETLBFS_SHMEM (1 << 12)
+#endif
+#ifndef UFFD_FEATURE_WP_UNPOPULATED
+#define UFFD_FEATURE_WP_UNPOPULATED (1 << 13)
+#endif
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>

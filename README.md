@@ -55,8 +55,32 @@ Builds are published on the [Releases](https://github.com/The-Crow-Den/Skylander
 page, each with patch notes ([RELEASE_NOTES.md](RELEASE_NOTES.md) for the coming
 0.1.0 beta). GitHub builds both: Windows gets a ready-to-run bundle, and Linux an
 archive with the game host already built (extract it and run
-`SkylandersPC.AppImage`). The prebuilt Linux host needs a recent glibc; on older
-systems, build from source (below).
+`SkylandersPC.AppImage`). It runs on Linux systems from Ubuntu 22.04 onwards,
+including Debian 12, Fedora, Arch and SteamOS on the Steam Deck.
+
+### Playing without the launcher
+
+The launcher is only needed to install a game and change settings. To start a
+game straight away with the settings, mods and portal you last chose, use
+`--play`, for example as a desktop shortcut or a non-Steam game in Steam:
+
+```sh
+SkylandersPC.exe --play            # Windows
+./SkylandersPC.AppImage --play     # Linux
+python3 tools/play.py              # source checkout
+```
+
+### Where your data is kept
+
+Saves, save backups, trophies, figures and settings are kept per user, outside
+the install folder, so a new release or a reinstall never touches them:
+
+- Linux: `~/.local/share/SkylandersPC`
+- Windows: `Saved Games\SkylandersPC` in your user folder
+
+Back up that folder to keep your progress. Data from older versions (inside the
+install folder, or in `skylanders-pc`) is copied there once, checked, and the old
+copy is left where it was.
 
 ## Features
 

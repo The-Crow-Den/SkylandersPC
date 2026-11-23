@@ -11,7 +11,7 @@ from your own PS4 package files. Expect rough edges and please report them.
 | File | For |
 | --- | --- |
 | `SkylandersPC-v0.1.0-windows.zip` | Windows 10/11, x86-64. Unzip and run `SkylandersPC.exe`; no Python or other install needed. |
-| `SkylandersPC-v0.1.0-linux.tar.gz` | Linux. Extract it and run `SkylandersPC.AppImage`; the game host is already built. Needs a recent system (the glibc version is listed in `.local/native-gpu-build/glibc-required.txt`). |
+| `SkylandersPC-v0.1.0-linux.tar.gz` | Linux (Ubuntu 22.04 or newer, Debian 12, Fedora, Arch, SteamOS). Extract it and run `SkylandersPC.AppImage`; the game host is already built. |
 | `Skylanders-Launcher-x86_64.AppImage` | Linux, for source checkouts: the launcher's Python runtime only. |
 | `SkylandersPC-v0.1.0-source.tar.gz` | Complete corresponding source for these binaries. |
 | `SHA256SUMS` | Checksums for every file above. |
@@ -22,6 +22,10 @@ You need a GPU with Vulkan 1.3.
 
 - **Install from PKG**: choose the game and update packages; the launcher unpacks,
   verifies and prepares them, and cleans up after itself.
+- **Play without the launcher**: `--play` starts the game with your saved
+  settings, for a desktop shortcut or a non-Steam game in Steam.
+- **Your data in one place**: saves, trophies, figures and settings live in
+  `~/.local/share/SkylandersPC` (Linux) or `Saved Games\SkylandersPC` (Windows).
 - **Virtual portal**: place Skylanders, swappers, traps and magic items from
   figure files, create new figures and capture villains from the in-game PC menu
   (F6, Insert or L3+R3), with the game's own portraits. Mixed swappers get their
@@ -56,8 +60,6 @@ You need a GPU with Vulkan 1.3.
 - With the gate mod, a swapper opens gates matching its bottom half; the top half
   has not been checked.
 - Only Trap Team is playable. Swap Force, SuperChargers and Imaginators are not yet.
-- The prebuilt Linux host needs a recent glibc. On older systems (Ubuntu 24.04,
-  Fedora 42, SteamOS) build it from source for now.
 
 ### Reporting problems
 
