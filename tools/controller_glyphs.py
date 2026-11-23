@@ -136,7 +136,7 @@ FITTED=(4,5,8,9)
 # View (touchpad) and Menu (Options pill with its OPTIONS label) become round
 # buttons like Xbox's and Nintendo's; everything else in those cells is keyed out.
 ROUND=(8,9)
-ROUND_FILL=(33,32,33)
+ROUND_FILL=(14,20,27)  # controller_art.BUTTON, so every button shares one colour
 
 
 def disc(width,height):
