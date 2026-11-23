@@ -76,7 +76,7 @@ cmake_dep() {  # name [cmake options]
   local name=$1; shift
   done_mark "$name" && return
   local dir; dir=$(src "$name")
-  cmake -S "$dir" -B "$BUILD/dep-$name" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS" \
+  cmake -S "$dir" -B "$BUILD/dep-$name" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS" -DCMAKE_PREFIX_PATH="$DEPS" \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON "$@"
   cmake --build "$BUILD/dep-$name" -j "$JOBS"; cmake --install "$BUILD/dep-$name"
   mark "$name"
@@ -85,7 +85,10 @@ cmake_dep() {  # name [cmake options]
 cmake_dep sdl3 -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
 cmake_dep fmt -DFMT_TEST=OFF -DFMT_DOC=OFF -DBUILD_SHARED_LIBS=ON
 cmake_dep glslang -DENABLE_OPT=OFF -DGLSLANG_TESTS=OFF -DBUILD_EXTERNAL=OFF -DENABLE_SPVREMAPPER=OFF
-# Zydis builds its pinned Zycore from its own dependencies/ folder.
+# Zydis builds its pinned Zycore from its own dependencies/ folder (its system-Zycore
+# option links the wrong target name), but its installed zydis-config.cmake still looks
+# Zycore up, so the same Zycore is installed on its own first.
+cmake_dep zycore -DZYCORE_BUILD_SHARED_LIB=OFF
 if ! done_mark zydis; then
   zycore=$(src zycore); zydis=$(src zydis)
   rm -rf "$zydis/dependencies/zycore"; mkdir -p "$zydis/dependencies"; cp -a "$zycore" "$zydis/dependencies/zycore"

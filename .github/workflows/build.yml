@@ -270,6 +270,7 @@ jobs:
   # corresponding source it was built from: this commit, its submodules and the
   # pinned header-only dependencies, as one archive.
   release:
+    name: Official release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [native, linux-runtime, windows-renderer, appimage]
     runs-on: ubuntu-latest
@@ -307,7 +308,7 @@ jobs:
       - uses: actions/download-artifact@v5
         with:
           path: out/artifacts
-      - name: Draft release
+      - name: Create the official release (draft until published)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -322,5 +323,5 @@ jobs:
           tar -C "$RUNNER_TEMP" -czf "out/release/SkylandersPC-${GITHUB_REF_NAME}-linux.tar.gz" SkylandersPC-linux
           (cd out/release && sha256sum * > SHA256SUMS)
           gh release create "$GITHUB_REF_NAME" out/release/* --draft --verify-tag \
-            --title "SkylandersPC $GITHUB_REF_NAME" \
+            --title "SkylandersPC ${GITHUB_REF_NAME#v} Beta - Official Release" \
             --notes-file RELEASE_NOTES.md
