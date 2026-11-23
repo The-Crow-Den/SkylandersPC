@@ -39,8 +39,13 @@
   const isTop=item=>item?.detail==='Swapper top half';
   const halves=slot=>{const list=collection(slot);return {main:list.find(item=>(item.state&6)===2),bottom:list.find(item=>(item.state&4)!==0)};};
   const halfName=name=>name.replace(/ \((Top|Bottom)\)$/,'');
+  // A mixed swapper takes the first word of its top and the second of its bottom, as the
+  // game names it: Wash Buckler on top of Free Ranger is Wash Ranger.
+  const SWAPPERS=['Blast Zone','Boom Jet','Doom Stone','Fire Kraken','Free Ranger','Freeze Blade','Grilla Drilla','Hoot Loop','Magna Charge','Night Shift','Rattle Shake','Rubble Rouser','Spy Rise','Stink Bomb','Trap Shadow','Wash Buckler'];
+  const swapperName=(top,bottom)=>{const a=halfName(top),b=halfName(bottom);const base=name=>SWAPPERS.find(entry=>name===entry||name.endsWith(' '+entry));
+    const t=base(a),u=base(b);if(!t||!u)return a+' + '+b;if(t===u)return a;return t.split(' ')[0]+' '+u.split(' ')[1];};
   const slotLabel=slot=>{if(slot!==0&&slot!==3)return selected(slot)?.name;const {main,bottom}=halves(slot);
-    if(bottom)return (isTop(main)?halfName(main.name):'?')+' + '+halfName(bottom.name);return isTop(main)?halfName(main.name)+' + ?':main?.name;};
+    if(bottom)return isTop(main)?swapperName(main.name,bottom.name):'? + '+halfName(bottom.name);return isTop(main)?halfName(main.name)+' + ?':main?.name;};
   const send=(verb,...args)=>bridge?.command([verb,...args].join(' '));
   // A figure without a picture gets a lettered tile instead of a blank card.
   function placeholder(name){const tile=document.createElement('span');tile.className='placeholder';tile.setAttribute('aria-hidden','true');
@@ -95,7 +100,7 @@
     for(const name of names.slice(0,10)){
       // A swapper combination is saved as "Top half name + Bottom half name".
       const parts=name.split(' + ').map(part=>list.find(entry=>entry.name===part));if(parts.some(part=>!part)||parts.length>2)continue;
-      const item=parts[0];const shown=parts.length===2?parts.map(part=>halfName(part.name)).join(' + '):name;
+      const item=parts[0];const shown=parts.length===2?swapperName(parts[0].name,parts[1].name):name;
       const chip=button('quick-figure',(favourites.includes(name)?'Favourite: ':'Recent: ')+'place '+shown+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(parts.every(part=>part.state&2)));
       chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=(favourites.includes(name)?'★ ':'')+shown;chip.append(label);
       chip.onclick=()=>parts.length===2?placeCombo(category,parts):place(category,item);row.append(chip);
@@ -115,7 +120,7 @@
     // A full swapper (top and bottom) is favourited as that combination.
     const combo=player&&isTop(main)&&bottom;const key=combo?main.name+' + '+bottom.name:item.name;
     const on=prefList('favourites',category).includes(key);
-    const shown=combo?halfName(main.name)+' + '+halfName(bottom.name):item.detail?.startsWith('Swapper ')?halfName(item.name):item.name;
+    const shown=combo?swapperName(main.name,bottom.name):item.detail?.startsWith('Swapper ')?halfName(item.name):item.name;
     node.textContent=(on?'★ Unfavourite ':'☆ Favourite ')+shown;node.title=shown;
     node.setAttribute('aria-label',(on?'Unfavourite ':'Favourite ')+node.title);
     node.onclick=()=>bridge?.toggleFavourite(category,key,applyPrefs);

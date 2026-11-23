@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-#trap-rail-demo { --rail-open:190px; --portal-width:390px; --ink:#f5f5f7; --quiet:#a9a9b1; --panel:#171719; --line:#343438; --accent:#98dfef; font-family:Inter,"Noto Sans",Arial,sans-serif; color:var(--ink); }
+#trap-rail-demo { --rail-open:226px; --portal-width:390px; --ink:#f5f5f7; --quiet:#a9a9b1; --panel:#171719; --line:#343438; --accent:#98dfef; font-family:Inter,"Noto Sans",Arial,sans-serif; color:var(--ink); }
 #trap-rail-demo * { box-sizing:border-box; }
 #trap-rail-demo button, #trap-rail-demo input, #trap-rail-demo select { font:inherit; }
 #trap-rail-demo button { color:inherit; }
