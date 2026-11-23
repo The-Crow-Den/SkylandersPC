@@ -55,11 +55,42 @@ def dark_button(pixels,width,height,box=None):
     return bytes(out)
 
 
+def dark_shape(pixels,width,height,box=None):
+    """A white button with dark lettering becomes a dark button with white lettering."""
+    x0,y0,x1,y1=box or (0,0,width,height);out=bytearray(pixels)
+    for y in range(y0,y1):
+        for x in range(x0,x1):
+            i=(y*width+x)*4
+            if not out[i+3]:continue
+            white=sum(out[i:i+3])/765
+            out[i:i+3]=bytes(round(BUTTON[c]*white+255*(1-white)) for c in range(3))
+    return bytes(out)
+
+
+def on_disc(pixels,width,height,box=None):
+    """Light line art (View, Menu) on a dark disc, like the Nintendo - and + buttons."""
+    x0,y0,x1,y1=box or (0,0,width,height);out=bytearray(pixels)
+    cx,cy=(x0+x1)/2,(y0+y1)/2;radius=min(x1-x0,y1-y0)/2-1
+    for y in range(y0,y1):
+        for x in range(x0,x1):
+            i=(y*width+x)*4;distance=((x+.5-cx)**2+(y+.5-cy)**2)**.5
+            cover=max(0.0,min(1.0,radius-distance+.5))
+            if not cover:out[i:i+4]=bytes(4);continue
+            # shrink the art toward the centre so it sits inside the disc
+            sx=round(cx+(x+.5-cx)/.62-.5);sy=round(cy+(y+.5-cy)/.62-.5)
+            alpha=0.0;art=bytes(3)
+            if x0<=sx<x1 and y0<=sy<y1:
+                j=(sy*width+sx)*4;alpha=pixels[j+3]/255;art=pixels[j:j+3]
+            out[i:i+3]=bytes(round(BUTTON[c]*(1-alpha)+art[c]*alpha) for c in range(3));out[i+3]=round(255*cover)
+    return bytes(out)
+
+
 def glyph(mode,index,width,height):
     if mode not in ('xbox','nintendo') or type(index) is not int or not 0<=index<10:
         raise ValueError('invalid controller art selection')
     pixels=_read(f'{mode}-{index}.rgba',width,height,4)
-    return dark_button(pixels,width,height) if mode=='xbox' and index<4 else pixels
+    if mode!='xbox':return pixels
+    return dark_button(pixels,width,height) if index<4 else dark_shape(pixels,width,height) if index in (4,5) else pixels
 
 
 def letter(mode,index,width,height):
@@ -72,6 +103,8 @@ def atlas_path():
     """The menu atlas with the Xbox face buttons (top-left 4 x 64 px cells) restyled."""
     pixels=_read('menu-atlas.rgba',512,256,4)
     for cell in range(4):pixels=dark_button(pixels,512,256,(cell*64,0,cell*64+64,64))
+    for cell in (4,5):pixels=dark_shape(pixels,512,256,(cell*64,0,cell*64+64,64))  # LS, RS
+    for cell in range(2):pixels=on_disc(pixels,512,256,(cell*64,64,cell*64+64,128))  # View, Menu
     styled=ROOT/'menu-atlas-styled.rgba';data=struct.pack('<II',512,256)+pixels
     if styled.is_symlink():raise ValueError('redirected controller artwork')
     if not styled.is_file() or styled.read_bytes()!=data:
