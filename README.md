@@ -38,8 +38,9 @@ Click **Install** and follow the steps: choose your game file, add an update
 or skip it, then click **Install game**. The launcher unpacks both into the **Games** folder
 and uses the newest installed update automatically. **Open games folder** opens
 that folder in your file manager. Existing installations stay where they are.
-After installing a supported game, setup runs automatically. If it needs
-attention, choose **Repair game setup** from the game’s menu. Controller artwork
+After installing a supported game, setup runs automatically. When an update
+changes the game host, **Play** rebuilds it before starting. If the game files
+themselves need attention, choose **Repair game setup** from the game’s menu. Controller artwork
 and portrait downloads are optional extras; they never block setup.
 When a newer release is published, an **Update available** button appears at the
 top of the library. In a git checkout it updates with a fast-forward pull (rebuild
@@ -57,17 +58,27 @@ from source (below) and use the launcher AppImage or `python3 tools/launcher.py`
 
 ## Features
 
-- **Virtual portal**: place Skylanders, traps and magic items from figure
-  dumps, create new figures, and capture villains, all from the in-game PC menu
-  (F6, Insert or L3+R3), which works with a controller.
+- **Virtual portal**: place Skylanders, swappers, traps and magic items from
+  figure files, mix swapper halves (named the way the game does, such as Wash
+  Ranger), keep favourites, create new figures and capture villains, all from
+  the in-game PC menu (F6, Insert or L3+R3), which works with a controller.
+- **Physical portals (experimental)**: PS3, PS4, Wii and Wii U portals are
+  passed to the game; *Automatic* uses one when it is plugged in.
 - **PC settings**: internal resolution up to 2160p (the game renders natively
-  at it), shadow quality, fullscreen, a 30 or 60 FPS cap or an automatic mode
-  that keeps cutscenes at 30 and gameplay at 60, and PlayStation, Xbox or
-  Nintendo button icons in the game's own prompts.
-- **Optional tweaks** (Trap Team US 01.01): elemental gates and Traptanium without a Trap Master,
-  adventure packs available in the Academy, and Nightmare mode unlocked.
-- **Launcher**: game installation from PKG files, figure management, trophies
-  and per-game settings.
+  at it), aspect ratios up to 32:9, shadow quality (High by default),
+  fullscreen, and a 30 or 60 FPS cap or an automatic mode that keeps cutscenes
+  at 30 and gameplay at 60.
+- **Controller prompts**: Xbox or Nintendo buttons in the game's own prompts,
+  including the animated ones, chosen automatically for the controller in use.
+  PlayStation controllers keep the game's original prompts.
+- **Skylanders Manager**: the collection in the launcher, with level, XP, gold
+  and nicknames you can edit and a backup before every change.
+- **Optional mods** (Trap Team US 01.01), each with its own switches: *No Trap
+  Master required* (elemental gates, Traptanium), *Unlock adventure packs*
+  (pack access, replayable introductions), *Skip cutscenes*, and Nightmare
+  unlocked from the start.
+- **Launcher**: game installation from PKG files, saves with automatic
+  snapshots, trophies, storage management and per-game settings.
 
 ## Building from source
 

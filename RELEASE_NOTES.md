@@ -23,20 +23,25 @@ You need a GPU with Vulkan 1.3.
   verifies and prepares them, and cleans up after itself.
 - **Virtual portal**: place Skylanders, swappers, traps and magic items from
   figure files, create new figures and capture villains from the in-game PC menu
-  (F6, Insert or L3+R3), with the game's own portraits.
+  (F6, Insert or L3+R3), with the game's own portraits. Mixed swappers get their
+  in-game names (Wash Ranger), and favourites include swapper combinations.
 - **Skylanders Manager**: your collection in one place; edit level, XP, gold and
   nicknames, with a backup before every change. Swappers are one figure each.
 - **Physical portals (experimental)**: PS3/PS4/Wii/Wii U portals are passed to the
   game. *Automatic* uses one when it is plugged in.
 - **PC settings**: resolution up to 2160p, aspect ratios up to 32:9, shadow
-  quality, anti-aliasing, 30/60 FPS with an automatic mode, game language.
+  quality (High by default), anti-aliasing, 30/60 FPS with an automatic mode,
+  game language.
 - **Controller prompts**: Xbox or Nintendo button icons in the game's prompts,
-  including the animated ones.
-- **Optional mods** (Trap Team US 01.01): elemental gates and Traptanium without
-  a Trap Master, skip cutscenes and logos, Nightmare unlocked, adventure packs.
+  including the animated ones, chosen automatically for the controller in use.
+  PlayStation controllers keep the game's original prompts.
+- **Optional mods** (Trap Team US 01.01), each with its own switches: *No Trap
+  Master required* (elemental gates, Traptanium), *Unlock adventure packs* (pack
+  access, replayable introductions), skip cutscenes and logos, Nightmare unlocked.
 - **Storage**: see what each part uses, cap caches, clear shaders and temporary
   files from Settings.
-- **Updates**: the launcher tells you when a newer release is out.
+- **Updates**: the launcher tells you when a newer release is out, and Play
+  rebuilds the game host after an update instead of asking for Repair.
 - **Trophies and saves** are kept locally, with automatic save snapshots.
 
 ### Known issues
