@@ -8,6 +8,7 @@
 #
 #   Skylanders-Launcher.AppImage [launcher arguments]
 #   Skylanders-Launcher.AppImage --python [python arguments]
+#   Skylanders-Launcher.AppImage --play [game]   (no launcher window)
 set -eu
 here="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
 python="$here/usr/python/bin/python3"
@@ -50,4 +51,9 @@ if [ "${1:-}" = --python ]; then
 fi
 root="$(find_root)"
 cd "$root"
+if [ "${1:-}" = --play ]; then
+    # Straight into a game with the saved settings (tools/play.py), no launcher window.
+    shift
+    exec "$python" "$root/tools/play.py" "$@"
+fi
 exec "$python" "$root/tools/launcher.py" "$@"

@@ -29,7 +29,10 @@ def main():
         args = args[1:]
         if sys.stdout is not None:
             sys.stdout.reconfigure(line_buffering=True)
-    if args and args[0].endswith('.py'):
+    if args and args[0] == '--play':
+        # Straight into a game with the saved settings, no launcher window.
+        script, rest = root / 'tools' / 'play.py', args[1:]
+    elif args and args[0].endswith('.py'):
         script, rest = Path(args[0]).resolve(), args[1:]
     else:
         script, rest = root / 'tools' / 'launcher.py', args
