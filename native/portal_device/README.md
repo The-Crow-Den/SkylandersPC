@@ -63,6 +63,9 @@ covers detection against a fake sysfs and the launcher choice.
 - Hardware confirmation of the USB ids (`lsusb`) and the firmware-id table.
 - Traps and the portal speaker on a real Trap Team portal. Audio is passed
   through, but nobody has listened to it.
+- Xbox portal recordings. Owners can run `python3 tools/portal_report.py --probe`
+  and attach the `portal-report.json` it writes to an issue: USB descriptors
+  and the replies to reset, activate and status, with no figure data.
 - Xbox portals in game. The PS4 game opens `1430:0150`; an Xbox portal has
   a different identity, and presenting it as `0150` would fake it.
 - Mixed mode (a real portal plus virtual figures), hot-plug recovery, and
