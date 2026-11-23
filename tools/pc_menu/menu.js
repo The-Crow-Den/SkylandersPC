@@ -199,7 +199,7 @@
   function initializeSettings(settings){
     if(ui.dirty)return;
     for(const [id,key] of [['trap-demo-res','resolution'],['trap-demo-quality','quality'],['trap-demo-fps','framePolicy'],['trap-demo-pad','layout'],['trap-demo-glyphs','glyphs']])root.querySelector('#'+id).selectedIndex=settings[key]??0;
-    root.querySelector('#trap-demo-fullscreen').checked=!!settings.fullscreen;root.querySelector('#trap-demo-counter').checked=!!settings.counter;root.querySelector('#trap-demo-audio').value=String(settings.volume??50);root.querySelector('[data-volume]').textContent=(settings.volume??50)+'%';
+    root.querySelector('#trap-demo-fullscreen').checked=!!settings.fullscreen;root.querySelector('#trap-demo-counter').checked=!!settings.counter;root.querySelector('#trap-demo-audio').value=String(Math.round((settings.volume??50)/10)*10);showVolume();
   }
   function receive(text){
     let snapshot;try{snapshot=JSON.parse(text);}catch{return;}if(snapshot.version!==1)return;
@@ -306,7 +306,13 @@
   root.querySelectorAll('.settings-panel input,.settings-panel select').forEach(node=>node.addEventListener('change',()=>ui.dirty=true));
   root.querySelector('#trap-demo-glyphs').addEventListener('change',()=>root.querySelector('[data-settings-message]').textContent='Button icons change in the game and this menu after Apply settings and restart.');
   root.querySelector('#trap-demo-fps').onchange=event=>{ui.dirty=true;send('fps',event.target.selectedIndex);};
-  root.querySelector('#trap-demo-audio').oninput=event=>{ui.dirty=true;root.querySelector('[data-volume]').textContent=event.target.value+'%';send('volume',event.target.value);};
+  // Volume is a row of ten bars: click (or press A on) a bar to set 10%–100%; the first bar again turns it off.
+  const volumeSteps=root.querySelector('[data-volume-steps]');const volumeInput=root.querySelector('#trap-demo-audio');
+  function showVolume(){const value=Number(volumeInput.value);root.querySelector('[data-volume]').textContent=value+'%';
+    volumeSteps.querySelectorAll('button').forEach((node,index)=>{const on=(index+1)*10<=value;node.classList.toggle('on',on);node.setAttribute('aria-pressed',String(on));});}
+  for(let level=10;level<=100;level+=10){const node=button('volume-step','Set volume to '+level+'%');
+    node.onclick=()=>{volumeInput.value=String(level===10&&Number(volumeInput.value)===10?0:level);volumeInput.dispatchEvent(new Event('input',{bubbles:true}));};volumeSteps.append(node);}
+  volumeInput.oninput=event=>{ui.dirty=true;showVolume();send('volume',event.target.value);};showVolume();
   root.querySelector('#trap-demo-counter').onchange=event=>send('counter',Number(event.target.checked));
   root.querySelector('[data-apply]').onclick=()=>send('settings',root.querySelector('#trap-demo-res').selectedIndex,root.querySelector('#trap-demo-quality').selectedIndex,Number(root.querySelector('#trap-demo-fullscreen').checked),Number(root.querySelector('#trap-demo-counter').checked),root.querySelector('#trap-demo-pad').selectedIndex,root.querySelector('#trap-demo-glyphs').selectedIndex);
   document.addEventListener('keydown',event=>{

@@ -157,8 +157,31 @@ void update_gamepad(const SDL_Event* event = nullptr) {
     if (keyboard_pad) keyboard_pad->set_physical(state,slot);
     }
 }
+// Held-stick repeat for the PC menu, on SDL's timer thread. Left stick: starts after
+// 350 ms and speeds up from 8 to 20 steps a second; right stick: 25 steps a second after 150 ms.
+struct StickHold { int key = 0; Uint64 since = 0, last = 0; };
+std::array<StickHold, 2> stick_held{};
+SDL_TimerID stick_timer = 0;
+std::mutex stick_mutex;
+Uint32 stick_repeat(void*, SDL_TimerID, Uint32 interval) {
+    std::lock_guard lock(stick_mutex);
+    const auto now = SDL_GetTicks();
+    bool any = false;
+    for (unsigned stick = 0; stick < 2; ++stick) {
+        auto& hold = stick_held[stick];
+        if (!hold.key) continue;
+        any = true;
+        const auto held = now - hold.since;
+        const Uint64 delay = stick ? 150 : 350;
+        const Uint64 every = stick ? 40 : (held > 1500 ? 50 : 120);
+        // The menu closed while the stick was held: its axis events no longer come here.
+        if (held >= delay && now - hold.last >= every) { hold.last = now; if (!sky_pc_menu_gamepad(hold.key)) { stick_held = {}; any = false; break; } }
+    }
+    if (!any) { stick_timer = 0; return 0; }
+    return interval;
+}
 // The web PC menu's extra controller keys (tools/pc_menu/menu.js): B goes back, Start/Select
-// close, LB/RB switch tabs, the left stick moves like the D-pad. D-pad, A and L3+R3 stay with
+// close, LB/RB switch tabs, either stick moves like the D-pad. D-pad, A and L3+R3 stay with
 // the renderer. Consumed here, so the renderer's own "B closes" mapping never sees them.
 bool menu_gamepad(const SDL_Event& event) {
     if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
@@ -170,18 +193,27 @@ bool menu_gamepad(const SDL_Event& event) {
         sky_pc_menu_gamepad(event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? key : -key);
         return true;
     }
-    if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION &&
-        (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTX || event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY)) {
-        // One step per push: press past 20000, release below 12000. SDL window thread only.
-        static std::array<int, 2> held{};
-        const unsigned axis = event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFTY ? 1 : 0;
+    if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && event.gaxis.axis <= SDL_GAMEPAD_AXIS_RIGHTY) {
+        // A push moves one step: past 20000 presses, below 12000 releases. Holding repeats
+        // (see stick_repeat); the right stick repeats much faster, for scrolling long lists.
+        // SDL window thread only.
+        static std::array<int, 4> held{};
+        const unsigned axis = static_cast<unsigned>(event.gaxis.axis);
         const int value = event.gaxis.value;
         int direction = held[axis];
         if (!direction && std::abs(value) > 20000) direction = value > 0 ? 1 : -1;
         else if (direction && std::abs(value) < 12000) direction = 0;
         if (direction != held[axis]) {
             held[axis] = direction;
-            if (direction) sky_pc_menu_gamepad(axis ? (direction > 0 ? 2 : 1) : (direction > 0 ? 4 : 3));
+            const bool vertical = axis & 1;
+            const int key = direction ? (vertical ? (direction > 0 ? 2 : 1) : (direction > 0 ? 4 : 3)) : 0;
+            if (key) sky_pc_menu_gamepad(key);
+            const unsigned stick = axis >> 1;
+            std::lock_guard lock(stick_mutex);
+            if (key) stick_held[stick] = {key, SDL_GetTicks(), SDL_GetTicks()};
+            else if (!held[stick * 2] && !held[stick * 2 + 1]) stick_held[stick] = {};
+            else stick_held[stick] = {held[stick*2+1] ? (held[stick*2+1] > 0 ? 2 : 1) : (held[stick*2] > 0 ? 4 : 3), SDL_GetTicks(), SDL_GetTicks()};
+            if (!stick_timer) stick_timer = SDL_AddTimer(16, stick_repeat, nullptr);
         }
         return true;
     }
