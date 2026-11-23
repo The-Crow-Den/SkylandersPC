@@ -28,13 +28,22 @@ def fnv1a64(data):
     return value
 
 
+def later_game(identity):
+    """The later game a figure belongs to, when Trap Team cannot use it; otherwise None."""
+    if 601 <= identity <= 631:return 'Imaginators'
+    if 3200 <= identity <= 3204 or 3300 <= identity <= 3303 or 3400 <= identity <= 3428 or 3500 <= identity <= 3503:
+        return 'SuperChargers'
+    return None
+
+
 def creatable(identity, variant):
     """Characters, swapper halves and items the native portal can place (see portal_library_adapter.cpp)."""
     character = (identity <= 32 or 100 <= identity <= 115 or identity in (404, 416, 419, 430) or
                  450 <= identity <= 485 or 502 <= identity <= 543 or 3000 <= identity <= 3015 or
                  figure_data.swapper_half(identity) is not None)
     # SuperChargers vehicles keep their deco variants (0x44xx), as on real figures.
-    return (character or figure_data.kind(identity) == 'item') and variant < 0x4000 or figure_data.kind(identity) == 'vehicle'
+    return ((character or figure_data.kind(identity) == 'item') and variant < 0x4000 or figure_data.kind(identity) == 'vehicle' or
+            later_game(identity) is not None and variant < 0x4000)  # kept for later games; hidden in Trap Team's portal
 
 
 def source_root(root):
@@ -119,7 +128,9 @@ class Collection:
         return sorted(found.values(), key=lambda e: (e.figure.kind != 'character', e.name.lower(), e.path.name))
 
     def choices(self):
-        return sorted(((name, i, v) for (i, v), name in self.names.items() if creatable(i, v)), key=lambda c: c[0].lower())
+        # Later games' figures say which game they are for.
+        return sorted(((name + (f' ({later_game(i)})' if later_game(i) else ''), i, v) for (i, v), name in self.names.items()
+                       if creatable(i, v)), key=lambda c: c[0].lower())
 
     def _publish(self, data, prefix='created-'):
         self.characters.mkdir(parents=True, exist_ok=True)

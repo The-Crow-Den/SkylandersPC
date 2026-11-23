@@ -56,6 +56,9 @@ void add_character(const fs::path& path) {
     if(!read_figure(path,bytes))return;
     const auto id=word(bytes,0x10),variant=word(bytes,0x1c);
     if(id>=210 && id<=220)return;
+    // Figures from later games (Imaginators, SuperChargers drivers, items and trophies) are
+    // kept in the collection for those games but never offered on Trap Team's portal.
+    if((id>=601 && id<=631) || (id>=3200 && id<=3204) || (id>=3300 && id<=3303) || (id>=3400 && id<=3428) || (id>=3500 && id<=3503))return;
     (VirtualPortal::is_vehicle(id)?vehicles:is_item(id)?items:characters).push_back({path,VirtualPortal::figure_name(id,variant),id,variant});
 }
 // Mirrors the virtual portal's start-up placement of SKY_PORTAL_FIGURE and
