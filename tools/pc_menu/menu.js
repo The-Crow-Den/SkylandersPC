@@ -30,7 +30,7 @@
     root.append(node);const height=Math.min(node.scrollHeight,260);node.style.top=(rect.bottom+height<innerHeight-12?rect.bottom+4:Math.max(12,rect.top-height-4))+'px';
     selectPopup={node,select,index:select.selectedIndex};moveSelect(0);
   }
-  const search=root.querySelector('[data-search]');const message=root.querySelector('[data-message]');
+  const search=root.querySelector('[data-search]');
   const icon=()=>window.lucide?.createIcons({attrs:{width:18,height:18}});
   const collection=kind=>ui.snapshot?.collections?.[String(kind)]||[];
   const selected=kind=>collection(kind).find(item=>(item.state&2)!==0);
@@ -95,6 +95,11 @@
     }
     if(!captures.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Captured villains appear here after an in-game capture.';grid.append(empty);}
   }
+  const checkMark=card=>{const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);};
+  // A figure on the portal for the other player can't be placed twice: show whose it is.
+  const otherPlayer=item=>{if(ui.slot!==0&&ui.slot!==3)return null;const other=ui.slot===3?0:3;if(other===3&&!ui.coop)return null;
+    const entry=collection(other)[item.index];return entry&&(entry.state&2||entry.state&4)?slotNames[other]:null;};
+  const takenBy=(card,owner)=>{card.disabled=true;card.classList.add('taken');const tag=document.createElement('span');tag.className='taken-by';tag.textContent=owner;card.append(tag);card.setAttribute('aria-label',card.getAttribute('aria-label')+' (on the portal for '+owner+')');};
   // Favourites first, then recently placed, by name within the current collection (per-user, outside the repo).
   const prefList=(field,category)=>ui.prefs?.[field]?.[String(category)]||[];
   const applyPrefs=text=>{try{ui.prefs=JSON.parse(text)||{};}catch{return;}render();};
@@ -108,8 +113,9 @@
       // A swapper combination is saved as "Top half name + Bottom half name".
       const parts=name.split(' + ').map(part=>list.find(entry=>entry.name===part));if(parts.some(part=>!part)||parts.length>2)return null;
       const item=parts[0];const shown=parts.length===2?swapperName(parts[0].name,parts[1].name):name;
-      const chip=button('quick-figure',(favourite?'Favourite: ':'Recent: ')+'place '+shown+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(parts.every(part=>part.state&2)));
-      chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=shown;chip.append(label);
+      const placed=parts.every(part=>part.state&2);const chip=button('figure','Place '+shown+' in '+slotNames[ui.slot]);chip.setAttribute('aria-pressed',String(placed));
+      chip.append(portrait(item.portrait,shown));const label=document.createElement('span');label.textContent=shown;chip.append(label);if(placed)checkMark(chip);
+      const owner=parts.map(otherPlayer).find(Boolean);if(owner){takenBy(chip,owner);return chip;}
       chip.onclick=()=>parts.length===2?placeCombo(category,parts):place(category,item);return chip;
     };
     const chips={favourites:favourites.map(name=>chipFor(name,true)).filter(Boolean),recent:recent.map(name=>chipFor(name,false)).filter(Boolean).slice(0,8)};
@@ -121,8 +127,9 @@
       tab.onclick=()=>{ui.listMode=mode;quickRow(category);};
     }
     tabs.hidden=searching||(!chips.favourites.length&&!chips.recent.length);
-    if(ui.listMode!=='all'){row.append(...chips[ui.listMode]);}
-    row.hidden=ui.listMode==='all';grid.hidden=ui.listMode!=='all';
+    // Favourites and Recent use the same cards and grid as All.
+    if(ui.listMode!=='all')grid.replaceChildren(...chips[ui.listMode]);
+    row.hidden=true;
   }
   function place(category,item){send('portal',category===9?17:category===2?8:ui.slot===3?6:0,item.index);bridge?.placed(category,item.name,applyPrefs);}
   // Top half first, then the bottom half under it, as when placing them one at a time.
@@ -154,20 +161,21 @@
       if(!group){group={name,halves:{}};swappers.set(name,group);entries.push({group});}
       group.halves[isTop(item)?'top':'bottom']=item;
     }
-    const mark=card=>{const check=document.createElement('span');check.className='selected-mark';check.innerHTML='<i data-lucide="check" aria-hidden="true"></i>';card.append(check);};
+    // Swappers sit among the other Skylanders in name order.
+    const nameOf=entry=>entry.item?entry.item.name:entry.group.name;entries.sort((a,b)=>nameOf(a).localeCompare(nameOf(b)));
     for(const {item,group} of entries){
       if(item){const card=button('figure','Place '+item.name+' in '+slotNames[ui.slot]);card.setAttribute('aria-pressed',String(!!(item.state&2)));card.append(portrait(item.portrait,item.name));const label=document.createElement('span');label.textContent=item.name;card.append(label);
-        if(item.state&2)mark(card);card.onclick=()=>place(category,item);grid.append(card);continue;}
+        if(item.state&2)checkMark(card);const owner=otherPlayer(item);if(owner)takenBy(card,owner);else card.onclick=()=>place(category,item);grid.append(card);continue;}
       const {top,bottom}=group.halves;const shown=top||bottom;const open=ui.swapperOpen===group.name;const placed=[top,bottom].some(half=>half&&half.state&2);
       const card=button('figure swapper-card','Choose a half of '+group.name);card.setAttribute('aria-pressed',String(placed));card.setAttribute('aria-expanded',String(open));
       card.append(portrait(shown.portrait,group.name));const label=document.createElement('span');label.textContent=group.name;card.append(label);
-      const tag=document.createElement('span');tag.className='swapper-half';tag.textContent='Swapper';card.append(tag);if(placed)mark(card);
+      if(placed)checkMark(card);
       card.onclick=()=>{ui.swapperOpen=open?null:group.name;figures();icon();const first=root.querySelector('.half-choice button');if(!open&&first)focus(first);};
       // The card and its pop-up share a cell, so the pop-up sits over the card.
       const cell=document.createElement('div');cell.className='swapper-cell';cell.append(card);grid.append(cell);
       if(open){const choice=document.createElement('div');choice.className='half-choice';choice.setAttribute('role','group');choice.setAttribute('aria-label',group.name+' halves');
         for(const [key,text] of [['top','Top half'],['bottom','Bottom half']]){const half=group.halves[key];const option=button('half-option',half?'Place '+group.name+' '+text.toLowerCase()+' in '+slotNames[ui.slot]:undefined);
-          option.textContent=text;option.disabled=!half;if(half){option.setAttribute('aria-pressed',String(!!(half.state&2)));option.onclick=()=>{ui.swapperOpen=null;place(category,half);figures();icon();focus(card.isConnected?card:root.querySelector('[aria-label="Choose a half of '+group.name+'"]'));};}choice.append(option);}
+          option.textContent=text;const owner=half&&otherPlayer(half);option.disabled=!half||!!owner;if(owner)option.textContent=text+' ('+owner+')';if(half&&!owner){option.setAttribute('aria-pressed',String(!!(half.state&2)));option.onclick=()=>{ui.swapperOpen=null;place(category,half);figures();icon();focus(card.isConnected?card:root.querySelector('[aria-label="Choose a half of '+group.name+'"]'));};}choice.append(option);}
         cell.append(choice);}
     }
     if(!list.length){const empty=document.createElement('p');empty.className='no-results';empty.textContent='Create or import a '+text[0]+' to start your collection.';grid.append(empty);}
@@ -185,7 +193,7 @@
     const old=root.querySelector('[data-setting-icon]');const next=document.createElement('i');next.dataset.settingIcon='';next.dataset.lucide={display:'monitor',graphics:'sliders-horizontal',controls:'gamepad-2',audio:'volume-2'}[ui.page];next.setAttribute('aria-hidden','true');old.replaceWith(next);
     slots();const isTrap=ui.slot===1;
     root.querySelector('.trap-browser').hidden=!isTrap;root.querySelector('.portrait-grid').hidden=isTrap;root.querySelector('.search').hidden=isTrap;root.querySelector('.collection-actions').hidden=isTrap;if(isTrap){root.querySelector('[data-quick]').hidden=true;root.querySelector('[data-list-tabs]').hidden=true;root.querySelector('[data-favourite]').hidden=true;tidyActions();}root.querySelector('.section-title').hidden=isTrap;
-    if(isTrap)traps();else figures();message.textContent=ui.snapshot?.status||'Waiting for the game…';icon();
+    if(isTrap)traps();else figures();icon();
     if(focused){const match=[...root.querySelectorAll('button')].find(node=>node.getAttribute('aria-label')===focused);if(match){match.focus({preventScroll:true});mark(match);}}
   }
   function initializeSettings(settings){
