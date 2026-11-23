@@ -17,7 +17,9 @@ written.
   - `xbox`: Xbox 360 portals over libusb, in 32-byte frames with the
     header `0B 14` both ways (format documented by skylanders-portal). Not yet
     tried on hardware here; frames that don't match are logged. Speaker audio
-    (`0B 17`, G.726) is not mapped. Xbox One portals are detected but refused: their GIP
+    (`0B 17`, G.726) is not mapped. The game only accepts the
+    `1430:0150` portal, so an Xbox 360 portal is shown to it with that
+    portal's standard descriptors and carries the same reports. Xbox One portals are detected but refused: their GIP
     handshake has not been recorded.
 - `native/portal_device/virtual_transport.cpp`: the virtual portal (the
   Cemu portal core used by `SKY_VIRTUAL_PORTAL`) behind the same interface.
@@ -67,7 +69,7 @@ covers detection against a fake sysfs and the launcher choice.
 - Xbox portal recordings. Owners can run `python3 tools/portal_report.py --probe`
   and attach the `portal-report.json` it writes to an issue: USB descriptors
   and the replies to reset, activate and status, with no figure data.
-- Xbox portals in game. The PS4 game opens `1430:0150`; an Xbox portal has
-  a different identity, and presenting it as `0150` would fake it.
+- Xbox One portals in game: their GIP handshake has not been recorded.
+- The Xbox 360 portal speaker (G.726 encoding).
 - Mixed mode (a real portal plus virtual figures), hot-plug recovery, and
   building and testing on Windows.

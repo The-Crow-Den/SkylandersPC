@@ -29,6 +29,21 @@ private:
 // skylanders-portal (TheBiemGamer, MIT), from Xenia, RPCS3 and Dolphin.
 constexpr std::size_t xbox_frame = 32;
 constexpr std::uint8_t xbox_header[]{0x0b, 0x14};
+// The PS4 game only accepts the HID portal (1430:0150). An Xbox 360 portal
+// speaks the same reports, so the game is shown that portal's standard
+// descriptors and each report is carried in an Xbox frame. This is a
+// translation, logged at open; the reports themselves stay the device's own.
+constexpr std::uint8_t standard_portal_descriptors[] = {
+    18, 1, 0x00, 0x02, 0, 0, 0, 64, 0x30, 0x14, 0x50, 0x01, 0x00, 0x01, 1, 2, 0, 1,  // device 1430:0150
+    9, 2, 41, 0, 1, 1, 0, 0x80, 0xfa,                                                 // configuration
+    9, 4, 0, 0, 2, 3, 0, 0, 0,                                                        // HID interface
+    9, 0x21, 0x11, 1, 0, 1, 0x22, 29, 0,                                              // HID descriptor
+    7, 5, 0x81, 3, 64, 0, 1, 7, 5, 0x02, 3, 64, 0, 1};                                // interrupt in/out
+constexpr std::uint8_t standard_portal_report[] = {
+    0x06, 0x00, 0xff, 0x09, 0x01, 0xa1, 0x01, 0x19, 0x01, 0x29, 0x40, 0x15, 0x00, 0x26, 0xff,
+    0x00, 0x75, 0x08, 0x95, 0x20, 0x81, 0x00, 0x19, 0x01, 0x29, 0x40, 0x91, 0x00, 0xc0};
+static_assert(sizeof(standard_portal_descriptors) == 18 + 41 && sizeof(standard_portal_report) == 29);
+
 class XboxTransport final : public Transport {
 public:
     XboxTransport(Info info, libusb_context* context, libusb_device_handle* handle, std::uint8_t in, std::uint8_t out)
@@ -149,7 +164,11 @@ std::unique_ptr<Transport> open_xbox(const Info& info) {
     }
     libusb_free_device_list(list, 1);
     if (!handle) { libusb_exit(context); return nullptr; }
-    return std::make_unique<XboxTransport>(info, context, handle, in, out);
+    Info shown = info;
+    shown.usb_descriptors.assign(std::begin(standard_portal_descriptors), std::end(standard_portal_descriptors));
+    shown.report_descriptor.assign(std::begin(standard_portal_report), std::end(standard_portal_report));
+    std::fprintf(stderr, "Portal: Xbox 360 portal shown to the game as a standard portal (1430:0150)\n");
+    return std::make_unique<XboxTransport>(shown, context, handle, in, out);
 }
 
 std::unique_ptr<Transport> open(const std::string& id) {

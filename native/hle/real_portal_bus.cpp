@@ -271,7 +271,7 @@ std::uint64_t call(std::string_view identity, const std::uint64_t* a) {
             s.device = s.opener ? s.opener() : nullptr;
             if (!s.device) { std::fprintf(stderr, "Real portal: no portal could be opened\n"); return error(4); }
             const auto& info = s.device->info();
-            if (info.family != Family::hid)
+            if (info.family == Family::xbox_one)
                 std::fprintf(stderr, "Real portal: %s portals use a different USB identity than the PS4 game looks for\n", family_name(info.family));
             if (raw_device(info).empty()) { std::fprintf(stderr, "Real portal: the device's USB descriptors are unavailable\n"); s.device.reset(); return error(4); }
             std::printf("Real portal: %s (%04x:%04x) at %s\n", info.name.c_str(), info.vendor, info.product, info.id.c_str());

@@ -48,8 +48,9 @@ You need a GPU with Vulkan 1.3.
 
 - The first visit to a new area can stutter while shaders compile. Later visits
   are smooth while *Save compiled shaders* is on.
-- Physical portals have not been tested on real hardware yet. Xbox portals are
-  detected but not supported.
+- Physical portals have not been tested on real hardware yet. Wired Xbox 360
+  portals can be chosen on the Portal page, without the trap speaker; Xbox One
+  portals are not supported yet.
 - Swappers' level, XP and gold cannot be edited in the Manager.
 - With the gate mod, a swapper opens gates matching its bottom half; the top half
   has not been checked.

@@ -63,7 +63,8 @@ from source (below) and use the launcher AppImage or `python3 tools/launcher.py`
   Ranger), keep favourites, create new figures and capture villains, all from
   the in-game PC menu (F6, Insert or L3+R3), which works with a controller.
 - **Physical portals (experimental)**: PS3, PS4, Wii and Wii U portals are
-  passed to the game; *Automatic* uses one when it is plugged in.
+  passed to the game; *Automatic* uses one when it is plugged in. Wired Xbox
+  360 portals can be chosen on the Portal page (no trap speaker yet).
 - **PC settings**: internal resolution up to 2160p (the game renders natively
   at it), aspect ratios up to 32:9, shadow quality (High by default),
   fullscreen, and a 30 or 60 FPS cap or an automatic mode that keeps cutscenes
@@ -130,7 +131,7 @@ Unknown system calls are reported, never answered with a fake success.
   builds on.
 - [Cemu](https://github.com/cemu-project/Cemu): the Skylanders portal implementation.
 - [skylanders-portal](https://github.com/TheBiemGamer/skylanders-portal) by TheBiemGamer: the Xbox 360
-  portal frame format the Xbox portal transport follows.
+  portal frame format the Xbox 360 portal support follows.
 - Mew00, SuperSamus and Winner Nombre: the Wii U Trap Team FPS graphics pack, whose delta-time
   clamp change the `60-delta` patch adapts.
 - Valve's Steam client: the Xbox and Nintendo button artwork used for the game's prompts. It is
