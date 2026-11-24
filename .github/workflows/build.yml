@@ -206,6 +206,9 @@ jobs:
           python -m PyInstaller --noconfirm --windowed --name SkylandersPC --paths tools --distpath "$env:RUNNER_TEMP\frozen" --workpath "$env:RUNNER_TEMP\pyi" @hidden tools/frozen_entry.py
           if ($LASTEXITCODE) { exit 1 }
           Copy-Item -Recurse "$env:RUNNER_TEMP\frozen\SkylandersPC\*" out/SkylandersPC-windows/
+          # PyInstaller's Qt hooks add every QML plugin; the launcher and PC menu use widgets
+          # and WebEngine only, so the qml folder is left out (and is not in the inventory).
+          Remove-Item -Recurse -Force out/SkylandersPC-windows/_internal/PyQt6/Qt6/qml -ErrorAction SilentlyContinue
           # Smoke: the frozen exe runs a helper script and imports the launcher.
           $out = & out/SkylandersPC-windows/SkylandersPC.exe tools/game_prepare.py --help | Out-String
           if ($out -notmatch 'usage: game_prepare') { Write-Output $out; exit 1 }
