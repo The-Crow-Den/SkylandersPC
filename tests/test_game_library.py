@@ -331,3 +331,22 @@ class RegionBuildTests(unittest.TestCase):
         body = query['body'][0]
         self.assertIn('ab' * 32, body);self.assertIn('22.0 GB', body);self.assertIn('non-functional copy', body)
         self.assertIn('CUSA00697', query['title'][0]);self.assertNotIn('/home/someone', body)
+
+    def test_code_fingerprint_ignores_the_file_wrapper(self):
+        import struct, tempfile
+        from tools import executable
+        # A minimal ELF64 with one loadable segment.
+        code = bytes(range(256)) * 4
+        header = struct.pack('<16sHHIQQQIHHHHHH', b'\x7fELF\x02\x01\x01' + bytes(9), 2, 62, 1,
+                             0x400000, 64, 0, 0, 64, 56, 1, 0, 0, 0)
+        program = struct.pack('<II6Q', 1, 5, 0x1000, 0x400000, 0x400000, len(code), len(code), 0x1000)
+        elf = header + program + bytes(0x1000 - 120) + code
+        padded = elf + bytes(64)  # same program, different file bytes
+        self.assertEqual(executable.code_fingerprint(elf), executable.code_fingerprint(padded))
+        changed = bytearray(elf);changed[0x1000 + 5] ^= 1
+        self.assertNotEqual(executable.code_fingerprint(elf), executable.code_fingerprint(bytes(changed)))
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / 'eboot.bin').write_bytes(padded)
+            entry = dict(title_id='CUSA00697', app_version='01.00', base_version='01.00', update_version=None,
+                         executable_sha256='ab' * 32, base_path=folder, update_path=None)
+            self.assertEqual(library.code_fingerprint(entry), executable.code_fingerprint(elf))

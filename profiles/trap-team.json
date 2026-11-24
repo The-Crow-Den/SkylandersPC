@@ -105,7 +105,8 @@
           "unlock-expansions": "profiles/patches/trap-team-us-01.01-unlock-expansions.experimental.json",
           "replay-expansion-intros": "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json"
         }
-      }
+      },
+      "code_sha256": "69dcce0f187e01268e2694780d1fc9cbff3f3d68ad903c6279838f8bd9ff15bc"
     },
     {
       "id": "eur-01-01",
@@ -144,7 +145,8 @@
           "unlock-expansions": "profiles/patches/trap-team-us-01.01-unlock-expansions.experimental.json",
           "replay-expansion-intros": "profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json"
         }
-      }
+      },
+      "code_sha256": "69dcce0f187e01268e2694780d1fc9cbff3f3d68ad903c6279838f8bd9ff15bc"
     }
   ],
   "patches": [],

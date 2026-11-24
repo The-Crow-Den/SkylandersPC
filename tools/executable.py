@@ -134,6 +134,25 @@ class Image:
         return self.read(p['offset'] + address - p['vaddr'], size)
 
 
+def code_fingerprint(data):
+    """SHA-256 of the program as it loads, independent of the file wrapper.
+
+    Covers the entry point and every loadable segment (address, sizes, flags and
+    bytes), so a plain ELF and a plaintext SELF of the same build match, while
+    any code or data difference does not. Raises UnsupportedExecutable or
+    ValueError when segments can't be read (encrypted, or not an executable).
+    """
+    image = Image(data)
+    digest = hashlib.sha256()
+    digest.update(struct.pack('<Q', image.entry))
+    loads = [p for p in image.programs if p['type'] in (PT_LOAD, 0x61000010)]
+    if not loads:
+        raise ValueError('executable has no loadable segments')
+    for p in sorted(loads, key=lambda p: (p['vaddr'], p['type'])):
+        digest.update(struct.pack('<IIQQQ', p['type'], p['flags'], p['vaddr'], p['filesz'], p['memsz']))
+        digest.update(image.read(p['offset'], p['filesz']) if p['filesz'] else b'')
+    return digest.hexdigest()
+
 def symbols(table, strings, entry_size):
     if entry_size != 24 or len(table) % 24 or len(table) // 24 > MAX_TABLE:
         raise ValueError('unsupported dynamic symbol table layout')

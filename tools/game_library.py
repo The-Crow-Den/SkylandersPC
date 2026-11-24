@@ -105,6 +105,24 @@ def unsupported_reason(project, entry):
     return 'Non-functional copy: this copy of the game can\'t be played with SkylandersPC.'
 
 
+def code_fingerprint(entry):
+    """The copy's code fingerprint (see executable.code_fingerprint), or why there is none."""
+    try:from . import executable
+    except ImportError:import executable
+    # Same choice as make_entry: the update's eboot.bin when it has one, else the base game's.
+    paths = [Path(entry[key]) / 'eboot.bin' for key in ('update_path', 'base_path') if entry.get(key)]
+    path = next((p for p in paths if p.is_file()), None)
+    if path is None:
+        return 'unavailable (eboot.bin not found)'
+    try:
+        if path.stat().st_size > executable.MAX_FILE:return 'unavailable (file too large)'
+        return executable.code_fingerprint(path.read_bytes())
+    except executable.UnsupportedExecutable:
+        return 'unavailable (encrypted eboot.bin)'
+    except (OSError, ValueError):
+        return 'unavailable (unreadable eboot.bin)'
+
+
 ISSUES = 'https://github.com/The-Crow-Den/SkylandersPC/issues/new'
 
 
@@ -119,6 +137,8 @@ def report_url(project, entry, size=None):
     except ImportError:import version as release
     profile = profile_for(project, entry)
     name = profile['title'] if profile else entry.get('title', entry['title_id'])
+    code = code_fingerprint(entry)
+    known = {b.get('code_sha256') for b in (profile or {}).get('validated_builds', []) if b.get('code_sha256')}
     lines = [f"Hi! The launcher says my copy of {name} is a non-functional copy.", '',
              'Where it came from (PKG files or an unpacked folder) and which region: ', '',
              '<details><summary>Game details (filled in by the launcher)</summary>', '',
@@ -126,6 +146,7 @@ def report_url(project, entry, size=None):
              + (f" (update {entry['update_version']})" if entry.get('update_version') else ' (no update)'),
              *([f'- Size: {size/1024**3:.1f} GB'] if size else []),
              f"- Game fingerprint: {entry['executable_sha256']}",
+             f"- Code fingerprint: {code}" + (' (same code as a supported build)' if code in known else ''),
              f'- Launcher: {release.VERSION}', '', '</details>']
     title = f"Please add my copy: {name} {entry['title_id']} {entry['app_version']}"
     return ISSUES + '?' + urlencode({'title': title, 'body': '\n'.join(lines)})
