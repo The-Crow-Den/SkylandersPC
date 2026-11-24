@@ -101,39 +101,41 @@ def supported(project, entry):
 
 
 def unsupported_reason(project, entry):
-    """Why an installed copy is not a validated build, in words a player can act on or report."""
+    """Why an installed copy can't be played yet, in plain words."""
     builds = (profile_for(project, entry) or {}).get('validated_builds', [])
-    copy = f"{entry['title_id']} version {entry['app_version']}"
     same_title = [b for b in builds if b.get('title_id') == entry['title_id']]
-    if not same_title:
-        return f'This copy ({copy}) is not supported yet.'
     versions = sorted({b['app_version'] for b in same_title})
-    if entry['app_version'] not in versions:
-        return (f"This copy is {copy}, which is not supported yet. Supported for {entry['title_id']}: "
-                f"version {', '.join(versions)}. Install the matching update to play.")
-    return (f"This copy ({copy}) is not supported yet: its game executable differs from the tested one "
-            f"(eboot.bin {entry['executable_sha256'][:12]}). Please report this code on GitHub.")
+    newer = [v for v in versions if game_install.version(v) > game_install.version(entry['app_version'])]
+    if same_title and entry['app_version'] not in versions and newer:
+        return (f"This version of the game isn't supported yet. Install the {newer[-1]} update to play, "
+                f"or let us know and we'll look into adding yours.")
+    return "This version of the game isn't supported yet. Let us know and we'll look into adding it."
 
 
 ISSUES = 'https://github.com/The-Crow-Den/SkylandersPC/issues/new'
 
 
 def report_url(project, entry, size=None):
-    """A pre-filled GitHub issue for an unsupported copy: only its identity, never paths or names."""
+    """A pre-filled GitHub issue about a copy that isn't supported yet.
+
+    It carries only what identifies the game version (title ID, version and a
+    fingerprint of the game's program file), never file paths or names.
+    """
     from urllib.parse import urlencode
     try:from . import version as release
     except ImportError:import version as release
     profile = profile_for(project, entry)
     name = profile['title'] if profile else entry.get('title', entry['title_id'])
-    lines = ['The launcher says this copy is not supported yet.', '',
-             f"- Game: {name}", f"- Title ID: {entry['title_id']}", f"- Version: {entry['app_version']}",
-             f"- Base / update: {entry.get('base_version', '?')} / {entry.get('update_version') or 'none'}",
-             f"- eboot.bin SHA-256: {entry['executable_sha256']}",
-             *( [f'- Installed size: {size/1024**3:.1f} GB'] if size else []),
-             f'- Launcher: {release.VERSION}', '',
-             'Where did this copy come from (PKG files, or an unpacked folder)? Which region?']
-    title = f"Unsupported copy: {name} {entry['title_id']} {entry['app_version']} ({entry['executable_sha256'][:12]})"
-    return ISSUES + '?' + urlencode({'title': title, 'body': '\n'.join(lines), 'labels': 'compatibility'})
+    lines = [f"Hi! My copy of {name} isn't supported yet.", '',
+             'Where it came from (PKG files or an unpacked folder) and which region: ', '',
+             '<details><summary>Game details (filled in by the launcher)</summary>', '',
+             f"- Title ID: {entry['title_id']}", f"- Version: {entry['app_version']}"
+             + (f" (update {entry['update_version']})" if entry.get('update_version') else ' (no update)'),
+             *([f'- Size: {size/1024**3:.1f} GB'] if size else []),
+             f"- Game fingerprint: {entry['executable_sha256']}",
+             f'- Launcher: {release.VERSION}', '', '</details>']
+    title = f"Please add my copy: {name} {entry['title_id']} {entry['app_version']}"
+    return ISSUES + '?' + urlencode({'title': title, 'body': '\n'.join(lines)})
 
 
 def manifest_path(library, entry):

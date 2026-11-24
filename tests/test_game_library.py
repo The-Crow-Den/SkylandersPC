@@ -321,9 +321,11 @@ class RegionBuildTests(unittest.TestCase):
         entry = dict(title_id='CUSA00697', app_version='01.00', executable_sha256='ab' * 32)
         self.assertFalse(library.supported(self.ROOT, entry))
         reason = library.unsupported_reason(self.ROOT, entry)
-        self.assertIn('not supported yet', reason);self.assertIn('abababababab', reason)
+        self.assertIn("isn't supported yet", reason);self.assertNotIn('abab', reason)
         entry = dict(title_id='CUSA00697', app_version='01.02', executable_sha256='ab' * 32)
-        self.assertIn('version 01.00', library.unsupported_reason(self.ROOT, entry))
+        self.assertNotIn('Install', library.unsupported_reason(self.ROOT, entry))
+        entry = dict(entry, app_version='00.90')
+        self.assertIn('Install the 01.01 update', library.unsupported_reason(self.ROOT, entry))
 
     def test_report_url_carries_only_the_copy_identity(self):
         from urllib.parse import parse_qs, urlsplit
