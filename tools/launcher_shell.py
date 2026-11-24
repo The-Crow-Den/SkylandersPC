@@ -514,8 +514,9 @@ def renovated(base):
                 button.setToolTip(self.game['name']+' · '+data['state']);button.setAccessibleName(button.toolTip())
             ready=data['state']=='Ready';busy=data['state'] in ('Installing','Preparing') or self.process is not None or getattr(self,'library_transfer',False)
             self.play.setEnabled(ready and not busy)
-            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'NOT SUPPORTED','Coming soon':'COMING SOON','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
-            self.primary.setEnabled(not busy and data['state'] in ('Ready','Needs repair','Not installed'))
+            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'REPORT THIS COPY' if data.get('entry') else 'NOT SUPPORTED','Coming soon':'COMING SOON','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
+            self.primary.setEnabled(not busy and (data['state'] in ('Ready','Needs repair','Not installed') or
+                                                  (data['state']=='Not supported' and bool(data.get('entry')))))
             size='' if data['size'] is None else f"{data['size']/1024**3:.1f} GB" if data['size']>=1024**3 else f"{data['size']/1024**2:.1f} MB"
             progress=f"{round(data['fraction']*100)}%" if data.get('fraction') is not None else ''
             if ready:
@@ -555,9 +556,20 @@ def renovated(base):
             if self.play.isEnabled():
                 self.launch()
                 return
-            if getattr(self,'game_state',{}).get('state')=='Needs repair':
+            state=getattr(self,'game_state',{})
+            if state.get('state')=='Needs repair':
                 self.repair_game();return
+            if state.get('state')=='Not supported' and state.get('entry'):
+                self.report_copy(state);return
             self.install()
+
+        def report_copy(self,state):
+            """Open a pre-filled GitHub issue; the player reviews it and presses Submit."""
+            from PyQt6.QtCore import QUrl
+            from PyQt6.QtGui import QDesktopServices
+            url=game_library.report_url(self.root,state['entry'],state.get('size'))
+            if not QDesktopServices.openUrl(QUrl(url)):
+                QMessageBox.information(self,'Report this copy','Open this address in your browser to report your copy:\n\n'+url)
 
         def launch(self):
             if self.process is not None: return

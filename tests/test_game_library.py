@@ -322,3 +322,12 @@ class RegionBuildTests(unittest.TestCase):
         self.assertIn('not supported yet', reason);self.assertIn('abababababab', reason)
         entry = dict(title_id='CUSA00697', app_version='01.02', executable_sha256='ab' * 32)
         self.assertIn('version 01.00', library.unsupported_reason(self.ROOT, entry))
+
+    def test_report_url_carries_only_the_copy_identity(self):
+        from urllib.parse import parse_qs, urlsplit
+        entry = dict(title_id='CUSA00697', app_version='01.00', base_version='01.00', update_version=None,
+                     executable_sha256='ab' * 32, base_path='/home/someone/Games/TT')
+        query = parse_qs(urlsplit(library.report_url(self.ROOT, entry, 22 * 1024**3)).query)
+        body = query['body'][0]
+        self.assertIn('ab' * 32, body);self.assertIn('22.0 GB', body);self.assertIn('CUSA00697', query['title'][0])
+        self.assertNotIn('/home/someone', body)

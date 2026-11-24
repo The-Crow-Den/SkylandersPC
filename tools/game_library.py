@@ -115,6 +115,27 @@ def unsupported_reason(project, entry):
             f"(eboot.bin {entry['executable_sha256'][:12]}). Please report this code on GitHub.")
 
 
+ISSUES = 'https://github.com/The-Crow-Den/SkylandersPC/issues/new'
+
+
+def report_url(project, entry, size=None):
+    """A pre-filled GitHub issue for an unsupported copy: only its identity, never paths or names."""
+    from urllib.parse import urlencode
+    try:from . import version as release
+    except ImportError:import version as release
+    profile = profile_for(project, entry)
+    name = profile['title'] if profile else entry.get('title', entry['title_id'])
+    lines = ['The launcher says this copy is not supported yet.', '',
+             f"- Game: {name}", f"- Title ID: {entry['title_id']}", f"- Version: {entry['app_version']}",
+             f"- Base / update: {entry.get('base_version', '?')} / {entry.get('update_version') or 'none'}",
+             f"- eboot.bin SHA-256: {entry['executable_sha256']}",
+             *( [f'- Installed size: {size/1024**3:.1f} GB'] if size else []),
+             f'- Launcher: {release.VERSION}', '',
+             'Where did this copy come from (PKG files, or an unpacked folder)? Which region?']
+    title = f"Unsupported copy: {name} {entry['title_id']} {entry['app_version']} ({entry['executable_sha256'][:12]})"
+    return ISSUES + '?' + urlencode({'title': title, 'body': '\n'.join(lines), 'labels': 'compatibility'})
+
+
 def manifest_path(library, entry):
     selector(entry['title_id'], entry['app_version'])
     return Path(library) / entry['title_id'] / entry['app_version'] / 'manifest.json'
