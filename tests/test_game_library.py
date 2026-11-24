@@ -314,6 +314,8 @@ class RegionBuildTests(unittest.TestCase):
         for title in ('CUSA00626', 'CUSA00697'):
             entry = dict(title_id=title, app_version='01.00', executable_sha256=self.BASE)
             self.assertTrue(library.supported(self.ROOT, entry), title)
+            update = dict(entry, app_version='01.01', executable_sha256='de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56')
+            self.assertTrue(library.supported(self.ROOT, update), title + ' 01.01')
 
     def test_unsupported_reason_names_the_copy_and_its_executable(self):
         entry = dict(title_id='CUSA00697', app_version='01.00', executable_sha256='ab' * 32)

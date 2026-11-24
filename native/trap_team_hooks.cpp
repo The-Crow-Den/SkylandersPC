@@ -8,6 +8,8 @@
 
 namespace {
 constexpr std::string_view kTitle = "Skylanders: Trap Team";
+// The 01.01 update's eboot.bin, the same file for the US and EU editions.
+constexpr std::string_view kUpdate0101 = "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56";
 void skip_movies(bool pc_menu) {
     static const auto settings = TrapMovieSkip::settings_from_environment();
     if (!settings.any) return;
@@ -27,9 +29,9 @@ void skip_movies(bool pc_menu) {
         });
 }
 void frame(const GameHooks::Build& build, bool pc_menu) {
-    LevelEvents::sample(build.id == "us-01-01", pc_menu);
+    LevelEvents::sample(build.executable_sha256 == kUpdate0101, pc_menu);
     // Movie layout offsets are verified only for the US 01.01 executable.
-    if (build.id == "us-01-01") skip_movies(pc_menu);
+    if (build.executable_sha256 == kUpdate0101) skip_movies(pc_menu);
     TrapTeamProbe::frame_clock();
     TrapTeamProbe::sample();
 }
@@ -38,9 +40,9 @@ constexpr GameHooks::Build eur_0100{"eur-01-00", "CUSA00697",
 // The 01.00 eboot.bin is identical in the US and EU base games; only param.sfo differs.
 constexpr GameHooks::Build us_0100{"us-01-00", "CUSA00626",
     "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd", kTitle, &frame};
-constexpr GameHooks::Build us_0101{"us-01-01", "CUSA00626",
-    "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56", kTitle, &frame};
-constexpr std::array<const GameHooks::Build*, 3> registered{&eur_0100, &us_0100, &us_0101};
+constexpr GameHooks::Build us_0101{"us-01-01", "CUSA00626", kUpdate0101, kTitle, &frame};
+constexpr GameHooks::Build eur_0101{"eur-01-01", "CUSA00697", kUpdate0101, kTitle, &frame};
+constexpr std::array<const GameHooks::Build*, 4> registered{&eur_0100, &us_0100, &us_0101, &eur_0101};
 }
 namespace TrapTeamHooks {
 std::span<const GameHooks::Build* const> builds() { return registered; }
