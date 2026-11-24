@@ -1,3 +1,15 @@
+## SkylandersPC 0.1.1 (beta)
+
+### What's new in 0.1.1
+
+- **More copies of Trap Team work.** The US base game without its update (01.00),
+  and the EU game with the 01.01 update, were wrongly marked as not supported.
+- **Request support for other copies.** A copy that still can't be played says so
+  plainly, and *Request support* opens a ready-made GitHub post with the game's
+  version and fingerprints (nothing personal) so it can be looked at.
+- **Game logos** now show in the launcher's library.
+- The remaining *SkylandersPS4* names are now *SkylandersPC*.
+
 ## SkylandersPC 0.1.0 (beta)
 
 The first public beta. **Skylanders: Trap Team** (US and EU) runs natively on PC
@@ -10,10 +22,10 @@ from your own PS4 package files. Expect rough edges and please report them.
 
 | File | For |
 | --- | --- |
-| `SkylandersPC-v0.1.0-windows.zip` | Windows 10/11, x86-64. Unzip and run `SkylandersPC.exe`; no Python or other install needed. |
-| `SkylandersPC-v0.1.0-linux.tar.gz` | Linux (Ubuntu 22.04 or newer, Debian 12, Fedora, Arch, SteamOS). Extract it and run `SkylandersPC.AppImage`; the game host is already built. |
+| `SkylandersPC-v0.1.1-windows.zip` | Windows 10/11, x86-64. Unzip and run `SkylandersPC.exe`; no Python or other install needed. |
+| `SkylandersPC-v0.1.1-linux.tar.gz` | Linux (Ubuntu 22.04 or newer, Debian 12, Fedora, Arch, SteamOS). Extract it and run `SkylandersPC.AppImage`; the game host is already built. |
 | `Skylanders-Launcher-x86_64.AppImage` | Linux, for source checkouts: the launcher's Python runtime only. |
-| `SkylandersPC-v0.1.0-source.tar.gz` | Complete corresponding source for these binaries. |
+| `SkylandersPC-v0.1.1-source.tar.gz` | Complete corresponding source for these binaries. |
 | `SHA256SUMS` | Checksums for every file above. |
 
 You need a GPU with Vulkan 1.3.

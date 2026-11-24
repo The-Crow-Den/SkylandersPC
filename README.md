@@ -52,8 +52,8 @@ for recovery, so this does not immediately reclaim their disk space.
 Unrecognized titles can be installed and are labelled “not supported yet”.
 
 Builds are published on the [Releases](https://github.com/The-Crow-Den/SkylandersPC/releases)
-page, each with patch notes ([RELEASE_NOTES.md](RELEASE_NOTES.md) for the coming
-0.1.0 beta). GitHub builds both: Windows gets a ready-to-run bundle, and Linux an
+page, each with patch notes ([RELEASE_NOTES.md](RELEASE_NOTES.md) for the latest
+beta). GitHub builds both: Windows gets a ready-to-run bundle, and Linux an
 archive with the game host already built (extract it and run
 `SkylandersPC.AppImage`). It runs on Linux systems from Ubuntu 22.04 onwards,
 including Debian 12, Fedora, Arch and SteamOS on the Steam Deck.
