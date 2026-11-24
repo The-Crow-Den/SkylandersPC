@@ -44,7 +44,7 @@ def snapshot(root,game,active=None):
     else:
         rebuild=False
         try:message=game_library.unsupported_reason(root,entry)
-        except (KeyError,TypeError):message='Your files are installed. This game is not supported yet.'
+        except (KeyError,TypeError):message='Non-functional copy: this copy of the game can\'t be played with SkylandersPC.'
     version='Base '+entry['base_version']+(' · Update '+entry['update_version'] if entry['update_version'] else '')
     return dict(state=state,message=message,entry=entry,size=size,version=version,rebuild=rebuild)
 

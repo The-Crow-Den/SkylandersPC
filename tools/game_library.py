@@ -101,22 +101,15 @@ def supported(project, entry):
 
 
 def unsupported_reason(project, entry):
-    """Why an installed copy can't be played yet, in plain words."""
-    builds = (profile_for(project, entry) or {}).get('validated_builds', [])
-    same_title = [b for b in builds if b.get('title_id') == entry['title_id']]
-    versions = sorted({b['app_version'] for b in same_title})
-    newer = [v for v in versions if game_install.version(v) > game_install.version(entry['app_version'])]
-    if same_title and entry['app_version'] not in versions and newer:
-        return (f"This version of the game isn't supported yet. Install the {newer[-1]} update to play, "
-                f"or let us know and we'll look into adding yours.")
-    return "This version of the game isn't supported yet. Let us know and we'll look into adding it."
+    """Why an installed copy can't be played, in one plain sentence."""
+    return 'Non-functional copy: this copy of the game can\'t be played with SkylandersPC.'
 
 
 ISSUES = 'https://github.com/The-Crow-Den/SkylandersPC/issues/new'
 
 
 def report_url(project, entry, size=None):
-    """A pre-filled GitHub issue about a copy that isn't supported yet.
+    """A pre-filled GitHub issue about a non-functional copy.
 
     It carries only what identifies the game version (title ID, version and a
     fingerprint of the game's program file), never file paths or names.
@@ -126,7 +119,7 @@ def report_url(project, entry, size=None):
     except ImportError:import version as release
     profile = profile_for(project, entry)
     name = profile['title'] if profile else entry.get('title', entry['title_id'])
-    lines = [f"Hi! My copy of {name} isn't supported yet.", '',
+    lines = [f"Hi! The launcher says my copy of {name} is a non-functional copy.", '',
              'Where it came from (PKG files or an unpacked folder) and which region: ', '',
              '<details><summary>Game details (filled in by the launcher)</summary>', '',
              f"- Title ID: {entry['title_id']}", f"- Version: {entry['app_version']}"

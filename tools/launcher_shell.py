@@ -514,7 +514,7 @@ def renovated(base):
                 button.setToolTip(self.game['name']+' · '+data['state']);button.setAccessibleName(button.toolTip())
             ready=data['state']=='Ready';busy=data['state'] in ('Installing','Preparing') or self.process is not None or getattr(self,'library_transfer',False)
             self.play.setEnabled(ready and not busy)
-            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'LET US KNOW' if data.get('entry') else 'NOT SUPPORTED','Coming soon':'COMING SOON','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
+            self.primary.setText({'Ready':'PLAY','Needs repair':'REPAIR','Not installed':'INSTALL','Not supported':'REQUEST SUPPORT' if data.get('entry') else 'NOT SUPPORTED','Coming soon':'COMING SOON','Installing':'INSTALLING','Preparing':'PREPARING'}[data['state']])
             self.primary.setEnabled(not busy and (data['state'] in ('Ready','Needs repair','Not installed') or
                                                   (data['state']=='Not supported' and bool(data.get('entry')))))
             size='' if data['size'] is None else f"{data['size']/1024**3:.1f} GB" if data['size']>=1024**3 else f"{data['size']/1024**2:.1f} MB"
@@ -568,7 +568,7 @@ def renovated(base):
             from PyQt6.QtCore import QUrl
             from PyQt6.QtGui import QDesktopServices
             box=QMessageBox(self);box.setWindowTitle('Help us support your game')
-            box.setText("This version of the game isn't supported yet, but you can help us add it.")
+            box.setText('This is a non-functional copy, but you can ask for it to be supported.')
             box.setInformativeText('We\'ll open a short GitHub post with your game\'s version already filled in. '
                                    'Nothing personal is included, and nothing is sent until you post it.\n\n'
                                    'You\'ll need a free GitHub account to post.')

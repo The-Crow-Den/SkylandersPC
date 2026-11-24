@@ -317,21 +317,17 @@ class RegionBuildTests(unittest.TestCase):
             update = dict(entry, app_version='01.01', executable_sha256='de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56')
             self.assertTrue(library.supported(self.ROOT, update), title + ' 01.01')
 
-    def test_unsupported_reason_names_the_copy_and_its_executable(self):
+    def test_unsupported_copy_gets_one_plain_sentence(self):
         entry = dict(title_id='CUSA00697', app_version='01.00', executable_sha256='ab' * 32)
         self.assertFalse(library.supported(self.ROOT, entry))
         reason = library.unsupported_reason(self.ROOT, entry)
-        self.assertIn("isn't supported yet", reason);self.assertNotIn('abab', reason)
-        entry = dict(title_id='CUSA00697', app_version='01.02', executable_sha256='ab' * 32)
-        self.assertNotIn('Install', library.unsupported_reason(self.ROOT, entry))
-        entry = dict(entry, app_version='00.90')
-        self.assertIn('Install the 01.01 update', library.unsupported_reason(self.ROOT, entry))
+        self.assertIn('Non-functional copy', reason);self.assertNotIn('abab', reason);self.assertNotIn('update', reason)
 
-    def test_report_url_carries_only_the_copy_identity(self):
+    def test_request_post_carries_only_the_copy_identity(self):
         from urllib.parse import parse_qs, urlsplit
         entry = dict(title_id='CUSA00697', app_version='01.00', base_version='01.00', update_version=None,
                      executable_sha256='ab' * 32, base_path='/home/someone/Games/TT')
         query = parse_qs(urlsplit(library.report_url(self.ROOT, entry, 22 * 1024**3)).query)
         body = query['body'][0]
-        self.assertIn('ab' * 32, body);self.assertIn('22.0 GB', body);self.assertIn('CUSA00697', query['title'][0])
-        self.assertNotIn('/home/someone', body)
+        self.assertIn('ab' * 32, body);self.assertIn('22.0 GB', body);self.assertIn('non-functional copy', body)
+        self.assertIn('CUSA00697', query['title'][0]);self.assertNotIn('/home/someone', body)
