@@ -237,14 +237,16 @@ def logo_size(path, reference):
 
 
 def supplied_artwork(root, game):
-    """Resolve supplied logos; launcher backgrounds are deliberately image-free."""
+    """Resolve the game logos (shipped in tools/launcher_art; a copy in .local/launcher-art/supplied
+    takes precedence). Launcher backgrounds are deliberately image-free."""
     folder = Path(root) / '.local/launcher-art/supplied'
     logo = {'swap-force': 'swap-force-logo.png', 'trap-team': 'trap-team-logo-cutout.png',
             'superchargers': 'superchargers-logo.png', 'imaginators': 'imaginators-logo.png'}.get(game['id'])
     themed = dict(game)
     themed.update(background='', composite=False)
-    if logo and (folder / logo).is_file():
-        themed['logo'] = str(folder / logo)
+    for place in (folder, Path(root) / 'tools/launcher_art'):
+        if logo and (place / logo).is_file():
+            themed['logo'] = str(place / logo);break
     return themed
 
 
