@@ -100,6 +100,21 @@ def supported(project, entry):
         (entry['title_id'], entry['app_version'], entry['executable_sha256']) for b in profile['validated_builds']))
 
 
+def unsupported_reason(project, entry):
+    """Why an installed copy is not a validated build, in words a player can act on or report."""
+    builds = (profile_for(project, entry) or {}).get('validated_builds', [])
+    copy = f"{entry['title_id']} version {entry['app_version']}"
+    same_title = [b for b in builds if b.get('title_id') == entry['title_id']]
+    if not same_title:
+        return f'This copy ({copy}) is not supported yet.'
+    versions = sorted({b['app_version'] for b in same_title})
+    if entry['app_version'] not in versions:
+        return (f"This copy is {copy}, which is not supported yet. Supported for {entry['title_id']}: "
+                f"version {', '.join(versions)}. Install the matching update to play.")
+    return (f"This copy ({copy}) is not supported yet: its game executable differs from the tested one "
+            f"(eboot.bin {entry['executable_sha256'][:12]}). Please report this code on GitHub.")
+
+
 def manifest_path(library, entry):
     selector(entry['title_id'], entry['app_version'])
     return Path(library) / entry['title_id'] / entry['app_version'] / 'manifest.json'

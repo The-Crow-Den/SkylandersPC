@@ -304,3 +304,21 @@ class GameLibraryTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RegionBuildTests(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+    BASE = 'bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd'
+
+    def test_region_free_base_executable_is_supported_for_us_and_eu(self):
+        for title in ('CUSA00626', 'CUSA00697'):
+            entry = dict(title_id=title, app_version='01.00', executable_sha256=self.BASE)
+            self.assertTrue(library.supported(self.ROOT, entry), title)
+
+    def test_unsupported_reason_names_the_copy_and_its_executable(self):
+        entry = dict(title_id='CUSA00697', app_version='01.00', executable_sha256='ab' * 32)
+        self.assertFalse(library.supported(self.ROOT, entry))
+        reason = library.unsupported_reason(self.ROOT, entry)
+        self.assertIn('not supported yet', reason);self.assertIn('abababababab', reason)
+        entry = dict(title_id='CUSA00697', app_version='01.02', executable_sha256='ab' * 32)
+        self.assertIn('version 01.00', library.unsupported_reason(self.ROOT, entry))

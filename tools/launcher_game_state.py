@@ -31,7 +31,7 @@ def snapshot(root,game,active=None):
             if path.is_file():
                 info=path.stat();key=(info.st_dev,info.st_ino)
                 if key not in seen:size+=info.st_size;seen.add(key)
-    state='Not supported';message='Your files are installed. This game is not supported yet.'
+    state='Not supported';message=''
     if game_library.supported(root,entry):
         rebuild=False
         try:game_prepare.require_ready(root,entry,deep=False);state='Ready';message='Ready to play.'
@@ -41,7 +41,10 @@ def snapshot(root,game,active=None):
             if os.name!='nt' and 'needs runtime.' in str(error):
                 state='Ready';message='Ready to play. The game host is rebuilt first.';rebuild=True
             else:state='Needs repair';message='Setup needs attention. Choose Repair to check and finish it.'
-    else:rebuild=False
+    else:
+        rebuild=False
+        try:message=game_library.unsupported_reason(root,entry)
+        except (KeyError,TypeError):message='Your files are installed. This game is not supported yet.'
     version='Base '+entry['base_version']+(' · Update '+entry['update_version'] if entry['update_version'] else '')
     return dict(state=state,message=message,entry=entry,size=size,version=version,rebuild=rebuild)
 
