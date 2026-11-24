@@ -2,10 +2,13 @@
 # Build the renderer and native host, run every synthetic test, and on a tag or by
 # hand package the launcher AppImage. Nothing here needs game files, keys or a GPU.
 # The full build is slow, so it runs for release tags, pull requests and by hand
-# (Actions > Build > Run workflow), not on every push.
+# (Actions > Build > Run workflow). A push to main runs only the Windows renderer
+# compile, to keep its compiler cache warm: caches saved on main are the only ones a
+# later tag build can restore, so releases recompile just what changed.
 name: Build
 on:
   push:
+    branches: [main]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -20,6 +23,7 @@ env:
   XBYAK_COMMIT: cd6bad3cad2e07a3e277c23d2b1f065320024717
 jobs:
   native:
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     # SDL3, Zydis and robin-map are packaged on Arch but not on Ubuntu's runner image.
     container: archlinux:base-devel
@@ -68,6 +72,7 @@ jobs:
   # The Linux release runtime is built on Ubuntu 22.04 so it runs on glibc 2.35
   # and newer (Ubuntu 22.04+, Debian 12, Fedora, Arch, SteamOS); see the script.
   linux-runtime:
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     container: ubuntu:22.04
     steps:
@@ -95,6 +100,7 @@ jobs:
   # Windows port (docs/windows-port.md): MinGW under MSYS2 CLANG64, the toolchain the renderer's
   # platform/win32 layer targets. The native host builds its portable pieces and their tests so far.
   windows-native:
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     defaults:
       run:
@@ -118,6 +124,14 @@ jobs:
 
   windows-renderer:
     runs-on: windows-latest
+    env:
+      # A push to main only warms the compiler cache: no tests or packaging.
+      WARM_ONLY: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 3G
+      # The toolchain is updated each run, so compare compilers by content, not mtime.
+      CCACHE_COMPILERCHECK: content
+      CCACHE_BASEDIR: ${{ github.workspace }}
     defaults:
       run:
         shell: msys2 {0}
@@ -129,7 +143,7 @@ jobs:
           pacboy: >-
             toolchain:p cmake:p ninja:p python:p pkgconf:p git:p sdl3:p fmt:p boost:p robin-map:p
             zydis:p spirv-headers:p vulkan-headers:p vulkan-loader:p glslang:p xxhash:p
-            ffmpeg:p glm:p vulkan-memory-allocator:p openssl:p libusb:p
+            ffmpeg:p glm:p vulkan-memory-allocator:p openssl:p libusb:p ccache:p
       - uses: actions/checkout@v7
         with:
           submodules: recursive
@@ -139,23 +153,33 @@ jobs:
           git init -q "$RUNNER_TEMP/xbyak"
           git -C "$RUNNER_TEMP/xbyak" fetch -q --depth 1 https://github.com/herumi/xbyak.git "$XBYAK_COMMIT"
           git -C "$RUNNER_TEMP/xbyak" checkout -q FETCH_HEAD
+      - name: Restore the compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-windows-renderer-${{ github.sha }}
+          restore-keys: ccache-windows-renderer-
       - name: Build complete Windows host with static renderer
         id: full-build
         run: |
           xbyak="$(cygpath -m "$RUNNER_TEMP/xbyak")"
           cmake -S native -B .local/windows-full-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DSKY_WINDOWS_FULL_HOST=ON -DSKY_TLS_PREFLIGHT=ON -DSKY_RENDERER_LTO=OFF \
-            -DSKY_RENDERER_PGO=off -DCMAKE_CXX_FLAGS="-isystem $xbyak"
+            -DSKY_RENDERER_PGO=off -DCMAKE_CXX_FLAGS="-isystem $xbyak" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          ccache -z
           cmake --build .local/windows-full-build
+          ccache -s
       - name: Full host synthetic tests (no guest admission/game validation)
+        if: env.WARM_ONLY != 'true'
         run: ctest --test-dir .local/windows-full-build --output-on-failure
       - name: Repeat the guest TLS loader test (flake hunt, informational)
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         continue-on-error: true
         run: ctest --test-dir .local/windows-full-build --output-on-failure -R native-windows-loader --repeat until-fail:30
       - name: Windows bundle (source tree, host, its DLLs, launcher script)
         # Built even when a synthetic test fails, so the bundle can be tried.
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         run: |
           dist=out/SkylandersPC-windows
           mkdir -p "$dist/.local/native-gpu-build"
@@ -188,11 +212,11 @@ jobs:
           } > "$dist/LICENSES/msys2-runtime.json"
           python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))), 'MSYS2 DLLs inventoried')" "$dist/LICENSES/msys2-runtime.json"
       - uses: actions/setup-python@v6
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         with:
           python-version: '3.13'
       - name: Freeze the launcher (no Python needed on the player's PC)
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
@@ -221,14 +245,14 @@ jobs:
           # The PC menu's web engine must be inside the bundle, not on the player's PC.
           if (-not (Get-ChildItem -Recurse out/SkylandersPC-windows -Filter QtWebEngineProcess.exe)) { Write-Output 'QtWebEngineProcess.exe missing'; exit 1 }
       - uses: actions/upload-artifact@v5
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         with:
           name: SkylandersPC-windows
           path: out/SkylandersPC-windows
           include-hidden-files: true
           if-no-files-found: error
       - name: Library and manifest tests on Windows (informational)
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         continue-on-error: true
         timeout-minutes: 5
         shell: pwsh
@@ -236,7 +260,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m unittest discover -v -s tests -p "test_game_*.py"
       - name: Python tests on Windows (informational)
-        if: ${{ !cancelled() && steps.full-build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.full-build.outcome == 'success' && env.WARM_ONLY != 'true' }}
         continue-on-error: true
         timeout-minutes: 15
         shell: pwsh
