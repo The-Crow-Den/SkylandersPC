@@ -1,13 +1,13 @@
 # skyrender
 
-The PS4 GPU, video-out, audio and memory component of SkylandersPS4: a GCN
+The PS4 GPU, video-out, audio and memory component of SkylandersPC: a GCN
 command processor, GCN -> SPIR-V shader translator and Vulkan renderer, built as
-`libskyrender.so` and driven by the SkylandersPS4 native host through
+`libskyrender.so` and driven by the SkylandersPC native host through
 `gpu/skyrender.h`. The host provides the `runtime_*` interface (`src/runtime.h`)
 and compiles `src/runtime_memory.c`, `src/runtime_ajm.c` and
 `src/runtime_audio.c` itself.
 
-Build (from SkylandersPS4): `out/dependency-build/rebuild-renderer.sh`.
+Build (from SkylandersPC): `out/dependency-build/rebuild-renderer.sh`.
 Library tests are CMake targets in `gpu/CMakeLists.txt` (for example
 `cmake --build <build> --target cp-decoder-test`).
 

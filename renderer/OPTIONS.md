@@ -2,7 +2,7 @@
 
 Every `SKY_RENDERER_<name>` environment variable the renderer reads, generated from the code
 (`tools/gen_options.py`; run it again after adding or removing an option). The host sets a few
-itself (SkylandersPS4 `native/gpu_backend.cpp`); the old `BB_<name>` spellings are taken over at
+itself (SkylandersPC `native/gpu_backend.cpp`); the old `BB_<name>` spellings are taken over at
 load (`gpu/shim/legacy_options.cpp`). "Default" is read off the code and may be blank where it
 is computed; the description is the comment at the read.
 

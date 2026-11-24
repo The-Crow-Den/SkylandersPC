@@ -3,7 +3,7 @@
   "id": "sixty-fps",
   "name": "60 FPS",
   "version": "1.0.0",
-  "author": "SkylandersPS4 contributors",
+  "author": "SkylandersPC contributors",
   "licence": "GPL-3.0-or-later",
   "description": "Plays at 60 FPS with elapsed-time simulation (the 60-delta patches, adapted from the Wii U FPS pack by Mew00, SuperSamus and Winner Nombre). Automatic keeps menus, cutscenes and portal arrival at 30 and switches gameplay to 60; turn it off for a fixed 60 cap.",
   "targets": [

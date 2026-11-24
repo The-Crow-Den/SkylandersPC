@@ -23,10 +23,10 @@ find_root() {
         echo "SKYLANDERS_ROOT does not contain tools/launcher.py: $SKYLANDERS_ROOT" >&2
         return 1
     fi
-    # Next to the image, inside a SkylandersPS4 folder beside it, or any parent.
+    # Next to the image, inside a SkylandersPC (or older SkylandersPS4) folder beside it, or any parent.
     directory="$(dirname -- "${APPIMAGE:-$here}")"
     while :; do
-        for candidate in "$directory" "$directory/SkylandersPS4"; do
+        for candidate in "$directory" "$directory/SkylandersPC" "$directory/SkylandersPS4"; do
             if is_root "$candidate"; then printf '%s\n' "$candidate"; return 0; fi
         done
         [ "$directory" = / ] && break
@@ -37,7 +37,7 @@ find_root() {
         candidate="$(cat "$here/usr/share/skylanders/root")"
         if is_root "$candidate"; then printf '%s\n' "$candidate"; return 0; fi
     fi
-    echo 'Cannot find the SkylandersPS4 checkout. Put the AppImage in or beside it, or set SKYLANDERS_ROOT.' >&2
+    echo 'Cannot find the SkylandersPC folder. Put the AppImage in or beside it, or set SKYLANDERS_ROOT.' >&2
     return 1
 }
 

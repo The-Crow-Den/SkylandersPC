@@ -3,7 +3,7 @@
   "id": "trap-master",
   "name": "No Trap Master required",
   "version": "1.0.0",
-  "author": "SkylandersPS4 contributors",
+  "author": "SkylandersPC contributors",
   "licence": "GPL-3.0-or-later",
   "description": "Experimental: any Skylander does the Trap Master jobs you turn on below. Elemental gates open for a Skylander of the matching element; Traptanium breaks for any Skylander.",
   "targets": [

@@ -1,6 +1,6 @@
 # Notices
 
-SkylandersPS4 is an independent compatibility project. Original project material
+SkylandersPC is an independent compatibility project. Original project material
 is GPL-3.0-or-later, subject to the exceptions in LICENSE_SCOPE.md.
 
 The playable local build uses bbport's renderer/platform/audio/memory code,

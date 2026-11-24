@@ -69,7 +69,7 @@ class AppRunTests(unittest.TestCase):
         elsewhere = self.base / 'elsewhere'; elsewhere.mkdir()
         result = self.run_apprun(image=elsewhere / 'Launcher.AppImage')
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Cannot find the SkylandersPS4 checkout', result.stderr)
+        self.assertIn('Cannot find the SkylandersPC folder', result.stderr)
 
     def test_python_passthrough_skips_checkout_lookup(self):
         elsewhere = self.base / 'elsewhere'; elsewhere.mkdir()

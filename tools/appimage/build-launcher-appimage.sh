@@ -96,7 +96,7 @@ app = QApplication([]); QWidget().show(); app.processEvents()'
 
 # Retained notices: the interpreter's licence and each package's dist-info.
 cp "$appdir"/usr/python/lib/python3*/LICENSE.txt "$appdir/usr/share/licenses/CPython-LICENSE.txt"
-cp "$root/LICENSE" "$appdir/usr/share/licenses/SkylandersPS4-LICENSE"
+cp "$root/LICENSE" "$appdir/usr/share/licenses/SkylandersPC-LICENSE"
 cp "$root/THIRD_PARTY_NOTICES.md" "$appdir/usr/share/licenses/"
 "$python" - "$appdir/usr/share/licenses/python-packages.txt" <<'EOF'
 import importlib.metadata, sys

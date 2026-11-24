@@ -3,7 +3,7 @@
   "id": "nightmare",
   "name": "Nightmare available by default",
   "version": "1.0.0",
-  "author": "SkylandersPS4 contributors",
+  "author": "SkylandersPC contributors",
   "licence": "GPL-3.0-or-later",
   "description": "Make Nightmare selectable when creating a fresh save.",
   "targets": [

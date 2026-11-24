@@ -3,7 +3,7 @@
   "id": "unlock-expansions",
   "name": "Unlock adventure packs",
   "version": "2.0.0",
-  "author": "SkylandersPS4 contributors",
+  "author": "SkylandersPC contributors",
   "licence": "GPL-3.0-or-later",
   "description": "Experimental: the adventure pack parts you turn on below. Unlock adventure packs opens all four packs without toys after the island introduction following Chapter 2; Replay introductions plays a pack's introduction after confirming travel at its Academy statue.",
   "targets": [

@@ -3,7 +3,7 @@
   "id": "controller-glyphs",
   "name": "Controller button prompts",
   "version": "1.0.0",
-  "author": "SkylandersPS4 contributors",
+  "author": "SkylandersPC contributors",
   "licence": "GPL-3.0-or-later",
   "description": "Redraws PlayStation button prompts with Xbox or Nintendo glyphs from locally imported Steam artwork.",
   "targets": [

@@ -3,7 +3,7 @@
   "id": "level-events",
   "name": "Level events",
   "version": "1.0.0",
-  "author": "SkylandersPS4 contributors",
+  "author": "SkylandersPC contributors",
   "licence": "GPL-3.0-or-later",
   "description": "Hooks level switches so the host can change the frame policy per level (needed by automatic FPS).",
   "targets": [
