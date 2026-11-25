@@ -42,9 +42,13 @@ After installing a supported game, setup runs automatically. When an update
 changes the game host, **Play** rebuilds it before starting. If the game files
 themselves need attention, choose **Repair game setup** from the game’s menu. Controller artwork
 and portrait downloads are optional extras; they never block setup.
-When a newer release is published, an **Update available** button appears at the
-top of the library. In a git checkout it updates with a fast-forward pull (rebuild
-the native parts afterwards); otherwise it opens the release page.
+Updates are automatic. When a newer release is published, the launcher downloads
+it in the background, checks it against the SHA-256 listed on the release, and
+installs it when the launcher closes (or straight away with **Restart to update**
+at the top of the library). Only the release's own files are replaced: games,
+saves and settings stay. If a setup step needs redoing afterwards, Play does it
+first. In a git checkout the button updates with a fast-forward pull instead
+(rebuild the native parts afterwards).
 The library shows setup status, installed versions and size. Use **Repair** to
 finish setup, **Open folder** to find the files, or **Remove** to unregister the
 game. Removal keeps saves, figures and settings; managed game files are retained

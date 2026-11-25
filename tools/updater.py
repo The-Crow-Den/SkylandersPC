@@ -1,15 +1,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check GitHub for a newer published release and, where it is safe, install it.
+"""Check GitHub for a newer published release and install it.
 
-The launcher code always runs from the checkout (the AppImage only carries
-Python), so the checkout is what gets updated. Git checkout: `git pull --ff-only` when the work tree is clean; native parts then
-need rebuilding, as after any pull. Anything else (Windows bundle, source
-archive) opens the release page.
+Release installs (the Linux folder with SkylandersPC.AppImage, the Windows
+folder with SkylandersPC.exe) update themselves: `download` fetches that
+platform's release archive, checks it against the SHA-256 GitHub lists for it
+and unpacks it into .local/update-staging. `apply_later` then starts a small
+script that waits for the launcher to close, copies the new files over the
+install and opens the launcher again. Only files that come with a release are
+replaced or removed: prepared game files, builds and the player's data stay.
+
+Git checkout: `git pull --ff-only` when the work tree is clean; native parts
+then need rebuilding, as after any pull. Anything else opens the release page.
 """
+import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
+import tarfile
+import zipfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -22,6 +33,9 @@ except ImportError:
 REPOSITORY = 'The-Crow-Den/SkylandersPC'
 API = f'https://api.github.com/repos/{REPOSITORY}/releases/latest'
 ROOT = Path(__file__).resolve().parents[1]
+STAGING = '.local/update-staging'
+MANIFEST = '.local/release-files.json'
+WINDOWS = os.name == 'nt'
 
 
 def parse(version):
@@ -60,11 +74,120 @@ def latest(timeout=10):
     return {'version': tag.lstrip('v'), 'tag': tag, 'url': data.get('html_url', ''),
             'notes': (data.get('body') or '')[:4000],
             'assets': {a['name']: a['browser_download_url'] for a in data.get('assets', [])
-                       if isinstance(a, dict) and a.get('name') and a.get('browser_download_url')}}
+                       if isinstance(a, dict) and a.get('name') and a.get('browser_download_url')},
+            'digests': {a['name']: a['digest'] for a in data.get('assets', [])
+                        if isinstance(a, dict) and a.get('name') and isinstance(a.get('digest'), str)}}
 
 
-def install_kind(root=ROOT):
-    return 'git' if (Path(root) / '.git').exists() else 'manual'
+def install_kind(root=ROOT, windows=WINDOWS, frozen=None):
+    root = Path(root)
+    if (root / '.git').exists():return 'git'
+    frozen = getattr(sys, 'frozen', False) if frozen is None else frozen
+    if windows and frozen and (root / 'SkylandersPC.exe').is_file():return 'windows'
+    if not windows and (root / 'SkylandersPC.AppImage').is_file():return 'linux'
+    return 'manual'
+
+
+def asset_name(release, kind):
+    suffix = {'linux': '-linux.tar.gz', 'windows': '-windows.zip'}[kind]
+    return f'SkylandersPC-{release["tag"]}{suffix}'
+
+
+def _safe_name(name):
+    path = Path(name.replace('\\', '/'))
+    return bool(name) and not path.is_absolute() and '..' not in path.parts and ':' not in name
+
+
+def download(release, kind, root=ROOT, progress=lambda fraction: None, opener=urllib.request.urlopen):
+    """Fetch, verify and unpack the release for this install. Returns the staged folder."""
+    root = Path(root);name = asset_name(release, kind)
+    url, digest = release['assets'].get(name), release.get('digests', {}).get(name, '')
+    if not url:raise ValueError('This release has no download for this computer yet.')
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):raise ValueError('The release does not list a checksum for its download.')
+    staging = root / STAGING
+    shutil.rmtree(staging, ignore_errors=True);staging.mkdir(parents=True)
+    archive = staging / name;hasher = hashlib.sha256()
+    request = urllib.request.Request(url, headers={'User-Agent': 'SkylandersPC-launcher'})
+    with opener(request, timeout=30) as response, archive.open('wb') as out:
+        total = int(response.headers.get('Content-Length') or 0);done = 0
+        for block in iter(lambda: response.read(1 << 20), b''):
+            out.write(block);hasher.update(block);done += len(block)
+            if total:progress(min(done / total, 1.0))
+    if 'sha256:' + hasher.hexdigest() != digest:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ValueError('The download did not match its published checksum. Nothing was changed.')
+    files = staging / 'files'
+    try:
+        if kind == 'linux':
+            with tarfile.open(archive) as bundle:
+                members = bundle.getmembers()
+                if any(not _safe_name(m.name) for m in members):raise ValueError('unsafe path in the download')
+                bundle.extractall(files, filter='data')
+            top = files / 'SkylandersPC-linux'
+            if not (top / 'tools/launcher.py').is_file():raise ValueError('the download is not a SkylandersPC release')
+        else:
+            with zipfile.ZipFile(archive) as bundle:
+                if any(not _safe_name(n) for n in bundle.namelist()):raise ValueError('unsafe path in the download')
+                bundle.extractall(files)
+            top = files
+            if not (top / 'SkylandersPC.exe').is_file():raise ValueError('the download is not a SkylandersPC release')
+    except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as error:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ValueError('The download could not be unpacked: ' + str(error)) from error
+    archive.unlink()
+    new = sorted(p.relative_to(top).as_posix() for p in top.rglob('*') if p.is_file() or p.is_symlink())
+    try:old = json.loads((root / MANIFEST).read_text())
+    except (OSError, ValueError):old = []
+    keep = set(new)
+    remove = [n for n in old if isinstance(n, str) and n not in keep and _safe_name(n)]
+    if kind == 'windows':remove = [n.replace('/', '\\') for n in remove]
+    (staging / 'remove.txt').write_text(''.join(n + '\n' for n in remove))
+    (top / MANIFEST).parent.mkdir(parents=True, exist_ok=True)
+    (top / MANIFEST).write_text(json.dumps(new))
+    (staging / 'version').write_text(release['version'])
+    return top
+
+
+def staged(root=ROOT):
+    """The version waiting in the staging folder, or None."""
+    try:return (Path(root) / STAGING / 'version').read_text().strip() or None
+    except OSError:return None
+
+
+def apply_later(kind, root=ROOT, pid=None, relaunch=True, popen=subprocess.Popen):
+    """Start the script that installs the staged files once this launcher exits."""
+    root = Path(root).resolve();staging = root / STAGING;pid = os.getpid() if pid is None else pid
+    if kind == 'linux':
+        script = staging / 'apply.sh'
+        script.write_text(f"""#!/bin/sh
+root={_sh(root)}; stage={_sh(staging)}
+while kill -0 {int(pid)} 2>/dev/null; do sleep 0.5; done
+while IFS= read -r name; do [ -n "$name" ] && rm -f -- "$root/$name"; done < "$stage/remove.txt"
+cp -a "$stage/files/SkylandersPC-linux/." "$root/" || exit 1
+rm -rf -- "$stage"
+{'exec "$root/SkylandersPC.AppImage" >/dev/null 2>&1' if relaunch else ''}
+""")
+        return popen(['sh', str(script)], start_new_session=True, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd='/')
+    script = staging / 'apply.cmd'
+    script.write_text(f"""@echo off
+set "ROOT={root}"
+set "STAGE={staging}"
+:wait
+tasklist /FI "PID eq {int(pid)}" 2>nul | find "{int(pid)}" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)
+for /f "usebackq delims=" %%f in ("%STAGE%\\remove.txt") do del /q "%ROOT%\\%%f" 2>nul
+robocopy "%STAGE%\\files" "%ROOT%" /E /NFL /NDL /NJH /NJS /R:5 /W:1 >nul
+if errorlevel 8 exit /b 1
+{'start "" "%ROOT%\\SkylandersPC.exe"' if relaunch else ''}
+rmdir /s /q "%STAGE%" & exit /b 0
+""".replace('\n', '\r\n'), newline='')
+    flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+    return popen(['cmd', '/c', str(script)], creationflags=flags, cwd=str(root.anchor or root),
+                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _sh(path):
+    return "'" + str(path).replace("'", "'\\''") + "'"
 
 
 def update_git(root=ROOT, run=subprocess.run):

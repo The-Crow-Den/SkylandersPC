@@ -52,6 +52,13 @@ class StaleHostTests(unittest.TestCase):
         state=self.snapshot(game_prepare.PreparationError('Game setup needs runtime. Choose Repair in the launcher to finish setup.'))
         self.assertEqual((state['state'],state['rebuild']),('Ready',True))
 
-    def test_changed_game_files_still_need_repair(self):
+    def test_outdated_setup_step_is_redone_by_play(self):
+        # After a launcher update: Play runs the same setup Repair would, then starts.
         state=self.snapshot(game_prepare.PreparationError('Game setup needs pack.60-delta. Choose Repair in the launcher to finish setup.'))
+        self.assertEqual((state['state'],state['rebuild']),('Ready',True))
+
+    def test_unreadable_setup_still_needs_repair(self):
+        state=self.snapshot(OSError('Permission denied'))
+        self.assertEqual((state['state'],state['rebuild']),('Needs repair',False))
+        state=self.snapshot(game_prepare.PreparationError('Game setup is running. It will be ready when setup finishes.'))
         self.assertEqual((state['state'],state['rebuild']),('Needs repair',False))
