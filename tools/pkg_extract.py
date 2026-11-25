@@ -357,12 +357,25 @@ def main():
     parser.add_argument('pkg', type=Path)
     parser.add_argument('out_dir', type=Path)
     args = parser.parse_args()
+    def progress(line):
+        try:print(line, flush=True)
+        except OSError as error:
+            # The launcher reading this output has gone (Windows reports a closed
+            # pipe as EINVAL); there is no one to finish the install for.
+            raise LauncherGone from error
     try:
-        extract(args.pkg, args.out_dir, progress=lambda line: print(line, flush=True))
+        extract(args.pkg, args.out_dir, progress=progress)
+    except LauncherGone:
+        return 1
     except (OSError, ValueError, struct.error, zlib.error) as error:
-        print('Extraction failed: ' + str(error), file=sys.stderr, flush=True)
+        try:print('Extraction failed: ' + str(error), file=sys.stderr, flush=True)
+        except OSError:pass
         return 1
     return 0
+
+
+class LauncherGone(Exception):
+    pass
 
 
 if __name__ == '__main__':

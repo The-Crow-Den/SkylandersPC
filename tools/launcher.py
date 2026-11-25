@@ -42,6 +42,36 @@ def launcher_icon(root):
     return folder / 'launcher.png' if (folder / 'launcher.png').is_file() else folder / 'crystal@2x.png'
 
 
+def record_errors():
+    """Keep the launcher open on an unexpected error and record it.
+
+    PyQt ends the process on an exception it can't hand to sys.excepthook; a
+    frozen Windows build has no console, so the window would just vanish. Errors
+    and hard crashes go to logs/launcher-errors.log in the player's data folder."""
+    import faulthandler, traceback, datetime
+    try:from .version import VERSION
+    except ImportError:from version import VERSION
+    try:
+        folder = user_data.base()/'logs';folder.mkdir(parents=True,exist_ok=True)
+        stream = open(folder/'launcher-errors.log','a',encoding='utf-8',errors='replace')
+        faulthandler.enable(stream)
+    except OSError:
+        folder,stream = None,None
+    def hook(kind, value, trace):
+        text = ''.join(traceback.format_exception(kind, value, trace))
+        if stream:
+            try:stream.write(f'--- {datetime.datetime.now().isoformat(timespec="seconds")} (v{VERSION})\n{text}\n');stream.flush()
+            except OSError:pass
+        if sys.stderr:
+            try:sys.stderr.write(text)
+            except OSError:pass
+        if issubclass(kind, KeyboardInterrupt):QApplication.quit();return
+        where = f'\n\nDetails were saved to {folder/"launcher-errors.log"}.' if folder else ''
+        try:QMessageBox.warning(None, 'Something went wrong', f'{kind.__name__}: {value}{where}')
+        except Exception:pass
+    sys.excepthook = hook
+
+
 class Launcher(QMainWindow):
     def __init__(self, root=ROOT):
         super().__init__()
@@ -394,6 +424,7 @@ def main():
         from PyQt6.QtGui import QIcon
         app.setWindowIcon(QIcon(str(icon)))
     adopt_user_data(ROOT)
+    record_errors()
     window = Launcher(ROOT)
     try:
         from .launcher_gamepad import game_mode

@@ -227,7 +227,7 @@ jobs:
           # Every tool module is a hidden import, so the stdlib/Qt they use is
           # frozen in; the tools themselves run from source beside the exe.
           $hidden = Get-ChildItem tools/*.py | Where-Object { $_.Name -notlike 'test*' -and $_.BaseName -ne 'frozen_entry' } | ForEach-Object { '--hidden-import', $_.BaseName }
-          python -m PyInstaller --noconfirm --windowed --name SkylandersPC --paths tools --distpath "$env:RUNNER_TEMP\frozen" --workpath "$env:RUNNER_TEMP\pyi" @hidden tools/frozen_entry.py
+          python -m PyInstaller --noconfirm --windowed --name SkylandersPC --icon tools/launcher_art/app-icon.ico --paths tools --distpath "$env:RUNNER_TEMP\frozen" --workpath "$env:RUNNER_TEMP\pyi" @hidden tools/frozen_entry.py
           if ($LASTEXITCODE) { exit 1 }
           Copy-Item -Recurse "$env:RUNNER_TEMP\frozen\SkylandersPC\*" out/SkylandersPC-windows/
           # PyInstaller's Qt hooks add every QML plugin; the launcher and PC menu use widgets

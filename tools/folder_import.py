@@ -38,10 +38,18 @@ def main():
     parser.add_argument('folder')
     parser.add_argument('out_dir')
     args = parser.parse_args()
+    gone = []
+    def progress(line):
+        try:print(line, flush=True)
+        except OSError:
+            # The launcher reading this output has gone; stop copying.
+            gone.append(True);raise
     try:
-        import_folder(args.folder, args.out_dir, progress=lambda line: print(line, flush=True))
+        import_folder(args.folder, args.out_dir, progress=progress)
     except (OSError, ValueError) as error:
-        print('Copy failed: ' + str(error), file=sys.stderr, flush=True)
+        if gone:return 1
+        try:print('Copy failed: ' + str(error), file=sys.stderr, flush=True)
+        except OSError:pass
         return 1
     return 0
 
