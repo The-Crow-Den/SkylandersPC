@@ -75,6 +75,55 @@ def installed_gpus(folder=ICD_FOLDER):
     return [vendor for vendor in GPU_DRIVERS if gpu_manifest(vendor, folder)]
 
 
+PCI_VENDORS = {'0x10de': 'nvidia', '0x1002': 'amd', '0x8086': 'intel'}
+VENDOR_NAMES = {'nvidia': 'NVIDIA', 'amd': 'AMD', 'intel': 'Intel'}
+PCI_IDS = (Path('/usr/share/hwdata/pci.ids'), Path('/usr/share/misc/pci.ids'), Path('/usr/share/pci.ids'))
+
+
+def pci_name(vendor_id, device_id, databases=PCI_IDS):
+    """A device's marketing name from the system's pci.ids, or None."""
+    vendor, device = vendor_id.lower().removeprefix('0x'), device_id.lower().removeprefix('0x')
+    for database in databases:
+        try:lines = database.read_text(errors='replace').splitlines()
+        except OSError:continue
+        inside = False
+        for line in lines:
+            if not line or line.startswith('#'):continue
+            if not line.startswith('\t'):
+                inside = line[:4].lower() == vendor
+            elif inside and not line.startswith('\t\t') and line[1:5].lower() == device:
+                name = line[5:].strip()
+                # pci.ids writes "GA104 [GeForce RTX 3070]": the bracketed part is the product.
+                if '[' in name and name.endswith(']'):name = name[name.rindex('[') + 1:-1]
+                return name
+        return None
+    return None
+
+
+def gpu_names(devices=Path('/sys/bus/pci/devices'), databases=PCI_IDS):
+    """{vendor: [GPU name, ...]} for the display adapters in this PC."""
+    found = {}
+    try:paths = sorted(devices.iterdir())
+    except OSError:return found
+    for path in paths:
+        try:
+            if not (path/'class').read_text().strip().startswith('0x03'):continue
+            vendor_id = (path/'vendor').read_text().strip();device_id = (path/'device').read_text().strip()
+        except OSError:continue
+        vendor = PCI_VENDORS.get(vendor_id.lower())
+        if not vendor:continue
+        name = pci_name(vendor_id, device_id, databases) or f'{VENDOR_NAMES[vendor]} GPU'
+        if not name.lower().startswith(VENDOR_NAMES[vendor].lower()):name = f'{VENDOR_NAMES[vendor]} {name}'
+        found.setdefault(vendor, []).append(name)
+    return found
+
+
+def gpu_label(vendor, names=None):
+    """What the launcher shows for a GPU choice: the card's name, not just its maker."""
+    names = gpu_names() if names is None else names
+    return ' + '.join(names.get(vendor, ())) or VENDOR_NAMES[vendor]
+
+
 def choose_gpu(choice, folder=ICD_FOLDER, problem=None):
     """(Vulkan manifest or None, warning or None) for a GPU choice. Automatic
     prefers a working NVIDIA driver, then AMD, then Intel, never the software

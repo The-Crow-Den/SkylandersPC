@@ -76,7 +76,7 @@ class SettingsPage(QWidget):
             'resolution':'Internal rendering resolution.',
             'aspect':'Wider screens show more of the world to the sides; menus and HUD keep their shape. Movies stay 16:9.', 'quality':'Detail and definition of game shadows.',
             'fullscreen':'Use the full display when starting a game.', 'motion_blur':'Smooth motion during camera movement.', 'anti_aliasing':'Smooth jagged edges (FXAA-style, almost free).',
-            'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'gpu':'Automatic uses NVIDIA when its driver works, otherwise the built-in GPU.',
+            'fps_counter':'Show frame rate during play.', 'trophy_popups':'Show a popup in the corner when a trophy unlocks.', 'gpu':'Automatic uses the NVIDIA card when its driver works, otherwise the next available GPU.',
             'mangohud':'Requires MangoHud to be installed separately.', 'figure':'Choose the figure placed at the start of a session.',
             'portal_volume':'Volume of voices from the portal speaker.', 'portal_device':'Automatic uses a plugged-in PS3/PS4/Wii/Wii U portal and otherwise the virtual portal with figure files. Physical portals are experimental.', 'unlock_nightmare':'Make Nightmare available when creating a save.',
             'skip_intro':'Go straight past the Activision, Toys for Bob and Beenox logos. US update only.',

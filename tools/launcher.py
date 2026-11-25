@@ -106,8 +106,8 @@ class Launcher(QMainWindow):
         self.check(display,'Show trophy popups','trophy_popups')
         self.check(display,'Motion blur','motion_blur')
         self.check(display,'Anti-aliasing','anti_aliasing')
-        names=dict(nvidia='NVIDIA',amd='AMD',intel='Intel')
-        self.combo(display,'Graphics card','gpu',[('Automatic','auto')]+[(names[v],v) for v in model.installed_gpus()])
+        cards=model.gpu_names()
+        self.combo(display,'Graphics card','gpu',[('Automatic','auto')]+[(model.gpu_label(v,cards),v) for v in model.installed_gpus()])
         self.check(display,'MangoHud overlay · optional installation','mangohud')
         for key in model.LINUX_ONLY:
             self.fields[key].setVisible(key in model.platform_settings())
