@@ -119,9 +119,9 @@ Icon=org.skylanders.Launcher
 Terminal=false
 Categories=Game;
 EOF
-# The supplied launcher icon is private (.local/); fall back to a plain square.
-if [ -f "$root/.local/app-icon/launcher.png" ]; then
-    cp "$root/.local/app-icon/launcher.png" "$appdir/org.skylanders.Launcher.png"
+# The launcher icon ships in tools/launcher_art; fall back to a plain square.
+if [ -f "$root/tools/launcher_art/app-icon.png" ]; then
+    cp "$root/tools/launcher_art/app-icon.png" "$appdir/org.skylanders.Launcher.png"
 else
     "$python" - "$appdir/org.skylanders.Launcher.png" <<'EOF'
 import struct, sys, zlib

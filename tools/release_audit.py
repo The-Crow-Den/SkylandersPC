@@ -31,7 +31,8 @@ REVIEWED_BINARY={'renderer/gpu/third_party/fonts/DejaVuSans.ttf', # Bitstream Ve
                  # Game logos for the launcher library, published by the project owner (2026-11-24);
                  # see tools/launcher_art/NOTICE.md.
                  'tools/launcher_art/swap-force-logo.png','tools/launcher_art/trap-team-logo-cutout.png',
-                 'tools/launcher_art/superchargers-logo.png','tools/launcher_art/imaginators-logo.png'}
+                 'tools/launcher_art/superchargers-logo.png','tools/launcher_art/imaginators-logo.png',
+                 'tools/launcher_art/app-icon.png'}  # The launcher and AppImage icon.
 SUBMODULES={'renderer/gpu/third_party/imgui','renderer/third_party/LibAtrac9'}
 # Literal mod payloads the project owner reviewed and chose to publish (2026-11-08).
 REVIEWED_LITERAL={'profiles/patches/trap-team-us-01.01-traptanium.experimental.json'}

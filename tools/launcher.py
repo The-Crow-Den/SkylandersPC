@@ -36,6 +36,8 @@ except ImportError:
 
 
 def launcher_icon(root):
+    shipped = Path(root) / 'tools/launcher_art/app-icon.png'
+    if shipped.is_file():return shipped
     folder = Path(root) / '.local/app-icon'
     return folder / 'launcher.png' if (folder / 'launcher.png').is_file() else folder / 'crystal@2x.png'
 
