@@ -99,6 +99,18 @@ class UpdaterTest(unittest.TestCase):
             self.assertFalse((root / updater.STAGING).exists())
             self.assertIn('SkylandersPC.AppImage', json.loads((root / updater.MANIFEST).read_text()))
 
+    def test_site_fallback_reads_checksums(self):
+        class Head(io.BytesIO):
+            def geturl(self):return 'https://github.com/x/y/releases/tag/v9.0.0'
+        sums = ('a' * 64 + '  SkylandersPC-v9.0.0-linux.tar.gz\n' + 'b' * 64 + ' *SkylandersPC-v9.0.0-windows.zip\n').encode()
+        old = updater.fetch
+        updater.fetch = lambda url, timeout=10, limit=None: sums
+        try:release = updater.latest_from_site(opener=lambda request, timeout: Head())
+        finally:updater.fetch = old
+        self.assertEqual(release['version'], '9.0.0')
+        self.assertEqual(release['digests']['SkylandersPC-v9.0.0-linux.tar.gz'], 'sha256:' + 'a' * 64)
+        self.assertTrue(release['assets']['SkylandersPC-v9.0.0-windows.zip'].endswith('/v9.0.0/SkylandersPC-v9.0.0-windows.zip'))
+
     def test_git_refuses_dirty_tree(self):
         run = lambda args, **k: SimpleNamespace(returncode=0, stdout=' M tools/x.py\n', stderr='')
         with self.assertRaises(ValueError):updater.update_git('/repo', run)

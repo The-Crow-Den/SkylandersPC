@@ -65,6 +65,8 @@ def latest(timeout=10):
     except urllib.error.HTTPError as error:
         if error.code == 404:  # nothing published yet
             return None
+        if error.code in (403, 429):  # the API's per-address limit; shared networks hit it
+            return latest_from_site(timeout)
         raise
     if not isinstance(data, dict) or data.get('draft') or data.get('prerelease'):
         return None
@@ -77,6 +79,28 @@ def latest(timeout=10):
                        if isinstance(a, dict) and a.get('name') and a.get('browser_download_url')},
             'digests': {a['name']: a['digest'] for a in data.get('assets', [])
                         if isinstance(a, dict) and a.get('name') and isinstance(a.get('digest'), str)}}
+
+
+def latest_from_site(timeout=10, opener=urllib.request.urlopen):
+    """The latest release from github.com itself (not rate-limited like the API).
+
+    The /releases/latest page redirects to the newest published release's tag;
+    checksums come from the release's SHA256SUMS file."""
+    request = urllib.request.Request(f'https://github.com/{REPOSITORY}/releases/latest',
+                                     headers={'User-Agent': 'SkylandersPC-launcher'}, method='HEAD')
+    with opener(request, timeout=timeout) as response:
+        final = response.geturl()
+    match = re.search(r'/releases/tag/([^/?#]+)$', final)
+    if not match or not newer(match.group(1)):return None
+    tag = match.group(1);base = f'https://github.com/{REPOSITORY}/releases/download/{tag}/'
+    try:sums = fetch(base + 'SHA256SUMS', timeout, limit=1 << 16).decode()
+    except urllib.error.HTTPError:return None
+    digests = {}
+    for line in sums.splitlines():
+        found = re.fullmatch(r'([0-9a-f]{64})\s+\*?(\S+)', line.strip())
+        if found:digests[found.group(2)] = 'sha256:' + found.group(1)
+    return {'version': tag.lstrip('v'), 'tag': tag, 'url': f'https://github.com/{REPOSITORY}/releases/tag/{tag}',
+            'notes': '', 'assets': {name: base + name for name in digests}, 'digests': digests}
 
 
 def install_kind(root=ROOT, windows=WINDOWS, frozen=None):
