@@ -284,7 +284,6 @@ def plan(pipeline, install, config):
     module_names = prep.get('modules',[])
     if not isinstance(module_names,list) or len(module_names)>15 or any(not isinstance(name,str) or not name or Path(name).name!=name or name in ('.','..') for name in module_names):raise PreparationError('Invalid profile module name')
     modules = [install.source('sce_module/'+name) for name in module_names]
-    profile_file = next(p for p in sorted((root/'profiles').glob('*.json')) if json.loads(p.read_text()).get('id')==config['profile_id'])
     def verify(key):
         actual = file_hash(install.source('eboot.bin'))
         if actual!=digest or actual!=pipeline.entry['executable_sha256']:raise PreparationError('The game file changed. Install the matching supported game again.')
@@ -292,7 +291,11 @@ def plan(pipeline, install, config):
             if not module.is_file():raise PreparationError('A required game module is missing: '+module.name)
             if module.stat().st_size>512*1024*1024:raise PreparationError('A game module exceeds the inspection limit: '+module.name)
         return pipeline.report('verify',key,dict(executable_sha256=actual,title_id=install.title_id,app_version=install.app_version))
-    steps = [Step('verify-executable',dict(files=[install.source('eboot.bin'),*modules,profile_file]),verify,'Checking your game files…')]
+    # Record only this build's own preparation settings, not the whole profile
+    # file: adding another build or region to a profile must not send every
+    # existing install back through Repair.
+    identity = dict(profile_id=config['profile_id'],executable_sha256=digest,preparation=prep)
+    steps = [Step('verify-executable',dict(files=[install.source('eboot.bin'),*modules],values=identity),verify,'Checking your game files…')]
     def validate_recipe(path):
         record = json.loads(path.read_text())
         if (record.get('title_id'),record.get('app_version'),record.get('executable_sha256'))!=(install.title_id,install.app_version,digest):

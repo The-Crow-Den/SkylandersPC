@@ -40,6 +40,10 @@ def snapshot(root,game,active=None):
             # host rebuilt: Play does that first, with no Repair needed. Game files are untouched.
             if os.name!='nt' and 'needs runtime.' in str(error):
                 state='Ready';message='Ready to play. The game host is rebuilt first.';rebuild=True
+            elif 'needs verify-executable.' in str(error):
+                # A launcher update changed what setup records; the game files still
+                # match a supported build, so Play re-checks them first.
+                state='Ready';message='Ready to play. Your game files are checked first.';rebuild=True
             else:state='Needs repair';message='Setup needs attention. Choose Repair to check and finish it.'
     else:
         rebuild=False
