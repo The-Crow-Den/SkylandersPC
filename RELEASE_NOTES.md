@@ -1,3 +1,18 @@
+## SkylandersPC 0.1.2 (beta)
+
+### What's new in 0.1.2
+
+- **Trap Team 01.01 launches again.** After updating to 0.1.1, existing installs
+  stopped at "exit code 2" until Repair was run. They now start normally.
+- **Automatic updates.** From this version on, the launcher downloads new releases
+  in the background, checks them against their published checksum and installs
+  them when it closes (or right away with *Restart to update*). Games, saves and
+  settings are kept. This version itself still has to be downloaded by hand.
+- **Graphics card names.** On Linux, the graphics card setting lists the cards in
+  your PC by name instead of by maker.
+- After an update, *Play* finishes any setup step that needs redoing instead of
+  asking for Repair.
+
 ## SkylandersPC 0.1.1 (beta)
 
 ### What's new in 0.1.1
