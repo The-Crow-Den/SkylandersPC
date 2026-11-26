@@ -599,10 +599,19 @@ def run(argv,sessions):
         mod_writes=[]
         code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
                  for operation in available_mods[ident]['operations'])
-        applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
-                                       settings=mod_settings,title_id=installation.title_id,
-                                       asset_source=installation.source,find_cache=ROOT/'out/asset-mod-cache/find',
-                                       executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
+        while True:
+            mod_writes=[]
+            try:
+                applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
+                                               settings=mod_settings,title_id=installation.title_id,
+                                               asset_source=installation.source,find_cache=ROOT/'out/asset-mod-cache/find',
+                                               executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
+                break
+            except mod_manifest.ModUnfit as error:
+                # Portable edits made on another region's copy: skip the mod, not the game.
+                if error.ident not in selected_mod_ids:raise
+                print(f'Skipping mod {error.ident}: it does not fit this copy of the game ({error})',flush=True)
+                selected_mod_ids=[ident for ident in selected_mod_ids if ident!=error.ident]
         if any(operation['type']=='code-patch' for mod in applied_mods for operation in mod['operations']):
             raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
         mod_handlers={(operation['handler']):(mod,operation) for mod,operation in mod_manifest.generated(applied_mods)}

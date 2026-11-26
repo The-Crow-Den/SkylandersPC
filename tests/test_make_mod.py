@@ -2,6 +2,7 @@
 import random
 from pathlib import Path
 import struct
+import tempfile
 import sys
 import unittest
 
@@ -10,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import archive_blocks
 import asset_mod
 import make_mod
+import mod_manifest
 from test_archive_blocks import archive
 
 # Two records hold pointers; a field of the first is what the mod changes. A second
@@ -78,25 +80,27 @@ class MakeModTests(unittest.TestCase):
         self.assertEqual(make_mod.port_asset(recipe, source, source), (recipe, 'same archive'))
 
     def test_port_relocates_a_moved_pointer(self):
-        # The field's old pointer differs per build; the new value is the same in both.
-        def variant(shift):
+        # A game data file (IGZ, object section at 0): the field's old pointer and the
+        # object the new pointer names both sit 0x60 later in the other build.
+        def variant(shift, moved=True):
             plain = bytearray(build(shift))
+            plain[0:4] = b'\x01ZGI';plain[0x28:0x2c] = bytes(4)
             plain[FIELD:FIELD + 8] = struct.pack('<Q', 0x24e28 + shift)
-            plain[0x7000:0x7008] = struct.pack('<Q', 0xadd60)
+            obj = 0x6000 + (shift if moved else 0)
+            plain[obj:obj + 128] = bytes(range(7, 135))
             return bytes(plain)
         source, target = archive([('a.bin', variant(0))]), archive([('a.bin', variant(0x60))])
-        recipe = archive_blocks.resolve(source, 'x.arc', [dict(member='a.bin', find_hex=b'FIELDTAG'.hex() , replacement_hex='00')])
+        recipe = archive_blocks.resolve(source, 'x.arc', [dict(member='a.bin', find_hex=b'FIELDTAG'.hex(), replacement_hex='00')])
         recipe['chunks'][0]['edits'] = [dict(offset=FIELD, expected_hex=struct.pack('<Q', 0x24e28).hex(),
-                                             replacement_hex=struct.pack('<Q', 0xadd60).hex())]
+                                             replacement_hex=struct.pack('<Q', 0x6000).hex())]
         ported, how = make_mod.port_asset(recipe, source, target)
         self.assertTrue(how.startswith('relocated'))
-        edit = ported['chunks'][0]['edits'][0]
-        self.assertEqual(bytes.fromhex(edit['expected_hex'])[:3], struct.pack('<Q', 0x24e28 + 0x60)[:3])
         patched = plain_of(asset_mod.patch_asset(target, ported)[0])
-        self.assertEqual(struct.unpack_from('<Q', patched, FIELD)[0], 0xadd60)
-        # A new pointer that does not exist in the other build is refused, never invented.
-        recipe['chunks'][0]['edits'][0]['replacement_hex'] = struct.pack('<Q', 0xbeef00).hex()
-        with self.assertRaisesRegex(ValueError, 'does not occur'):
+        # The new pointer follows its object, never the other build's stale value.
+        self.assertEqual(struct.unpack_from('<Q', patched, FIELD)[0], 0x6060)
+        # An object that cannot be found once is refused, never guessed.
+        recipe['chunks'][0]['edits'][0]['replacement_hex'] = struct.pack('<Q', 0x7fc0).hex()  # its object would run past the file
+        with self.assertRaisesRegex(ValueError, 'not found once'):
             make_mod.port_asset(recipe, source, target)
 
     def test_refusals(self):
@@ -107,6 +111,18 @@ class MakeModTests(unittest.TestCase):
             make_mod.portable_edits(data, [], {'a.bin': build(0)})
         with self.assertRaisesRegex(ValueError, 'not in this archive'):
             make_mod.portable_edits(data, [], {'b.bin': b''})
+
+    def test_portable_mod_that_does_not_fit_is_reported_as_unfit(self):
+        data = archive([('a.bin', build(0))])
+        manifest = mod_manifest.parse(dict(
+            schema_version=1, id='region', name='Region', version='1.0.0', author='Tests', licence='GPL-3.0-or-later',
+            targets=[dict(title_id='CUSA00000', app_version='01.00', executable_sha256='a' * 64)],
+            operations=[dict(type='asset-find', asset='x.arc', edits=[dict(find_hex=b'NOTHERE!'.hex(), replacement_hex='00')])]))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'x.arc';path.write_bytes(data)
+            with self.assertRaises(mod_manifest.ModUnfit) as caught:
+                mod_manifest.plan({'region': manifest}, ['region'], 'a' * 64, asset_source=lambda _: path)
+        self.assertEqual(caught.exception.ident, 'region')
 
     def test_member_names_become_safe_paths(self):
         self.assertEqual(str(make_mod.safe_name('c:\\temp/a//b.igz')), 'c_/temp/a/b.igz')

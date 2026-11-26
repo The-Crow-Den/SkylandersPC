@@ -158,7 +158,7 @@ class ManifestTest(unittest.TestCase):
         # The same two recipes for each build: 01.01, and US 01.00 (ported).
         for version in ('01.01', '01.00'):
             profiles = [operation['profile'] for operation in available['unlock-expansions']['operations']
-                        if f'-{version}-' in operation['profile']]
+                        if f'-us-{version}-' in operation['profile']]
             self.assertEqual(len(profiles), 2)
             self.assertTrue(any('replay-expansion-intros' in name for name in profiles))
         self.assertEqual(set(available['unlock-expansions']['settings']), {'unlock-adventure-packs', 'replay-introductions'})
@@ -166,10 +166,14 @@ class ManifestTest(unittest.TestCase):
         replay_only = mods.plan(available, ['unlock-expansions'], us, settings={'unlock-expansions': {'unlock-adventure-packs': False}})
         self.assertEqual([op['profile'] for op in replay_only[0]['operations']],
                          ['profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json'])
-        # US and EU 01.00 share an executable; only the US copy has recipes, so EU skips the mod.
+        # US and EU 01.00 share an executable; each region has its own recipe. EU 01.01
+        # (same executable as US 01.01) has none, so it skips the mod.
         base = 'bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd'
         self.assertTrue(mods.supports(available, 'unlock-expansions', base, 'CUSA00626'))
-        self.assertFalse(mods.supports(available, 'unlock-expansions', base, 'CUSA00697'))
+        self.assertTrue(mods.supports(available, 'unlock-expansions', base, 'CUSA00697'))
+        eu = [operation['profile'] for operation in available['unlock-expansions']['operations'] if operation.get('title_id') == 'CUSA00697']
+        self.assertEqual(eu, ['profiles/patches/trap-team-eu-01.00-unlock-expansions.experimental.json'])
+        self.assertFalse(mods.supports(available, 'unlock-expansions', us, 'CUSA00697'))
         self.assertTrue(mods.supports(available, 'nightmare', base, 'CUSA00697'))
 
     def test_builtin_manifests_parse(self):

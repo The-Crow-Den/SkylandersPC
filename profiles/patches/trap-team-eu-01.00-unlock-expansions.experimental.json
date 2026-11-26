@@ -1,0 +1,113 @@
+{
+  "schema_version": 2,
+  "recipe_features": [
+    "iga-block-alignment"
+  ],
+  "revision": 6,
+  "title_id": "CUSA00697",
+  "app_version": "01.00",
+  "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+  "name": "Expansion eligibility",
+  "status": "Ported from the US 01.00 recipe to EU 01.00 by tools/make_mod.py port; not yet played on EU.",
+  "behavior": "Unlocks all adventure packs without toys, while retaining the original Academy island introduction after Chapter 2 and its saved deployment state; platform, stairs, statues and portal effects follow the original story flow",
+  "assets": [
+    {
+      "asset": "permanent/global.bld",
+      "source_sha256": "f1358f785eb6fb2826adbf028aa30ebdbd1b02b32b3dc3d8f3c70dbd634bcb4f",
+      "chunks": [
+        {
+          "offset": 1282048,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3666,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "26e096cb74244ee11af54e70d93d56f484c7bfd14a1cc95ad497b3fc45e99197",
+          "edits": [
+            {
+              "offset": 20668,
+              "expected_hex": "d04a250000000000",
+              "replacement_hex": "e0dc0a0000000000"
+            },
+            {
+              "offset": 21644,
+              "expected_hex": "d04a250000000000",
+              "replacement_hex": "e0dc0a0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_hub_2014_01.bld",
+      "source_sha256": "d1d49cbea358e1b12fb3f9dfb912e2df36fff945b504eb3b14d565ba65f2225a",
+      "chunks": [
+        {
+          "offset": 2234368,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 5121,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "ae1695dbe7627302ae74e0f2c930ceeca007b5dfd620d73d4c2204de2043ca48",
+          "edits": [
+            {
+              "offset": 22288,
+              "expected_hex": "0100000000000000005727",
+              "replacement_hex": "000000000000000098b028"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_hub_2014_02.bld",
+      "source_sha256": "2e1df4fd26919c67b9c632cced2a2b6d2cfd14adb11b48f81f45f7bba9e85418",
+      "chunks": [
+        {
+          "offset": 2426880,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4784,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "b2bdb80cebe2917f05e3331e7bde2303c7b5303af9ed63d6eb4603e106f17454",
+          "edits": [
+            {
+              "offset": 30616,
+              "expected_hex": "0100000000000000d8a2290000000000",
+              "replacement_hex": "0000000000000000b0fb2a0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_hub_2014_03.bld",
+      "source_sha256": "0cbc2f065f6c8efdf2d5e28daf13d41705b64d2ebf3e60b309f244f9decebbd7",
+      "chunks": [
+        {
+          "offset": 2615296,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4873,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "780db941114ed426fb22e9abae4fc6de22aaa88be2ffddddd6d78d044e522153",
+          "edits": [
+            {
+              "offset": 15004,
+              "expected_hex": "010000000000000058932e0000000000",
+              "replacement_hex": "000000000000000038ec2f0000000000"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "EU 01.00: pack access and English text, from the US recipe"
+}

@@ -129,6 +129,11 @@ edit is searched for in the installed archive and turned into an exact
   such as pointers, by copying them from where the game already holds them.
 - `member` (optional) limits the search to one file inside the archive.
 
+When an edit is not found once in the installed copy, the launch skips that
+mod with a message instead of refusing to start. Trap Master and Unlock
+Expansions use this for the EU game: their edits were made from the US copy
+and apply wherever the EU files hold the same content.
+
 `profiles/mods/nightmare/mod.json` uses one `asset-find` edit for both US
 builds.
 

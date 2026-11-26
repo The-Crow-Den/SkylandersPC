@@ -45,6 +45,13 @@ class ModError(ValueError):
     pass
 
 
+class ModUnfit(ModError):
+    """A mod's portable edits are not found in the installed copy of the game."""
+    def __init__(self, ident, message):
+        super().__init__(message)
+        self.ident = ident
+
+
 def text(value, name, maximum=200):
     if not isinstance(value, str) or not value.strip() or len(value) > maximum:
         raise ModError(f'{name} must be a nonempty string')
@@ -473,7 +480,7 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
                 try:
                     recipe = find_recipe(operation, asset_source, find_cache)
                 except (OSError, ValueError) as error:
-                    raise ModError(f"mod {ident}: {operation['asset']}: {error}") from None
+                    raise ModUnfit(ident, f"mod {ident}: {operation['asset']}: {error}") from None
                 operation = dict(operation, recipes=[recipe])
             if operation['type'] == 'generated' and 'profile' in operation:
                 path, _ = load_profile(manifest, operation['profile'], executable_sha256)
@@ -492,7 +499,7 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
         if not operations:
             raise ModError(f'mod {ident} has no operations for this game build')
         applied.append(dict(id=ident, name=manifest['name'], version=manifest['version'],
-                            builtin=manifest.get('builtin', False), title_id=target['title_id'],
+                            builtin=manifest.get('builtin', False), title_id=title_id or target['title_id'],
                             app_version=target['app_version'], settings=chosen, operations=operations))
     return applied
 

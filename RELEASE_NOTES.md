@@ -26,6 +26,10 @@ updates from older versions, before it goes out.
   Xbox or Nintendo controller prompts. *Skip Cutscenes* still needs the 01.01
   update; mods that don't fit your version are skipped instead of stopping the
   game.
+- **More mods on the EU game (01.00).** Xbox or Nintendo controller prompts and
+  *Unlock adventure packs* now work on it, alongside *Unlock Nightmare* and
+  60 FPS (not yet played through on EU). *Trap Master* and *Skip Cutscenes* are
+  still US-only; on an EU copy they are skipped instead of stopping the game.
 - **Making mods is easier.** `tools/make_mod.py` turns files you edit into a mod:
   unpack a game archive, change it, and the tool writes the mod for you, fitting
   every game version it can. `profiles/mods/README.md` explains how.

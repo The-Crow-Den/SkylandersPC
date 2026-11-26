@@ -22,6 +22,7 @@ private, inside out/ or another ignored folder.
 """
 import argparse
 import hashlib
+import struct
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -126,6 +127,9 @@ def overlapping_count(haystack, needle):
     return count
 
 
+PIECE = 128
+
+
 def portable_edits(data, other_archives, changed):
     """Portable edits for changed={member: edited bytes} of archive data.
 
@@ -145,7 +149,9 @@ def portable_edits(data, other_archives, changed):
         if len(edited) != len(original):
             raise ValueError(f'{member} changed size ({len(original)} -> {len(edited)} bytes); edits must keep the size')
         for start, end in runs(original, edited):
-            edits.append(_edit(blocks, others, member, original, edited, start, end))
+            # A long change (rewritten text) is split so each piece fits a pattern with context.
+            for piece in range(start, end, PIECE):
+                edits.append(_edit(blocks, others, member, original, edited, piece, min(end, piece + PIECE)))
     if not edits:
         raise ValueError('No changes found')
     fitting = []
@@ -203,10 +209,21 @@ def _pointerish(raw):
     return len(raw) == 8 and 0x100 <= int.from_bytes(raw, 'little') < 1 << 40
 
 
-def _count(plains, compiled):
-    """0, 1 or 2 (two or more): only uniqueness matters."""
+def _literal(text):
+    """The longest run of fixed bytes in hex text with ?? wildcards."""
+    return max((bytes.fromhex(part) for part in text.split('??') if part), key=len, default=b'')
+
+
+def _count(plains, compiled, text=None):
+    """0, 1 or 2 (two or more): only uniqueness matters.
+
+    text: the pattern's hex; blocks without its longest fixed run are skipped by a
+    fast byte search before the slower pattern match (large archives)."""
+    literal = _literal(text) if text else b''
     total = 0
     for plain in plains:
+        if literal and literal not in plain:
+            continue
         for _ in compiled.finditer(plain):
             total += 1
             if total > 1:
@@ -238,9 +255,9 @@ def _portable(blocks, others, original, start, end, fixed):
                 continue
             try:compiled, _ = archive_blocks.pattern(text)
             except ValueError:continue
-            if _count(blocks, compiled) != 1:
+            if _count(blocks, compiled, text) != 1:
                 continue
-            if all(_count(plains, compiled) == 1 for plains in others):
+            if all(_count(plains, compiled, text) == 1 for plains in others):
                 return a, b, text
             best = best or (a, b, text)
         if a == low and b == high:
@@ -323,6 +340,34 @@ def port_asset(recipe, source, target):
     return ported, 'relocated: the original values differ in this build, review before use'
 
 
+def _translate(original, whole, value):
+    """Where the object a pointer value names sits in the other build's member.
+
+    Game data members are IGZ files whose pointers are offsets into the object
+    section (its start is at header offset 0x28). The object is found by its
+    first 128 bytes with pointer-like values masked, near the same offset; the
+    result is None unless exactly one place matches."""
+    if original[:4] != b'\x01ZGI' or whole[:4] != b'\x01ZGI':
+        return None
+    size = 128
+    def signature(data, at):
+        base = struct.unpack_from('<I', data, 0x28)[0] + at
+        if not 0 <= base <= len(data) - size:
+            return None
+        part = data[base:base + size]
+        return [None if _pointerish(part[i:i + 8]) else part[i:i + 8] for i in range(0, size, 8)]
+    wanted = signature(original, value)
+    if wanted is None or sum(item is not None for item in wanted) < 6:
+        return None
+    hits = []
+    for distance in range(-0x4000, 0x4001, 4):
+        other = signature(whole, value + distance)
+        if other and all(a is None or b is None or a == b for a, b in zip(wanted, other)) and \
+                sum(a is not None and b is not None for a, b in zip(wanted, other)) >= 6:
+            hits.append(value + distance)
+    return hits[0] if len(hits) == 1 else None
+
+
 def relocate(asset, source, target, before, changed):
     """Exact edits for target where the original bytes are moved pointers.
 
@@ -342,10 +387,21 @@ def relocate(asset, source, target, before, changed):
         original = b''.join(block['plain'] for block in before[member])
         whole = b''.join(target_members.get(member, []))
         for start, end in runs(original, edited):
+            new = bytearray()
             q0 = start
-            new = edited[start:end]
-            if _pointerish(edited[q0:q0 + 8]) and edited[q0:q0 + 8] not in whole:
-                raise ValueError(f'{asset}: the new value at byte {start} of {member} does not occur in the other build')
+            # Each changed 8-byte value from the change's start; a pointer may name an
+            # object that sits elsewhere in the other build too.
+            while q0 < end:
+                if _pointerish(edited[q0:q0 + 8]):
+                    target_value = _translate(original, whole, int.from_bytes(edited[q0:q0 + 8], 'little'))
+                    if target_value is None:
+                        raise ValueError(f'{asset}: the object the new value at byte {q0} of {member} points to '
+                                         'is not found once in the other build')
+                    new += target_value.to_bytes(8, 'little');end = max(end, q0 + 8)
+                else:
+                    new += edited[q0:min(q0 + 8, end)]
+                q0 += 8
+            new = bytes(new)
             a, b, text = _portable(blocks, [target_plains], original, start, end, (start, start))
             compiled, _ = archive_blocks.pattern(text)
             found = [(block, match.start()) for block in target_blocks if block['member'] == member

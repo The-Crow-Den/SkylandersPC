@@ -38,7 +38,8 @@
         "setting": "elemental-gates",
         "equals": true
       },
-      "profile": "profiles/patches/trap-team-us-01.01-element-gates.experimental.json"
+      "profile": "profiles/patches/trap-team-us-01.01-element-gates.experimental.json",
+      "title_id": "CUSA00626"
     },
     {
       "type": "asset-patch",
@@ -47,7 +48,8 @@
         "setting": "traptanium",
         "equals": true
       },
-      "profile": "profiles/patches/trap-team-us-01.01-traptanium.experimental.json"
+      "profile": "profiles/patches/trap-team-us-01.01-traptanium.experimental.json",
+      "title_id": "CUSA00626"
     },
     {
       "type": "asset-patch",

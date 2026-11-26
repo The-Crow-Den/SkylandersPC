@@ -404,15 +404,16 @@ def port_profile(profile,source_read,target_read,target_build):
     source_read/target_read map an archive path to its bytes in each build. A
     section whose archive is unchanged is kept. Otherwise every texture it
     draws into must occur exactly once in the target archive's same member,
-    all moved by one distance; texture offsets shift by it and the blocks
-    covering the moved bytes are taken from the target.
+    all moved by one distance (prompts may each move by their own); texture
+    offsets shift and the blocks covering the moved bytes are taken from the
+    target. A section without textures must hold identical content.
     """
     try:from . import archive_blocks
     except ImportError:import archive_blocks
-    def section(current,ranges):
+    def section(current,ranges,per_texture=False):
         source,target=source_read(current['asset']),target_read(current['asset'])
         if asset_mod.digest(source)!=current['source_sha256']:raise ValueError(f"{current['asset']}: unexpected source archive")
-        if source==target:return dict(current),0
+        if source==target:return dict(current),([0]*len(ranges) if per_texture else 0)
         def members(data):
             result={}
             for block in archive_blocks.blocks(data):result.setdefault(block['member'],[]).append(block)
@@ -423,21 +424,26 @@ def port_profile(profile,source_read,target_read,target_build):
                    asset_mod.digest(b['plain']) in {r['decoded_sha256'] for r in current['chunks']}}=={*bases}),None)
         if name is None or name not in after:raise ValueError(f"{current['asset']}: the drawn blocks are not in one member")
         old=b''.join(b['plain'] for b in before[name]);new=b''.join(b['plain'] for b in after[name])
-        shifts=set()
+        # Each texture is found again by content. Prompts may move by different
+        # distances (another region repacks the archive); the others must not.
+        moved=[]
         for start,size in ranges:
             data=old[start:start+size]
             if not data or new.count(data)!=1:raise ValueError(f"{current['asset']}: a texture is not found once in the other build")
-            shifts.add(new.find(data)-start)
-        if len(shifts)!=1:raise ValueError(f"{current['asset']}: the textures moved by different distances")
-        shift=shifts.pop()
+            moved.append(new.find(data)-start)
+        if not ranges and old!=new:raise ValueError(f"{current['asset']}: the drawn member changed; port it by hand")
+        if not per_texture and len(set(moved))>1:raise ValueError(f"{current['asset']}: the textures moved by different distances")
         wanted=set()
-        for base in bases:
-            for at in range(base+shift,base+shift+32768,32768):wanted.add(at//32768*32768)
-            wanted.add((base+shift+32767)//32768*32768)
+        if ranges:
+            for (start,size),distance in zip(ranges,moved):
+                for at in range((start+distance)//32768*32768,start+distance+size,32768):wanted.add(at)
+        else:
+            wanted=set(bases)
         rows=[]
         for block in after[name]:
             if block['member_offset'] in wanted and block['member_offset']<len(new):
                 rows.append(dict(block['chunk'],plain_offset=block['member_offset'],decoded_sha256=asset_mod.digest(block['plain'])))
+        shift=moved if per_texture else (moved[0] if moved else 0)
         return dict(current,source_sha256=asset_mod.digest(target),chunks=rows),shift
     result=dict(profile,app_version=target_build['app_version'],executable_sha256=target_build['executable_sha256'])
     root,shift=section(profile,[(profile['texture_offset'],profile['texture_height']*1024*4)] if 'texture_height' in profile else [])
@@ -448,9 +454,9 @@ def port_profile(profile,source_read,target_read,target_build):
         current=profile[key]
         ranges=([(t['texture_offset'],t['texture_size']) for t in current['textures']] if key=='prompts' else
                 [(current['texture_offset'],current['texture_size'])] if key=='title' else [])
-        ported,shift=section(current,ranges)
+        ported,shift=section(current,ranges,per_texture=key=='prompts')
         if key=='shapes' and shift:raise ValueError('the font archive moved; port it by hand')
-        if key=='prompts':ported['textures']=[dict(t,texture_offset=t['texture_offset']+shift) for t in current['textures']]
+        if key=='prompts':ported['textures']=[dict(t,texture_offset=t['texture_offset']+d) for t,d in zip(current['textures'],shift)]
         if key=='title':ported['texture_offset']=current['texture_offset']+shift
         result[key]=ported
     return result

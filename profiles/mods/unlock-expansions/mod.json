@@ -38,7 +38,8 @@
       "when": {
         "setting": "unlock-adventure-packs",
         "equals": true
-      }
+      },
+      "title_id": "CUSA00626"
     },
     {
       "type": "asset-patch",
@@ -47,7 +48,8 @@
       "when": {
         "setting": "replay-introductions",
         "equals": true
-      }
+      },
+      "title_id": "CUSA00626"
     },
     {
       "type": "asset-patch",
@@ -68,6 +70,16 @@
         "equals": true
       },
       "title_id": "CUSA00626"
+    },
+    {
+      "type": "asset-patch",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "profile": "profiles/patches/trap-team-eu-01.00-unlock-expansions.experimental.json",
+      "when": {
+        "setting": "unlock-adventure-packs",
+        "equals": true
+      },
+      "title_id": "CUSA00697"
     }
   ]
 }

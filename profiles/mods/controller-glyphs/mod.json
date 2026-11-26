@@ -35,7 +35,8 @@
       "type": "generated",
       "handler": "controller-glyphs",
       "target": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56",
-      "profile": "profiles/patches/trap-team-us-01.01-controller-glyphs.json"
+      "profile": "profiles/patches/trap-team-us-01.01-controller-glyphs.json",
+      "title_id": "CUSA00626"
     },
     {
       "type": "generated",
@@ -43,6 +44,13 @@
       "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
       "title_id": "CUSA00626",
       "profile": "profiles/patches/trap-team-us-01.00-controller-glyphs.json"
+    },
+    {
+      "type": "generated",
+      "handler": "controller-glyphs",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "title_id": "CUSA00697",
+      "profile": "profiles/patches/trap-team-eu-01.00-controller-glyphs.json"
     }
   ]
 }
