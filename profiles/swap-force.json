@@ -2,8 +2,18 @@
   "schema_version": 1,
   "id": "swap-force",
   "title": "Skylanders: SWAP Force",
-  "status": "awaiting dump; no validated builds",
+  "status": "in development: EU 01.00 dump fingerprinted; no validated builds",
   "validated_builds": [],
+  "known_builds": [
+    {
+      "title_id": "CUSA00024",
+      "region": "EU",
+      "content_id": "EP0002-CUSA00024_00-SKYLANDERFORCEDL",
+      "app_version": "01.00",
+      "executable_sha256": "9e53961e8ad16cede2a7e3763c0086553b8e3f343d16494c8d0d0e5b35c1b0e3",
+      "note": "base game; not validated"
+    }
+  ],
   "patches": [],
   "acceptance_cases": [
     "first level visible environment, movement and combat",

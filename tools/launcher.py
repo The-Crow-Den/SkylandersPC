@@ -298,7 +298,11 @@ class Launcher(QMainWindow):
     def refresh_readiness(self):
         missing = model.missing_files(self.root, getattr(self, 'game', None))
         self.status.setText('Setup incomplete · see Session log' if missing else 'Ready for adventure')
-        if missing: self.log.append('Missing local files: ' + ', '.join(missing))
+        # A game that isn't installed yet has nothing to report; say each problem once.
+        text = 'Missing local files: ' + ', '.join(missing) if missing else ''
+        installed = not any(item.startswith(('No matching game installation','This title/version is not supported')) for item in missing)
+        if text and installed and text != getattr(self, 'readiness_logged', ''):self.log.append(text)
+        self.readiness_logged = text
         self.play.setEnabled(not missing)
 
     def launch(self):
