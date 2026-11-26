@@ -19,7 +19,7 @@ renderer grew from.
 | Game | Status |
 | --- | --- |
 | Skylanders: Trap Team | Supported (US and EU) |
-| Skylanders: Swap Force | Next |
+| Skylanders: Swap Force | In Progress |
 | Skylanders: SuperChargers | Planned |
 | Skylanders: Imaginators | Planned |
 
