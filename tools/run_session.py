@@ -380,6 +380,18 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
         return result
 
 
+def fixed_frame_fallback(args, arguments):
+    """Saved settings default to automatic FPS, which needs 60-delta and the built-in
+    limiter. An explicit choice that rules it out gets a fixed frame rate instead."""
+    explicit_variant = any(item == '--variant' or item.startswith('--variant=') for item in arguments)
+    if (args.frame_policy == 'auto' and 'sixty-fps' not in args.mod and
+            (explicit_variant and args.variant != '60-delta' or args.manual_phase_cap or args.present_limit is not None)):
+        print('Automatic FPS needs the 60-delta variant and the built-in limiter; using a fixed frame rate.',flush=True)
+        args.frame_policy = 'manual'
+        return True
+    return False
+
+
 def main(argv=None):
     sessions=[]
     try:
@@ -504,13 +516,7 @@ def run(argv,sessions):
         parser.error('manual phase cap requires MangoHud')
     if args.mangohud and shutil.which('mangohud') is None:
         parser.error('MangoHud was requested but is not installed; omit --mangohud to run normally')
-    explicit_variant = any(item == '--variant' or item.startswith('--variant=') for item in arguments)
-    if (args.frame_policy == 'auto' and 'sixty-fps' not in args.mod and
-            (explicit_variant and args.variant != '60-delta' or args.manual_phase_cap or args.present_limit is not None)):
-        # Saved settings default to automatic FPS, which needs 60-delta and the built-in
-        # limiter. An explicit choice that rules it out gets a fixed frame rate instead.
-        print('Automatic FPS needs the 60-delta variant and the built-in limiter; using a fixed frame rate.',flush=True)
-        args.frame_policy = 'manual'
+    fixed_frame_fallback(args, arguments)
     if 'sixty-fps' in args.mod:
         # The 60 FPS mod owns the frame options: automatic 30/60 or a fixed 60.
         automatic = True

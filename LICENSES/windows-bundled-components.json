@@ -40,6 +40,8 @@
      "paths": ["_internal/PyQt6/Qt6/bin/QtWebEngineProcess.exe", "_internal/PyQt6/Qt6/bin/Qt6WebEngine*.dll"]},
     {"name": "cryptography", "version": "50.0.2", "license": "Apache-2.0 OR BSD-3-Clause (statically links OpenSSL, Apache-2.0)",
      "source": "https://pypi.org/project/cryptography/50.0.2/", "paths": ["_internal/cryptography/**/*.pyd"]},
-    {"name": "cffi", "version": "2.1.1", "license": "MIT-0", "source": "https://pypi.org/project/cffi/2.1.1/", "paths": ["_internal/_cffi_backend*.pyd"]}
+    {"name": "cffi", "version": "2.1.1", "license": "MIT-0", "source": "https://pypi.org/project/cffi/2.1.1/", "paths": ["_internal/_cffi_backend*.pyd"]},
+    {"name": "Pillow", "version": "13.0.0", "license": "MIT-CMU", "source": "https://pypi.org/project/pillow/13.0.0/",
+     "note": "Bundles FreeType, HarfBuzz, libjpeg-turbo, libpng, libtiff, libwebp, libavif, OpenJPEG, Little CMS, Brotli, liblzma, zstd, libxcb and libXau; their licenses are in Pillow's LICENSE file.", "paths": ["_internal/PIL/*.pyd"]}
   ]
 }

@@ -5,11 +5,15 @@ from pathlib import Path
 from unittest.mock import patch
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-import launcher_install_dialog as dialog
+try:
+    import launcher_install_dialog as dialog
+except ImportError:  # optional PyQt6 is not installed
+    dialog = None
 
 Usage = namedtuple('Usage', 'total used free')
 
 
+@unittest.skipIf(dialog is None, 'optional PyQt6 is not installed')
 class SpaceTest(unittest.TestCase):
     def test_shortage_names_sizes(self):
         with tempfile.TemporaryDirectory() as tmp:

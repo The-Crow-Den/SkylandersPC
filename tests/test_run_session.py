@@ -8,20 +8,23 @@ import tempfile
 import time
 import unittest
 
-from tools.run_session import announce_window, run_logged, overlay_environment, overlay_pci_configuration, renderer_environment, main
+from tools.run_session import announce_window, run_logged, overlay_environment, overlay_pci_configuration, renderer_environment, main, fixed_frame_fallback
 
 
 class RunSessionTests(unittest.TestCase):
-    def test_automatic_policy_refuses_incompatible_timing_and_external_cap(self):
-        for argv in (['--variant','original','--frame-policy','auto'],
-                     ['--variant','60','--frame-policy','auto'],
-                     ['--variant','60-delta','--frame-policy','auto','--present-limit','60']):
-            with self.subTest(argv=argv):
-                output=io.StringIO()
-                with contextlib.redirect_stderr(output), self.assertRaises(SystemExit) as result:
-                    main(argv)
-                self.assertEqual(result.exception.code,2)
-                self.assertIn('automatic FPS requires 60-delta',output.getvalue())
+    def test_incompatible_timing_falls_back_to_a_fixed_frame_rate(self):
+        from types import SimpleNamespace
+        def args(variant='60-delta', cap=False, limit=None, mods=()):
+            return SimpleNamespace(frame_policy='auto', mod=list(mods), variant=variant, manual_phase_cap=cap, present_limit=limit)
+        for value, arguments in ((args('original'), ['--variant','original']), (args('60'), ['--variant=60']),
+                                 (args(limit=60), ['--present-limit','60']), (args(cap=True), ['--manual-phase-cap'])):
+            with self.subTest(arguments=arguments), contextlib.redirect_stdout(io.StringIO()):
+                self.assertTrue(fixed_frame_fallback(value, arguments))
+                self.assertEqual(value.frame_policy, 'manual')
+        for value, arguments in ((args(), []), (args('original'), []), (args('original', mods=['sixty-fps']), ['--variant','original'])):
+            with self.subTest(arguments=arguments, mods=value.mod):
+                self.assertFalse(fixed_frame_fallback(value, arguments))
+                self.assertEqual(value.frame_policy, 'auto')
 
     def test_sixty_fps_mod_refuses_other_variants_and_invalid_setting(self):
         for argv,message in ((['--variant','original','--mod','sixty-fps'],'the 60 FPS mod requires 60-delta'),

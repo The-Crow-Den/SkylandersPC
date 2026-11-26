@@ -127,6 +127,18 @@
       "source": "https://pypi.org/project/pycparser/3.12/",
       "notice": "usr/python/lib/python3.14/site-packages/pycparser-3.12.dist-info/licenses/LICENSE",
       "paths": []
+    },
+    {
+      "name": "Pillow",
+      "version": "13.0.0",
+      "license": "MIT-CMU",
+      "source": "https://pypi.org/project/pillow/13.0.0/",
+      "notice": "usr/python/lib/python3.14/site-packages/pillow-13.0.0.dist-info/licenses/LICENSE",
+      "note": "Bundles FreeType, HarfBuzz, libjpeg-turbo, libpng, libtiff, libwebp, libavif, OpenJPEG, Little CMS, Brotli, liblzma, zstd, libxcb and libXau; their licenses are in Pillow's LICENSE file.",
+      "paths": [
+        "usr/python/lib/python3.14/site-packages/PIL/*.so",
+        "usr/python/lib/python3.14/site-packages/pillow.libs/*.so*"
+      ]
     }
   ]
 }
