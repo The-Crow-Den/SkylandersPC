@@ -145,6 +145,38 @@ def encode_prompt(image):
     return bytes(out)
 
 
+# The HUD swap button: 52x52 RGBA8 in a 64-pixel 2D-tiled surface (0x8000 bytes).
+# Its 8x8 micro tiles sit in 16-tile rows; rows are bit-reversed and columns
+# swizzled. Worked out from the game's own button, every opaque tile accounted for.
+SWAP_SIZE,SWAP_WIDTH=0x8000,52
+
+
+def swap_offset(x,y):
+    tx,ty=x//8,y//8
+    row=(ty&1)<<2|(ty&2)|(ty>>2&1)
+    column=(tx^(tx>>1&1))^ty
+    return (row*16+column)*256+(sum(((x>>i&1)<<(2*i))|((y>>i&1)<<(2*i+1)) for i in range(3)))*4
+
+
+def decode_swap(raw):
+    """The swap button as a display-oriented 128x128 RGBA canvas (button at the top left)."""
+    if len(raw)!=SWAP_SIZE:raise ValueError('unsupported swap button layout')
+    image=[[(0,0,0,0)]*128 for _ in range(128)]
+    for y in range(SWAP_WIDTH):
+        for x in range(SWAP_WIDTH):
+            at=swap_offset(x,y);image[SWAP_WIDTH-1-y][x]=tuple(raw[at:at+4])
+    return image
+
+
+def encode_swap(image,raw):
+    """Write the canvas's button back over the original bytes; padding is kept."""
+    out=bytearray(raw)
+    for y in range(SWAP_WIDTH):
+        for x in range(SWAP_WIDTH):
+            at=swap_offset(x,y);out[at:at+4]=bytes(image[SWAP_WIDTH-1-y][x])
+    return bytes(out)
+
+
 def opaque_bounds(image,threshold=128):
     """Smallest (left, top, right, bottom) box around pixels at least this opaque, or None."""
     xs=[x for row in image for x,p in enumerate(row) if p[3]>=threshold]
@@ -157,20 +189,26 @@ def luminance(image,threshold=128):
     return sum(values)/len(values) if values else 0.0
 
 
-def replace_prompt(image,art,width,height,brightness=1.0,margin=2):
+def replace_prompt(image,art,width,height,brightness=1.0,margin=2,rim=0.0):
     """Draw controller art over a prompt frame's button, fitted to its opaque box.
 
     The whole button is replaced (not only its symbol); the frame's box keeps the
     game's press/mash scaling, and brightness keeps its darker pressed frames.
-    Pixels well outside the button (glow, rings) are kept."""
+    Pixels well outside the button (glow, rings) are kept. rim (0..1) draws a
+    light ring around the art, like the game's white button rim; its strength
+    follows the original frame so the mash animation still pulses."""
     box=opaque_bounds(image)
     if box is None:return [list(row) for row in image]
     left,top,right,bottom=box;bw,bh=right-left,bottom-top
+    # A rim takes the outer ring of the box, as the game's own white rim does.
+    rim_width=max(2,round(min(bw,bh)*.07)) if rim>0 else 0
+    left,top,right,bottom=left+rim_width,top+rim_width,right-rim_width,bottom-rim_width;bw,bh=right-left,bottom-top
     scale=min(bw/width,bh/height);dw,dh=max(1,round(width*scale)),max(1,round(height*scale))
     ox,oy=left+(bw-dw)//2,top+(bh-dh)//2
     out=[list(row) for row in image]
-    for y in range(max(0,top-margin),min(128,bottom+margin)):
-        for x in range(max(0,left-margin),min(128,right+margin)):out[y][x]=(0,0,0,0)
+    clear=margin+rim_width
+    for y in range(max(0,top-clear),min(128,bottom+clear)):
+        for x in range(max(0,left-clear),min(128,right+clear)):out[y][x]=(0,0,0,0)
     for y in range(dh):
         for x in range(dw):
             # Area-average the art onto the target pixel.
@@ -184,4 +222,12 @@ def replace_prompt(image,art,width,height,brightness=1.0,margin=2):
             rgb=tuple(max(0,min(255,round(total[c]/total[3]*brightness))) for c in range(3))
             tx,ty=ox+x,oy+y
             if 0<=tx<128 and 0<=ty<128:out[ty][tx]=(*rgb,max(0,min(255,round(total[3]/weight))))
+    if rim>0:
+        solid={(x,y) for y in range(max(0,oy),min(128,oy+dh)) for x in range(max(0,ox),min(128,ox+dw)) if out[y][x][3]>=128}
+        alpha=max(0,min(255,round(255*rim)))
+        for y in range(max(0,oy-rim_width),min(128,oy+dh+rim_width)):
+            for x in range(max(0,ox-rim_width),min(128,ox+dw+rim_width)):
+                if (x,y) in solid:continue
+                if any((x+dx,y+dy) in solid for dy in range(-rim_width,rim_width+1) for dx in range(-rim_width,rim_width+1) if dx*dx+dy*dy<=rim_width*rim_width):
+                    out[y][x]=(255,255,255,alpha)
     return out

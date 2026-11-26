@@ -432,7 +432,9 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
     applied, environment = [], {}
     for ident in order(selected, available):
         manifest = available[ident]
-        target = next((item for item in manifest['targets'] if item['executable_sha256'] == executable_sha256), None)
+        matching = [item for item in manifest['targets'] if item['executable_sha256'] == executable_sha256]
+        # US and EU 01.00 share an executable; record the region being played.
+        target = next((item for item in matching if item.get('title_id') == title_id), matching[0] if matching else None)
         if target is None:
             raise ModError(f"mod {ident} does not support this game build (executable sha256 {executable_sha256[:12]}…)")
         chosen = resolve_settings(manifest, settings.get(ident))

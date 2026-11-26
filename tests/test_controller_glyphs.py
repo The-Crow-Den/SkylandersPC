@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from tools import controller_glyphs as glyph,asset_mod
+from tools import controller_glyphs as glyph,asset_mod,block_texture as bt
 
 
 class ControllerGlyphTests(unittest.TestCase):
@@ -118,12 +118,29 @@ class ControllerGlyphTests(unittest.TestCase):
     def test_shipped_animated_pack_uses_correct_action_and_bounded_regions(self):
         path=Path(__file__).resolve().parents[1]/'profiles/patches/trap-team-us-01.01-controller-glyphs.json'
         profile=json.loads(path.read_text(encoding='utf-8'));images=profile['prompts']['textures']
-        self.assertEqual(len(images),37)
-        self.assertEqual(len({image['texture_offset'] for image in images}),37)
+        self.assertEqual(len(images),38)
+        self.assertEqual(len({image['texture_offset'] for image in images}),38)
         for image in images:
+            if image['name'].endswith('/hud_swapbutton.png'):
+                # The tag button: the left trigger, in the tiled RGBA8 layout.
+                self.assertEqual((image['glyph_index'],image['texture_size']),(7,0x8000));continue
             expected=0 if '/a_mash/' in image['name'] else 1 if '/square_mash/' in image['name'] else 6
             self.assertEqual(image['glyph_index'],expected)
             self.assertEqual(image['texture_size'],16384)
+
+    def test_swap_button_layout_round_trips_and_keeps_padding(self):
+        offsets={bt.swap_offset(x,y) for y in range(52) for x in range(52)}
+        self.assertEqual(len(offsets),52*52)
+        self.assertTrue(all(at%4==0 and at<bt.SWAP_SIZE for at in offsets))
+        raw=bytes(range(256))*(bt.SWAP_SIZE//256)
+        self.assertEqual(bt.encode_swap(bt.decode_swap(raw),raw),raw)
+        image=bt.decode_swap(raw);image[0][0]=(1,2,3,4)
+        changed=bt.encode_swap(image,raw)
+        # Display row 0 is the stored sprite's last row; nothing else changes.
+        at=bt.swap_offset(0,51)
+        self.assertEqual(changed[at:at+4],bytes((1,2,3,4)))
+        self.assertEqual(changed[:at]+changed[at+4:],raw[:at]+raw[at+4:])
+        with self.assertRaises(ValueError):bt.decode_swap(raw[:-1])
 
     def test_unavailable_sdl_keeps_original_prompts(self):
         with patch('ctypes.util.find_library',return_value=None):

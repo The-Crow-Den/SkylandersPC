@@ -37,6 +37,9 @@ updates from older versions, before it goes out.
 - **Controller button prompts work on Windows.** The launcher now finds Steam's
   button artwork on Windows, and the image support it needs is included.
   Selecting the mod with a PlayStation pad no longer stops the game from starting.
+  The tag button at the bottom of the screen now shows LT or ZL instead of L2,
+  and mash prompts are no longer darker than the game's: they keep a light rim
+  that pulses like the original.
 - **Safer installs.** The launcher warns before an install when the drive is
   short on space, asks before installing a game that can't be played yet, and
   explains how to reinstall a version that is already installed.

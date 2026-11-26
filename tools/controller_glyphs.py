@@ -256,16 +256,17 @@ def recipe(source,profile,mode):
 def prompt_recipe(source,profile,mode):
     """Animated press/mash prompts: each frame's whole PlayStation button is redrawn
     from the chosen controller's artwork, fitted to that frame's button box so the
-    animation's scaling stays, and dimmed like the game's darker pressed frames."""
+    animation's scaling stays. The art keeps full brightness; a light rim pulses
+    with the original frames, as the game's white button rim does."""
     if mode not in LABELS:raise ValueError('invalid prompt pack')
     blocks=_read_blocks(source,profile)
     if not 0<len(profile['textures'])<=64:raise ValueError('invalid prompt count')
     seen=set();frames=[]
     for image in profile['textures']:
         start=asset_mod.number(image['texture_offset'],512*1024*1024,'prompt offset');length=image['texture_size']
-        if any(start<end and begin<start+16384 for begin,end in seen):raise ValueError('overlapping prompt textures')
-        seen.add((start,start+16384))
-        if length!=16384:raise ValueError('unsupported prompt texture size')
+        if length not in (16384,block_texture.SWAP_SIZE):raise ValueError('unsupported prompt texture size')
+        if any(start<end and begin<start+length for begin,end in seen):raise ValueError('overlapping prompt textures')
+        seen.add((start,start+length))
         raw=bytearray();at=start
         while at<start+length:
             base=at//32768*32768
@@ -274,19 +275,23 @@ def prompt_recipe(source,profile,mode):
             if take<=0:raise ValueError('invalid prompt region')
             raw.extend(plain[at-base:at-base+take]);at+=take
         index=image['glyph_index'];label(mode,index)
-        decoded=block_texture.decode_prompt(bytes(raw))
+        decoded=(block_texture.decode_prompt if length==16384 else block_texture.decode_swap)(bytes(raw))
         # Frames of one animation share a folder (a_mash/...); they are dimmed relative to its brightest frame.
         name=str(image.get('name',''));group=name.rsplit('/',2)[-2] if name.count('/')>=1 else index
-        frames.append((start,length,index,group,decoded))
+        frames.append((start,length,index,group,decoded,bytes(raw)))
     brightest={}
-    for _,_,_,group,decoded in frames:
+    for _,_,_,group,decoded,_ in frames:
         brightest[group]=max(brightest.get(group,0.0),block_texture.luminance(decoded))
     art={}
-    for start,length,index,group,decoded in frames:
+    for start,length,index,group,decoded,raw in frames:
         if index not in art:art[index]=raster(mode,index)
         _,_,_,width,height=CELLS[index]
         top=brightest[group];level=block_texture.luminance(decoded)/top if top else 1.0
-        result=block_texture.encode_prompt(block_texture.replace_prompt(decoded,art[index],width,height,brightness=max(.55,min(1.0,level))))
+        if length==16384:
+            result=block_texture.encode_prompt(block_texture.replace_prompt(decoded,art[index],width,height,rim=max(.45,min(1.0,level))))
+        else:
+            # The HUD swap (tag) button: a still image, drawn without a rim.
+            result=block_texture.encode_swap(block_texture.replace_prompt(decoded,art[index],width,height),raw)
         at=start
         while at<start+length:
             base=at//32768*32768;_,_,modified=blocks[base];take=min(len(modified)-(at-base),start+length-at)
@@ -469,4 +474,4 @@ def build_profile(source_root,profile_path,mode,executable_sha256):
 def prepare(source_root,game_root,session,profile_path,mode,executable_sha256):
     record=build_profile(source_root,profile_path,mode,executable_sha256)
     result=asset_mod.prepare(source_root,game_root,session,record,enabled=True)
-    return dict(mode=mode,coverage='shared font, animated mash prompts and title confirm button',**result)
+    return dict(mode=mode,coverage='shared font, animated mash prompts, tag button and title confirm button',**result)

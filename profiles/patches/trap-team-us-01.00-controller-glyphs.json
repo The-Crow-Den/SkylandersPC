@@ -429,6 +429,28 @@
         "alignment": 2048,
         "plain_offset": 13172736,
         "decoded_sha256": "aeea0a905f8501eb847d18c116704852b6379eb1e40d90cd0e5cc59282ec6915"
+      },
+      {
+        "plain_offset": 26411008,
+        "offset": 5087232,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 3367,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "decoded_sha256": "cf727d21e353a5fcb3d6da02813a3b3f593718488e8204df572eb51dee412b90"
+      },
+      {
+        "plain_offset": 26443776,
+        "offset": 5091328,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 5737,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "decoded_sha256": "22320946fc0275220f3480180bf651e46277ff2c8bf3196a8e08fc42ed7f1114"
       }
     ],
     "textures": [
@@ -875,6 +897,12 @@
           48,
           48
         ]
+      },
+      {
+        "name": "ui_sky4/hud/png/format_8888/ps4/hud_swapbutton.png",
+        "texture_offset": 26411704,
+        "texture_size": 32768,
+        "glyph_index": 7
       }
     ]
   },
