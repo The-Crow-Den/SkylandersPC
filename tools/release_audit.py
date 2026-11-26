@@ -21,7 +21,7 @@ ROOT=Path(__file__).resolve().parents[1]
 ROOT_FILES={'LICENSE','LICENSE_SCOPE.md','NOTICE.md','THIRD_PARTY_NOTICES.md','README.md','CONTRIBUTING.md','RELEASE_NOTES.md',
             'AGENTS.md','SOURCE_MANIFEST.json','references.lock.json','release-policy.json','.gitignore','.gitattributes','.gitmodules'}
 SCOPES={'renderer','docs','native','tools','tests','profiles','patches','LICENSES','.github'}
-SUFFIXES={'.md','.txt','.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.json','.patch','.yml','.yaml','.toml','.html','.css','.js'}
+SUFFIXES={'.md','.txt','.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.json','.patch','.yml','.yaml','.toml','.html','.css','.js','.rc','.manifest'}
 CODE={'.py','.cpp','.c','.h','.hpp','.S','.inc','.sh','.ld','.html','.css','.js'}
 MAGIC=(b'\x7fELF',b'MZ',b'\x01ZGI',b'IGA\x1a',b'DDS ',b'\x89PNG',b'RIFF',b'PK\x03\x04',b'KB2',b'\x00PSF',b'\x4f\x15\x3d\x1d')
 # Vendored renderer dependencies keep their own license files and headers.
