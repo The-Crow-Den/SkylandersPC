@@ -30,7 +30,7 @@ class StorageTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'p.json'
             old = {k: v for k, v in launcher_model.DEFAULTS.items() if k != 'save_shaders'}
-            path.write_text(__import__('json').dumps(old))
+            path.write_text(__import__('json').dumps(old), encoding='utf-8')
             self.assertTrue(launcher_model.load(path)['save_shaders'])
 
     def test_windows_profile_paths_redacted(self):

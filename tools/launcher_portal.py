@@ -24,18 +24,18 @@ class Portraits:
         self.cells = {}; self.files = {}; self.atlas = QImage(); self.cache = {}; self.game = {}
         folder = Path(root) / '.local/portal-assets'
         try:
-            index = json.loads((folder / 'game/index.json').read_text())['portraits']
+            index = json.loads((folder / 'game/index.json').read_text(encoding='utf-8'))['portraits']
             for key, filename in index.items():
                 identity, variant = map(int, key.split(':'))
                 if '/' not in filename and '\\' not in filename:self.game[(identity, variant)] = folder / 'game' / filename
         except (OSError, ValueError, KeyError, AttributeError):
             pass
         try:
-            lines = (folder / 'portrait-index.txt').read_text().split('\n')
+            lines = (folder / 'portrait-index.txt').read_text(encoding='utf-8').split('\n')
             for line in lines[1:]:
                 parts = line.split()
                 if len(parts) == 3: self.cells[(int(parts[0]), int(parts[1]))] = int(parts[2])
-            sources = json.loads((folder / 'sources.json').read_text()).get('sources', [])
+            sources = json.loads((folder / 'sources.json').read_text(encoding='utf-8')).get('sources', [])
             self.files = {s['cell']: folder / s['cache'] for s in sources
                           if s.get('kind') == 'figure' and isinstance(s.get('cell'), int) and '/' not in str(s.get('cache', '/'))}
             data = (folder / 'portraits.rgba').read_bytes()

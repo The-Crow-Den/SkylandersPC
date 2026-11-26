@@ -99,7 +99,7 @@ def main(argv=None):
         def __init__(self):super().__init__();self.state='{}';self.loaded=False
         @pyqtSlot()
         def ready(self):
-            self.loaded=True;(directory/'ready').write_text(str(os.getpid()));heartbeat()
+            self.loaded=True;(directory/'ready').write_text(str(os.getpid()), encoding='utf-8');heartbeat()
         @pyqtSlot(result=str)
         def snapshot(self):return self.state
         @pyqtSlot(int,result=str)
@@ -196,7 +196,7 @@ def main(argv=None):
         if pixels!=last_pixels:frames.write(rendered.width(),rendered.height(),pixels);last_pixels=pixels
     def heartbeat():
         if portal.loaded:
-            try:(directory/'heartbeat').write_text(str(os.getpid()))
+            try:(directory/'heartbeat').write_text(str(os.getpid()), encoding='utf-8')
             except OSError:app.quit()
     def poll():
         nonlocal last_signature,was_visible,last_pid,buttons,last_event,last_pixels,frame_size

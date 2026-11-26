@@ -39,7 +39,7 @@ def load(file=None):
     file=Path(file) if file else path()
     try:
         if file.is_symlink() or file.stat().st_size>256*1024:return {}
-        return _clean(json.loads(file.read_text()))
+        return _clean(json.loads(file.read_text(encoding='utf-8')))
     except (OSError,ValueError):
         return {}
 
@@ -48,7 +48,7 @@ def _write(file,value):
     file.parent.mkdir(parents=True,exist_ok=True)
     if file.is_symlink():raise ValueError('redirected preferences file')
     temporary=file.with_name(file.name+'.tmp')
-    temporary.write_text(json.dumps(value,indent=2,ensure_ascii=False)+'\n')
+    temporary.write_text(json.dumps(value,indent=2,ensure_ascii=False)+'\n', encoding='utf-8')
     os.replace(temporary,file)
 
 

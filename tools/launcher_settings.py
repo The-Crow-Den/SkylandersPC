@@ -302,7 +302,7 @@ class SettingsPage(QWidget):
         command=portal_devices.install_rule_command()
         if not command:
             QMessageBox.information(self,'Portal access',portal_devices.access_help());return
-        try:result=subprocess.run(command,capture_output=True,text=True,timeout=120)
+        try:result=subprocess.run(command,capture_output=True,text=True,timeout=120, encoding='utf-8', errors='replace')
         except (OSError,subprocess.TimeoutExpired) as error:
             QMessageBox.warning(self,'Portal access',str(error));return
         if result.returncode!=0:

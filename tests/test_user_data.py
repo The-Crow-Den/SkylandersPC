@@ -26,22 +26,22 @@ class UserData(unittest.TestCase):
     def test_migration_copies_verified_and_keeps_originals(self):
         old = self.top/'data/skylanders-pc/saves/CUSA00626';old.mkdir(parents=True);(old/'save.bin').write_bytes(b'progress')
         figures = self.root/'out/figures';figures.mkdir(parents=True);(figures/'a.sky').write_bytes(b'figure')
-        (self.root/'.local/launcher-settings.json').write_text('{"x": 1}')
+        (self.root/'.local/launcher-settings.json').write_text('{"x": 1}', encoding='utf-8')
         report = user_data.migrate(self.root, self.env)
         new = user_data.base(self.env)
         self.assertEqual((new/'saves/CUSA00626/save.bin').read_bytes(), b'progress')
         self.assertEqual((new/'figures/progress/a.sky').read_bytes(), b'figure')
-        self.assertEqual(json.loads((new/'settings/launcher-settings.json').read_text()), {'x': 1})
+        self.assertEqual(json.loads((new/'settings/launcher-settings.json').read_text(encoding='utf-8')), {'x': 1})
         self.assertTrue((old/'save.bin').is_file() and (figures/'a.sky').is_file())  # originals stay
         self.assertTrue(user_data.adopted(self.root))
         self.assertEqual(user_data.path(self.root, 'out/figures', self.env), new/'figures/progress')
         self.assertEqual(len(report['copied']), 3);self.assertEqual(report['conflicts'], [])
 
     def test_conflict_is_never_overwritten(self):
-        new = user_data.base(self.env)/'settings';new.mkdir(parents=True);(new/'launcher-settings.json').write_text('{"kept": true}')
-        (self.root/'.local/launcher-settings.json').write_text('{"old": true}')
+        new = user_data.base(self.env)/'settings';new.mkdir(parents=True);(new/'launcher-settings.json').write_text('{"kept": true}', encoding='utf-8')
+        (self.root/'.local/launcher-settings.json').write_text('{"old": true}', encoding='utf-8')
         report = user_data.migrate(self.root, self.env)
-        self.assertEqual(json.loads((new/'launcher-settings.json').read_text()), {'kept': True})
+        self.assertEqual(json.loads((new/'launcher-settings.json').read_text(encoding='utf-8')), {'kept': True})
         self.assertEqual(len(report['conflicts']), 1)
 
 

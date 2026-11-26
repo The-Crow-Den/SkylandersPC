@@ -284,7 +284,7 @@ def probe_runtime():
     parent.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix='cli-', dir=parent))
     result = execute([str(binary), '--appimage-extract-and-run', '--help'], directory, 20)
-    help_text = (directory / 'runtime.log').read_text(errors='replace')
+    help_text = (directory / 'runtime.log').read_text(errors='replace', encoding='utf-8')
     required = ('--game', '--override-root', '--ignore-game-patch')
     result['required_options_present'] = all(option in help_text for option in required)
     result['runtime_sha256'] = digest(binary)
@@ -318,7 +318,7 @@ def launch_session(directory, timeout):
     # Exclusive creation claims the attempt even if two callers both read the
     # prepared manifest before either updates it. Keep the marker for audit.
     try:
-        with (directory / 'launch.claim').open('x') as claim:
+        with (directory / 'launch.claim').open('x', encoding='utf-8') as claim:
             claim.write(datetime.now(timezone.utc).isoformat() + '\n')
     except FileExistsError as error:
         raise ValueError('session already claimed; prepare a fresh session') from error

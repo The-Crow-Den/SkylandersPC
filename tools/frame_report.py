@@ -30,7 +30,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     args = parser.parse_args()
-    print(json.dumps(summarize(args.log.read_text(errors='replace')), indent=2))
+    print(json.dumps(summarize(args.log.read_text(errors='replace', encoding='utf-8')), indent=2))
 
 
 if __name__ == '__main__':

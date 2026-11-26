@@ -33,6 +33,9 @@ class LauncherUITests(unittest.TestCase):
         everything=type('Everything',(),{'__contains__':lambda self,item:True})()
         available=patch.object(launcher_library,'AVAILABLE',everything)
         available.start();self.addCleanup(available.stop)
+        # The fake packages use made-up titles; the "Not playable yet" question is modal.
+        playable=patch.object(launcher_library,'playable_title',return_value=True)
+        playable.start();self.addCleanup(playable.stop)
         self.window=Launcher(self.root)
 
     def test_unreleased_games_cannot_be_installed(self):
@@ -56,11 +59,11 @@ class LauncherUITests(unittest.TestCase):
 
     def extractor(self,body):
         tool=self.root/'synthetic-extractor'
-        tool.write_text('#!/usr/bin/env python3\n'+body);tool.chmod(0o755)
+        tool.write_text('#!/usr/bin/env python3\n'+body, encoding='utf-8');tool.chmod(0o755)
         # These subprocess tests use base64 SFOs instead of binary PKGs.
         from tools.workspace import read_sfo
         def info(path):
-            try:return read_sfo(base64.b64decode(Path(path).read_text(),validate=True))
+            try:return read_sfo(base64.b64decode(Path(path).read_text(encoding='utf-8'),validate=True))
             except (ValueError,UnicodeError):
                 return dict(TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test')
         inspector=patch('tools.launcher_packages.package_info',side_effect=info)
@@ -95,7 +98,7 @@ class LauncherUITests(unittest.TestCase):
         (folder/'mod.json').write_text(json.dumps(dict(schema_version=1,id='sample',name='Sample mod',version='1.0',author='Tests',licence='MIT',
             targets=[dict(title_id='CUSA00626',app_version='01.01',executable_sha256='a'*64)],
             settings={'strength':dict(type='choice',choices=['low','high'],default='low')},
-            operations=[dict(type='host-option',environment={'SKY_SAMPLE':'1'})])))
+            operations=[dict(type='host-option',environment={'SKY_SAMPLE':'1'})])), encoding='utf-8')
         page.open(self.window.game)
         self.assertIn('sample',page.mod_fields)
         self.assertFalse(page.mod_fields['sample'].isEnabled())  # no installed build to check against
@@ -167,14 +170,14 @@ class LauncherUITests(unittest.TestCase):
     def test_in_game_controller_choices_load_and_survive_launch(self):
         pc=self.root/'out/pc-settings.json';pc.parent.mkdir(parents=True,exist_ok=True)
         pc.write_text(json.dumps({'resolution':'1080p','quality':'high','fullscreen':True,'fps_counter':True,'frame_limit':30,
-                                  'frame_policy':'auto','portal_volume':30,'controller_layout':'keyboard-and-pad','controller_glyphs':'xbox'}))
+                                  'frame_policy':'auto','portal_volume':30,'controller_layout':'keyboard-and-pad','controller_glyphs':'xbox'}), encoding='utf-8')
         window=Launcher(self.root)
         try:
             window.select_game('trap-team')
             with patch('tools.launcher_model.command',return_value=['python3','-c','pass']):
                 window.launch()
             self.wait(lambda:window.process is None)
-            saved=json.loads(pc.read_text())
+            saved=json.loads(pc.read_text(encoding='utf-8'))
             self.assertEqual(saved['controller_layout'],'keyboard-and-pad')
             self.assertEqual(saved['controller_glyphs'],'xbox')
         finally:
@@ -199,7 +202,7 @@ class LauncherUITests(unittest.TestCase):
         from test_figure_data import SEED, played
         from tools import figure_data
         assets=self.root/'.local/portal-assets';assets.mkdir(parents=True)
-        (assets/'trap-metadata.seed').write_bytes(SEED);(assets/'figure-names.json').write_text(json.dumps({'14:0':'Gill Grunt','16:0':'Spyro'}))
+        (assets/'trap-metadata.seed').write_bytes(SEED);(assets/'figure-names.json').write_text(json.dumps({'14:0':'Gill Grunt','16:0':'Spyro'}), encoding='utf-8')
         library=self.root/'out/portal-library/characters';library.mkdir(parents=True)
         (library/'created-water.sky').write_bytes(played(gold=100))
         (library/'created-fresh.sky').write_bytes(figure_data.blank(16,0))
@@ -251,7 +254,7 @@ class LauncherUITests(unittest.TestCase):
         import hashlib
         (self.root/'profiles').mkdir()
         (self.root/'profiles/trap-team.json').write_text(json.dumps(dict(id='trap-team',title='Trap Team',
-            validated_builds=[dict(title_id='CUSA00626',app_version='01.00',executable_sha256=hashlib.sha256(b'synthetic').hexdigest())])))
+            validated_builds=[dict(title_id='CUSA00626',app_version='01.00',executable_sha256=hashlib.sha256(b'synthetic').hexdigest())])), encoding='utf-8')
         self.make_library_base()
         update=self.root/'synthetic-update';(update/'sce_sys').mkdir(parents=True)
         (update/'sce_sys/param.sfo').write_bytes(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='test')))
@@ -346,7 +349,7 @@ class LauncherUITests(unittest.TestCase):
             'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'
             '(out/"sce_sys/param.sfo").write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))\n')
         pkg=self.root/'update.pkg'
-        pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='test'))).decode())
+        pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gp',APP_VER='01.01',CONTENT_ID='test'))).decode(), encoding='utf-8')
         dialog=InstallDialog(self.window);dialog.fields['game_pkg'].clear();dialog.fields['update_pkg'].setText(str(pkg))
         with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.begin()
         self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
@@ -364,7 +367,7 @@ class LauncherUITests(unittest.TestCase):
         self.assertNotIn('extractor',dialog.fields)
         for key,cat,ver in [('game_pkg','gd','01.00'),('update_pkg','gp','01.01')]:
             pkg=self.root/(key+'.pkg')
-            pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY=cat,APP_VER=ver,CONTENT_ID='test'))).decode())
+            pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY=cat,APP_VER=ver,CONTENT_ID='test'))).decode(), encoding='utf-8')
             dialog.fields[key].setText(str(pkg))
         dialog.start.click();self.assertEqual(dialog.step,1)
         dialog.start.click();self.assertEqual(dialog.step,2)
@@ -376,6 +379,32 @@ class LauncherUITests(unittest.TestCase):
         self.assertIn('is installed',dialog.phase.text())
         self.assertEqual(dialog.progress.value(),1)
         self.assertFalse(self.window.play.isEnabled()) # no prepared runtime
+        dialog.close()
+
+    def test_install_can_choose_another_folder(self):
+        tool=self.extractor('import sys,json,base64\nfrom pathlib import Path\n'
+            'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'
+            '(out/"sce_sys/param.sfo").write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))\n'
+            '(out/"eboot.bin").write_bytes(b"synthetic")\nprint("Synthetic extraction complete")\n')
+        from tools import game_library
+        self.window.select_game('trap-team');dialog=InstallDialog(self.window)
+        pkg=self.root/'game.pkg'
+        pkg.write_text(base64.b64encode(sfo(dict(TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test'))).decode(), encoding='utf-8')
+        dialog.fields['game_pkg'].setText(str(pkg))
+        dialog.start.click();dialog.skip.click();self.assertEqual(dialog.step,2)
+        self.assertIn(str(self.root/'Games'),dialog.location.text());self.assertTrue(dialog.change_location.isVisibleTo(dialog))
+        inside=self.root/'.local/nope'
+        with patch('tools.launcher_files.choose_folder',return_value=str(inside)),patch('tools.launcher_install_dialog.QMessageBox.warning') as warning:
+            dialog.change_location.click()
+        warning.assert_called_once();self.assertIsNone(dialog.install_folder)
+        other=self.root/'Other Drive'/'My Games'
+        with patch('tools.launcher_files.choose_folder',return_value=str(other)):dialog.change_location.click()
+        self.assertIn(str(other),dialog.location.text())
+        self.assertEqual(game_library.directory(self.root),self.root/'Games') # nothing saved until Install
+        with patch('tools.launcher_packages.BUILTIN_EXTRACTOR',tool): dialog.start.click()
+        self.wait(lambda: 'Extraction validated' in dialog.output.toPlainText())
+        self.assertEqual(Path(game_library.directory(self.root)).resolve(),other.resolve())
+        self.assertTrue(all(Path(p).resolve().is_relative_to(other.resolve()) for p in self.window.game['installed_paths']))
         dialog.close()
 
     def test_game_states_gate_play_and_show_version_and_size(self):
@@ -416,20 +445,20 @@ class LauncherUITests(unittest.TestCase):
         self.assertTrue(any((self.root/'.local/removed-games').glob('*/0/eboot.bin')))
 
     def setup_script(self, body):
-        path=self.root/'synthetic-preparer.py';path.write_text('import json,time\n'+body)
+        path=self.root/'synthetic-preparer.py';path.write_text('import json,time\n'+body, encoding='utf-8')
         return path
 
     def test_supported_install_automatically_runs_preparation_and_shows_progress(self):
         import hashlib
         (self.root/'profiles').mkdir()
         (self.root/'profiles/trap-team.json').write_text(json.dumps(dict(id='trap-team',title='Trap Team',validated_builds=[dict(
-            title_id='CUSA00626',app_version='01.00',executable_sha256=hashlib.sha256(b'synthetic').hexdigest())])))
+            title_id='CUSA00626',app_version='01.00',executable_sha256=hashlib.sha256(b'synthetic').hexdigest())])), encoding='utf-8')
         tool=self.extractor('import sys,base64\nfrom pathlib import Path\n'
             'out=Path(sys.argv[2]);(out/"sce_sys").mkdir(parents=True)\n'
             '(out/"sce_sys/param.sfo").write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))\n'
             '(out/"eboot.bin").write_bytes(b"synthetic")\n')
         package=self.root/'game.pkg';package.write_text(base64.b64encode(sfo(dict(
-            TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test'))).decode())
+            TITLE_ID='CUSA00626',CATEGORY='gd',APP_VER='01.00',CONTENT_ID='test'))).decode(), encoding='utf-8')
         script=self.setup_script('print(json.dumps(dict(name="verify-executable",state="running",fraction=0,message="Checking your game files")),flush=True)\n'
             'time.sleep(.1)\nprint(json.dumps(dict(name="ready",state="complete",fraction=1,message="Setup complete.")),flush=True)\n')
         dialog=InstallDialog(self.window);dialog.fields['game_pkg'].setText(str(package))
@@ -470,7 +499,7 @@ class LauncherUITests(unittest.TestCase):
     def test_broken_entry_is_labelled_needs_repair_without_hiding_other_game(self):
         from tools import game_library
         broken=self.make_library_base();good=self.make_library_base('CUSA99999')
-        game_library.manifest_path(game_library.directory(self.root),broken).write_text('corrupt')
+        game_library.manifest_path(game_library.directory(self.root),broken).write_text('corrupt', encoding='utf-8')
         self.window.rebuild_rail();self.window.select_game('title-cusa00626')
         self.assertEqual(self.window.primary.text(),'REPAIR')
         self.assertIn('Needs repair',self.window.game_info.text())

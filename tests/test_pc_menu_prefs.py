@@ -30,13 +30,13 @@ class PcMenuPreferenceTests(unittest.TestCase):
             file=Path(directory)/'prefs.json'
             for title,kind,name in (('../x',0,'A'),('trap-team',1,'A'),('trap-team',0,''),('trap-team',0,'x'*97)):
                 with self.assertRaises(ValueError):pc_menu_prefs.record_recent(title,kind,name,file)
-            file.write_text('not json');self.assertEqual(pc_menu_prefs.load(file),{})
-            file.write_text(json.dumps({'trap-team':{'recent':{'0':['Ok',5,None],'7':['Bad']}},'BAD TITLE':{}}))
+            file.write_text('not json', encoding='utf-8');self.assertEqual(pc_menu_prefs.load(file),{})
+            file.write_text(json.dumps({'trap-team':{'recent':{'0':['Ok',5,None],'7':['Bad']}},'BAD TITLE':{}}), encoding='utf-8')
             self.assertEqual(pc_menu_prefs.load(file),{'trap-team':{'favourites':{},'recent':{'0':['Ok']}}})
 
     def test_menu_has_quick_row_and_no_snapshot(self):
-        page=(ROOT/'tools/pc_menu/index.html').read_text();script=(ROOT/'tools/pc_menu/menu.js').read_text()
-        host=(ROOT/'tools/pc_overlay.py').read_text()
+        page=(ROOT/'tools/pc_menu/index.html').read_text(encoding='utf-8');script=(ROOT/'tools/pc_menu/menu.js').read_text(encoding='utf-8')
+        host=(ROOT/'tools/pc_overlay.py').read_text(encoding='utf-8')
         for marker in ('data-quick','data-favourite'):self.assertIn(marker,page)
         self.assertNotIn('data-snapshot',page)
         # Moving along the rail must not quit; only A/Enter does.

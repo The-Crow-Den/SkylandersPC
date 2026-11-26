@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 import struct
 import tempfile
@@ -27,9 +28,27 @@ NAMES={
 }
 
 
-def discover():
+def steam_folders():
     home=Path.home()
-    for base in (home/'.steam/steam',home/'.local/share/Steam',home/'.var/app/com.valvesoftware.Steam/.local/share/Steam'):
+    folders=[home/'.steam/steam',home/'.local/share/Steam',home/'.var/app/com.valvesoftware.Steam/.local/share/Steam']
+    if sys.platform=='win32':
+        # Steam records its folder in the registry; the default install is the fallback.
+        try:
+            import winreg
+            for hive,key,value in ((winreg.HKEY_CURRENT_USER,r'Software\Valve\Steam','SteamPath'),
+                                   (winreg.HKEY_LOCAL_MACHINE,r'SOFTWARE\WOW6432Node\Valve\Steam','InstallPath'),
+                                   (winreg.HKEY_LOCAL_MACHINE,r'SOFTWARE\Valve\Steam','InstallPath')):
+                try:
+                    with winreg.OpenKey(hive,key) as handle:folders.insert(0,Path(winreg.QueryValueEx(handle,value)[0]))
+                except OSError:pass
+        except ImportError:pass
+        for variable in ('ProgramFiles(x86)','ProgramFiles'):
+            if os.environ.get(variable):folders.append(Path(os.environ[variable])/'Steam')
+    return folders
+
+
+def discover():
+    for base in steam_folders():
         candidate=base/'controller_base/images/api/dark'
         if candidate.is_dir():return candidate.resolve()
     raise ValueError('Steam controller glyph directory not found; pass --source')
@@ -82,7 +101,7 @@ def prepare(source,destination):
         write('menu-atlas.rgba',atlas)
         record=dict(schema_version=1,provider='Steam client',style='contrast-selected dark/light',sources=sources,files=files,
                     note='Local client artwork; not a redistribution grant. No Steam process or SDK required at runtime.')
-        (staged/'manifest.json').write_text(json.dumps(record,indent=2)+'\n')
+        (staged/'manifest.json').write_text(json.dumps(record,indent=2)+'\n', encoding='utf-8')
         destination.mkdir()
         try:os.replace(staged,destination)
         except BaseException:

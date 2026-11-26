@@ -117,7 +117,7 @@ class ControllerGlyphTests(unittest.TestCase):
 
     def test_shipped_animated_pack_uses_correct_action_and_bounded_regions(self):
         path=Path(__file__).resolve().parents[1]/'profiles/patches/trap-team-us-01.01-controller-glyphs.json'
-        profile=json.loads(path.read_text());images=profile['prompts']['textures']
+        profile=json.loads(path.read_text(encoding='utf-8'));images=profile['prompts']['textures']
         self.assertEqual(len(images),37)
         self.assertEqual(len({image['texture_offset'] for image in images}),37)
         for image in images:
@@ -132,6 +132,6 @@ class ControllerGlyphTests(unittest.TestCase):
     def test_unknown_executable_is_rejected_before_reading_assets(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'profile.json'
-            path.write_text('{"executable_sha256":"verified"}')
+            path.write_text('{"executable_sha256":"verified"}', encoding='utf-8')
             with self.assertRaises(ValueError):
                 glyph.prepare(folder,folder,folder,path,'xbox','other')

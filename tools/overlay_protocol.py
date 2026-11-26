@@ -21,7 +21,7 @@ def read_snapshot(path):
     path=Path(path)
     if path.is_symlink() or not path.is_file() or path.stat().st_size>8*1024*1024:
         raise ValueError('invalid overlay snapshot')
-    data=json.loads(path.read_text())
+    data=json.loads(path.read_text(encoding='utf-8'))
     if data.get('version')!=1 or not isinstance(data.get('visible'),bool):raise ValueError('invalid overlay state')
     geometry=data.get('geometry')
     if not isinstance(geometry,list) or len(geometry)!=4 or any(type(value)is not int for value in geometry):raise ValueError('invalid overlay geometry')
@@ -36,7 +36,7 @@ class Commands:
         self.serial+=1
         name=f'command-{time.monotonic_ns():020d}-{self.serial:04d}'
         temporary=self.directory/(name+'.tmp');target=self.directory/(name+'.req')
-        with temporary.open('x') as file:file.write(text)
+        with temporary.open('x', encoding='utf-8') as file:file.write(text)
         temporary.rename(target)
         return target
 
@@ -47,7 +47,7 @@ class Portraits:
         try:
             manifest=self.directory/'sources.json'
             if manifest.is_symlink() or manifest.stat().st_size>5*1024*1024:return
-            sources=json.loads(manifest.read_text())
+            sources=json.loads(manifest.read_text(encoding='utf-8'))
             if isinstance(sources,dict):sources=sources.get('sources',[])
             for entry in sources:
                 cell=entry.get('cell',entry.get('index',-1));name=entry.get('cache','')

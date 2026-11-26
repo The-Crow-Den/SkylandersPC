@@ -13,7 +13,7 @@ class MenuTipTests(unittest.TestCase):
 
     def test_unreadable_record_shows_the_card_again(self):
         with tempfile.TemporaryDirectory() as root:
-            path=launcher_menu_tip.path(root);path.parent.mkdir(parents=True);path.write_text('not json')
+            path=launcher_menu_tip.path(root);path.parent.mkdir(parents=True);path.write_text('not json', encoding='utf-8')
             self.assertFalse(launcher_menu_tip.seen(root))
             launcher_menu_tip.mark(root);self.assertTrue(launcher_menu_tip.seen(root))
 

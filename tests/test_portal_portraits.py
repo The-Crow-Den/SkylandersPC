@@ -24,14 +24,14 @@ class PortalPortraitTests(unittest.TestCase):
         blob=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);(root/'profiles').mkdir()
-            (root/'profiles/trap-team-portal.json').write_text(json.dumps({'villains':[{'portrait_url':'https://example.invalid/'+str(i)} for i in range(46)]}))
-            tree=root/'tree.json';tree.write_text(json.dumps({'tree':[{'path':'data/images/00000e-0000/thumb.png','sha':blob}]}))
+            (root/'profiles/trap-team-portal.json').write_text(json.dumps({'villains':[{'portrait_url':'https://example.invalid/'+str(i)} for i in range(46)]}), encoding='utf-8')
+            tree=root/'tree.json';tree.write_text(json.dumps({'tree':[{'path':'data/images/00000e-0000/thumb.png','sha':blob}]}), encoding='utf-8')
             cache=root/'cache'
             with patch.object(portraits,'ROOT',root),patch.object(portraits,'download',return_value=data):
                 record=portraits.prepare(cache,tree)
             self.assertFalse(record['missing']);self.assertEqual(record['figure_portraits'],1)
-            self.assertIn('14 0 46',(cache/'portrait-index.txt').read_text())
-            elements=[tuple(map(int,line.split())) for line in (cache/'element-index.txt').read_text().splitlines()]
+            self.assertIn('14 0 46',(cache/'portrait-index.txt').read_text(encoding='utf-8'))
+            elements=[tuple(map(int,line.split())) for line in (cache/'element-index.txt').read_text(encoding='utf-8').splitlines()]
             self.assertEqual(elements,[(i,47+i) for i in range(11)])
             width,height=struct.unpack('<II',(cache/'portraits.rgba').read_bytes()[:8])
             self.assertEqual((width,height),(1536,384))

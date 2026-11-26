@@ -55,7 +55,7 @@ def creatable(identity, variant):
 def source_root(root):
     cache = Path(root) / '.local/native-gpu-build/CMakeCache.txt'
     try:
-        for line in cache.read_text().splitlines():
+        for line in cache.read_text(encoding='utf-8').splitlines():
             if line.startswith('SKY_PORTAL_SOURCE_ROOT:PATH=') and line.split('=', 1)[1]:
                 return Path(line.split('=', 1)[1])
     except OSError:
@@ -67,18 +67,18 @@ def names(root):
     """Figure names from the portal sources the native build uses, cached privately."""
     cache = Path(root) / '.local/portal-assets/figure-names.json'
     try:
-        return {tuple(map(int, key.split(':'))): name for key, name in json.loads(cache.read_text()).items()}
+        return {tuple(map(int, key.split(':'))): name for key, name in json.loads(cache.read_text(encoding='utf-8')).items()}
     except (OSError, ValueError):
         pass
     try:
-        text = (source_root(root) / 'Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp').read_text(errors='replace')
+        text = (source_root(root) / 'Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp').read_text(errors='replace', encoding='utf-8')
     except OSError:
         return {}
     found = {(int(i), int(v, 16)): name for i, v, name in NAME_PATTERN.findall(text)}
     if found:
         try:
             cache.parent.mkdir(parents=True, exist_ok=True)
-            cache.write_text(json.dumps({f'{i}:{v}': n for (i, v), n in sorted(found.items())}, indent=1) + '\n')
+            cache.write_text(json.dumps({f'{i}:{v}': n for (i, v), n in sorted(found.items())}, indent=1) + '\n', encoding='utf-8')
         except OSError:
             pass
     return found

@@ -92,6 +92,8 @@ def check_operation(operation, targets, settings, index):
     target = operation.get('target')
     if target is not None and target not in targets:
         raise ModError(f'{where} targets an undeclared executable')
+    if 'title_id' in operation and not (isinstance(operation['title_id'], str) and re.fullmatch(r'CUSA\d{5}', operation['title_id'])):
+        raise ModError(f'{where} has an invalid title_id')
     when = operation.get('when')
     if when is not None:
         if (not isinstance(when, dict) or set(when) != {'setting', 'equals'} or when['setting'] not in settings or
@@ -365,7 +367,7 @@ def claim(writes, ident, ranges):
         writes.append((ident, path, chunk, start, end))
 
 
-def plan(available, selected, executable_sha256, settings=None, executable=None, writes=None):
+def plan(available, selected, executable_sha256, settings=None, executable=None, writes=None, title_id=None):
     """Check selected mods against one build; returns ordered, conflict-free operations.
 
     executable: original eboot bytes, required when a code patch is selected so
@@ -384,6 +386,10 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
         operations, skipped = [], False
         for operation in manifest['operations']:
             if operation.get('target', executable_sha256) != executable_sha256:
+                continue
+            # Regions share an executable but not every asset: a recipe pinned to one
+            # title ID applies only to that region's copy.
+            if title_id is not None and operation.get('title_id', title_id) != title_id:
                 continue
             when = operation.get('when')
             if when and chosen[when['setting']] != when['equals']:

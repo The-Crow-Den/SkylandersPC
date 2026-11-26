@@ -72,7 +72,7 @@ def patch_asset(data, profile):
 
 
 def prepare(original_game, session_game, session, profile_path=None):
-    profile=json.loads(Path(profile_path or PROFILE).read_text())
+    profile=json.loads(Path(profile_path or PROFILE).read_text(encoding='utf-8'))
     if hashlib.sha256((original_game/'eboot.bin').read_bytes()).hexdigest()!=profile['executable_sha256']:
         raise ValueError('Nightmare mod refuses an unknown original executable')
     source=original_game/profile['asset']

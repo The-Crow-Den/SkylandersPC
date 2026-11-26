@@ -15,9 +15,9 @@ class UpdaterTest(unittest.TestCase):
     def test_install_kind(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(updater.install_kind(tmp, windows=False), 'manual')
-            (Path(tmp) / 'SkylandersPC.AppImage').write_text('')
+            (Path(tmp) / 'SkylandersPC.AppImage').write_text('', encoding='utf-8')
             self.assertEqual(updater.install_kind(tmp, windows=False), 'linux')
-            (Path(tmp) / 'SkylandersPC.exe').write_text('')
+            (Path(tmp) / 'SkylandersPC.exe').write_text('', encoding='utf-8')
             self.assertEqual(updater.install_kind(tmp, windows=True, frozen=True), 'windows')
             self.assertEqual(updater.install_kind(tmp, windows=True, frozen=False), 'manual')
             (Path(tmp) / '.git').mkdir()
@@ -26,7 +26,7 @@ class UpdaterTest(unittest.TestCase):
     @staticmethod
     def tarball(files, top='SkylandersPC-linux'):
         data = io.BytesIO()
-        with tarfile.open(fileobj=data, mode='w:gz') as bundle:
+        with tarfile.open(fileobj=data, mode='w:gz', encoding='utf-8') as bundle:
             for name, text in files.items():
                 raw = text.encode();info = tarfile.TarInfo(name if name.startswith('/') or '..' in name else f'{top}/{name}')
                 info.size = len(raw);bundle.addfile(info, io.BytesIO(raw))
@@ -47,14 +47,14 @@ class UpdaterTest(unittest.TestCase):
         payload = self.tarball({'tools/launcher.py': 'new', 'tools/added.py': 'x'})
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp);(root / '.local').mkdir()
-            (root / updater.MANIFEST).write_text(json.dumps(['tools/launcher.py', 'tools/gone.py', '../escape']))
+            (root / updater.MANIFEST).write_text(json.dumps(['tools/launcher.py', 'tools/gone.py', '../escape']), encoding='utf-8')
             seen = []
             top = updater.download(self.release(payload), 'linux', root, seen.append, self.opener(payload))
-            self.assertEqual((top / 'tools/launcher.py').read_text(), 'new')
+            self.assertEqual((top / 'tools/launcher.py').read_text(encoding='utf-8'), 'new')
             self.assertEqual(seen[-1], 1.0)
-            self.assertEqual((root / updater.STAGING / 'remove.txt').read_text(), 'tools/gone.py\n')
+            self.assertEqual((root / updater.STAGING / 'remove.txt').read_text(encoding='utf-8'), 'tools/gone.py\n')
             self.assertEqual(updater.staged(root), '9.0.0')
-            self.assertIn('tools/added.py', json.loads((top / updater.MANIFEST).read_text()))
+            self.assertIn('tools/added.py', json.loads((top / updater.MANIFEST).read_text(encoding='utf-8')))
 
     def test_download_rejects_bad_checksum_and_paths(self):
         payload = self.tarball({'tools/launcher.py': 'new'})
@@ -87,17 +87,17 @@ class UpdaterTest(unittest.TestCase):
         payload = self.tarball({'tools/launcher.py': 'new', 'SkylandersPC.AppImage': ''})
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp);(root / 'tools').mkdir();(root / '.local/game-preparation').mkdir(parents=True)
-            (root / 'tools/launcher.py').write_text('old');(root / 'tools/gone.py').write_text('old')
-            (root / '.local/game-preparation/state.json').write_text('keep')
-            (root / updater.MANIFEST).write_text(json.dumps(['tools/launcher.py', 'tools/gone.py']))
+            (root / 'tools/launcher.py').write_text('old', encoding='utf-8');(root / 'tools/gone.py').write_text('old', encoding='utf-8')
+            (root / '.local/game-preparation/state.json').write_text('keep', encoding='utf-8')
+            (root / updater.MANIFEST).write_text(json.dumps(['tools/launcher.py', 'tools/gone.py']), encoding='utf-8')
             updater.download(self.release(payload), 'linux', root, opener=self.opener(payload))
             updater.apply_later('linux', root, pid=2 ** 22 + 7, relaunch=False,
                                 popen=lambda args, **k: subprocess.run(args, check=True, timeout=30))
-            self.assertEqual((root / 'tools/launcher.py').read_text(), 'new')
+            self.assertEqual((root / 'tools/launcher.py').read_text(encoding='utf-8'), 'new')
             self.assertFalse((root / 'tools/gone.py').exists())
-            self.assertEqual((root / '.local/game-preparation/state.json').read_text(), 'keep')
+            self.assertEqual((root / '.local/game-preparation/state.json').read_text(encoding='utf-8'), 'keep')
             self.assertFalse((root / updater.STAGING).exists())
-            self.assertIn('SkylandersPC.AppImage', json.loads((root / updater.MANIFEST).read_text()))
+            self.assertIn('SkylandersPC.AppImage', json.loads((root / updater.MANIFEST).read_text(encoding='utf-8')))
 
     def test_site_fallback_reads_checksums(self):
         class Head(io.BytesIO):

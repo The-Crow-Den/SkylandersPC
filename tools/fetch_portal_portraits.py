@@ -46,12 +46,12 @@ def prepare(destination,tree_file=None):
     destination=Path(destination).absolute()
     if destination.is_symlink() or destination.resolve()!=destination:raise ValueError('redirected portrait cache')
     destination.mkdir(parents=True,exist_ok=True)
-    catalogue=json.loads((ROOT/'profiles/trap-team-portal.json').read_text())
-    if tree_file:tree=json.loads(Path(tree_file).read_text())
+    catalogue=json.loads((ROOT/'profiles/trap-team-portal.json').read_text(encoding='utf-8'))
+    if tree_file:tree=json.loads(Path(tree_file).read_text(encoding='utf-8'))
     else:
         cache=destination/'catalogue.json'
         if not cache.exists():cache.write_bytes(download(TREE,8*1024*1024))
-        tree=json.loads(cache.read_text())
+        tree=json.loads(cache.read_text(encoding='utf-8'))
     characters=image_entries(tree)
     jobs=[dict(kind='villain',index=i,url=v['portrait_url'],cache=f'{i:02}.image') for i,v in enumerate(catalogue['villains'])]
     jobs += [dict(row,kind='figure',cache=f"figure-{row['id']:06x}-{row['variant']:04x}.image") for row in characters]
@@ -99,12 +99,12 @@ def prepare(destination,tree_file=None):
     content=struct.pack('<II',*atlas.size)+atlas.tobytes()
     temporary=destination/'portraits.rgba.tmp';temporary.write_bytes(content);temporary.replace(destination/'portraits.rgba')
     lines=[f'SKYPORTRAITS1 {columns} {rows}']+[f'{identity} {variant} {slot}' for identity,variant,slot in mapping]
-    temporary=destination/'portrait-index.txt.tmp';temporary.write_text('\n'.join(lines)+'\n');temporary.replace(destination/'portrait-index.txt')
-    (destination/'element-index.txt').write_text('\n'.join(f'{element} {cell}' for element,cell in element_mapping)+'\n')
+    temporary=destination/'portrait-index.txt.tmp';temporary.write_text('\n'.join(lines)+'\n', encoding='utf-8');temporary.replace(destination/'portrait-index.txt')
+    (destination/'element-index.txt').write_text('\n'.join(f'{element} {cell}' for element,cell in element_mapping)+'\n', encoding='utf-8')
     record=dict(schema_version=2,atlas_sha256=hashlib.sha256(content).hexdigest(),dimensions=list(atlas.size),columns=columns,rows=rows,
                 figure_portraits=len(mapping),villain_portraits=sum(j['kind']=='villain' and p is not None for j,p,_ in results),
                 sources=sources,missing=missing,note='Third-party identification artwork; private cache only, not a redistribution grant.')
-    (destination/'sources.json').write_text(json.dumps(record,indent=2)+'\n')
+    (destination/'sources.json').write_text(json.dumps(record,indent=2)+'\n', encoding='utf-8')
     print(json.dumps({key:record[key] for key in ('figure_portraits','villain_portraits','dimensions')},indent=2));print('Missing portraits:',len(missing))
     return record
 

@@ -12,7 +12,7 @@ import asset_cache
 class PruneTests(unittest.TestCase):
     def entry(self, cache, name, size, used):
         folder = cache/(name*64); folder.mkdir()
-        (folder/'asset').write_bytes(b'x'*size); (folder/'manifest.json').write_text('{}')
+        (folder/'asset').write_bytes(b'x'*size); (folder/'manifest.json').write_text('{}', encoding='utf-8')
         os.utime(folder/'manifest.json', (used, used)); return folder
 
     def test_old_and_over_budget_entries_go_current_ones_stay(self):

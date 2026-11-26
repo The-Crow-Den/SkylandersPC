@@ -11,7 +11,7 @@ import run_session
 class GpuChoiceTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.folder = Path(self.temp.name)
-        for name in ('nvidia_icd.json', 'radeon_icd.x86_64.json', 'lvp_icd.json'):(self.folder/name).write_text('{}')
+        for name in ('nvidia_icd.json', 'radeon_icd.x86_64.json', 'lvp_icd.json'):(self.folder/name).write_text('{}', encoding='utf-8')
 
     def tearDown(self):self.temp.cleanup()
 

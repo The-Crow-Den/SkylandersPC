@@ -41,7 +41,7 @@ def configured_key(path):
     if path is None:return None
     path=Path(path)
     if path.is_symlink() or path.stat().st_size>2*1024*1024:raise ValueError('invalid private trophy-key configuration')
-    data=path.read_text().strip()
+    data=path.read_text(encoding='utf-8').strip()
     candidates=[]
     if re.fullmatch(r'[0-9a-fA-F]{32}',data):candidates.append(data)
     else:
@@ -145,7 +145,7 @@ def prepare(root,install,session,*,store=None,key_config=None):
             lines.append('\t'.join(map(str,[i,grade.get(row['grade'],0),row.get('group',0),int(row['hidden']),int(unlocked),timestamp,clean_text(row['name']),clean_text(row['detail'])])))
             item=ET.SubElement(document,'trophy',id=str(i),ttype=row['grade'] or '?',gid=str(row.get('group',0)),hidden='yes' if row['hidden'] else 'no',unlockstate='true' if unlocked else 'false',timestamp=str(timestamp))
             ET.SubElement(item,'name').text=row['name'];ET.SubElement(item,'detail').text=row['detail']
-        (destination/f'{user}.tsv').write_text('\n'.join(lines)+'\n')
+        (destination/f'{user}.tsv').write_text('\n'.join(lines)+'\n', encoding='utf-8')
         if not progress.exists():
             with progress.open('xb') as output:output.write(ET.tostring(document,encoding='utf-8',xml_declaration=True))
     return dict(available=True,npwr=npwr,store=str(store),catalogues=str(destination),icons=str(icons),definitions=str(definition) if definition else None,

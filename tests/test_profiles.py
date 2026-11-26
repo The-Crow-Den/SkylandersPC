@@ -67,13 +67,13 @@ class ProfileTests(unittest.TestCase):
     def test_profile_filename_identity_and_traversal(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'wrong.json'
-            path.write_text(json.dumps(self.profile))
+            path.write_text(json.dumps(self.profile), encoding='utf-8')
             with self.assertRaises(ValueError):
                 p.load_profile(directory, 'wrong')
             with self.assertRaises(ValueError):
                 p.load_profile(directory, '../test-game')
             outside = Path(directory).parent / (Path(directory).name + '-outside.json')
-            outside.write_text(json.dumps(self.profile))
+            outside.write_text(json.dumps(self.profile), encoding='utf-8')
             try:
                 (Path(directory) / 'test-game.json').symlink_to(outside)
                 with self.assertRaises(ValueError):

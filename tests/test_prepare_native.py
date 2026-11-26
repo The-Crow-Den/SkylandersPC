@@ -108,7 +108,7 @@ class NativePreparationTests(unittest.TestCase):
             with patch.object(n, 'ROOT', root):
                 output = root / 'out' / 'native'
                 metadata = n.prepare_path(source, output)
-                self.assertEqual(json.loads((output / 'metadata.json').read_text())['pack_sha256'], metadata['pack_sha256'])
+                self.assertEqual(json.loads((output / 'metadata.json').read_text(encoding='utf-8'))['pack_sha256'], metadata['pack_sha256'])
                 with self.assertRaises(FileExistsError):
                     n.prepare_path(source, output)
                 with self.assertRaises(ValueError):

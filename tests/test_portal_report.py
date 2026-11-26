@@ -17,7 +17,7 @@ class PortalReport(unittest.TestCase):
             node = Path(root)/'bus/usb/devices/3-2';node.mkdir(parents=True)
             for name, value in dict(idVendor='1430', idProduct='1f17', product='Portal', manufacturer='Activision',
                                     serial='SECRET', busnum='3', devnum='2', speed='12').items():
-                (node/name).write_text(value+'\n')
+                (node/name).write_text(value+'\n', encoding='utf-8')
             (node/'descriptors').write_bytes(DEVICE+CONFIG+INTERFACE+ENDPOINTS)
             data = portal_report.report(sysfs=root)
         device = data['portals'][0]
@@ -28,7 +28,7 @@ class PortalReport(unittest.TestCase):
         self.assertNotIn('node', device)
 
     def test_probe_never_reads_figures(self):
-        source = Path(portal_report.__file__).read_text()
+        source = Path(portal_report.__file__).read_text(encoding='utf-8')
         self.assertNotIn("b'Q'", source);self.assertNotIn("b'W'", source)
 
 

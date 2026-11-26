@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Games-folder metadata shares universal preferences without becoming a game override."""
 import json
+import os
 from pathlib import Path
 import uuid
 
@@ -17,12 +18,14 @@ def raw(path):
     path = Path(path)
     if not path.exists():return {}
     if any(p.is_symlink() for p in (path,*path.parents)) or path.stat().st_size>1024*1024:raise ValueError('Invalid launcher preferences file')
-    value = json.loads(path.read_text())
+    value = json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(value,dict):raise ValueError('Invalid launcher preferences')
     return value
 
 
 def resolve(project, value):
+    # Windows folders were once saved as D:\Games; read them as D:/Games.
+    if isinstance(value,str) and os.name=='nt':value = value.replace('\\','/')
     if not isinstance(value,str) or '\0' in value or '\\' in value or '..' in Path(value).parts:
         raise ValueError('Invalid games folder preference')
     if not value:return Path(project).absolute()/'Games'
@@ -52,11 +55,11 @@ def save_location(project, current, previous):
     def stored(folder):
         folder = Path(folder).absolute()
         try:return folder.relative_to(project).as_posix()
-        except ValueError:return str(folder)
+        except ValueError:return folder.as_posix()
     value['games_folder'] = stored(current)
     value['previous_games_folders'] = [stored(p) for p in dict.fromkeys(previous) if Path(p)!=Path(current)]
     path.parent.mkdir(parents=True,exist_ok=True)
     temporary = path.with_name('.launcher-settings-'+uuid.uuid4().hex+'.tmp')
     try:
-        temporary.write_text(json.dumps(value,indent=2)+'\n');temporary.replace(path)
+        temporary.write_text(json.dumps(value,indent=2)+'\n', encoding='utf-8');temporary.replace(path)
     finally:temporary.unlink(missing_ok=True)

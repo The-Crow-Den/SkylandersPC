@@ -36,7 +36,7 @@ class GameLibraryTests(unittest.TestCase):
         (self.root/'profiles').mkdir(exist_ok=True)
         path = self.root/'profiles'/f'{profile_id}.json'
         path.write_text(json.dumps(dict(id=profile_id,title='Synthetic profile',validated_builds=[dict(
-            title_id=title,app_version=ver,executable_sha256=hashlib.sha256(executable).hexdigest())])))
+            title_id=title,app_version=ver,executable_sha256=hashlib.sha256(executable).hexdigest())])), encoding='utf-8')
 
     def test_unpacked_folders_install_and_originals_stay(self):
         base=self.dump('mine/Game');update=self.dump('mine/Update',ver='01.01',category='gp',executable=b'patch')
@@ -124,7 +124,7 @@ class GameLibraryTests(unittest.TestCase):
         marker.parent.mkdir(exist_ok=True)
         preferences=launcher_library.defaults();preferences['figures']=['/synthetic/figure.sky']
         preferences['games'][1]['settings']={'resolution':'2160p'}
-        marker.write_text(json.dumps(preferences));before=marker.read_bytes()
+        marker.write_text(json.dumps(preferences), encoding='utf-8');before=marker.read_bytes()
         for name in ('saves/progress','out/sessions/research','figures/collection'):
             p=self.root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'keep')
         inode=(base/'eboot.bin').stat().st_ino
@@ -184,7 +184,7 @@ class GameLibraryTests(unittest.TestCase):
         for values in ({'executable_sha256':'not-a-hash'},{'base_path':'../outside'},{'app_version':'../../escape'}, {'update_path':'/elsewhere'}):
             with self.subTest(values=values),self.assertRaises(ValueError):
                 library.validate_entry({**entry,**values})
-        path.write_text(json.dumps({**entry,'content_id':'different'}))
+        path.write_text(json.dumps({**entry,'content_id':'different'}), encoding='utf-8')
         with self.assertRaisesRegex(ValueError,'base metadata'): library.resolve(self.root)
         linked=self.root/'linked';linked.symlink_to(Path(entry['base_path']),target_is_directory=True)
         with self.assertRaisesRegex(ValueError,'symlink'): library.publish(self.library,linked)
@@ -227,17 +227,17 @@ class GameLibraryTests(unittest.TestCase):
         project=self.root/'SkylandersPS4';self.dump('SkylandersPS4/Game/external')
         entry=library.entries(project)[0];manifest=library.manifest_path(library.directory(project),entry)
         for foreign in ('H:\\Skylanders\\SkylandersPS4\\Game\\external','/mnt/drive/SkylandersPS4/Game/external'):
-            raw=json.loads(manifest.read_text());raw['base_path']=foreign;manifest.write_text(json.dumps(raw))
+            raw=json.loads(manifest.read_text(encoding='utf-8'));raw['base_path']=foreign;manifest.write_text(json.dumps(raw), encoding='utf-8')
             issues=[];library.register(project,issues)
             self.assertEqual(issues,[])
             self.assertEqual(library.resolve(project,'CUSA00626').base,project/'Game/external')
-            self.assertEqual(json.loads(manifest.read_text())['base_path'],'@project/Game/external')
+            self.assertEqual(json.loads(manifest.read_text(encoding='utf-8'))['base_path'],'@project/Game/external')
 
     def test_managed_paths_survive_project_move_and_external_references_reregister(self):
         origin=self.root/'original';moved=self.root/'renamed'
         base=self.dump('original/incoming')
         entry=library.publish(library.directory(origin),base)
-        raw=json.loads(library.manifest_path(library.directory(origin),entry).read_text())
+        raw=json.loads(library.manifest_path(library.directory(origin),entry).read_text(encoding='utf-8'))
         self.assertEqual(raw['base_path'],'CUSA00626/01.00/base')
         self.dump('original/Game/external',title='CUSA99999')
         library.register(origin)
@@ -251,7 +251,7 @@ class GameLibraryTests(unittest.TestCase):
     def test_bad_manifest_and_ambiguous_legacy_updates_do_not_hide_other_titles(self):
         bad=library.publish(self.library,self.dump('bad'))
         good=library.publish(self.library,self.dump('good',title='CUSA99999'))
-        library.manifest_path(self.library,bad).write_text('broken json')
+        library.manifest_path(self.library,bad).write_text('broken json', encoding='utf-8')
         self.dump('Game/legacy',title='CUSA11111')
         self.dump('Game/patch1',title='CUSA11111',ver='01.01',category='gp')
         self.dump('Game/patch2',title='CUSA11111',ver='01.01',category='gp')
@@ -262,7 +262,7 @@ class GameLibraryTests(unittest.TestCase):
         value=launcher_library.defaults();launcher_library.sync_installations(self.root,value)
         game=next(g for g in value['games'] if g.get('title_id')=='CUSA00626')
         self.assertTrue(game['installation_issue'])
-        self.assertTrue(library.manifest_path(self.library,bad).read_text()=='broken json')
+        self.assertTrue(library.manifest_path(self.library,bad).read_text(encoding='utf-8')=='broken json')
 
     def test_folder_leave_and_move_preserve_library_entries(self):
         from tools import library_location,launcher_model

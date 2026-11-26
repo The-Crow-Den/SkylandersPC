@@ -19,12 +19,14 @@ try:
     from .launcher_theme import STYLE, Hero, PortraitStrip, feature_card, text_label
     from .pc_settings import load_settings, save_settings
     from .resolution import PRESETS
+    from .process_text import utf8_reader
 except ImportError:
     import launcher_model as model, portal_devices
     import host_process
     from launcher_theme import STYLE, Hero, PortraitStrip, feature_card, text_label
     from pc_settings import load_settings, save_settings
     from resolution import PRESETS
+    from process_text import utf8_reader
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,6 +42,20 @@ def launcher_icon(root):
     if shipped.is_file():return shipped
     folder = Path(root) / '.local/app-icon'
     return folder / 'launcher.png' if (folder / 'launcher.png').is_file() else folder / 'crystal@2x.png'
+
+
+def single_instance():
+    """A lock held while this launcher runs, or None when another one already holds it.
+
+    Two launchers would save settings over each other and could install or start
+    games at the same time. A lock left by a crashed launcher is detected as stale."""
+    from PyQt6.QtCore import QLockFile
+    try:
+        folder = user_data.base();folder.mkdir(parents=True,exist_ok=True)
+    except OSError:
+        return True  # nowhere to keep a lock: don't block the player
+    lock = QLockFile(str(folder/'launcher.lock'));lock.setStaleLockTime(0)
+    return lock if lock.tryLock(100) else None
 
 
 def record_errors():
@@ -327,7 +343,7 @@ class Launcher(QMainWindow):
 
     def read_output(self):
         if self.process:
-            text = bytes(self.process.readAllStandardOutput()).decode('utf-8', errors='replace')
+            text = utf8_reader(self, self.process).decode(bytes(self.process.readAllStandardOutput()))
             self.output_buffer = (self.output_buffer + text)[-32768:]
             self.last_output = text
             self.log.moveCursor(self.log.textCursor().MoveOperation.End)
@@ -425,6 +441,10 @@ def main():
         app.setWindowIcon(QIcon(str(icon)))
     adopt_user_data(ROOT)
     record_errors()
+    instance = single_instance()
+    if instance is None:
+        QMessageBox.information(None, 'Skylanders PC', 'SkylandersPC is already open. Look for its window or its icon on the taskbar.')
+        return 0
     window = Launcher(ROOT)
     try:
         from .launcher_gamepad import game_mode

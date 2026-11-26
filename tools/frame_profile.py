@@ -169,8 +169,8 @@ def main():
     if not frames.is_file():
         parser.error(f'{frames} is missing; run the session with --profile')
     guest = args.session/'frame-profile.csv'
-    report = summarize(frames.read_text(), guest.read_text() if guest.is_file() else '',
-                       (args.session/'runtime.log').read_text(errors='replace'), args.settling_ms)
+    report = summarize(frames.read_text(encoding='utf-8'), guest.read_text(encoding='utf-8') if guest.is_file() else '',
+                       (args.session/'runtime.log').read_text(errors='replace', encoding='utf-8'), args.settling_ms)
     if args.json:
         print(json.dumps(report, indent=2))
         return

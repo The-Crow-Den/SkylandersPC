@@ -24,10 +24,10 @@ class LibraryTests(unittest.TestCase):
             path=Path(directory)/'library.json'
             for bad in [{'resolution':'bad'}, {'fullscreen':'yes'}, {'extra':True}]:
                 value=library.defaults();value['games'][0]['settings']=bad
-                path.write_text(json.dumps(value))
+                path.write_text(json.dumps(value), encoding='utf-8')
                 with self.assertRaises(ValueError):library.load(path)
             value=library.defaults();value['games'][0]['id']='../outside'
-            path.write_text(json.dumps(value))
+            path.write_text(json.dumps(value), encoding='utf-8')
             with self.assertRaises(ValueError):library.load(path)
 
 

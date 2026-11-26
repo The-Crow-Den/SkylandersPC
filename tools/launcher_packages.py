@@ -81,3 +81,7 @@ def check_packages(game_pkg=None, update_pkg=None, installed=()):
         version(base.get('APP_VER'))
     if update and (update.get('TITLE_ID') != base.get('TITLE_ID') or update.get('CONTENT_ID') != base.get('CONTENT_ID') or version(update.get('APP_VER')) <= version(base.get('APP_VER'))):
         raise ValueError('This update does not match your game, or is older than your game file. Choose a newer update for the same game.')
+    final = update or base
+    if final and any(e['title_id'] == final.get('TITLE_ID') and e.get('app_version', e.get('base_version')) == final.get('APP_VER') for e in installed):
+        raise ValueError('This version of the game is already installed. To install it again, first choose Remove game '
+                         'from the game\'s menu (your saves, figures and settings are kept), then install it.')

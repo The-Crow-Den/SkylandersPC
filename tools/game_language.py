@@ -28,7 +28,7 @@ def offered(root, profile_id):
     """Languages a title profile lists, in its order; English (US) when none are listed."""
     path = Path(root) / 'profiles' / f'{profile_id}.json'
     try:
-        languages = json.loads(path.read_text()).get('languages', [DEFAULT])
+        languages = json.loads(path.read_text(encoding='utf-8')).get('languages', [DEFAULT])
     except (OSError, ValueError, AttributeError):
         return [DEFAULT]
     if not isinstance(languages, list) or not languages or any(item not in CODES for item in languages):

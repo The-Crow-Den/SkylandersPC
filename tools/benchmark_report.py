@@ -41,4 +41,4 @@ if __name__=='__main__':
     parser.add_argument('--last-seconds',type=float,default=15)
     args=parser.parse_args()
     if not 0<args.last_seconds<float('inf'):parser.error('last-seconds must be positive and finite')
-    print(json.dumps(summarize(args.csv.read_text(),args.last_seconds),indent=2))
+    print(json.dumps(summarize(args.csv.read_text(encoding='utf-8'),args.last_seconds),indent=2))

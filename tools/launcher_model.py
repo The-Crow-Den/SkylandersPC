@@ -82,7 +82,7 @@ def migrate(value):
 def load(path):
     path = Path(path)
     if not path.exists(): return dict(DEFAULTS)
-    value=migrate(json.loads(path.read_text()))
+    value=migrate(json.loads(path.read_text(encoding='utf-8')))
     if isinstance(value,dict):
         value = {k:v for k,v in value.items() if k not in ('games_folder','previous_games_folders')}
     if isinstance(value,dict) and 'figure_bottom' not in value:
@@ -117,7 +117,7 @@ def save(path, value):
     value = {**value,**{key:existing[key] for key in KEYS if key in existing}}
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.tmp')
-    temporary.write_text(json.dumps(value, indent=2) + '\n')
+    temporary.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
     temporary.replace(path)
 
 
@@ -194,7 +194,7 @@ def controllers(sysfs=Path('/sys/class/input')):
     result = []
     for path in sorted(Path(sysfs).glob('js*/device/name')):
         try:
-            name = path.read_text().strip()
+            name = path.read_text(encoding='utf-8').strip()
         except OSError:
             continue
         if name:

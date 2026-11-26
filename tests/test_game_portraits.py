@@ -51,7 +51,7 @@ class GamePortraitTests(unittest.TestCase):
             width, height = struct.unpack('>II', png[16:24]); self.assertEqual((width, height), (96, 96))
             raw = zlib.decompress(png[png.index(b'IDAT') + 4:png.index(b'IEND') - 8])
             self.assertEqual(raw[1:5], bytes((255, 0, 0, 255)))
-            saved = json.loads((Path(temp)/'out/index.json').read_text())
+            saved = json.loads((Path(temp)/'out/index.json').read_text(encoding='utf-8'))
             self.assertEqual(saved['portraits'], index)
 
     def test_portal_atlas_gets_game_pictures_and_keeps_villains(self):
@@ -60,27 +60,27 @@ class GamePortraitTests(unittest.TestCase):
             red = bytes((255, 0, 0, 255)) * 96
             (assets/'game/30_0.png').write_bytes(game_portraits.png([red] * 96))
             (assets/'game/2011_0.png').write_bytes(game_portraits.png([red] * 96))
-            (assets/'game/index.json').write_text(json.dumps(dict(schema_version=2, portraits={'30:0': '30_0.png', '2011:0': '2011_0.png'})))
+            (assets/'game/index.json').write_text(json.dumps(dict(schema_version=2, portraits={'30:0': '30_0.png', '2011:0': '2011_0.png'})), encoding='utf-8')
             width, height = 16 * 96, 20 * 96; atlas = bytearray(width * height * 4)
             atlas[0:4] = b'\x01\x02\x03\xff'                       # villain cell 0
             atlas[(302 % 16) * 384:(302 % 16) * 384 + 4] = b'\x09\x09\x09\xff'  # element icon at cell 302 (row 18)
             at = 18 * 96 * width * 4 + (302 % 16) * 384; atlas[at:at + 4] = b'\x07\x07\x07\xff'
             (assets/'portraits.rgba').write_bytes(struct.pack('<II', width, height) + bytes(atlas))
-            (assets/'element-index.txt').write_text('0 302\n')
+            (assets/'element-index.txt').write_text('0 302\n', encoding='utf-8')
             (assets/'sources.json').write_text(json.dumps(dict(sources=[dict(cell=0, kind='villain', cache='00.image'),
-                dict(cell=302, kind='element', cache='e.image'), dict(cell=100, kind='figure', cache='old.image')])))
+                dict(cell=302, kind='element', cache='e.image'), dict(cell=100, kind='figure', cache='old.image')])), encoding='utf-8')
             self.assertTrue(game_portraits.install(assets)); self.assertFalse(game_portraits.install(assets))
             data = (assets/'portraits.rgba').read_bytes(); w, h = struct.unpack_from('<II', data)
             self.assertEqual(data[8:12], b'\x01\x02\x03\xff')
-            self.assertEqual((assets/'element-index.txt').read_text(), '0 1\n')
+            self.assertEqual((assets/'element-index.txt').read_text(encoding='utf-8'), '0 1\n')
             self.assertEqual(data[8 + 384:8 + 388], b'\x07\x07\x07\xff')
             cell = lambda c: data[8 + (c // 16) * 96 * w * 4 + (c % 16) * 384:][:4]
-            lines = (assets/'portrait-index.txt').read_text().split('\n')
+            lines = (assets/'portrait-index.txt').read_text(encoding='utf-8').split('\n')
             self.assertEqual(lines[0], f'SKYPORTRAITS1 16 {h // 96}')
             entries = {tuple(map(int, l.split()[:2])): int(l.split()[2]) for l in lines[1:] if l}
             self.assertEqual(entries[(30, 0)], 64); self.assertEqual(entries[(1011, 0)], entries[(2011, 0)])
             self.assertEqual(cell(64), bytes((255, 0, 0, 255)))
-            kinds = sorted(s['kind'] for s in json.loads((assets/'sources.json').read_text())['sources'])
+            kinds = sorted(s['kind'] for s in json.loads((assets/'sources.json').read_text(encoding='utf-8'))['sources'])
             self.assertEqual(kinds, ['element', 'figure', 'figure', 'villain'])
 
     def test_unknown_archives_are_refused(self):

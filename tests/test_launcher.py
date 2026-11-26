@@ -24,7 +24,7 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(result['reason'], 'spawn-error')
             self.assertIsNone(result['returncode'])
             self.assertFalse(result['gameplay_verified'])
-            self.assertEqual(json.loads((root / 'result.json').read_text()), result)
+            self.assertEqual(json.loads((root / 'result.json').read_text(encoding='utf-8')), result)
 
     def test_interrupt_still_kills_and_reaps_child(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -68,14 +68,14 @@ class LauncherTests(unittest.TestCase):
                       '\nwhile not Path("child.pid").exists(): time.sleep(0.01)')
             result = w.execute([sys.executable, '-c', parent], root, 5)
             self.assertEqual(result['returncode'], 0)
-            pid = int((root / 'child.pid').read_text())
+            pid = int((root / 'child.pid').read_text(encoding='utf-8'))
             # A killed orphan can remain a zombie until PID 1 reaps it; it must
             # no longer execute. Poll only for the signal to be delivered.
             import time
             deadline = time.monotonic() + 1
             while True:
                 try:
-                    state = Path(f'/proc/{pid}/stat').read_text().split(') ', 1)[1][0]
+                    state = Path(f'/proc/{pid}/stat').read_text(encoding='utf-8').split(') ', 1)[1][0]
                 except FileNotFoundError:
                     break
                 if state == 'Z':

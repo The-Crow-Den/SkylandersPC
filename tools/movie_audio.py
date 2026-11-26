@@ -218,7 +218,7 @@ def cache_for(profile_path):
 
 def prepare(original_game, session_game, session, profile_path, narration='English'):
     """Keep one narration track (by language name in the profile) plus the shared tracks."""
-    profile=json.loads(Path(profile_path).read_text())
+    profile=json.loads(Path(profile_path).read_text(encoding='utf-8'))
     if type(profile.get('schema_version')) is not int or profile['schema_version']!=2:
         raise ValueError('unsupported movie localization profile')
     tracks,shared=profile.get('narration_tracks'),profile.get('shared_tracks')
@@ -237,7 +237,7 @@ def prepare(original_game, session_game, session, profile_path, narration='Engli
 
 def skip_logos(original_game, session_game, session, profile_path):
     """Startup logo movies cut to their first frame, so the game moves straight on."""
-    profile=json.loads(Path(profile_path).read_text())
+    profile=json.loads(Path(profile_path).read_text(encoding='utf-8'))
     if profile.get('schema_version')!=1 or not isinstance(profile.get('logos'),list):
         raise ValueError('unsupported intro profile')
     items=[(recipe,recipe.get('output_sha256')) for recipe in profile['logos']]

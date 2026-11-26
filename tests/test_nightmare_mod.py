@@ -57,7 +57,7 @@ class NightmareModTests(unittest.TestCase):
             profile['executable_sha256']=hashlib.sha256(b'synthetic executable').hexdigest()
             source=original/'level/title.bld';destination=game/'level/title.bld'
             source.write_bytes(data);os.link(source,destination)
-            manifest=root/'profile.json';manifest.write_text(json.dumps(profile))
+            manifest=root/'profile.json';manifest.write_text(json.dumps(profile), encoding='utf-8')
             with patch.object(mod,'PROFILE',manifest):
                 mod.prepare(original,game,session)
                 self.assertEqual(source.read_bytes(),data)

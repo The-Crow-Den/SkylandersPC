@@ -98,7 +98,7 @@ class ManifestTest(unittest.TestCase):
             for base in ('profiles/mods/x', 'mods/x'):
                 (root / base).mkdir(parents=True)
                 data = {key: value for key, value in manifest().items() if key != 'source'}
-                (root / base / 'mod.json').write_text(json.dumps(data))
+                (root / base / 'mod.json').write_text(json.dumps(data), encoding='utf-8')
             with self.assertRaisesRegex(mods.ModError, 'defined by both'):
                 mods.discover(root)
             (root / 'mods/x/mod.json').unlink()
@@ -113,10 +113,10 @@ class ManifestTest(unittest.TestCase):
             with self.assertRaisesRegex(mods.ModError, 'unavailable in this checkout'):
                 mods.plan({'gates': gates}, ['gates'], BUILD)
             (root / 'profiles/patches').mkdir(parents=True)
-            (root / 'profiles/patches/gates.json').write_text(json.dumps(dict(executable_sha256=OTHER, assets=[recipe])))
+            (root / 'profiles/patches/gates.json').write_text(json.dumps(dict(executable_sha256=OTHER, assets=[recipe])), encoding='utf-8')
             with self.assertRaisesRegex(mods.ModError, 'different executable'):
                 mods.plan({'gates': gates}, ['gates'], BUILD)
-            (root / 'profiles/patches/gates.json').write_text(json.dumps(dict(executable_sha256=BUILD, assets=[recipe])))
+            (root / 'profiles/patches/gates.json').write_text(json.dumps(dict(executable_sha256=BUILD, assets=[recipe])), encoding='utf-8')
             applied = mods.plan({'gates': gates}, ['gates'], BUILD)
             self.assertEqual(mods.asset_profile(applied, 'CUSA00000', '01.00', BUILD)['assets'], [recipe])
             # A user mod reads only from its own folder; a built-in one only from profiles/patches.
@@ -146,7 +146,7 @@ class ManifestTest(unittest.TestCase):
         available = mods.discover(ROOT)
         manifest = available['trap-master']
         self.assertEqual(set(manifest['settings']), {'elemental-gates', 'traptanium'})
-        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text(encoding='utf-8'))['executable_sha256']
         gates_only = mods.plan(available, ['trap-master'], us, settings={'trap-master': {'traptanium': False}})
         self.assertEqual([op['profile'] for op in gates_only[0]['operations']],
                          ['profiles/patches/trap-team-us-01.01-element-gates.experimental.json'])
@@ -158,7 +158,7 @@ class ManifestTest(unittest.TestCase):
         self.assertEqual(len(profiles), 2)
         self.assertTrue(any('replay-expansion-intros' in name for name in profiles))
         self.assertEqual(set(available['unlock-expansions']['settings']), {'unlock-adventure-packs', 'replay-introductions'})
-        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text(encoding='utf-8'))['executable_sha256']
         replay_only = mods.plan(available, ['unlock-expansions'], us, settings={'unlock-expansions': {'unlock-adventure-packs': False}})
         self.assertEqual([op['profile'] for op in replay_only[0]['operations']],
                          ['profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json'])
@@ -168,7 +168,7 @@ class ManifestTest(unittest.TestCase):
         self.assertNotIn('movie-audio', available)  # a fix, not a mod
         for ident in ('nightmare', 'level-events', 'controller-glyphs', 'trap-master', 'unlock-expansions'):
             self.assertTrue(available[ident]['builtin'], ident)
-        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text(encoding='utf-8'))['executable_sha256']
         self.assertTrue(mods.supports(available, 'nightmare', us))
         self.assertFalse(mods.supports(available, 'nightmare', BUILD))
 
@@ -179,7 +179,7 @@ class ManifestTest(unittest.TestCase):
             rows, error = launcher_mods.catalogue(ROOT, {'id': 'trap-team'})
         self.assertIsNone(error)
         self.assertEqual({row['status'] for row in rows}, {'not-installed'})
-        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text())['executable_sha256']
+        us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text(encoding='utf-8'))['executable_sha256']
         with patch.object(launcher_mods, 'build', return_value=('CUSA00626', '01.01', us)):
             status = {row['id']: row for row in launcher_mods.catalogue(ROOT, {'id': 'trap-team'})[0]}
         self.assertEqual(status['nightmare']['status'], 'ready')
@@ -191,9 +191,11 @@ class ManifestTest(unittest.TestCase):
 
     def test_builtin_nightmare_matches_profiles(self):
         nightmare = mods.read(ROOT / 'profiles/mods/nightmare')
-        for name in ('trap-team-us-01.01-nightmare.json', 'trap-team-nightmare.json'):
-            profile = json.loads((ROOT / 'profiles/patches' / name).read_text())
-            applied = mods.plan({'nightmare': nightmare}, ['nightmare'], profile['executable_sha256'])
+        # US and EU 01.00 share an executable but not level/title.bld: each region's
+        # copy gets the recipe for its own file.
+        for name in ('trap-team-us-01.01-nightmare.json', 'trap-team-nightmare.json', 'trap-team-us-01.00-nightmare.json'):
+            profile = json.loads((ROOT / 'profiles/patches' / name).read_text(encoding='utf-8'))
+            applied = mods.plan({'nightmare': nightmare}, ['nightmare'], profile['executable_sha256'], title_id=profile['title_id'])
             self.assertEqual(mods.asset_profile(applied, profile['title_id'], profile['app_version'], profile['executable_sha256']),
                              nightmare_mod.recipe(profile))
 

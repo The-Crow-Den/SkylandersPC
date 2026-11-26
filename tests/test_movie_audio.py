@@ -43,7 +43,7 @@ class MovieAudioTests(unittest.TestCase):
             profile=root/'profiles/patches/intro.json';profile.parent.mkdir(parents=True)
             profile.write_text(json.dumps(dict(schema_version=1,executable_sha256=movie_audio.digest(b'executable'),
                 logos=[dict(asset='movies/logo.avi',source_sha256=movie_audio.digest(data),source_tracks=[1,7,0],
-                            output_sha256=movie_audio.digest(movie_audio.shorten(data)))])))
+                            output_sha256=movie_audio.digest(movie_audio.shorten(data)))])), encoding='utf-8')
             report=movie_audio.skip_logos(source,target,session,profile)
             self.assertEqual(report['assets'][0]['asset'],'movies/logo.avi')
             self.assertEqual((target/'movies/logo.avi').read_bytes(),movie_audio.shorten(data))
@@ -80,7 +80,7 @@ class MovieAudioTests(unittest.TestCase):
             recipe=dict(schema_version=2,narration_tracks={'English':7,'Spanish':1},shared_tracks=[0],executable_sha256=movie_audio.digest(b'executable'),
                         assets=[dict(asset='movies/test.mov',source_sha256=movie_audio.digest(data),source_tracks=[1,7,0],
                                      outputs={'English':movie_audio.digest(after),'Spanish':movie_audio.digest(spanish)})])
-            profile.write_text(json.dumps(recipe))
+            profile.write_text(json.dumps(recipe), encoding='utf-8')
             with self.assertRaisesRegex(ValueError,'no French narration'):
                 movie_audio.prepare(source,target,session,profile,'French')
             report=movie_audio.prepare(source,target,session,profile,'Spanish')

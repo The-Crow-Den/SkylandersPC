@@ -54,7 +54,7 @@ class ResolutionTests(unittest.TestCase):
             session = root/'session'
             session.mkdir()
             profile = root/'profile.json'
-            profile.write_text(json.dumps({'renderer_sha256': hashlib.sha256(self.RENDERER).hexdigest()}))
+            profile.write_text(json.dumps({'renderer_sha256': hashlib.sha256(self.RENDERER).hexdigest()}), encoding='utf-8')
             with patch('tools.resolution.PROFILE', profile):
                 output, metadata = prepare_assets(game, session, (2560,1440), 'low')
             self.assertEqual(source.read_bytes(), self.RENDERER)
@@ -135,11 +135,11 @@ class ResolutionTests(unittest.TestCase):
     def test_menu_and_native_host_list_presets_in_the_same_order(self):
         # The in-game menu sends an index; both sides must agree on it.
         root = Path(__file__).resolve().parents[1]
-        native = (root / 'native/pc_settings.hpp').read_text()
+        native = (root / 'native/pc_settings.hpp').read_text(encoding='utf-8')
         entries = re.findall(r'\{"(\d+p)",(\d+),(\d+)\}', native)
         self.assertEqual([(name, (int(w), int(h))) for name, w, h in entries], list(PRESETS.items()))
         self.assertIn('default_resolution = %d;' % list(PRESETS).index('1080p'), native)
-        menu = (root / 'tools/pc_menu/index.html').read_text()
+        menu = (root / 'tools/pc_menu/index.html').read_text(encoding='utf-8')
         select = re.search(r'<select id="trap-demo-res">(.*?)</select>', menu)[1]
         options = re.findall(r'<option>(\d+) × (\d+)', select)
         self.assertEqual([(int(w), int(h)) for w, h in options], list(PRESETS.values()))

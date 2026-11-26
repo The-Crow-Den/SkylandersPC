@@ -82,7 +82,7 @@ def html_overlay(directory,root,environment):
         ui_env['QTWEBENGINE_CHROMIUM_FLAGS']=' '.join(flags+[flag for flag in ('--disable-gpu','--disable-gpu-compositing') if flag not in flags])
         ui_env['QT_QUICK_BACKEND']='software'
         if ui_env.get('SDL_VIDEO_DRIVER')=='x11':ui_env.setdefault('QT_QPA_PLATFORM','xcb')
-        with (directory/'pc-overlay.log').open('x') as output:
+        with (directory/'pc-overlay.log').open('x', encoding='utf-8') as output:
             command=[python,str(root/'tools/pc_overlay.py'),'--directory',str(private)]
             if embedded:command.append('--embedded')
             process=subprocess.Popen(command,cwd=root,env=ui_env,stdout=output,stderr=subprocess.STDOUT,**host_process.group_options())
@@ -96,7 +96,7 @@ def html_overlay(directory,root,environment):
         if status['active']!='web':raise RuntimeError('HTML overlay did not become ready; using native menu')
     except (ImportError,ModuleNotFoundError,OSError,RuntimeError) as error:
         status['error']=str(error);print('PC menu:',error,file=sys.stderr,flush=True)
-    (directory/'pc-overlay-status.json').write_text(json.dumps(status,indent=2)+'\n')
+    (directory/'pc-overlay-status.json').write_text(json.dumps(status,indent=2)+'\n', encoding='utf-8')
     try:
         yield runtime
     finally:

@@ -109,7 +109,7 @@ class CollectionTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(); self.root = Path(self.temporary.name)
         (self.root / '.local/portal-assets').mkdir(parents=True)
         (self.root / '.local/portal-assets/trap-metadata.seed').write_bytes(SEED)
-        (self.root / '.local/portal-assets/figure-names.json').write_text(json.dumps({'14:0': 'Gill Grunt', '16:0': 'Spyro', '230:0': 'Hand of Fate'}))
+        (self.root / '.local/portal-assets/figure-names.json').write_text(json.dumps({'14:0': 'Gill Grunt', '16:0': 'Spyro', '230:0': 'Hand of Fate'}), encoding='utf-8')
         self.collection = fc.Collection(self.root)
 
     def tearDown(self):
@@ -151,9 +151,9 @@ class CollectionTests(unittest.TestCase):
         (self.root / '.local/portal-assets/figure-names.json').unlink()
         source = self.root / 'wiiu'
         cpp = source / 'Cemu-main/src/Cafe/OS/libs/nsyshid/Skylander.cpp'; cpp.parent.mkdir(parents=True)
-        cpp.write_text('{{0, 0x0000}, "Whirlwind"},\n{{16, 0x1801}, "Series 2 Spyro"},\n{{211, 0x3001}, "Water Trap"},')
+        cpp.write_text('{{0, 0x0000}, "Whirlwind"},\n{{16, 0x1801}, "Series 2 Spyro"},\n{{211, 0x3001}, "Water Trap"},', encoding='utf-8')
         (self.root / '.local/native-gpu-build').mkdir(parents=True)
-        (self.root / '.local/native-gpu-build/CMakeCache.txt').write_text(f'SKY_PORTAL_SOURCE_ROOT:PATH={source}\n')
+        (self.root / '.local/native-gpu-build/CMakeCache.txt').write_text(f'SKY_PORTAL_SOURCE_ROOT:PATH={source}\n', encoding='utf-8')
         collection = fc.Collection(self.root)
         self.assertEqual(collection.names[(16, 0x1801)], 'Series 2 Spyro')
         self.assertEqual([c[0] for c in collection.choices()], ['Series 2 Spyro', 'Whirlwind'])

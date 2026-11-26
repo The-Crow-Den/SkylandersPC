@@ -41,8 +41,8 @@ class TrophyStoreTests(unittest.TestCase):
                 progress=store/'users/4096'/f'{NPWR}.xml';before=progress.read_bytes();progress.write_bytes(before.replace(b'unlockstate="false"',b'unlockstate="true"',1));saved=progress.read_bytes()
                 again=root/'again';again.mkdir();trophy_store.prepare(root,install,again,store=store)
                 self.assertEqual(progress.read_bytes(),saved)
-                self.assertIn('0\t4\t0\t0\t1\t0\tFirst',(again/'trophies/4096.tsv').read_text())
-                self.assertIn('1\t2\t2\t0\t0\t0\tExtra',(again/'trophies/4096.tsv').read_text())
+                self.assertIn('0\t4\t0\t0\t1\t0\tFirst',(again/'trophies/4096.tsv').read_text(encoding='utf-8'))
+                self.assertIn('1\t2\t2\t0\t0\t0\tExtra',(again/'trophies/4096.tsv').read_text(encoding='utf-8'))
                 self.assertFalse(launcher_trophies.read_xml(store/'users/4097'/f'{NPWR}.xml')[1][0]['unlocked'])
                 redirected=root/'redirected';redirected.mkdir();(redirected/'catalogues').symlink_to(store/'catalogues',target_is_directory=True)
                 with self.assertRaises(ValueError):trophy_store.prepare(root,install,again,store=redirected)
@@ -54,9 +54,9 @@ class TrophyStoreTests(unittest.TestCase):
             with self.assertRaises(ValueError):trophy_store.entries(file)
     def test_private_key_config(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path=Path(tmp)/'private.toml';path.write_text('[Keys]\ntrophyKey="000102030405060708090a0b0c0d0e0f"\n')
+            path=Path(tmp)/'private.toml';path.write_text('[Keys]\ntrophyKey="000102030405060708090a0b0c0d0e0f"\n', encoding='utf-8')
             self.assertEqual(trophy_store.configured_key(path),bytes(range(16)))
-            path.write_text('{"Keys":{"trophyKey":"000102030405060708090a0b0c0d0e0f"}}')
+            path.write_text('{"Keys":{"trophyKey":"000102030405060708090a0b0c0d0e0f"}}', encoding='utf-8')
             self.assertEqual(trophy_store.configured_key(path),bytes(range(16)))
-            path.write_text('0'*32)
+            path.write_text('0'*32, encoding='utf-8')
             with self.assertRaises(ValueError):trophy_store.configured_key(path)

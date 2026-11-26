@@ -81,7 +81,7 @@ def profiles(project):
     """Only validated_builds associate console title IDs with a launcher profile."""
     result = []
     for path in sorted((Path(project) / 'profiles').glob('*.json')):
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding='utf-8'))
         if 'validated_builds' in value:
             result.append(value)
     return result
@@ -164,7 +164,7 @@ def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name('.' + path.name + '.' + uuid.uuid4().hex + '.tmp')
     try:
-        temporary.write_text(json.dumps(value, indent=2) + '\n')
+        temporary.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
@@ -270,7 +270,7 @@ def store_entry(library, entry):
     validate_entry(stored)
     path = manifest_path(library,stored)
     content = json.dumps(stored,indent=2)+'\n'
-    if path.is_file() and not path.is_symlink() and path.read_text()==content:return
+    if path.is_file() and not path.is_symlink() and path.read_text(encoding='utf-8')==content:return
     write_json(path,stored)
 
 
@@ -278,7 +278,7 @@ def load_entry(path):
     path = Path(path).absolute()
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError('Installation manifest refuses symlinks')
-    entry = validate_entry(json.loads(path.read_text()))
+    entry = validate_entry(json.loads(path.read_text(encoding='utf-8')))
     library = path.parents[2]
     for key,kind,version_key in (('base_path','base','base_version'),('update_path','update','update_version')):
         if not entry[key]:continue
@@ -412,7 +412,7 @@ def register(project, issues=None):
 def removed(project):
     path=user_data.path(project,'.local/removed-games.json')
     try:
-        value=json.loads(path.read_text())
+        value=json.loads(path.read_text(encoding='utf-8'))
         return value if isinstance(value,list) and all(isinstance(v,str) for v in value) else []
     except (OSError,ValueError):return []
 
@@ -453,12 +453,12 @@ def resolve_entry(project, choice=None, game=None):
     if choice is None and game is None:
         saved = directory(project) / 'selection.json'
         if saved.exists():
-            choice = json.loads(saved.read_text()).get('selected')
+            choice = json.loads(saved.read_text(encoding='utf-8')).get('selected')
         else:
             # Read the launcher's per-game selection, including a deliberately empty one.
             launcher = user_data.path(project, '.local/launcher-library.json')
             if launcher.exists():
-                value = json.loads(launcher.read_text())
+                value = json.loads(launcher.read_text(encoding='utf-8'))
                 selected = next((g for g in value.get('games', []) if g['id'] == value.get('selected')), None)
                 if selected and for_game(project, selected):
                     return resolve_entry(project, game=selected)

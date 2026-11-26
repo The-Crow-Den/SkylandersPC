@@ -63,7 +63,7 @@
         "recipes": {
           "resolution": "profiles/patches/trap-team-resolution.json",
           "level-events": "profiles/patches/trap-team-level-events.json",
-          "nightmare": "profiles/patches/trap-team-nightmare.json"
+          "nightmare": "profiles/patches/trap-team-us-01.00-nightmare.json"
         },
         "optional_recipes": {}
       }

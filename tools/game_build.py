@@ -52,7 +52,7 @@ def configuration(root, install, variant):
     state = root/'.local/game-preparation'/install.title_id/install.app_version/'state.json'
     if state.is_file() and not state.is_symlink():
         try:
-            marker = json.loads(state.read_text())['steps']['pack.'+variant]
+            marker = json.loads(state.read_text(encoding='utf-8'))['steps']['pack.'+variant]
             candidate = relative(root,next(p for p in marker['outputs'] if Path(p).name=='image.pack'))
             if candidate.is_relative_to(root/'out'):pack = candidate.parent
         except (ValueError,KeyError,StopIteration,TypeError):pass

@@ -24,7 +24,7 @@ def defaults():
 def load(path):
     if not Path(path).exists():
         return defaults()
-    value = json.loads(Path(path).read_text())
+    value = json.loads(Path(path).read_text(encoding='utf-8'))
     if not isinstance(value, dict) or not isinstance(value.get('games'), list) or not value['games']:
         raise ValueError('Invalid launcher library')
     ids = set()
@@ -76,7 +76,7 @@ def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.tmp')
     stored={**value,'games':[{k:v for k,v in game.items() if k!='operation'} for game in value['games']]}
-    temporary.write_text(json.dumps(stored, indent=2) + '\n')
+    temporary.write_text(json.dumps(stored, indent=2) + '\n', encoding='utf-8')
     temporary.replace(path)
 
 
@@ -141,3 +141,15 @@ def open_games_folder(root):
     folder.mkdir(parents=True, exist_ok=True)
     if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve()))):
         raise OSError('The file manager could not open the Games folder.')
+
+
+def playable_title(root, title_id):
+    """True when a game available in this release has a validated build of this title."""
+    import json
+    for path in sorted((Path(root)/'profiles').glob('*.json')):
+        try:profile = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError,ValueError):continue
+        if isinstance(profile,dict) and profile.get('id') in AVAILABLE and any(
+                isinstance(build,dict) and build.get('title_id')==title_id for build in profile.get('validated_builds',[])):
+            return True
+    return False

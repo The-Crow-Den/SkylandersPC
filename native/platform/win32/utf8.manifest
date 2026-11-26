@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The host reads its arguments and environment through the ANSI interfaces and
+     treats them as UTF-8. Making UTF-8 the process code page (Windows 10 1903+)
+     keeps paths with non-English characters, such as C:\Users\José, intact.
+     Older Windows ignores this; the launcher also passes ASCII short paths. -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="SkylandersPC.NativeHost" version="1.0.0.0"/>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+</assembly>

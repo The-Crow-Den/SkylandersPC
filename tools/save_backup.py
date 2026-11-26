@@ -35,7 +35,7 @@ def verify(path, title_id):
             files.is_symlink() or not files.is_dir() or files.resolve()!=files or
             {p.name for p in path.iterdir()}!={'files','snapshot.json'}):
         raise ValueError('invalid or modified backup tree')
-    record=json.loads(manifest.read_text())
+    record=json.loads(manifest.read_text(encoding='utf-8'))
     if (not isinstance(record,dict) or type(record.get('schema_version')) is not int or
             record['schema_version']!=1 or record.get('title_id')!=title_id or
             record.get('snapshot_id')!=path.name or not isinstance(record.get('files'),dict) or
@@ -100,7 +100,7 @@ def snapshot(source_root, title_id, *, reason='manual', backup_root=None, keep=8
         shutil.copytree(source,staged/'files',symlinks=True)
         if save_profile._manifest(staged/'files')!=expected or save_profile._manifest(source)!=expected:
             raise ValueError('save changed while taking backup')
-        (staged/'snapshot.json').write_text(json.dumps(record,indent=2)+'\n')
+        (staged/'snapshot.json').write_text(json.dumps(record,indent=2)+'\n', encoding='utf-8')
         target.mkdir()  # reserve without overwriting any existing snapshot
         try:
             staged.replace(target)

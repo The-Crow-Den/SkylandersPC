@@ -44,7 +44,7 @@ class SwapperFigureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'old.json'
             old = dict(model.DEFAULTS); old.pop('figure_bottom')
-            path.write_text(json.dumps(old))
+            path.write_text(json.dumps(old), encoding='utf-8')
             self.assertEqual(model.load(path)['figure_bottom'], '')
         with self.assertRaises(ValueError):
             model.validate(dict(model.DEFAULTS, figure_bottom='bad\0path'))
@@ -56,9 +56,9 @@ class SwapperFigureTests(unittest.TestCase):
             path = Path(directory) / 'library.json'
             value = launcher_library.defaults()
             value.update(portal=str(top), portal_bottom=str(bottom))
-            path.write_text(json.dumps(value))
+            path.write_text(json.dumps(value), encoding='utf-8')
             self.assertEqual(launcher_library.load(path)['portal_bottom'], str(bottom))
-            value.update(portal=None); path.write_text(json.dumps(value))
+            value.update(portal=None); path.write_text(json.dumps(value), encoding='utf-8')
             self.assertIsNone(launcher_library.load(path)['portal_bottom'])
 
 

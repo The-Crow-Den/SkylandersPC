@@ -49,13 +49,13 @@ class PreparationTests(unittest.TestCase):
         hashes={variant:hashlib.sha256(link_native.link_images([('eboot.bin',payload)])[0]).hexdigest()
                 for variant,payload in [('original',data),('60-delta',changed)]}
         patch_path.write_text(json.dumps(dict(schema_version=1,title_id=title,app_version='01.00',executable_sha256=digest,
-            patches=[dict(id='synthetic-timing',kind='enhancement',reason='Synthetic test',file_offset=0x190,expected_hex='00',replacement_hex='01')])))
+            patches=[dict(id='synthetic-timing',kind='enhancement',reason='Synthetic test',file_offset=0x190,expected_hex='00',replacement_hex='01')])), encoding='utf-8')
         recipe.write_text(json.dumps(dict(title_id=title,app_version='01.00',executable_sha256=digest,pack_sha256=hashes,
-            renderer_sha256=hashlib.sha256(b'synthetic graphics asset').hexdigest(),expected_hex=instruction.hex(),virtual_address=0x400180)))
+            renderer_sha256=hashlib.sha256(b'synthetic graphics asset').hexdigest(),expected_hex=instruction.hex(),virtual_address=0x400180)), encoding='utf-8')
         prep=dict(modules=[],variants={'original':dict(pack='unused-original'),'60-delta':dict(pack='unused-delta',patch=str(patch_path.relative_to(self.root)))},
                   recipes={'resolution':str(recipe.relative_to(self.root))},optional_recipes={'glyphs':'profiles/unavailable.json'})
         (profiles/(title+'.json')).write_text(json.dumps(dict(id=title.lower(),title='Synthetic game',validated_builds=[
-            dict(title_id=title,app_version='01.00',executable_sha256=digest,preparation=prep)])))
+            dict(title_id=title,app_version='01.00',executable_sha256=digest,preparation=prep)])), encoding='utf-8')
         return entry
 
     def run_prepare(self,entry=None):
@@ -69,7 +69,7 @@ class PreparationTests(unittest.TestCase):
             install=game_library.discover(self.entry)
             config=game_build.configuration(self.root,install,variant)
             self.assertTrue((config['pack']/'boot.plan').is_file())
-            self.assertEqual(prepare.file_hash(config['pack']/'image.pack'),json.loads((self.root/'profiles/CUSA11111-resolution.json').read_text())['pack_sha256'][variant])
+            self.assertEqual(prepare.file_hash(config['pack']/'image.pack'),json.loads((self.root/'profiles/CUSA11111-resolution.json').read_text(encoding='utf-8'))['pack_sha256'][variant])
             prepare.require_ready(self.root,self.entry,variant)
         before={k:v['outputs'] for k,v in first['steps'].items()}
         second,events=self.run_prepare()
@@ -80,7 +80,7 @@ class PreparationTests(unittest.TestCase):
     def test_changed_input_reruns_only_affected_steps_and_keeps_old_outputs(self):
         first,_=self.run_prepare();old=dict(first['steps']['pack.original']['outputs'])
         graphics=Path(self.entry['base_path'])/'renderer/tfbRenderer.igx';graphics.write_bytes(b'changed synthetic graphics')
-        recipe=self.root/'profiles/CUSA11111-resolution.json';record=json.loads(recipe.read_text());record['renderer_sha256']=prepare.file_hash(graphics);recipe.write_text(json.dumps(record))
+        recipe=self.root/'profiles/CUSA11111-resolution.json';record=json.loads(recipe.read_text(encoding='utf-8'));record['renderer_sha256']=prepare.file_hash(graphics);recipe.write_text(json.dumps(record), encoding='utf-8')
         second,events=self.run_prepare()
         self.assertTrue(any(e['name']=='recipes' and e['state']=='complete' for e in events))
         self.assertTrue(any(e['name']=='verify-executable' and e['state']=='skipped' for e in events))
@@ -98,7 +98,7 @@ class PreparationTests(unittest.TestCase):
 
     def test_failure_keeps_earlier_steps_and_resumes_after_fix(self):
         first,_=self.run_prepare();original=dict(first['steps']['pack.original']['outputs'])
-        patch_path=self.root/'profiles/CUSA11111-timing.json';record=json.loads(patch_path.read_text());record['patches'][0]['expected_hex']='ff';patch_path.write_text(json.dumps(record))
+        patch_path=self.root/'profiles/CUSA11111-timing.json';record=json.loads(patch_path.read_text(encoding='utf-8'));record['patches'][0]['expected_hex']='ff';patch_path.write_text(json.dumps(record), encoding='utf-8')
         events=[]
         with self.assertRaisesRegex(prepare.PreparationError,'pack.60-delta'):
             prepare.prepare(self.root,self.entry,progress=events.append)
@@ -106,7 +106,7 @@ class PreparationTests(unittest.TestCase):
         state=prepare.read_state(self.root,self.entry)
         self.assertEqual(state['steps']['pack.original']['outputs'],original)
         self.assertTrue(all(prepare.file_hash(self.root/p)==digest for p,digest in original.items()))
-        record['patches'][0]['expected_hex']='00';patch_path.write_text(json.dumps(record))
+        record['patches'][0]['expected_hex']='00';patch_path.write_text(json.dumps(record), encoding='utf-8')
         self.run_prepare();prepare.require_ready(self.root,self.entry)
 
     def test_progress_is_json_lines_and_runner_names_missing_step_before_creating_a_session(self):
@@ -140,8 +140,8 @@ class PreparationTests(unittest.TestCase):
     def test_corrupt_preparation_marker_is_rebuilt_without_removing_old_packs(self):
         record,_=self.run_prepare();original=list(record['steps']['pack.original']['outputs'])
         path=prepare.state_path(self.root,self.entry)
-        damaged=json.loads(path.read_text());damaged['steps']['pack.60-delta']['outputs']=['bad record']
-        path.write_text(json.dumps(damaged))
+        damaged=json.loads(path.read_text(encoding='utf-8'));damaged['steps']['pack.60-delta']['outputs']=['bad record']
+        path.write_text(json.dumps(damaged), encoding='utf-8')
         with self.assertRaisesRegex(prepare.PreparationError,'pack.60-delta'):prepare.require_ready(self.root,self.entry)
         self.run_prepare();prepare.require_ready(self.root,self.entry)
         self.assertTrue(all((self.root/p).exists() for p in original))
@@ -149,7 +149,7 @@ class PreparationTests(unittest.TestCase):
     def test_missing_runtime_and_renderer_use_build_commands_without_touching_game(self):
         host,renderer=prepare.runtime_paths(self.root);host.unlink();renderer.unlink()
         for folder in (self.root/'native',self.root/'.local/skyrender/gpu'):
-            folder.mkdir(parents=True,exist_ok=True);(folder/'CMakeLists.txt').write_text('# synthetic build input')
+            folder.mkdir(parents=True,exist_ok=True);(folder/'CMakeLists.txt').write_text('# synthetic build input', encoding='utf-8')
         calls=[]
         def build(argv,**kwargs):
             calls.append([str(x) for x in argv])
@@ -168,8 +168,8 @@ class PreparationTests(unittest.TestCase):
     @unittest.skipIf(prepare.WINDOWS,'Linux release layout')
     def test_linux_release_uses_prebuilt_runtime_and_never_compiles(self):
         host,renderer=prepare.runtime_paths(self.root)
-        (host.parent/'prebuilt.json').write_text('{"commit": "synthetic"}')
-        (self.root/'native').mkdir(parents=True,exist_ok=True);(self.root/'native/CMakeLists.txt').write_text('# would rebuild')
+        (host.parent/'prebuilt.json').write_text('{"commit": "synthetic"}', encoding='utf-8')
+        (self.root/'native').mkdir(parents=True,exist_ok=True);(self.root/'native/CMakeLists.txt').write_text('# would rebuild', encoding='utf-8')
         calls=[]
         def run(argv,**kwargs):
             calls.append(argv[0]);self.assertNotEqual(argv[0],'cmake')
@@ -179,7 +179,7 @@ class PreparationTests(unittest.TestCase):
 
     @unittest.skipIf(prepare.WINDOWS,'Linux release layout')
     def test_old_glibc_is_explained(self):
-        host,_=prepare.runtime_paths(self.root);(host.parent/'glibc-required.txt').write_text('GLIBC_2.43\n')
+        host,_=prepare.runtime_paths(self.root);(host.parent/'glibc-required.txt').write_text('GLIBC_2.43\n', encoding='utf-8')
         missing=f"{host}: /lib/libc.so.6: version `GLIBC_2.43' not found"
         with patch.object(prepare.subprocess,'run',return_value=subprocess.CompletedProcess(['ldd'],1,stdout=missing,stderr='')):
             with contextlib.redirect_stderr(io.StringIO()),self.assertRaisesRegex(prepare.PreparationError,'glibc 2.43 or newer'):prepare.check_dependencies(host)
@@ -187,7 +187,7 @@ class PreparationTests(unittest.TestCase):
     def test_optional_artwork_cache_has_independent_skippable_markers(self):
         self.run_prepare();destination=self.root/'.local/controller-glyphs';destination.mkdir()
         atlas=destination/'menu-atlas.rgba';atlas.write_bytes(b'synthetic cached artwork')
-        (destination/'manifest.json').write_text(json.dumps({'files':{'menu-atlas.rgba':prepare.file_hash(atlas)}}))
+        (destination/'manifest.json').write_text(json.dumps({'files':{'menu-atlas.rgba':prepare.file_hash(atlas)}}), encoding='utf-8')
         source=self.root/'steam';source.mkdir()
         with patch('tools.import_controller_glyphs.discover',return_value=source):
             events=[];prepare.prepare_optional(self.root,self.entry,'controller-art',events.append)
@@ -201,7 +201,7 @@ class PreparationTests(unittest.TestCase):
         # Use the system's no-op ELF solely for dependency inspection, never as a game host.
         host,_=prepare.runtime_paths(self.root);shutil.copy2(shutil.which('true'),host)
         process=subprocess.Popen([sys.executable,str(Path(prepare.__file__)), '--root',str(self.root),'--game','CUSA11111'],
-            stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True, encoding='utf-8', errors='replace')
         output,error=process.communicate(timeout=15)
         self.assertEqual(process.returncode,0,error)
         events=[json.loads(line) for line in output.splitlines()]

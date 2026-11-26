@@ -59,7 +59,7 @@ def main():
     parser.add_argument('--manifest', type=Path,
                         default=Path('patches/trap-team-CUSA00626-01.01-60-delta.experimental.json'))
     args = parser.parse_args()
-    print(json.dumps(audit(args.executable.read_bytes(), json.loads(args.manifest.read_text())), indent=2))
+    print(json.dumps(audit(args.executable.read_bytes(), json.loads(args.manifest.read_text(encoding='utf-8'))), indent=2))
 
 
 if __name__ == '__main__':

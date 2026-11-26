@@ -101,7 +101,7 @@ def main():
     parser.add_argument('--allow-incomplete-tail', action='store_true',
                         help='explicitly exclude and count one truncated final CSV row')
     args = parser.parse_args()
-    print(json.dumps(summarize(args.csv.read_text(), args.runtime_log.read_text(errors='replace'),
+    print(json.dumps(summarize(args.csv.read_text(encoding='utf-8'), args.runtime_log.read_text(errors='replace', encoding='utf-8'),
                                args.settling_ms, allow_incomplete_tail=args.allow_incomplete_tail), indent=2))
 
 

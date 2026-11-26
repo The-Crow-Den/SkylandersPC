@@ -217,7 +217,7 @@ class ExtractTests(unittest.TestCase):
         source={'path':'keys.h','url':'https://example.invalid/keys.h','sha256':'0'*64}
         (self.root/'LICENSES').mkdir()
         import json
-        (self.root/'LICENSES/pkg-source.json').write_text(json.dumps({'keys':source}))
+        (self.root/'LICENSES/pkg-source.json').write_text(json.dumps({'keys':source}), encoding='utf-8')
         with patch.object(pkg,'ROOT',self.root),patch.object(pkg.urllib.request,'urlopen',return_value=io.BytesIO(b'not keys')):
             with self.assertRaisesRegex(ValueError,'hash mismatch'): pkg.load_keys()
         self.assertFalse((self.root/'.local/shadps4-pkg-reference/keys.h').exists())

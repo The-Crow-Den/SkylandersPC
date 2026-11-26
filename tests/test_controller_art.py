@@ -16,7 +16,7 @@ class ControllerArtTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder,patch.object(art,'ROOT',Path(folder).resolve()):
             root=Path(folder);data=struct.pack('<II',2,3)+bytes(range(24))
             name='xbox-0.rgba';(root/name).write_bytes(data)
-            (root/'manifest.json').write_text(json.dumps(dict(schema_version=1,provider='Steam client',files={name:hashlib.sha256(data).hexdigest()})))
+            (root/'manifest.json').write_text(json.dumps(dict(schema_version=1,provider='Steam client',files={name:hashlib.sha256(data).hexdigest()})), encoding='utf-8')
             self.assertEqual(art.glyph('xbox',0,2,3),data[8:])
             with self.assertRaises(ValueError):art.glyph('xbox',0,3,2)
             (root/name).write_bytes(data[:-1]+b'x')

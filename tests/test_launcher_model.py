@@ -53,7 +53,7 @@ class LauncherModelTests(unittest.TestCase):
     def test_settings_saved_before_anti_aliasing_turn_it_on(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'settings.json'
-            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'anti_aliasing'}))
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'anti_aliasing'}), encoding='utf-8')
             self.assertTrue(model.load(path)['anti_aliasing'])
         argv = model.command('/project', 'python', dict(model.DEFAULTS, anti_aliasing=False))
         self.assertIn('--no-anti-aliasing', argv)
@@ -61,7 +61,7 @@ class LauncherModelTests(unittest.TestCase):
     def test_aspect_ratio_is_saved_and_forwarded(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'settings.json'
-            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'aspect'}))
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'aspect'}), encoding='utf-8')
             self.assertEqual(model.load(path)['aspect'], '16:9')
         argv = model.command('/project', 'python', dict(model.DEFAULTS, aspect='21:9'))
         self.assertEqual(argv[argv.index('--aspect') + 1], '21:9')
@@ -131,7 +131,7 @@ class LauncherModelTests(unittest.TestCase):
                     model.save(path, dict(model.DEFAULTS, **patch))
                 self.assertEqual(path.read_bytes(), before)
             self.assertEqual(model.load(path), model.DEFAULTS)
-            path.write_text(json.dumps({'resolution': '1080p'}))
+            path.write_text(json.dumps({'resolution': '1080p'}), encoding='utf-8')
             with self.assertRaises(ValueError):
                 model.load(path)
 
@@ -140,7 +140,7 @@ class LauncherModelTests(unittest.TestCase):
             path=Path(directory)/'old.json'
             old=dict(model.DEFAULTS, resolution='1600p', frame_limit=60)
             old.pop('frame_policy')
-            path.write_text(json.dumps(old))
+            path.write_text(json.dumps(old), encoding='utf-8')
             loaded=model.load(path)
             self.assertEqual(loaded['frame_policy'],'auto')
             self.assertEqual(loaded['resolution'],'1600p')
@@ -152,7 +152,7 @@ class LauncherModelTests(unittest.TestCase):
             self.assertEqual(len(model.missing_files(root)), 5)
             device = root / 'js0/device/name'
             device.parent.mkdir(parents=True)
-            device.write_text('DualSense Edge\n')
+            device.write_text('DualSense Edge\n', encoding='utf-8')
             self.assertEqual(model.controllers(root), ['DualSense Edge'])
             self.assertEqual(model.controllers(root / 'missing'), [])
 

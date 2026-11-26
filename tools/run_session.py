@@ -20,7 +20,7 @@ import shutil
 try:
     from .overlay_session import html_overlay
     from . import host_process
-    from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
+    from .resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size, guest_size
     from .pc_settings import QUALITY, load_settings, save_settings
     from . import level_events_mod, trophy_store
     from . import mod_manifest
@@ -29,7 +29,7 @@ try:
 except ImportError:
     from overlay_session import html_overlay
     import host_process
-    from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size
+    from resolution import PRESETS, SHADOWS, prepare_resolution, prepare_assets, parse_aspect, render_size, guest_size
     from pc_settings import QUALITY, load_settings, save_settings
     import level_events_mod, trophy_store
     import mod_manifest
@@ -84,7 +84,7 @@ def pci_name(vendor_id, device_id, databases=PCI_IDS):
     """A device's marketing name from the system's pci.ids, or None."""
     vendor, device = vendor_id.lower().removeprefix('0x'), device_id.lower().removeprefix('0x')
     for database in databases:
-        try:lines = database.read_text(errors='replace').splitlines()
+        try:lines = database.read_text(errors='replace', encoding='utf-8').splitlines()
         except OSError:continue
         inside = False
         for line in lines:
@@ -107,8 +107,8 @@ def gpu_names(devices=Path('/sys/bus/pci/devices'), databases=PCI_IDS):
     except OSError:return found
     for path in paths:
         try:
-            if not (path/'class').read_text().strip().startswith('0x03'):continue
-            vendor_id = (path/'vendor').read_text().strip();device_id = (path/'device').read_text().strip()
+            if not (path/'class').read_text(encoding='utf-8').strip().startswith('0x03'):continue
+            vendor_id = (path/'vendor').read_text(encoding='utf-8').strip();device_id = (path/'device').read_text(encoding='utf-8').strip()
         except OSError:continue
         vendor = PCI_VENDORS.get(vendor_id.lower())
         if not vendor:continue
@@ -148,7 +148,7 @@ def nvidia_problem(proc=Path('/proc/driver/nvidia/version'), libraries=Path('/us
     update the loaded kernel module stays old until a reboot, and Vulkan then
     finds no GPUs at all."""
     import re
-    try:text = proc.read_text()
+    try:text = proc.read_text(encoding='utf-8')
     except OSError:return 'kernel module not loaded'
     loaded = re.search(r'Kernel Module.*?\s(\d+\.\d+(?:\.\d+)?)\s', text)
     installed = sorted(p.name.split('.so.', 1)[1] for p in libraries.glob('libnvidia-glcore.so.*'))
@@ -164,7 +164,7 @@ def latest_log(last=None):
 
 def hold_session(session):
     """Lock a live session folder so sweep_sessions leaves it alone; keep the result open."""
-    stream = (Path(session) / '.live').open('w')
+    stream = (Path(session) / '.live').open('w', encoding='utf-8')
     try:
         import fcntl
         fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -194,7 +194,7 @@ def sweep_sessions(folder=None, keep=None, now=None, stale_after=86400):
         lock = session / '.live'
         if fcntl and lock.is_file():
             try:
-                with lock.open('a') as stream:
+                with lock.open('a', encoding='utf-8') as stream:
                     fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
                 continue  # a running game holds it
@@ -224,7 +224,7 @@ def finish_session(session, protected=(), last=None):
     for name in KEPT_LOGS:
         if (session / name).is_file() and not (session / name).is_symlink():
             shutil.copyfile(session / name, staging / name)
-    (staging / 'source').write_text(session.name + '\n')
+    (staging / 'source').write_text(session.name + '\n', encoding='utf-8')
     old = last.with_name(last.name + '.old')
     shutil.rmtree(old, ignore_errors=True)
     if last.exists():
@@ -278,7 +278,7 @@ def overlay_pci_configuration(directory, pci_device):
     if not re.fullmatch(r'[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]', pci_device):
         raise ValueError('GPU PCI address must have the form 0000:c5:00.0')
     path = directory / 'MangoHud.conf'
-    with path.open('x') as output:
+    with path.open('x', encoding='utf-8') as output:
         output.write('pci_dev=' + pci_device.lower() + '\n')
     return path
 
@@ -356,6 +356,7 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
     started = time.monotonic()
     reason = 'process-exit'
     with (directory / 'runtime.log').open('xb') as output, html_overlay(directory,cwd,env) as runtime_environment:
+        command, runtime_environment = host_process.ansi_safe_launch(command, runtime_environment)
         process = subprocess.Popen(command, cwd=cwd, env=runtime_environment, stdout=output,
                                    stderr=subprocess.STDOUT, **host_process.group_options())
         try:
@@ -375,7 +376,7 @@ def run_logged(command, directory, *, cwd, env=None, seconds=0):
         result = {'returncode': code, 'stop_reason': reason,
                   'elapsed_seconds': round(time.monotonic() - started, 3),
                   'signal': -code if code < 0 else None}
-        (directory / 'exit.json').write_text(json.dumps(result, indent=2) + '\n')
+        (directory / 'exit.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
         return result
 
 
@@ -546,11 +547,11 @@ def run(argv,sessions):
         # Keep one narration track: the chosen language's when the profile
         # identifies it, otherwise the movies stay as shipped.
         narration='English' if args.movie_audio=='english' else game_language.narration(language) if args.movie_audio=='auto' else None
-        if movie_profile is None or narration not in json.loads(movie_profile.read_text()).get('narration_tracks',{}):
+        if movie_profile is None or narration not in json.loads(movie_profile.read_text(encoding='utf-8')).get('narration_tracks',{}):
             narration=None
         selected_movie_audio=narration.lower() if narration else 'original'
         intro_profile=next((path for path in sorted((ROOT/'profiles/patches').glob('*-skip-intro.json'))
-                            if json.loads(path.read_text()).get('executable_sha256')==executable_sha256),None) if args.skip_intro else None
+                            if json.loads(path.read_text(encoding='utf-8')).get('executable_sha256')==executable_sha256),None) if args.skip_intro else None
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
         if glyph_mode!='playstation' and not controller_art.available():
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
@@ -564,6 +565,13 @@ def run(argv,sessions):
                                             [name for name,enabled in selected_mods.items() if enabled]+
                                             (['level-events'] if args.level_events else [])+
                                             (['controller-glyphs'] if glyph_mode!='playstation' else [])+args.mod))
+        # Mod choices are saved per game, not per version: one made for another build
+        # (Trap Master on 01.01, then playing 01.00) is skipped, not a failed start.
+        unsupported=[ident for ident in selected_mod_ids if ident in available_mods
+                     and not mod_manifest.supports(available_mods,ident,executable_sha256)]
+        if unsupported:
+            print('Skipping mods made for another version of this game: '+', '.join(unsupported),flush=True)
+            selected_mod_ids=[ident for ident in selected_mod_ids if ident not in unsupported]
         mod_settings={}
         for item in args.mod_setting:
             name,_,value=item.partition('=')
@@ -571,11 +579,15 @@ def run(argv,sessions):
             try:mod_settings.setdefault(ident,{})[setting]=json.loads(value)
             except ValueError:raise ValueError(f'invalid mod setting {item}') from None
         if glyph_mode!='playstation':mod_settings.setdefault('controller-glyphs',{})['mode']=glyph_mode
+        elif 'controller-glyphs' in selected_mod_ids:
+            # Selected by id while the prompts stay PlayStation (no artwork, or a
+            # PlayStation pad): nothing to replace, so the mod sits out this start.
+            selected_mod_ids.remove('controller-glyphs')
         mod_writes=[]
         code=any(operation['type']=='code-patch' for ident in selected_mod_ids if ident in available_mods
                  for operation in available_mods[ident]['operations'])
         applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
-                                       settings=mod_settings,
+                                       settings=mod_settings,title_id=installation.title_id,
                                        executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
         if any(operation['type']=='code-patch' for mod in applied_mods for operation in mod['operations']):
             raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')
@@ -665,7 +677,7 @@ def run(argv,sessions):
     if args.resolution or shadows != 'native' or not args.motion_blur or recipes or narration or intro_profile or 'controller-glyphs' in mod_handlers:
         try:
             game_root, asset_metadata = prepare_assets(game_root, session,
-                render_size(args.resolution, aspect) if args.resolution else None, shadows, args.motion_blur, build['resolution'])
+                guest_size(args.resolution, aspect) if args.resolution else None, shadows, args.motion_blur, build['resolution'])
         except (OSError, ValueError) as error:
             parser.error(str(error))
     preparation_checkpoint('renderer_assets')
@@ -753,7 +765,7 @@ def run(argv,sessions):
     if 'level-events' in mod_handlers:
         try:
             files[0],level_metadata = level_events_mod.prepare(pack,session,
-                build['executable'],args.variant,args.resolution and render_size(args.resolution,aspect),
+                build['executable'],args.variant,args.resolution and guest_size(args.resolution,aspect),
                 mod_handlers['level-events'][1]['profile_path'],build['resolution'],aspect)
         except (OSError,ValueError) as error:
             parser.error(str(error))
@@ -888,7 +900,7 @@ def run(argv,sessions):
                     'sha256': hashlib.sha256(Path(env['MANGOHUD_CONFIGFILE']).read_bytes()).hexdigest()}
                     if env.get('MANGOHUD_CONFIGFILE') and Path(env['MANGOHUD_CONFIGFILE']).is_file() else None,
                 'phase_policy': 'mod-auto-30-60' if args.frame_policy=='auto' else 'external-manual-30-60' if args.manual_phase_cap else 'native-manual-30-60'}
-    (session / 'session.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    (session / 'session.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
     print(f'Runtime log: {session / "runtime.log"}', flush=True)
     try:
         with exclusive_session(ROOT / 'out/active-session.lock'):
@@ -902,7 +914,7 @@ def run(argv,sessions):
                 except OSError as error:
                     metadata['save_backups']['before_error']=str(error)
                     print(f'Save backup unavailable; existing saves preserved: {error}',file=sys.stderr)
-                (session/'session.json').write_text(json.dumps(metadata,indent=2)+'\n')
+                (session/'session.json').write_text(json.dumps(metadata,indent=2)+'\n', encoding='utf-8')
             result = run_logged(command, session, cwd=ROOT, env=env, seconds=args.seconds)
             if args.save_backups and result['stop_reason']=='process-exit' and result['returncode']==0:
                 try:
@@ -910,7 +922,7 @@ def run(argv,sessions):
                 except (OSError,ValueError) as error:
                     metadata['save_backups']['after_error']=str(error)
                     print(f'Save backup unavailable; existing saves preserved: {error}',file=sys.stderr)
-                (session/'session.json').write_text(json.dumps(metadata,indent=2)+'\n')
+                (session/'session.json').write_text(json.dumps(metadata,indent=2)+'\n', encoding='utf-8')
     except ValueError as error:
         parser.error(str(error))
     print(json.dumps(result), flush=True)

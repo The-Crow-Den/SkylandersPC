@@ -96,7 +96,7 @@ def darkspyro_index(cache):
         path=cache/f'darkspyro-{game}.html';url=f'{DARKSPYRO}/{game}/figures/'
         if not path.exists():
             path.write_bytes(download(url,4*1024*1024));time.sleep(0.5)
-        for name,value in parse_darkspyro(path.read_text(errors='replace'),url).items():index.setdefault(name,value)
+        for name,value in parse_darkspyro(path.read_text(errors='replace', encoding='utf-8'),url).items():index.setdefault(name,value)
     return index
 
 
@@ -141,7 +141,7 @@ def prepare(destination,figures_file=None,tree_file=None,everything=False,fandom
     if not everything:
         cached=ROOT/'.local/portal-assets/catalogue.json'
         tree_path=Path(tree_file) if tree_file else cached if cached.exists() else None
-        tree=json.loads(tree_path.read_text() if tree_path else download(CATALOGUE,8*1024*1024))
+        tree=json.loads(tree_path.read_text(encoding='utf-8') if tree_path else download(CATALOGUE,8*1024*1024))
         have=catalogued(tree)
         figures=[f for f in figures if (f['id'],f['variant']&0xfff) not in have]
     wanted={f['name']:candidates(f['name']) for f in figures}
@@ -168,14 +168,14 @@ def prepare(destination,figures_file=None,tree_file=None,everything=False,fandom
         for option in job['options']:
             try:
                 meta=path.with_suffix('.json')
-                cached=path.exists() and meta.exists() and json.loads(meta.read_text()).get('url')==option['url']
+                cached=path.exists() and meta.exists() and json.loads(meta.read_text(encoding='utf-8')).get('url')==option['url']
                 data=path.read_bytes() if cached else download(option['url'],8*1024*1024)
                 with Image.open(io.BytesIO(data)) as image:
                     if image.width*image.height>16*1024*1024:raise ValueError('oversized image dimensions')
                     image.verify()
                 if not cached:
                     temporary=path.with_suffix('.tmp');temporary.write_bytes(data);temporary.replace(path)
-                    meta.write_text(json.dumps(dict(url=option['url']))+'\n')
+                    meta.write_text(json.dumps(dict(url=option['url']))+'\n', encoding='utf-8')
                 result={k:v for k,v in job.items() if k!='options'}
                 return dict(result,**option,cache=path.name,sha256=hashlib.sha256(data).hexdigest())
             except (OSError,ValueError,urllib.error.URLError) as error:errors.append(dict(option,error=str(error)))
@@ -185,7 +185,7 @@ def prepare(destination,figures_file=None,tree_file=None,everything=False,fandom
     record=dict(schema_version=2,sources=[DARKSPYRO]+([API] if fandom else []),figure_list=FIGURES,
                 fetched=fetched,failed=[r for r in results if 'error' in r],unresolved=unresolved,
                 note='Third-party identification artwork (darkSpyro; Fandom files are CC BY-SA unless marked); private cache only.')
-    (destination/'variant-sources.json').write_text(json.dumps(record,indent=2)+'\n')
+    (destination/'variant-sources.json').write_text(json.dumps(record,indent=2)+'\n', encoding='utf-8')
     counts={name:sum(r['source']==name for r in fetched) for name in ('darkspyro','fandom-page','fandom-file')}
     print(json.dumps(dict(considered=len(figures),fetched=len(fetched),by_source=counts,
                           failed=len(record['failed']),unresolved=len(unresolved)),indent=2))

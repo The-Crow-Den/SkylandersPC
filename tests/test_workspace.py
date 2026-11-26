@@ -150,7 +150,7 @@ class RuntimeAndSessionTests(unittest.TestCase):
             self.assertEqual(result['returncode'], 7)
             self.assertEqual(result['reason'], 'exited')
             self.assertFalse(result['gameplay_verified'])
-            self.assertIn(str(root / 'data'), (root / 'runtime.log').read_text())
+            self.assertIn(str(root / 'data'), (root / 'runtime.log').read_text(encoding='utf-8'))
 
     def test_execution_timeout_is_not_success(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -198,7 +198,7 @@ class RuntimeAndSessionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     w.prepare_session(game, 'trap-team', figure)
             self.assertNotEqual(first, second)
-            manifest = json.loads((first / 'session.json').read_text())
+            manifest = json.loads((first / 'session.json').read_text(encoding='utf-8'))
             self.assertEqual(manifest['status'], 'prepared; not launched')
             self.assertIn('unverified', manifest['profile_build_match'])
             (first / 'figures/working.sky').write_bytes(b'changed by synthetic game')

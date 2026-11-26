@@ -25,7 +25,7 @@ def seen(root, tip=TIP):
     try:
         file = path(root)
         if file.is_symlink() or file.stat().st_size > 4096:return False
-        value = json.loads(file.read_text())
+        value = json.loads(file.read_text(encoding='utf-8'))
         return isinstance(value, dict) and value.get(tip) is True
     except (OSError, ValueError):
         return False
@@ -34,14 +34,14 @@ def seen(root, tip=TIP):
 def mark(root, tip=TIP):
     file = path(root)
     try:
-        value = json.loads(file.read_text()) if file.is_file() and not file.is_symlink() else {}
+        value = json.loads(file.read_text(encoding='utf-8')) if file.is_file() and not file.is_symlink() else {}
         if not isinstance(value, dict):value = {}
     except (OSError, ValueError):
         value = {}
     value[tip] = True
     try:
         file.parent.mkdir(parents=True, exist_ok=True)
-        temporary = file.with_name(file.name+'.tmp');temporary.write_text(json.dumps(value)+'\n');temporary.replace(file)
+        temporary = file.with_name(file.name+'.tmp');temporary.write_text(json.dumps(value)+'\n', encoding='utf-8');temporary.replace(file)
     except OSError:
         pass  # worst case the card shows again next time
 

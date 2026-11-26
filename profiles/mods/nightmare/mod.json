@@ -76,7 +76,37 @@
             "alignment": 2048
           }
         ]
-      }
+      },
+      "title_id": "CUSA00697"
+    },
+    {
+      "type": "asset-patch",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "reason": "Menu-Diff-Create compares the returned eligibility flag with itself, then uses its existing local allow-nightmare assignment. Preserve the outer disallow guard, selected difficulty and completion/save logic.",
+      "recipe": {
+        "asset": "level/title.bld",
+        "source_sha256": "ddcb4983bc3ee55b8e52d92f689b3371f814cc5b8bfc7aaa045b3e3791795b67",
+        "chunks": [
+          {
+            "offset": 1040384,
+            "allocation": 4096,
+            "decoded_size": 32768,
+            "decoded_sha256": "91a0a488ed315ea11dfba63097e46f644c3c84fa896e169afd2f3654e3fa0de4",
+            "encoding": "raw-lzma",
+            "encoded_size": 3878,
+            "properties_hex": "5d00800000",
+            "edits": [
+              {
+                "offset": 32268,
+                "expected_hex": "284e020000000000",
+                "replacement_hex": "70c4060000000000"
+              }
+            ],
+            "alignment": 2048
+          }
+        ]
+      },
+      "title_id": "CUSA00626"
     }
   ]
 }

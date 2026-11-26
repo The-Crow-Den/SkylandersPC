@@ -24,7 +24,7 @@ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="1430", ATTR{idPro
 
 def _read(path):
     try:
-        return Path(path).read_text().strip()
+        return Path(path).read_text(encoding='utf-8').strip()
     except OSError:
         return ''
 

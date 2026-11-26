@@ -150,7 +150,7 @@ def migrate(root=None, environment=None):
                 continue
             if _copy(source, target):report['copied'].append(str(source))
         destination.mkdir(parents=True, exist_ok=True)
-        done.write_text(json.dumps({'from': str(old), 'conflicts': report['conflicts']}, indent=2)+'\n')
+        done.write_text(json.dumps({'from': str(old), 'conflicts': report['conflicts']}, indent=2)+'\n', encoding='utf-8')
     if root is not None:
         root = Path(root)
         if not adopted(root):
@@ -164,12 +164,12 @@ def migrate(root=None, environment=None):
                 if _copy(source, target):report['copied'].append(str(source))
             marker = root/MARKER
             marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_text(json.dumps({'version': 1, 'conflicts': report['conflicts']}, indent=2)+'\n')
+            marker.write_text(json.dumps({'version': 1, 'conflicts': report['conflicts']}, indent=2)+'\n', encoding='utf-8')
     destination.mkdir(parents=True, exist_ok=True)
     readme = destination/'README.txt'
     if not readme.exists():
         readme.write_text('SkylandersPC keeps your saves, trophies, figures and settings here.\n'
-                          'Back up this whole folder to keep your progress.\n')
+                          'Back up this whole folder to keep your progress.\n', encoding='utf-8')
     return report
 
 

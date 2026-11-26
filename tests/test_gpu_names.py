@@ -19,12 +19,12 @@ PCI_IDS = """# comment
 class GpuNameTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory();root = Path(self.folder.name)
-        self.ids = root/'pci.ids';self.ids.write_text(PCI_IDS)
+        self.ids = root/'pci.ids';self.ids.write_text(PCI_IDS, encoding='utf-8')
         self.devices = root/'devices'
         for slot, (klass, vendor, device) in enumerate([('0x030000', '0x10de', '0x2c59'), ('0x038000', '0x1002', '0x150e'),
                                                         ('0x020000', '0x8086', '0x9999'), ('0x030000', '0x8086', '0x1234')]):
             path = self.devices/f'0000:0{slot}:00.0';path.mkdir(parents=True)
-            for name, value in (('class', klass), ('vendor', vendor), ('device', device)):(path/name).write_text(value + '\n')
+            for name, value in (('class', klass), ('vendor', vendor), ('device', device)):(path/name).write_text(value + '\n', encoding='utf-8')
 
     def tearDown(self):
         self.folder.cleanup()

@@ -24,7 +24,7 @@ def registrations(text):
 def audit(metadata, references, native, traces):
     imports = {}
     for path in metadata:
-        for entry in json.loads(path.read_text())['imports']:
+        for entry in json.loads(path.read_text(encoding='utf-8'))['imports']:
             imports[entry['name']] = entry
     exact, candidates, sources = defaultdict(set), defaultdict(set), defaultdict(set)
     signatures = defaultdict(set)
@@ -34,7 +34,7 @@ def audit(metadata, references, native, traces):
             if not path.is_file() or path.suffix not in {'.cpp', '.c', '.h', '.hpp', '.inc'}:
                 continue
             source_count += 1
-            text = path.read_text(errors='replace')
+            text = path.read_text(errors='replace', encoding='utf-8')
             declarations = re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
             # Declaration facts only: omit bodies and do not reconstruct types.
             for declaration, fn in re.findall(r'(?:^|\n)([^\n{};=]*?\b((?:sce|posix_)[A-Za-z0-9_]+)\s*\([^{};]*?\))\s*(?:\{|;)', declarations):
@@ -52,10 +52,10 @@ def audit(metadata, references, native, traces):
                 candidates[nid(fn.removeprefix('posix_'))].add(fn)
             for fn in set(re.findall(r'(?:REG\(\s*|\{\s*)"([A-Za-z_][A-Za-z0-9_]*)"\s*,', declarations)):
                 candidates[nid(fn)].add(fn)
-    native_text = '\n'.join(p.read_text() for p in native.rglob('*') if p.is_file() and p.suffix in {'.cpp', '.inc'})
+    native_text = '\n'.join(p.read_text(encoding='utf-8') for p in native.rglob('*') if p.is_file() and p.suffix in {'.cpp', '.inc'})
     observed, stopped = Counter(), Counter()
     for path in traces:
-        for line in path.read_text(errors='replace').splitlines():
+        for line in path.read_text(errors='replace', encoding='utf-8').splitlines():
             try:
                 event = json.loads(line)
             except ValueError:
@@ -127,8 +127,8 @@ def main():
     args = parser.parse_args()
     report = audit(args.metadata, args.reference, args.native,
                    sorted(args.trace_dir.glob('startup*.log')) if args.trace_dir else [])
-    args.json.write_text(json.dumps(report, indent=2) + '\n')
-    args.markdown.write_text(markdown(report))
+    args.json.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+    args.markdown.write_text(markdown(report), encoding='utf-8')
     print(json.dumps({'source_files_scanned': report['source_files_scanned'],
                       'imports': len(report['imports']),
                       'evidence': dict(Counter(r['name_evidence'] for r in report['imports']))}))

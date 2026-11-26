@@ -41,7 +41,7 @@ INLINE_IMAGE=re.compile(r'data:image/[^;,\s]+;base64,[A-Za-z0-9+/=]{256,}')
 
 
 def policy(root):
-    value=json.loads((Path(root)/'release-policy.json').read_text())
+    value=json.loads((Path(root)/'release-policy.json').read_text(encoding='utf-8'))
     if (value.get('schema_version')!=1 or value.get('project_license')!='GPL-3.0-or-later' or
             not isinstance(value.get('withheld'),dict) or not isinstance(value.get('required'),list)):
         raise ValueError('invalid publication policy')
@@ -197,7 +197,7 @@ def main(argv=None):
         record=policy(ROOT);names,loader=git_selection(ROOT,args.staged) if args.tracked or args.staged else (candidates(ROOT,record),None)
         result=audit(ROOT,names,loader)
         if args.report:
-            args.report.parent.mkdir(parents=True,exist_ok=True);args.report.write_text(json.dumps(result,indent=2)+'\n')
+            args.report.parent.mkdir(parents=True,exist_ok=True);args.report.write_text(json.dumps(result,indent=2)+'\n', encoding='utf-8')
         for error in result['errors']:print(error)
         print(f"Source audit: {'PASS' if result['ok'] else 'FAIL'} ({len(result['files'])} files; {len(result['withheld'])} withheld). Binary release readiness: {'ready' if result['binary_release_ready'] else 'not established'}.")
         if args.export:print('Source export:',export_source(ROOT,result,args.export))

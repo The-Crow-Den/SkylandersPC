@@ -148,8 +148,8 @@ class NavigationTests(unittest.TestCase):
 
 class PcMenuQuitTests(unittest.TestCase):
     def test_menu_offers_quit_to_launcher(self):
-        html = (ROOT / 'tools/pc_menu/index.html').read_text(); script = (ROOT / 'tools/pc_menu/menu.js').read_text()
-        bridge = (ROOT / 'native/pc_overlay_bridge.cpp').read_text()
+        html = (ROOT / 'tools/pc_menu/index.html').read_text(encoding='utf-8'); script = (ROOT / 'tools/pc_menu/menu.js').read_text(encoding='utf-8')
+        bridge = (ROOT / 'native/pc_overlay_bridge.cpp').read_text(encoding='utf-8')
         self.assertIn('data-quit', html); self.assertIn("send('quit')", script)
         self.assertIn('verb=="quit"', bridge)
 

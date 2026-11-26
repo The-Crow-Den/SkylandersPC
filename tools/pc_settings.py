@@ -32,12 +32,12 @@ def validate_settings(value):
 
 
 def load_settings(path):
-    return validate_settings(json.loads(Path(path).read_text())) if Path(path).exists() else {}
+    return validate_settings(json.loads(Path(path).read_text(encoding='utf-8'))) if Path(path).exists() else {}
 
 
 def save_settings(path, value):
     value = validate_settings(value)
     path = Path(path)
     temporary = path.with_suffix('.tmp')
-    temporary.write_text(json.dumps(value,indent=2)+'\n')
+    temporary.write_text(json.dumps(value,indent=2)+'\n', encoding='utf-8')
     temporary.replace(path)

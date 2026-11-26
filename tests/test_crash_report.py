@@ -15,7 +15,7 @@ class CrashReportTest(unittest.TestCase):
     def test_deleted_session_uses_kept_logs(self):
         with tempfile.TemporaryDirectory() as directory:
             last = Path(directory)/'last-session';last.mkdir()
-            (last/'source').write_text('20261030T000000Z-abc\n')
+            (last/'source').write_text('20261030T000000Z-abc\n', encoding='utf-8')
             gone = Path(directory)/'sessions/20261030T000000Z-abc'
             self.assertEqual(crash_report.kept_session(gone, last), last)
             self.assertIsNone(crash_report.kept_session(Path(directory)/'sessions/other', last))
@@ -28,10 +28,10 @@ class CrashReportTest(unittest.TestCase):
         (session / 'session.json').write_text(json.dumps({
             'installation': {'title_id': 'CUSA00000', 'app_version': '01.01', 'executable_sha256': 'ab' * 32,
                              'base': '/home/alice/Games/base'},
-            'save_selection': {'root': '/home/alice/saves'}, 'variant': 'original', 'memory_mode': 'compact'}))
-        (session / 'runtime.log').write_text('\n'.join(log_lines) + '\n')
+            'save_selection': {'root': '/home/alice/saves'}, 'variant': 'original', 'memory_mode': 'compact'}), encoding='utf-8')
+        (session / 'runtime.log').write_text('\n'.join(log_lines) + '\n', encoding='utf-8')
         if exit_info is not None:
-            (session / 'exit.json').write_text(json.dumps(exit_info))
+            (session / 'exit.json').write_text(json.dumps(exit_info), encoding='utf-8')
         return session
 
     def test_report_contents_and_tail(self):

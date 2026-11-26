@@ -74,7 +74,7 @@ def private_directory(path):
         return path
     try:
         identity = subprocess.run(['whoami', '/user', '/fo', 'csv', '/nh'], capture_output=True, text=True,
-                                  check=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW).stdout
+                                  check=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW, encoding='utf-8', errors='replace').stdout
         sid = identity.strip().split(',')[-1].strip('"')
         if not sid.startswith('S-1-'):
             raise OSError('could not read the current user SID')
@@ -125,3 +125,47 @@ def data_home(environment=None):
             raise OSError('LOCALAPPDATA is not set')
         return Path(local)
     return Path(environment.get('XDG_DATA_HOME', str(Path.home() / '.local/share')))
+
+
+def ansi_safe(text, windows=None, shorten=None):
+    """A path the game host can read through Windows' ANSI interfaces.
+
+    The host reads its arguments and environment as bytes it treats as UTF-8,
+    but Windows hands those over in the ANSI code page, so a path under, say,
+    C:\\Users\\José arrives garbled. Windows keeps an ASCII-only short name for
+    each folder; the longest existing part of a non-ASCII path is replaced by
+    it. Other platforms, ASCII text and non-paths pass through unchanged."""
+    windows = os.name == 'nt' if windows is None else windows
+    if not windows or not isinstance(text, str) or text.isascii():return text
+    path = Path(text)
+    if not path.is_absolute():return text
+    shorten = shorten or _short_path
+    existing, rest = path, []
+    while not existing.exists():
+        if existing.parent == existing:return text
+        rest.insert(0, existing.name);existing = existing.parent
+    short = shorten(str(existing))
+    if not short:return text
+    result = str(Path(short, *rest))
+    return result if result.isascii() else text
+
+
+def _short_path(text):
+    try:
+        import ctypes
+        from ctypes import wintypes
+        function = ctypes.windll.kernel32.GetShortPathNameW
+        function.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        size = function(text, None, 0)
+        if not size:return None
+        buffer = ctypes.create_unicode_buffer(size)
+        return buffer.value if function(text, buffer, size) else None
+    except (AttributeError, OSError):
+        return None
+
+
+def ansi_safe_launch(command, environment):
+    """ansi_safe applied to every host argument and environment value (Windows)."""
+    if os.name != 'nt':return command, environment
+    return ([ansi_safe(str(part)) for part in command],
+            None if environment is None else {key: ansi_safe(value) for key, value in environment.items()})

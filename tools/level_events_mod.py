@@ -126,7 +126,7 @@ def patch_pack(data, profile, variant, preset=None, graphics_profile=None, aspec
     if hashlib.sha256(data).hexdigest() != profile['pack_sha256'].get(variant):
         raise ValueError('level events refuse an unknown linked pack')
     if preset:
-        graphics = graphics_profile or json.loads(resolution.PROFILE.read_text())
+        graphics = graphics_profile or json.loads(resolution.PROFILE.read_text(encoding='utf-8'))
         data = resolution.patch_pack(data,preset,variant,graphics,aspect)
     header = list(prepare_native.HEADER.unpack_from(data))
     if header[0] != prepare_native.MAGIC or not 0 < header[4] <= 4094:
@@ -195,11 +195,11 @@ def patch_pack(data, profile, variant, preset=None, graphics_profile=None, aspec
 
 
 def prepare(pack, session, executable, variant, preset=None, profile_path=None, graphics_profile_path=None, aspect=None):
-    profile = json.loads(Path(profile_path or PROFILE).read_text())
+    profile = json.loads(Path(profile_path or PROFILE).read_text(encoding='utf-8'))
     if hashlib.sha256(executable.read_bytes()).hexdigest()!=profile['executable_sha256']:
         raise ValueError('level events refuse an unknown original executable')
     source = (pack/'image.pack').read_bytes()
-    graphics = json.loads(Path(graphics_profile_path).read_text()) if graphics_profile_path else None
+    graphics = json.loads(Path(graphics_profile_path).read_text(encoding='utf-8')) if graphics_profile_path else None
     patched, metadata = patch_pack(source,profile,variant,preset,graphics,aspect)
     output = session/'level-events.pack'
     with output.open('xb') as stream: stream.write(patched)

@@ -52,7 +52,7 @@ def read_state(root, entry):
     path = state_path(root,entry)
     try:
         if any(p.is_symlink() for p in (path,*path.parents)):return {}
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding='utf-8'))
         if not isinstance(value,dict) or value.get('schema_version')!=1 or not isinstance(value.get('steps'),dict):return {}
         value['steps'] = {name:marker for name,marker in value['steps'].items() if isinstance(marker,dict)}
         if value.get('failure') and not isinstance(value['failure'],dict):
@@ -142,7 +142,7 @@ class Pipeline:
         return self.record
 
     def report(self, name, key, value):
-        path = self.path.parent/'reports'/f'{name}-{key}-{uuid.uuid4().hex[:8]}.json'
+        path = self.path.parent/'reports'/f'{name}-{key[:24]}-{uuid.uuid4().hex[:8]}.json'
         game_library.write_json(path,value)
         return [path]
 
@@ -189,7 +189,7 @@ def renderer_step(pipeline):
             prefix = root/'.local/deps/prefix'
             # A build folder configured from the old private copy refuses the new source.
             cache = library.parent/'CMakeCache.txt'
-            if cache.is_file() and f'CMAKE_HOME_DIRECTORY:INTERNAL={source}' not in cache.read_text(errors='replace'):cache.unlink()
+            if cache.is_file() and f'CMAKE_HOME_DIRECTORY:INTERNAL={source}' not in cache.read_text(errors='replace', encoding='utf-8'):cache.unlink()
             run_command(['cmake','-S',source,'-B',library.parent,'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo',
                 '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',f'-DCMAKE_PREFIX_PATH={prefix}',f'-DVulkan_INCLUDE_DIR={prefix}/include',
                 '-DSKY_RENDERER_LTO=OFF','-DSKY_RENDERER_PGO=off','-DFETCHCONTENT_FULLY_DISCONNECTED=ON'],root)
@@ -209,7 +209,7 @@ def portal_source(root):
     if (bundled/'src/runtime/cemu_portal.cpp').is_file():return bundled
     cache = root/'.local/native-gpu-build/CMakeCache.txt'
     if not cache.is_file():return None
-    for line in cache.read_text().splitlines():
+    for line in cache.read_text(encoding='utf-8').splitlines():
         if line.startswith('SKY_PORTAL_SOURCE_ROOT:PATH='):
             value = line.split('=',1)[1]
             if not value:return None
@@ -259,13 +259,13 @@ def runtime_step(pipeline):
 def check_dependencies(host):
     # Windows resolves the shipped DLLs beside the executable at launch.
     if WINDOWS:return
-    try:dependencies = subprocess.run(['ldd',str(host)],capture_output=True,text=True)
+    try:dependencies = subprocess.run(['ldd',str(host)],capture_output=True,text=True, encoding='utf-8', errors='replace')
     except OSError as error:raise PreparationError('runtime: The runtime checker is unavailable. Restore the runtime tools, then choose Repair.') from error
     if dependencies.returncode or 'not found' in dependencies.stdout:
         print(dependencies.stdout+dependencies.stderr,file=sys.stderr)
         if re.search(r'GLIBC_[0-9.]+\' not found',dependencies.stdout+dependencies.stderr):
             required = host.with_name('glibc-required.txt')
-            needed = required.read_text().strip().replace('GLIBC_','') if required.is_file() else 'a newer version'
+            needed = required.read_text(encoding='utf-8').strip().replace('GLIBC_','') if required.is_file() else 'a newer version'
             raise PreparationError(f'runtime: This build needs glibc {needed} or newer, which your Linux system does not have yet. Update your system, or build the game host from source (see the README).')
         raise PreparationError('runtime: A runtime dependency is missing. Restore the runtime files, then choose Repair.')
 
@@ -297,8 +297,10 @@ def plan(pipeline, install, config):
     identity = dict(profile_id=config['profile_id'],executable_sha256=digest,preparation=prep)
     steps = [Step('verify-executable',dict(files=[install.source('eboot.bin'),*modules],values=identity),verify,'Checking your game files…')]
     def validate_recipe(path):
-        record = json.loads(path.read_text())
-        if (record.get('title_id'),record.get('app_version'),record.get('executable_sha256'))!=(install.title_id,install.app_version,digest):
+        record = json.loads(path.read_text(encoding='utf-8'))
+        # The executable is region-free (US and EU share it), so a recipe binds to its
+        # version and exact executable hash; the title ID it was written for doesn't matter.
+        if (record.get('app_version'),record.get('executable_sha256'))!=(install.app_version,digest):
             raise PreparationError('Recipe does not match the selected executable: '+path.name)
         return record
     def validate(key):
@@ -323,7 +325,7 @@ def plan(pipeline, install, config):
         files = [*required.values(),*optional.values()]
         for name,path in required.items():
             if path.is_file():
-                record = json.loads(path.read_text())
+                record = json.loads(path.read_text(encoding='utf-8'))
                 if name=='resolution':files.append(install.source('renderer/tfbRenderer.igx'))
                 if 'asset' in record:files.append(install.source(record['asset']))
         return dict(files=files,values={'executable':digest})
@@ -337,7 +339,7 @@ def plan(pipeline, install, config):
                 manifest = validate_recipe(patch_path)
                 for offset,before,after,_ in patches.validate(original,manifest):modified[offset:offset+len(before)] = after
             packed,types,metadata = link_native.link_images([('eboot.bin',bytes(modified)),*[(name,path.read_bytes()) for name,path in zip(module_names,modules)]])
-            recipe = json.loads(required['resolution'].read_text())
+            recipe = json.loads(required['resolution'].read_text(encoding='utf-8'))
             if hashlib.sha256(packed).hexdigest()!=recipe['pack_sha256'][variant]:raise PreparationError('Linked pack differs from the verified build; check the game modules')
             resolution.patch_pack(packed,'1080p',variant,recipe)
             boot = link_native.boot_plan(metadata)
@@ -387,7 +389,7 @@ def prepare_optional(root, entry, name, progress):
         progress(value)
     worker = Pipeline(root,entry,optional_progress)
     worker.path = worker.path.parent/('optional-'+name)/'state.json'
-    try:worker.record = json.loads(worker.path.read_text())
+    try:worker.record = json.loads(worker.path.read_text(encoding='utf-8'))
     except (OSError,ValueError):worker.record = dict(schema_version=1,steps={})
     source = None
     try:
@@ -416,7 +418,7 @@ def prepare_optional(root, entry, name, progress):
             with redirect_stdout(sys.stderr):
                 if name=='controller-art':
                     if not destination.exists():importer.prepare(source,destination)
-                    manifest = json.loads((destination/'manifest.json').read_text())
+                    manifest = json.loads((destination/'manifest.json').read_text(encoding='utf-8'))
                     if 'menu-atlas.rgba' not in manifest.get('files',{}):raise ValueError('Optional controller artwork is incomplete')
                     for filename,digest in manifest['files'].items():
                         path = game_build.relative(destination,filename)

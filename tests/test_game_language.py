@@ -28,7 +28,7 @@ class GameLanguageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'profiles').mkdir()
-            (root / 'profiles/game.json').write_text(json.dumps({'languages': ['en-US', 'klingon']}))
+            (root / 'profiles/game.json').write_text(json.dumps({'languages': ['en-US', 'klingon']}), encoding='utf-8')
             with self.assertRaises(ValueError):
                 game_language.offered(root, 'game')
             self.assertEqual(launcher_model.languages(root), ['en-US'])

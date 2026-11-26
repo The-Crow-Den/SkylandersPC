@@ -10,9 +10,11 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLa
     QLineEdit, QPushButton, QFileDialog, QTextEdit, QMessageBox, QProgressBar, QStackedWidget, QWidget)
 try:
     from . import game_library, launcher_library
+    from .process_text import utf8_reader
     from . import launcher_packages as packages
 except ImportError:
     import game_library, launcher_library
+    from process_text import utf8_reader
     import launcher_packages as packages
 
 
@@ -60,6 +62,36 @@ def sweep_imports(root):
     folder = Path(root)/'.local/pkg-imports'
     if folder.is_dir():
         for child in folder.iterdir():shutil.rmtree(child,ignore_errors=True)
+
+
+SETUP_SPACE = 2 << 30  # prepared game files and setup records, with room to spare
+
+
+def space_shortage(root, jobs):
+    """A message when the drive can't hold these packages unpacked plus setup, else None.
+
+    Unpacked folders are used where they are and need no copy."""
+    needed = SETUP_SPACE + sum(Path(path).stat().st_size for _,path in jobs
+                               if Path(path).is_file())
+    targets = {Path(root)/'.local'}
+    try:targets.add(Path(game_library.directory(root)))
+    except (OSError,ValueError):pass
+    for target in targets:
+        probe = target
+        while not probe.exists() and probe.parent != probe:probe = probe.parent
+        try:free = shutil.disk_usage(probe).free
+        except OSError:continue
+        if free < needed:
+            gb = lambda value:f'{value/(1<<30):.1f} GB'
+            return (f'Installing needs about {gb(needed)} free on the drive with {probe}, '
+                    f'but only {gb(free)} is free. Free up some space, or move the SkylandersPC '
+                    'folder to a drive with more room, then try again.')
+    return None
+
+
+def low_space(root, limit=256 << 20):
+    try:return shutil.disk_usage(Path(root)/'.local').free < limit
+    except OSError:return False
 
 
 class InstallDialog(QDialog):
@@ -152,7 +184,15 @@ class InstallDialog(QDialog):
         icon = QLabel();icon.setPixmap(file_icon());card_layout.addWidget(icon)
         self.summary = QLabel();self.summary.setObjectName('reviewSummary');self.summary.setWordWrap(True);card_layout.addWidget(self.summary,1)
         review_layout.addWidget(review_card)
-        location = QLabel('We’ll put everything in your Games folder.');location.setObjectName('description');location.setWordWrap(True);review_layout.addWidget(location)
+        self.install_folder = None
+        location_line = QHBoxLayout();location_line.setSpacing(12)
+        self.location = QLabel();self.location.setObjectName('description');self.location.setWordWrap(True)
+        self.location.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        location_line.addWidget(self.location,1)
+        self.change_location = QPushButton('Change…');self.change_location.clicked.connect(self.choose_install_folder)
+        self.change_location.setToolTip('New games go here from now on. Games you already have stay where they are.')
+        location_line.addWidget(self.change_location,0,Qt.AlignmentFlag.AlignTop)
+        review_layout.addLayout(location_line)
         self.hint = QLabel('Your original files will stay where they are.');self.hint.setWordWrap(True);self.hint.setObjectName('muted')
         review_layout.addWidget(self.hint);review_layout.addStretch();self.pages.addWidget(review)
         progress_page = QWidget();progress_layout = QVBoxLayout(progress_page);progress_layout.setContentsMargins(0,0,0,0)
@@ -207,6 +247,37 @@ class InstallDialog(QDialog):
             in_place = bool(folders) and all(packages.unpacked(path) for path in folders)
             self.hint.setText('Nothing is copied: the game will run from the folders you chose, so keep them where they are.'
                               if in_place else 'Your original files will stay where they are.')
+            self.location.setVisible(not in_place);self.change_location.setVisible(not in_place)
+            self.location.setText('Install to:\n'+str(self.install_target()))
+
+    def install_target(self):
+        return Path(self.install_folder) if self.install_folder else Path(game_library.directory(self.owner.root))
+
+    def choose_install_folder(self):
+        try:from .launcher_files import choose_folder
+        except ImportError:from launcher_files import choose_folder
+        try:from . import library_location
+        except ImportError:import library_location
+        chosen = choose_folder(self,'Choose where to install',str(self.install_target()))
+        if not chosen:return
+        root = self.owner.root
+        try:
+            folder = library_location.validate_destination(root,chosen,game_library.entries(root),game_library.libraries(root),False)
+        except (OSError,ValueError) as error:
+            QMessageBox.warning(self,'Choose another folder',str(error));return
+        self.install_folder = None if folder==Path(game_library.directory(root)).resolve() else str(folder)
+        self.location.setText('Install to:\n'+str(self.install_target()))
+
+    def apply_install_folder(self):
+        """Make the chosen folder the Games folder; games already installed stay where they are."""
+        if not self.install_folder:return True
+        try:from . import library_location
+        except ImportError:import library_location
+        try:library_location.change(self.owner.root,self.install_folder,move=False)
+        except (OSError,ValueError) as error:
+            QMessageBox.warning(self,'Cannot use this folder',str(error));return False
+        self.install_folder = None
+        return True
 
     def add_update_only(self):
         self.only_update = True;self.fields['game_pkg'].clear();self.show_step(1)
@@ -228,6 +299,15 @@ class InstallDialog(QDialog):
                     raise ValueError('This looks like an update. Choose the game file first, then add the update in the next step.')
             except (OSError,ValueError) as error:
                 QMessageBox.warning(self,'Check your game file',str(error));return
+            info = packages.package_info(path)
+            if not launcher_library.playable_title(self.owner.root,info.get('TITLE_ID','')):
+                size = path.stat().st_size if path.is_file() else 0
+                name = info.get('TITLE') or info.get('TITLE_ID') or 'This game'
+                answer = QMessageBox.question(self,'Not playable yet',
+                    f'{name} can\'t be played with this version of SkylandersPC yet. '
+                    +(f'Installing it uses about {size/(1<<30):.0f} GB. ' if size else '')+'Install it anyway?',
+                    QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+                if answer!=QMessageBox.StandardButton.Yes:return
             self.show_step(1)
         elif self.step==1:
             if not self.checked_jobs():return
@@ -264,6 +344,10 @@ class InstallDialog(QDialog):
     def begin(self):
         jobs = self.checked_jobs()
         if not jobs:return
+        if not all(packages.unpacked(path) for _,path in jobs) and not self.apply_install_folder():return
+        shortage = space_shortage(self.owner.root,jobs)
+        if shortage:
+            QMessageBox.warning(self,'Not enough free space',shortage);return
         self.show_step(3)
         self.game['operation']={'state':'Installing','message':'Unpacking your game…'}
         self.owner.refresh_game()
@@ -309,7 +393,7 @@ class InstallDialog(QDialog):
                 installed = game['installed_paths']
                 self.output.append('Extraction validated. Installed to:\n'+'\n'.join(installed))
                 self.owner.rebuild_rail()
-                self.phase.setText(game['name']+' is installed. Your game files are in the Games folder.')
+                self.phase.setText(game['name']+' is installed. Your game files are in '+str(game_library.directory(self.owner.root))+'.')
                 self.hint.setText('You can close this window. The launcher will show whether the game is ready to play.')
                 self.done_state(success=True);self.progress.setValue(1)
                 if game_library.supported(self.owner.root,entry):
@@ -365,12 +449,12 @@ class InstallDialog(QDialog):
         if getattr(self,'log_path',None):
             try:
                 self.log_path.parent.mkdir(parents=True,exist_ok=True)
-                with self.log_path.open('a') as stream:stream.write(text)
+                with self.log_path.open('a',encoding='utf-8',errors='replace') as stream:stream.write(text)
             except OSError:pass
 
     def read_output(self):
         if self.process:
-            output = bytes(self.process.readAllStandardOutput()).decode('utf-8',errors='replace')
+            output = utf8_reader(self,self.process).decode(bytes(self.process.readAllStandardOutput()))
             self.append_log(output);self.output.ensureCursorVisible()
 
     def error(self,error):
@@ -386,6 +470,7 @@ class InstallDialog(QDialog):
             self.output.append(f'Extractor failed (exit {code}). No installation was published.')
             what = 'game' if self.current_kind=='base' else 'update'
             if self.current_folder:self.fail('Could not copy the '+what+' folder. Check that it is complete and readable, and that there is enough free space.')
+            elif low_space(self.owner.root):self.fail('The drive ran out of free space while unpacking the '+what+'. Free up some space, then try again.')
             else:self.fail('Could not unpack the '+what+'. Check that the PKG file is complete and try again.')
             return
         self.completed_jobs += 1;self.next_job()

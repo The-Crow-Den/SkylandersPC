@@ -19,7 +19,7 @@ class SaveProfileTests(unittest.TestCase):
             payload.write_bytes(b'existing progress')
             profiles = root/'out/play-profiles';profiles.mkdir()
             (profiles/'CUSA00626.json').write_text(json.dumps(dict(
-                schema_version=1, title_id='CUSA00626', save_root=str(save))))
+                schema_version=1, title_id='CUSA00626', save_root=str(save))), encoding='utf-8')
             self.assertEqual(save_profile.select(root, 'CUSA00626', environment={}), (save, 'saved-profile'))
             self.assertEqual(save_profile.select(root, 'CUSA00016', environment={}), (save_profile.home_root({}), 'home-default'))
             self.assertEqual(payload.read_bytes(), b'existing progress')
@@ -33,7 +33,7 @@ class SaveProfileTests(unittest.TestCase):
             (old/'CUSA00626').mkdir(parents=True);(new/'CUSA00626').mkdir(parents=True)
             profiles = root/'out/play-profiles';profiles.mkdir(parents=True)
             (profiles/'CUSA00626.json').write_text(json.dumps(dict(
-                schema_version=1, title_id='CUSA00626', save_root=str(old))))
+                schema_version=1, title_id='CUSA00626', save_root=str(old))), encoding='utf-8')
             with patch.object(save_profile.user_data,'WINDOWS',False):
                 self.assertEqual(save_profile.select(root, 'CUSA00626', environment=env), (new, 'saved-profile'))
 
@@ -73,7 +73,7 @@ class SaveProfileTests(unittest.TestCase):
             (destination/'CUSA00626').mkdir(parents=True)
             profiles=root/'out/play-profiles';profiles.mkdir(parents=True)
             (profiles/'CUSA00626.json').write_text(json.dumps(dict(
-                schema_version=1,title_id='CUSA00626',save_root=str(destination))))
+                schema_version=1,title_id='CUSA00626',save_root=str(destination))), encoding='utf-8')
             self.assertEqual(save_profile.select(root,'CUSA00626',environment=env),(destination,'saved-profile'))
             source=root/'source';(source/'CUSA00626').mkdir(parents=True)
             (source/'CUSA00626/link').symlink_to(root/'unrelated')
@@ -83,7 +83,7 @@ class SaveProfileTests(unittest.TestCase):
     def test_explicit_and_environment_overrides_precede_profile(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve();profiles = root/'out/play-profiles';profiles.mkdir(parents=True)
-            (profiles/'CUSA00626.json').write_text('invalid JSON')
+            (profiles/'CUSA00626.json').write_text('invalid JSON', encoding='utf-8')
             env = {'SKY_SAVE_DATA_ROOT': str(root/'environment')}
             self.assertEqual(save_profile.select(root, 'CUSA00626', root/'chosen', env),
                              (root/'chosen', 'command-line'))
@@ -101,7 +101,7 @@ class SaveProfileTests(unittest.TestCase):
                                 ('CUSA00626', link), ('CUSA00626', child_link),
                                 ('CUSA00626', root/'outside')]:
                 (profiles/'CUSA00626.json').write_text(json.dumps(dict(
-                    schema_version=1, title_id=title, save_root=str(path))))
+                    schema_version=1, title_id=title, save_root=str(path))), encoding='utf-8')
                 with self.subTest(title=title, path=path), self.assertRaises(ValueError):
                     save_profile.select(root, 'CUSA00626', environment={})
             with self.assertRaises(ValueError):

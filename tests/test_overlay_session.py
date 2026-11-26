@@ -25,7 +25,7 @@ class OverlaySessionTests(unittest.TestCase):
             with overlay_session.html_overlay(temp, temp, {'SKY_PC_WEB_MENU': '1'}) as runtime:
                 self.assertNotIn('SKY_PC_OVERLAY_DIR', runtime)
             popen.assert_not_called()
-            status = json.loads((Path(temp) / 'pc-overlay-status.json').read_text())
+            status = json.loads((Path(temp) / 'pc-overlay-status.json').read_text(encoding='utf-8'))
             self.assertEqual((status['requested'], status['active']), ('web', 'native'))
 
     def test_trimmed_launcher_uses_available_system_webengine(self):

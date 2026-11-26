@@ -93,7 +93,7 @@ def select(root, title_id, explicit=None, environment=None):
         return home_root(environment), 'home-default'
     if profile.is_symlink() or profile.resolve() != profile or profile.stat().st_size > 16384:
         raise ValueError('invalid or redirected save profile')
-    record = json.loads(profile.read_text())
+    record = json.loads(profile.read_text(encoding='utf-8'))
     if (not isinstance(record, dict) or type(record.get('schema_version')) is not int or
             record['schema_version'] != 1 or
             record.get('title_id') != title_id or

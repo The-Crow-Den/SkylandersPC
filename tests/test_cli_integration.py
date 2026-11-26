@@ -23,15 +23,15 @@ class CliIntegrationTests(unittest.TestCase):
             (game / 'sce_sys/param.sfo').write_bytes(sfo_fixture())
             inspected = subprocess.run([sys.executable, str(ROOT / 'tools/workspace.py'),
                                         'inventory', str(game)], cwd=root, capture_output=True,
-                                       text=True, check=True, timeout=5)
+                                       text=True, check=True, timeout=5, encoding='utf-8', errors='replace')
             report = json.loads(inspected.stdout)
             self.assertEqual(report['imports']['count'], 1)
             self.assertEqual(report['imports']['symbols'][0]['resolution'], 'not checked')
             inventory = root / 'inventory.json'
-            inventory.write_text(inspected.stdout)
+            inventory.write_text(inspected.stdout, encoding='utf-8')
             identified = subprocess.run([sys.executable, str(ROOT / 'tools/profiles.py'),
                                          'trap-team', str(inventory)], cwd=root,
-                                        capture_output=True, text=True, check=True, timeout=5)
+                                        capture_output=True, text=True, check=True, timeout=5, encoding='utf-8', errors='replace')
             match = json.loads(identified.stdout)
             self.assertEqual(match['status'], 'unverified')
             self.assertFalse(match['patches_allowed'])

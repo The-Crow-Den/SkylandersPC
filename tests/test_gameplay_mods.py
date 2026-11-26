@@ -12,13 +12,13 @@ class GameplayModTests(unittest.TestCase):
             root=Path(directory).resolve()
             profile=root/'out/mod-profiles/CUSA00626.json';profile.parent.mkdir(parents=True)
             self.assertEqual(gameplay_mods.selection(root,'CUSA00626'),dict.fromkeys(gameplay_mods.NAMES,False))
-            profile.write_text(json.dumps(dict(schema_version=1,title_id='CUSA00626',enabled={'element-gates':True,'traptanium':False})))
+            profile.write_text(json.dumps(dict(schema_version=1,title_id='CUSA00626',enabled={'element-gates':True,'traptanium':False})), encoding='utf-8')
             self.assertEqual(gameplay_mods.selection(root,'CUSA00626',{'unlock-expansions':False}),{'unlock-expansions':False,'trap-master':True})
             self.assertTrue(gameplay_mods.selection(root,'CUSA00626',{'traptanium':True})['trap-master'])
             self.assertTrue(gameplay_mods.selection(root,'CUSA00626',{'unlock-expansions':True})['unlock-expansions'])
             # The retired replay mod now turns on the adventure pack mod that carries it.
             self.assertTrue(gameplay_mods.selection(root,'CUSA00626',{'replay-expansion-intros':True})['unlock-expansions'])
-            profile.write_text(json.dumps(dict(schema_version=1,title_id='CUSA00626',enabled={'element-gates':False,'traptanium':False,'replay-expansion-intros':True})))
+            profile.write_text(json.dumps(dict(schema_version=1,title_id='CUSA00626',enabled={'element-gates':False,'traptanium':False,'replay-expansion-intros':True})), encoding='utf-8')
             self.assertTrue(gameplay_mods.selection(root,'CUSA00626')['unlock-expansions'])
             self.assertFalse(any(gameplay_mods.selection(root,'CUSA00697').values()))
             with self.assertRaises(ValueError):gameplay_mods.selection(root,'../bad')
@@ -30,8 +30,8 @@ class GameplayModTests(unittest.TestCase):
             for record in ({'schema_version':True,'title_id':'CUSA00626','enabled':dict.fromkeys(gameplay_mods.NAMES,True)},
                            {'schema_version':1,'title_id':'CUSA00000','enabled':dict.fromkeys(gameplay_mods.NAMES,True)},
                            {'schema_version':1,'title_id':'CUSA00626','enabled':{'element-gates':1,'traptanium':False}}):
-                profile.write_text(json.dumps(record))
+                profile.write_text(json.dumps(record), encoding='utf-8')
                 with self.assertRaises(ValueError):gameplay_mods.selection(root,'CUSA00626')
             profile.unlink();profile.symlink_to(root/'elsewhere')
-            (root/'elsewhere').write_text('{}')
+            (root/'elsewhere').write_text('{}', encoding='utf-8')
             with self.assertRaises(ValueError):gameplay_mods.selection(root,'CUSA00626')

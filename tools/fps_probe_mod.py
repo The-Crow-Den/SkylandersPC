@@ -173,7 +173,7 @@ def main():
     parser.add_argument('output_pack',type=Path)
     args=parser.parse_args()
     print(json.dumps(prepare(args.executable,args.source_pack,
-                             json.loads(args.profile.read_text()),args.output_pack),indent=2))
+                             json.loads(args.profile.read_text(encoding='utf-8')),args.output_pack),indent=2))
 
 
 if __name__=='__main__':

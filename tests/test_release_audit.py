@@ -75,7 +75,7 @@ class ReleaseAuditTests(unittest.TestCase):
             result=release.audit(root,names);self.assertTrue(result['ok'])
             (root/'tools/public.py').write_bytes(b'# SPDX-License-Identifier: GPL-3.0-or-later\nchanged\n')
             with self.assertRaises(ValueError):release.export_source(root,result,root/'bad.tar.gz')
-            (root/'LICENSES/third-party/example.txt').write_text('changed notice')
+            (root/'LICENSES/third-party/example.txt').write_text('changed notice', encoding='utf-8')
             self.assertFalse(release.audit(root,names)['ok'])
             (root/'tools/link.py').symlink_to(root/'tools/public.py')
             self.assertFalse(release.audit(root,release.candidates(root,policy))['ok'])

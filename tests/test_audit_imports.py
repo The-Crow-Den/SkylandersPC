@@ -12,11 +12,11 @@ class ImportAuditTests(unittest.TestCase):
             root = Path(directory)
             identity = nid('sceExample') + '#library#module'
             metadata = root / 'metadata.json'
-            metadata.write_text(json.dumps({'imports': [{'name': identity}, {'name': 'module_start'}]}))
+            metadata.write_text(json.dumps({'imports': [{'name': identity}, {'name': 'module_start'}]}), encoding='utf-8')
             source = root / 'reference.cpp'
             source.write_text('''// int sceExample(int wrong) { misleading comment }
 int sceExample(int value) { return value; }
-LIB_FUNCTION("''' + nid('sceExample') + '''", "library", 1, "module", sceExample);''')
+LIB_FUNCTION("''' + nid('sceExample') + '''", "library", 1, "module", sceExample);''', encoding='utf-8')
             report = audit([metadata], [root], root, [])
             entry = next(r for r in report['imports'] if r['identity'] == identity)
             self.assertEqual(entry['reference_signatures'], ['int sceExample(int value)'])

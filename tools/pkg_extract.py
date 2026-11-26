@@ -27,7 +27,7 @@ SECTOR = 0x1000
 
 def load_keys():
     """Fetch only the pinned, hash-verified reference; never export parsed keys."""
-    provenance = json.loads((ROOT / 'LICENSES/pkg-source.json').read_text())
+    provenance = json.loads((ROOT / 'LICENSES/pkg-source.json').read_text(encoding='utf-8'))
     source = provenance['keys']
     path = ROOT / '.local/shadps4-pkg-reference' / source['path']
     if path.exists():
@@ -301,7 +301,7 @@ def _extract(pkg, destination, keys, progress):
         dk3 = package.unlock(load_keys() if keys is None else keys)
         package.setup_pfs()
         names = package.entry_data(0x200) if 0x200 in package.by_id else b''
-        fallbacks = json.loads((ROOT / 'tools/pkg_entry_names.json').read_text())
+        fallbacks = json.loads((ROOT / 'tools/pkg_entry_names.json').read_text(encoding='utf-8'))
         destination.mkdir(parents=True)
         metadata = set()
         for entry in package.entries:

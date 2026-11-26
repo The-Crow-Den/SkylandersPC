@@ -1,6 +1,6 @@
-## SkylandersPC 0.1.2 (beta)
+## SkylandersPC 0.1.3 (beta)
 
-### What's new in 0.1.2
+### What's new in 0.1.3
 
 - **Trap Team 01.01 launches again.** After updating to 0.1.1, existing installs
   stopped at "exit code 2" until Repair was run. They now start normally.
@@ -12,6 +12,29 @@
   your PC by name instead of by maker.
 - After an update, *Play* finishes any setup step that needs redoing instead of
   asking for Repair.
+- **Installing on Windows no longer freezes or closes the launcher.** Writing the
+  install log failed on some characters, which stopped the launcher partway.
+- **The US base game without its update (01.00) now finishes setup** and can use
+  *Unlock Nightmare*. Mods made only for 01.01 are skipped on 01.00 instead of
+  stopping the game.
+- The launcher has its icon on Windows and in the AppImage, and the Trap Master
+  mod now works in release downloads.
+- **4K and ultrawide screens no longer crash.** 2160p, and 21:9 or 32:9 at high
+  resolutions, ran the game out of video memory shortly after starting. Large sizes
+  now render at the biggest size the game can hold and are scaled to your screen.
+- **Controller button prompts work on Windows.** The launcher now finds Steam's
+  button artwork on Windows, and the image support it needs is included.
+  Selecting the mod with a PlayStation pad no longer stops the game from starting.
+- **Safer installs.** The launcher warns before an install when the drive is
+  short on space, asks before installing a game that can't be played yet, and
+  explains how to reinstall a version that is already installed.
+- **Choose where to install.** The last install step shows where the game goes,
+  with *Change…* to pick another folder or drive. New games go there from then
+  on; games you already have stay where they are.
+- On Windows, a Games folder on another drive (set in Settings) is now kept;
+  before, the launcher quietly went back to its own Games folder.
+- Opening the launcher a second time says it is already open instead of starting
+  two copies.
 
 ## SkylandersPC 0.1.1 (beta)
 

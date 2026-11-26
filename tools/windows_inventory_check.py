@@ -38,9 +38,9 @@ def main(argv=None):
     if len(args) != 1:
         sys.exit(__doc__.strip())
     bundle = Path(args[0])
-    inventory = json.loads((ROOT / 'LICENSES/windows-bundled-components.json').read_text())
+    inventory = json.loads((ROOT / 'LICENSES/windows-bundled-components.json').read_text(encoding='utf-8'))
     generated = bundle / 'LICENSES/msys2-runtime.json'
-    msys2 = json.loads(generated.read_text()) if generated.is_file() else []
+    msys2 = json.loads(generated.read_text(encoding='utf-8')) if generated.is_file() else []
     bad = [e['file'] for e in msys2 if not e.get('license') or not e.get('package')]
     for name in bad:
         print('MSYS2 file without package/license:', name, file=sys.stderr)

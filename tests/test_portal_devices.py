@@ -14,12 +14,12 @@ def fake_sysfs(root, hid=(), usb=()):
     for name, hid_id in hid:
         device = root / 'class/hidraw' / name / 'device'
         device.mkdir(parents=True)
-        (device / 'uevent').write_text(f'HID_ID={hid_id}\nHID_NAME=Portal\n')
+        (device / 'uevent').write_text(f'HID_ID={hid_id}\nHID_NAME=Portal\n', encoding='utf-8')
     for name, vendor, product in usb:
         device = root / 'bus/usb/devices' / name
         device.mkdir(parents=True)
         for key, value in (('idVendor', vendor), ('idProduct', product), ('busnum', '3'), ('devnum', '7')):
-            (device / key).write_text(value + '\n')
+            (device / key).write_text(value + '\n', encoding='utf-8')
 
 
 class PortalDevicesTest(unittest.TestCase):
@@ -57,11 +57,11 @@ class PortalDevicesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'settings.json'
             import json
-            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'portal_device'}))
+            path.write_text(json.dumps({k: v for k, v in model.DEFAULTS.items() if k != 'portal_device'}), encoding='utf-8')
             self.assertEqual(model.load(path)['portal_device'], 'virtual')
 
     def test_transcript_has_no_figure_contents(self):
-        lines = (ROOT / 'native/tests/data/portal_transcript_hid.txt').read_text().splitlines()
+        lines = (ROOT / 'native/tests/data/portal_transcript_hid.txt').read_text(encoding='utf-8').splitlines()
         reports = [line[2:].split() for line in lines if line[:2] in ('> ', '< ')]
         self.assertTrue(reports)
         self.assertFalse([r for r in reports if r[0] in ('51', '57') and len(r) > 3])  # No block data.

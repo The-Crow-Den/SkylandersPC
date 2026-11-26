@@ -17,7 +17,7 @@ class AppRunTests(unittest.TestCase):
         python = self.appdir / 'usr/python/bin/python3'
         python.parent.mkdir(parents=True)
         # Stands in for the bundled interpreter: reports where and how it was started.
-        python.write_text('#!/bin/sh\necho "cwd=$PWD"\necho "path=${PYTHONPATH-unset}"\nfor a; do echo "arg=$a"; done\n')
+        python.write_text('#!/bin/sh\necho "cwd=$PWD"\necho "path=${PYTHONPATH-unset}"\nfor a; do echo "arg=$a"; done\n', encoding='utf-8')
         python.chmod(0o755)
         self.repo = self.make_repo(self.base / 'games/SkylandersPS4')
 
@@ -27,7 +27,7 @@ class AppRunTests(unittest.TestCase):
     def make_repo(self, path):
         (path / 'tools').mkdir(parents=True)
         for name in ('launcher.py', 'run_session.py'):
-            (path / 'tools' / name).write_text('')
+            (path / 'tools' / name).write_text('', encoding='utf-8')
         return path
 
     def run_apprun(self, *args, image=None, **extra):
@@ -35,7 +35,7 @@ class AppRunTests(unittest.TestCase):
         env.update(APPDIR=str(self.appdir), PYTHONPATH='/host', **extra)
         if image is not None:
             env['APPIMAGE'] = str(image)
-        return subprocess.run(['sh', str(APPRUN), *args], env=env, capture_output=True, text=True)
+        return subprocess.run(['sh', str(APPRUN), *args], env=env, capture_output=True, text=True, encoding='utf-8', errors='replace')
 
     def test_finds_checkout_beside_the_image(self):
         result = self.run_apprun('--flag', image=self.base / 'games/Launcher.AppImage')
@@ -52,7 +52,7 @@ class AppRunTests(unittest.TestCase):
 
     def test_falls_back_to_recorded_build_checkout(self):
         record = self.appdir / 'usr/share/skylanders/root'
-        record.parent.mkdir(parents=True); record.write_text(str(self.repo) + '\n')
+        record.parent.mkdir(parents=True); record.write_text(str(self.repo) + '\n', encoding='utf-8')
         elsewhere = self.base / 'elsewhere'; elsewhere.mkdir()
         result = self.run_apprun(image=elsewhere / 'Launcher.AppImage')
         self.assertIn('cwd=' + str(self.repo), result.stdout)

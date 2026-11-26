@@ -35,7 +35,7 @@ def stage(cache,source_data,recipe,destination,patch):
     if entry.exists():
         try:
             if entry.is_symlink() or data_path.is_symlink() or manifest.is_symlink() or manifest.stat().st_size>8192:raise ValueError('redirected cache entry')
-            record=json.loads(manifest.read_text())
+            record=json.loads(manifest.read_text(encoding='utf-8'))
             if (record.get('version')!=1 or record.get('source_sha256')!=source_hash or
                 record.get('recipe_sha256')!=key or not data_path.is_file() or data_path.stat().st_size!=record['size'] or
                 digest_file(data_path)!=record['output_sha256']):record=None
@@ -50,7 +50,7 @@ def stage(cache,source_data,recipe,destination,patch):
         with tempfile.TemporaryDirectory(prefix='.asset-',dir=cache) as temporary:
             temporary=Path(temporary);(temporary/'asset').write_bytes(modified)
             record=dict(version=1,source_sha256=source_hash,recipe_sha256=key,output_sha256=metadata['output_sha256'],size=len(modified))
-            (temporary/'manifest.json').write_text(json.dumps(record,sort_keys=True)+'\n')
+            (temporary/'manifest.json').write_text(json.dumps(record,sort_keys=True)+'\n', encoding='utf-8')
             try:
                 entry.mkdir();os.link(temporary/'asset',data_path);os.link(temporary/'manifest.json',manifest)
             except FileExistsError:pass

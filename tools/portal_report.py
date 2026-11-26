@@ -47,7 +47,7 @@ USBDEVFS_CONNECT = 0x5517
 
 def _read(path):
     try:
-        return Path(path).read_text().strip()
+        return Path(path).read_text(encoding='utf-8').strip()
     except OSError:
         return ''
 
@@ -210,7 +210,7 @@ def main(argv=None):
     if not data['portals']:
         print('No Activision USB device found. Plug the portal in and try again.', file=sys.stderr)
         return 1
-    Path(args.output).write_text(json.dumps(data, indent=2)+'\n')
+    Path(args.output).write_text(json.dumps(data, indent=2)+'\n', encoding='utf-8')
     for device in data['portals']:
         print(f"Found {device['product'] or 'portal'} ({device['family']}, 1430:{device['product_id']})")
         if 'probe' in device and 'error' in device['probe']:

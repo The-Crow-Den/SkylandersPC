@@ -228,6 +228,9 @@ if(WIN32)
       $<TARGET_OBJECTS:sky-virtual-portal>)
     target_link_libraries(skylanders-native-host PRIVATE sky-host-portable sky-guest-tls
       sky-portal-core PkgConfig::SkyWindowsUSB sky-renderer-media skyrender)
+    # UTF-8 process code page, so non-English characters in paths survive argv/getenv.
+    enable_language(RC)
+    target_sources(skylanders-native-host PRIVATE platform/win32/utf8.rc)
     if(BUILD_TESTING)
       add_test(NAME native-windows-loader COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_windows_loader.py $<TARGET_FILE:skylanders-native-host>)

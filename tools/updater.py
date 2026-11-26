@@ -160,21 +160,21 @@ def download(release, kind, root=ROOT, progress=lambda fraction: None, opener=ur
         raise ValueError('The download could not be unpacked: ' + str(error)) from error
     archive.unlink()
     new = sorted(p.relative_to(top).as_posix() for p in top.rglob('*') if p.is_file() or p.is_symlink())
-    try:old = json.loads((root / MANIFEST).read_text())
+    try:old = json.loads((root / MANIFEST).read_text(encoding='utf-8'))
     except (OSError, ValueError):old = []
     keep = set(new)
     remove = [n for n in old if isinstance(n, str) and n not in keep and _safe_name(n)]
     if kind == 'windows':remove = [n.replace('/', '\\') for n in remove]
-    (staging / 'remove.txt').write_text(''.join(n + '\n' for n in remove))
+    (staging / 'remove.txt').write_text(''.join(n + '\n' for n in remove), encoding='utf-8')
     (top / MANIFEST).parent.mkdir(parents=True, exist_ok=True)
-    (top / MANIFEST).write_text(json.dumps(new))
-    (staging / 'version').write_text(release['version'])
+    (top / MANIFEST).write_text(json.dumps(new), encoding='utf-8')
+    (staging / 'version').write_text(release['version'], encoding='utf-8')
     return top
 
 
 def staged(root=ROOT):
     """The version waiting in the staging folder, or None."""
-    try:return (Path(root) / STAGING / 'version').read_text().strip() or None
+    try:return (Path(root) / STAGING / 'version').read_text(encoding='utf-8').strip() or None
     except OSError:return None
 
 
@@ -190,7 +190,7 @@ while IFS= read -r name; do [ -n "$name" ] && rm -f -- "$root/$name"; done < "$s
 cp -a "$stage/files/SkylandersPC-linux/." "$root/" || exit 1
 rm -rf -- "$stage"
 {'exec "$root/SkylandersPC.AppImage" >/dev/null 2>&1' if relaunch else ''}
-""")
+""", encoding='utf-8')
         return popen(['sh', str(script)], start_new_session=True, stdin=subprocess.DEVNULL,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd='/')
     script = staging / 'apply.cmd'
@@ -204,7 +204,7 @@ robocopy "%STAGE%\\files" "%ROOT%" /E /NFL /NDL /NJH /NJS /R:5 /W:1 >nul
 if errorlevel 8 exit /b 1
 {'start "" "%ROOT%\\SkylandersPC.exe"' if relaunch else ''}
 rmdir /s /q "%STAGE%" & exit /b 0
-""".replace('\n', '\r\n'), newline='')
+""".replace('\n', '\r\n'), newline='', encoding='utf-8')
     flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
     return popen(['cmd', '/c', str(script)], creationflags=flags, cwd=str(root.anchor or root),
                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -216,12 +216,12 @@ def _sh(path):
 
 def update_git(root=ROOT, run=subprocess.run):
     status = run(['git', '-C', str(root), 'status', '--porcelain', '--untracked-files=no'],
-                 capture_output=True, text=True, timeout=30)
+                 capture_output=True, text=True, timeout=30, encoding='utf-8', errors='replace')
     if status.returncode != 0:
         raise ValueError('git status failed: ' + status.stderr.strip())
     if status.stdout.strip():
         raise ValueError('You have local changes; commit or stash them, then update.')
-    pull = run(['git', '-C', str(root), 'pull', '--ff-only'], capture_output=True, text=True, timeout=300)
+    pull = run(['git', '-C', str(root), 'pull', '--ff-only'], capture_output=True, text=True, timeout=300, encoding='utf-8', errors='replace')
     if pull.returncode != 0:
         raise ValueError('git pull failed: ' + (pull.stderr or pull.stdout).strip())
     return pull.stdout.strip()

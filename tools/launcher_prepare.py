@@ -6,8 +6,10 @@ import sys
 from PyQt6.QtCore import QObject, QProcess, QTimer, pyqtSignal
 try:
     from . import host_process
+    from .process_text import utf8_reader
 except ImportError:
     import host_process
+    from process_text import utf8_reader
 
 PREPARER = Path(__file__).with_name('game_prepare.py')
 
@@ -33,7 +35,7 @@ class PreparationProcess(QObject):
 
     def read_stdout(self):
         if not self.process:return
-        self.buffer += bytes(self.process.readAllStandardOutput()).decode('utf-8',errors='replace')
+        self.buffer += utf8_reader(self,self.process).decode(bytes(self.process.readAllStandardOutput()))
         if len(self.buffer)>1024*1024:
             self.error = 'The setup log could not be read. Choose Repair to try again.';self.cancel();return
         while '\n' in self.buffer:

@@ -39,7 +39,7 @@ def kept_session(session, last=None):
     if session.is_dir():return session
     last = Path(last) if last else Path(__file__).resolve().parents[1]/'out/last-session'
     try:
-        if (last/'source').read_text().strip() == session.name:return last
+        if (last/'source').read_text(encoding='utf-8').strip() == session.name:return last
     except OSError:
         pass
     return None
@@ -77,14 +77,14 @@ def fault_lines(lines):
 
 def read_json(path):
     try:
-        return json.loads(Path(path).read_text())
+        return json.loads(Path(path).read_text(encoding='utf-8'))
     except (OSError, ValueError):
         return {}
 
 
 def _run(command):
     try:
-        return subprocess.run(command, capture_output=True, text=True, timeout=5, check=False).stdout
+        return subprocess.run(command, capture_output=True, text=True, timeout=5, check=False, encoding='utf-8', errors='replace').stdout
     except (OSError, subprocess.SubprocessError):
         return ''
 
@@ -111,7 +111,7 @@ def gpu_description():
 def distro_description(os_release='/etc/os-release'):
     values = {}
     try:
-        for line in Path(os_release).read_text().splitlines():
+        for line in Path(os_release).read_text(encoding='utf-8').splitlines():
             key, _, value = line.partition('=')
             values[key] = value.strip().strip('"')
     except OSError:

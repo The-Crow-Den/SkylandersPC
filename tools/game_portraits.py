@@ -113,7 +113,7 @@ def find(games, relative):
 def prepare(destination, games):
     destination = Path(destination); destination.mkdir(parents=True, exist_ok=True)
     index = {}
-    try:current = json.loads((destination / 'index.json').read_text()).get('schema_version') == SCHEMA
+    try:current = json.loads((destination / 'index.json').read_text(encoding='utf-8')).get('schema_version') == SCHEMA
     except (OSError, ValueError, AttributeError):current = False
     for relative in ARCHIVES:
         data = find(games, relative).read_bytes()
@@ -127,7 +127,7 @@ def prepare(destination, games):
                 target.write_bytes(png(picture(extract(data, offset, size, mode, align))))
             index[key] = filename
     if not index:raise ValueError('No portraits were found in the installed game')
-    (destination / 'index.json').write_text(json.dumps(dict(schema_version=SCHEMA, portraits=index), indent=1, sort_keys=True) + '\n')
+    (destination / 'index.json').write_text(json.dumps(dict(schema_version=SCHEMA, portraits=index), indent=1, sort_keys=True) + '\n', encoding='utf-8')
     if destination.name == 'game':install(destination.parent)  # .local/portal-assets/game
     return index
 
@@ -144,7 +144,9 @@ def unpng(data):
 
 def write(path, content):
     temporary = path.with_name(path.name + '.tmp')
-    (temporary.write_bytes if isinstance(content, bytes) else temporary.write_text)(content); temporary.replace(path)
+    if isinstance(content, bytes):temporary.write_bytes(content)
+    else:temporary.write_text(content, encoding='utf-8')
+    temporary.replace(path)
 
 
 COLUMNS = 16
@@ -160,7 +162,7 @@ def install(assets):
     assets = Path(assets); game = assets / 'game'
     index_data = (game / 'index.json').read_bytes()
     index = json.loads(index_data)['portraits']
-    try:record = json.loads((assets / 'sources.json').read_text())
+    try:record = json.loads((assets / 'sources.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):record = {}
     if not isinstance(record, dict):record = {}
     try:atlas = (assets / 'portraits.rgba').read_bytes()
@@ -208,7 +210,7 @@ def install(assets):
             mapping.setdefault((identity - 1000, variant), cell)
     content = struct.pack('<II', COLUMNS * SIZE, rows * SIZE) + bytes(pixels)
     if moved:
-        try:lines = (assets / 'element-index.txt').read_text().split()
+        try:lines = (assets / 'element-index.txt').read_text(encoding='utf-8').split()
         except OSError:lines = []
         pairs = [(int(lines[i]), int(lines[i + 1])) for i in range(0, len(lines) - 1, 2)]
         write(assets / 'element-index.txt', ''.join(f'{e} {moved.get(c, c)}\n' for e, c in pairs))

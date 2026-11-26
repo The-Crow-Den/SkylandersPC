@@ -17,7 +17,7 @@ import time
 
 def process_state(pid):
     # comm can contain spaces and parentheses; fields after its closing ')' start at 3.
-    fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')',1)[1].split()
+    fields = Path(f'/proc/{pid}/stat').read_text(encoding='utf-8').rsplit(')',1)[1].split()
     return {'ticks':int(fields[11])+int(fields[12]), 'start':int(fields[19]),
             'rss_kib':int(fields[21])*os.sysconf('SC_PAGE_SIZE')/1024}
 
@@ -26,7 +26,7 @@ def nvidia_state(index):
     fields = ('utilization.gpu','power.draw','clocks.current.graphics','memory.used')
     result = subprocess.run(['nvidia-smi','-i',str(index),
                              '--query-gpu='+','.join(fields),'--format=csv,noheader,nounits'],
-                            capture_output=True,text=True,timeout=3,check=True)
+                            capture_output=True,text=True,timeout=3,check=True, encoding='utf-8', errors='replace')
     values = result.stdout.strip().split(',')
     if len(values) != len(fields):
         raise ValueError('unexpected NVIDIA telemetry')
@@ -81,5 +81,5 @@ if __name__ == '__main__':
         text = json.dumps(sample(args.pid,args.seconds,args.nvidia_index),indent=2)+'\n'
     except (OSError,ValueError) as error:
         parser.exit(1,f'Cannot measure runtime: {error}\n')
-    if args.output: args.output.write_text(text)
+    if args.output: args.output.write_text(text, encoding='utf-8')
     print(text,end='')

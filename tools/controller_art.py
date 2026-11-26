@@ -15,7 +15,7 @@ def _manifest():
     path=ROOT/'manifest.json'
     if ROOT.is_symlink() or ROOT.resolve()!=ROOT or path.is_symlink() or not path.is_file() or path.stat().st_size>65536:
         raise ValueError('Import local Steam glyphs with tools/import_controller_glyphs.py first')
-    record=json.loads(path.read_text())
+    record=json.loads(path.read_text(encoding='utf-8'))
     if (not isinstance(record,dict) or type(record.get('schema_version')) is not int or record.get('schema_version')!=1 or record.get('provider')!='Steam client' or
             not isinstance(record.get('files'),dict)):
         raise ValueError('invalid controller artwork cache')

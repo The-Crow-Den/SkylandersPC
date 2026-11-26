@@ -46,7 +46,7 @@ def selection(root, title_id, overrides=None):
     if path.exists() or path.is_symlink():
         if path.is_symlink() or path.resolve()!=path or path.stat().st_size>16384:
             raise ValueError('redirected or oversized gameplay mod selection')
-        record=json.loads(path.read_text())
+        record=json.loads(path.read_text(encoding='utf-8'))
         if (not isinstance(record,dict) or set(record)!={'schema_version','title_id','enabled'} or
                 type(record['schema_version']) is not int or record['schema_version']!=1 or
                 record['title_id']!=title_id or not isinstance(record['enabled'],dict) or

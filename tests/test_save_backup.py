@@ -27,7 +27,7 @@ class SaveBackupTests(unittest.TestCase):
             root=Path(directory).resolve();source=root/'saves';title=source/'CUSA00626';title.mkdir(parents=True)
             backups=root/'backups';(title/'Slot1').write_bytes(b'progress')
             first=Path(save_backup.snapshot(source,'CUSA00626',backup_root=backups)['path'])
-            (first/'notes.txt').write_text('keep this recovery point')
+            (first/'notes.txt').write_text('keep this recovery point', encoding='utf-8')
             with self.assertRaises(ValueError):save_backup.verify(first,'CUSA00626')
             second=save_backup.snapshot(source,'CUSA00626',backup_root=backups,keep=1)
             self.assertEqual(second['status'],'created');self.assertTrue(first.exists())
@@ -39,7 +39,7 @@ class SaveBackupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory).resolve();backups=root/'backups'
             for name in ('main','isolated'):
-                title=root/name/'CUSA00626';title.mkdir(parents=True);(title/'Slot1').write_text(name)
+                title=root/name/'CUSA00626';title.mkdir(parents=True);(title/'Slot1').write_text(name, encoding='utf-8')
                 save_backup.snapshot(root/name,'CUSA00626',backup_root=backups,keep=1)
             self.assertEqual(len(save_backup.snapshots(root/'main','CUSA00626',backups)),1)
             self.assertEqual(len(save_backup.snapshots(root/'isolated','CUSA00626',backups)),1)

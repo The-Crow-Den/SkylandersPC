@@ -376,7 +376,7 @@ def title_recipe(source,profile,mode):
 def game_faces(source_root,profile_path):
     """The game's own PlayStation face buttons (cross, circle, square, triangle) as
     84x84 RGBA, read from the verified font, for menus drawn outside the game."""
-    profile=json.loads(Path(profile_path).read_text())
+    profile=json.loads(Path(profile_path).read_text(encoding='utf-8'))
     relative=Path(profile['asset'])
     if relative.is_absolute() or '..' in relative.parts:raise ValueError('invalid glyph asset path')
     source=Path(source_root)/relative
@@ -394,7 +394,7 @@ def game_faces(source_root,profile_path):
 
 
 def build_profile(source_root,profile_path,mode,executable_sha256):
-    profile=json.loads(Path(profile_path).read_text())
+    profile=json.loads(Path(profile_path).read_text(encoding='utf-8'))
     if profile['executable_sha256']!=executable_sha256:raise ValueError('controller glyphs require the verified executable')
     assets=[]
     for current,transform in ([(profile,recipe)]+([(profile['shapes'],shape_recipe)] if 'shapes' in profile else [])+

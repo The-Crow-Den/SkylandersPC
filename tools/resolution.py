@@ -69,7 +69,7 @@ def renderer_options(data, dimensions=None, shadows='native', motion_blur=True):
 
 
 def prepare_assets(game, session, dimensions=None, shadows='native', motion_blur=True, profile_path=None):
-    profile = json.loads(Path(profile_path or PROFILE).read_text())
+    profile = json.loads(Path(profile_path or PROFILE).read_text(encoding='utf-8'))
     source = game / 'renderer/tfbRenderer.igx'
     original = source.read_bytes()
     if hashlib.sha256(original).hexdigest() != profile['renderer_sha256']:
@@ -129,6 +129,23 @@ def render_size(preset, aspect=None):
     return max(8, round(height * aspect / 8) * 8), height
 
 
+# The game's own render-target pool runs out above about 5.2 million pixels
+# (3200x1600 runs, 3360x1600 faults on a null allocation). Larger choices render
+# at the biggest size under this budget with the same shape; the renderer then
+# scales the frame up to the window.
+MAX_GUEST_PIXELS = 3200 * 1600
+
+
+def guest_size(preset, aspect=None):
+    """render_size, shrunk to fit the game's render-target memory."""
+    width, height = render_size(preset, aspect)
+    if width * height <= MAX_GUEST_PIXELS:
+        return width, height
+    scale = (MAX_GUEST_PIXELS / (width * height)) ** 0.5
+    width, height = int(width * scale) // 8 * 8, int(height * scale) // 8 * 8
+    return width, height
+
+
 def mapped_offset(data, header, address, size):
     locations = []
     for index in range(header[4]):
@@ -180,12 +197,12 @@ def patch_pack(data, preset, variant, profile, aspect=None):
 
 
 def prepare_resolution(pack, session, executable, preset, variant, profile_path=None, aspect=None):
-    profile = json.loads(Path(profile_path or PROFILE).read_text())
+    profile = json.loads(Path(profile_path or PROFILE).read_text(encoding='utf-8'))
     if hashlib.sha256(executable.read_bytes()).hexdigest() != profile['executable_sha256']:
         raise ValueError('resolution patch refuses unknown original executable')
     source = pack / 'image.pack'
     data = source.read_bytes()
-    size = render_size(preset, aspect)
+    size = guest_size(preset, aspect)
     patched = patch_pack(data, size, variant, profile, aspect)
     output = session / 'resolution.pack'
     with output.open('xb') as stream:

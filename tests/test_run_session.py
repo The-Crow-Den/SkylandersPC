@@ -84,7 +84,7 @@ class RunSessionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = overlay_pci_configuration(root, '0000:C5:00.0')
-            self.assertEqual(path.read_text(), 'pci_dev=0000:c5:00.0\n')
+            self.assertEqual(path.read_text(encoding='utf-8'), 'pci_dev=0000:c5:00.0\n')
             with self.assertRaises(FileExistsError):
                 overlay_pci_configuration(root, '0000:c5:00.0')
             for value in ('0000', '0000:c5:00.0\nfps_limit=0', '../other', '0000:c5:00.8'):
@@ -97,8 +97,8 @@ class RunSessionTests(unittest.TestCase):
             result = run_logged([sys.executable, '-c', 'print("unsupported-call"); raise SystemExit(20)'], root, cwd=root)
             self.assertEqual(result['returncode'], 20)
             self.assertEqual(result['stop_reason'], 'process-exit')
-            self.assertIn('unsupported-call', (root / 'runtime.log').read_text())
-            self.assertEqual(json.loads((root / 'exit.json').read_text()), result)
+            self.assertIn('unsupported-call', (root / 'runtime.log').read_text(encoding='utf-8'))
+            self.assertEqual(json.loads((root / 'exit.json').read_text(encoding='utf-8')), result)
 
     def test_started_marker_waits_for_game_window(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -115,7 +115,7 @@ class RunSessionTests(unittest.TestCase):
     def test_no_started_marker_if_game_exits_before_window(self):
         with tempfile.TemporaryDirectory() as tmp:
             log = Path(tmp) / 'runtime.log'
-            log.write_text('booting\n')
+            log.write_text('booting\n', encoding='utf-8')
             class Exited:
                 def poll(self): return 1
             output = io.StringIO()
@@ -126,7 +126,7 @@ class RunSessionTests(unittest.TestCase):
     def test_window_marker_followed_by_a_burst_of_output_is_seen(self):
         with tempfile.TemporaryDirectory() as tmp:
             log = Path(tmp) / 'runtime.log'
-            log.write_text('booting\nWindow backend: x11\n' + 'x' * 20000 + '\n')
+            log.write_text('booting\nWindow backend: x11\n' + 'x' * 20000 + '\n', encoding='utf-8')
             class Running:
                 def poll(self): return None
             output = io.StringIO()
@@ -159,11 +159,11 @@ class SessionCleanupTests(unittest.TestCase):
             for name, text in (('a', 'first'), ('b', 'second')):
                 session = root/'temp'/name
                 (session/'install').mkdir(parents=True)
-                (session/'runtime.log').write_text(text)
+                (session/'runtime.log').write_text(text, encoding='utf-8')
                 (session/'install/eboot.bin').write_bytes(b'x')
                 self.assertTrue(run_session.finish_session(session, [root/'saves'], last=last))
                 self.assertFalse(session.exists())
-            self.assertEqual(run_session.latest_log(last).read_text(), 'second')
+            self.assertEqual(run_session.latest_log(last).read_text(encoding='utf-8'), 'second')
             self.assertEqual(list((root/'temp').iterdir()), [])
 
     def test_finish_refuses_when_user_data_is_inside(self):
