@@ -105,6 +105,33 @@ The archive is refused if its hash differs; each edit is refused if the bytes
 at its offset differ from `expected_hex`. Replacement bytes keep the original
 length. `profiles/mods/nightmare/mod.json` is a complete example.
 
+**`asset-find`**: portable edits inside a game archive, found by content
+instead of offsets, so one operation can fit several builds of a game. It
+applies to every build in `targets` (narrow it with `title_id`). At launch each
+edit is searched for in the installed archive and turned into an exact
+`asset-patch` recipe, so every hash and expected-byte check above still runs.
+`tools/make_mod.py` writes these for you; the format is:
+
+```json
+{"type": "asset-find", "asset": "level/title.bld", "edits": [
+  {"member": "level.bld", "find_hex": "f0fd15?? 0000 284e0200", "at": 6, "replacement_hex": "d8c4"},
+  {"member": "level.bld", "find_hex": "...", "at": 32, "length": 8,
+   "copy": {"member": "level.bld", "find_hex": "...", "at": 32}}]}
+```
+
+- `find_hex` is hex (spaces allowed) with `??` for bytes that differ between
+  builds. It must match exactly once in the archive's decoded files, within one
+  32 KiB block, or the mod is refused for that build.
+- `at` is where the change starts inside the match. The bytes it replaces must
+  not be wildcards: they are the expected bytes.
+- The new bytes are either `replacement_hex` or `copy`: read `length` bytes at
+  `at` inside another unique match. Use `copy` for values that differ per build,
+  such as pointers, by copying them from where the game already holds them.
+- `member` (optional) limits the search to one file inside the archive.
+
+`profiles/mods/nightmare/mod.json` uses one `asset-find` edit for both US
+builds.
+
 **`code-patch`**: an edit to the executable, using the entry format of
 `profiles/patches/*.json` (schema 1):
 
@@ -152,6 +179,51 @@ archive are combined into a single preparation. A file listed in a generated
 operation's `writes` belongs to that mod alone. Two mods setting one
 host option to different values are refused the same way.
 
+## Making a data mod
+
+`tools/make_mod.py` makes `asset-find` edits from files you edit, so you never
+write offsets or hashes:
+
+```bash
+python3 tools/make_mod.py unpack level/title.bld out/mod-work/title
+```
+
+Edit the unpacked files in place with any tool, keeping each file's size, then:
+
+```bash
+python3 tools/make_mod.py diff out/mod-work/title mods/my-mod
+```
+
+`diff` writes the edits into `mods/my-mod/mod.json`, creating it if needed
+(fill in its name, author and licence). It tries every installed build of the
+game: patterns get `??` for pointer-like values that moved, and a changed
+pointer is copied from where each build holds it. It lists the builds the mod
+fits and adds them to `targets`. To try the mod on builds installed later:
+
+```bash
+python3 tools/make_mod.py check mods/my-mod --add
+```
+
+An existing recipe file can be carried to another installed build:
+
+```bash
+python3 tools/make_mod.py port profiles/patches/x-01.01.json --to CUSA00626@01.00 -o x-01.00.json
+```
+
+Archives the update did not replace are reused as they are; blocks whose
+content is unchanged keep their edits at their new position; other changes are
+found again by content. A change whose original value is a pointer that moved
+is *relocated*: its place is found with pointers masked, the target's own bytes
+become the expected bytes, and the new value must already occur in the target
+file. Review relocated edits. This is how Trap Master, Unlock Expansions and
+the controller prompts gained US 01.00 support.
+
+A build "fits" when every edit is found exactly once with the expected bytes;
+that does not prove the change does the same thing there. Play each build
+before sharing the mod. Unpacked files are the game's own data: keep them in
+`out/` or another ignored folder and never share them. `diff` takes 10–60
+seconds on a large archive.
+
 ## Finding addresses
 
 Work from your own legally obtained copy. Record only what a mod needs to be
@@ -172,7 +244,8 @@ repository or to a mod you share.
 ## Testing
 
 `tests/test_mod_manifest.py` covers parsing, build and byte refusal, ordering
-and conflicts with synthetic data. Run all tests with:
+and conflicts with synthetic data; `tests/test_archive_blocks.py` and
+`tests/test_make_mod.py` cover portable edits with synthetic archives. Run all tests with:
 
 ```bash
 python3 -m unittest discover -s tests

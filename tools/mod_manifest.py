@@ -12,6 +12,9 @@ Operations:
   asset-patch  tools/asset_mod recipe assets (archive path, source sha256,
                chunks with expected-byte edits), inline as `recipe` or in a
                recipe file named by `profile`
+  asset-find   portable archive edits found by content (tools/archive_blocks),
+               resolved against the installed build at launch into an
+               asset-patch recipe; applies to every declared target
   host-option  SKY_* environment values for the native host
   generated    edits built at launch by a named host handler (for example
                from local artwork); `writes` lists whole files it replaces
@@ -22,15 +25,17 @@ import re
 
 try:
     from .asset_mod import relative_asset
+    from . import archive_blocks
 except ImportError:
     from asset_mod import relative_asset
+    import archive_blocks
 
 SCHEMA_VERSION = 1
 BUILTIN = Path('profiles/mods')
 USER = Path('mods')
 IDENTIFIER = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
 SHA256 = re.compile(r'[0-9a-f]{64}')
-OPERATIONS = ('code-patch', 'asset-patch', 'host-option', 'generated')
+OPERATIONS = ('code-patch', 'asset-patch', 'asset-find', 'host-option', 'generated')
 PATCHES = 'profiles/patches/'
 SETTING_TYPES = ('bool', 'choice', 'number')
 HOST_OPTION = re.compile(r'SKY_[A-Z0-9_]{1,64}')
@@ -120,6 +125,19 @@ def check_operation(operation, targets, settings, index):
             check_recipe(operation['recipe'], where)
         else:
             profile_path(operation['profile'], where)
+    elif kind == 'asset-find':
+        try:
+            relative_asset(operation.get('asset'))
+        except (ValueError, TypeError):
+            raise ModError(f'{where} has an invalid asset path') from None
+        edits = operation.get('edits')
+        if not isinstance(edits, list) or not 0 < len(edits) <= 4096:
+            raise ModError(f'{where} needs 1..4096 edits')
+        for number, edit in enumerate(edits):
+            try:
+                archive_blocks.check_edit(edit)
+            except ValueError as error:
+                raise ModError(f'{where} edit {number}: {error}') from None
     elif kind == 'generated':
         if target is None:
             raise ModError(f'{where}: generated operations must name one target executable')
@@ -310,9 +328,14 @@ def order(selected, available):
     return result
 
 
-def supports(available, ident, executable_sha256):
+def supports(available, ident, executable_sha256, title_id=None):
+    """Whether the mod has a target for this build. Regions can share an executable
+    (US and EU 01.00); with title_id, an operation must also apply to that region."""
     manifest = available.get(ident)
-    return bool(manifest) and any(item['executable_sha256'] == executable_sha256 for item in manifest['targets'])
+    if not manifest or not any(item['executable_sha256'] == executable_sha256 for item in manifest['targets']):
+        return False
+    return title_id is None or any(operation.get('target', executable_sha256) == executable_sha256 and
+                                   operation.get('title_id', title_id) == title_id for operation in manifest['operations'])
 
 
 def resolve_settings(manifest, values):
@@ -367,11 +390,41 @@ def claim(writes, ident, ranges):
         writes.append((ident, path, chunk, start, end))
 
 
-def plan(available, selected, executable_sha256, settings=None, executable=None, writes=None, title_id=None):
+def find_recipe(operation, asset_source, cache=None):
+    """The asset-patch recipe for an asset-find operation on the installed build.
+
+    asset_source maps an archive path to the original file. cache: a folder for
+    resolved recipes, keyed by the file's identity and the edits; the recipe
+    still carries every hash, so asset_mod refuses it if the file changed.
+    """
+    path = Path(asset_source(operation['asset']))
+    key = None
+    if cache is not None:
+        import hashlib
+        stat = path.stat()
+        key = hashlib.sha256(json.dumps([str(path.resolve()), stat.st_size, stat.st_mtime_ns, stat.st_ino,
+                                         operation['asset'], operation['edits']], sort_keys=True).encode()).hexdigest()
+        stored = Path(cache) / (key + '.json')
+        try:
+            return json.loads(stored.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            pass
+    recipe = archive_blocks.resolve(path.read_bytes(), operation['asset'], operation['edits'])
+    if key is not None:
+        Path(cache).mkdir(parents=True, exist_ok=True)
+        temporary = Path(cache) / (key + '.tmp')
+        temporary.write_text(json.dumps(recipe), encoding='utf-8')
+        temporary.replace(Path(cache) / (key + '.json'))
+    return recipe
+
+
+def plan(available, selected, executable_sha256, settings=None, executable=None, writes=None, title_id=None,
+         asset_source=None, find_cache=None):
     """Check selected mods against one build; returns ordered, conflict-free operations.
 
     executable: original eboot bytes, required when a code patch is selected so
-    its expected bytes are compared before launch. writes: a list that receives
+    its expected bytes are compared before launch. asset_source: maps an archive
+    path to the original file, required by asset-find operations. writes: a list that receives
     every claimed byte range, so edits generated later can be checked with claim().
     """
     settings = settings or {}
@@ -412,6 +465,14 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
                 else:
                     recipes = [operation['recipe']]
                 operation = dict(operation, recipes=recipes)
+            if operation['type'] == 'asset-find':
+                if asset_source is None:
+                    raise ModError(f'mod {ident}: portable edits need the original game files')
+                try:
+                    recipe = find_recipe(operation, asset_source, find_cache)
+                except (OSError, ValueError) as error:
+                    raise ModError(f"mod {ident}: {operation['asset']}: {error}") from None
+                operation = dict(operation, recipes=[recipe])
             if operation['type'] == 'generated' and 'profile' in operation:
                 path, _ = load_profile(manifest, operation['profile'], executable_sha256)
                 operation = dict(operation, profile_path=str(path))
@@ -437,7 +498,7 @@ def plan(available, selected, executable_sha256, settings=None, executable=None,
 def asset_profile(applied, title_id, app_version, executable_sha256):
     """The asset-patch operations as one asset_mod profile, or None."""
     assets = [recipe for mod in applied for operation in mod['operations']
-              if operation['type'] == 'asset-patch' for recipe in operation['recipes']]
+              if operation['type'] in ('asset-patch', 'asset-find') for recipe in operation['recipes']]
     if not assets:
         return None
     return dict(schema_version=2, executable_sha256=executable_sha256, title_id=title_id,
@@ -462,6 +523,8 @@ def record(applied):
         if operation['type'] == 'asset-patch':
             return dict(type='asset-patch', assets=[recipe['asset'] for recipe in operation['recipes']],
                         **({'profile': operation['profile']} if 'profile' in operation else {}))
+        if operation['type'] == 'asset-find':
+            return dict(type='asset-find', assets=[operation['asset']], edits=len(operation['edits']))
         if operation['type'] == 'generated':
             return dict(type='generated', handler=operation['handler'], writes=operation.get('writes', []))
         return dict(type='host-option', environment=sorted(operation['environment']))

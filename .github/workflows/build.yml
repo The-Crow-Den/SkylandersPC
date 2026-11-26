@@ -340,7 +340,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           (cd out/artifacts/SkylandersPC-windows && zip -qr "$GITHUB_WORKSPACE/out/release/SkylandersPC-${GITHUB_REF_NAME}-windows.zip" .)
-          cp out/artifacts/Skylanders-Launcher-x86_64.AppImage/*.AppImage out/release/
           # Linux: the source tree with the prebuilt runtime and the launcher AppImage beside it.
           linux="$RUNNER_TEMP/SkylandersPC-linux"; mkdir -p "$linux"
           git -c core.autocrlf=false archive HEAD | tar -x -C "$linux"

@@ -393,6 +393,64 @@ def game_faces(source_root,profile_path):
     return faces
 
 
+def port_profile(profile,source_read,target_read,target_build):
+    """This profile for another build of the game, or ValueError.
+
+    source_read/target_read map an archive path to its bytes in each build. A
+    section whose archive is unchanged is kept. Otherwise every texture it
+    draws into must occur exactly once in the target archive's same member,
+    all moved by one distance; texture offsets shift by it and the blocks
+    covering the moved bytes are taken from the target.
+    """
+    try:from . import archive_blocks
+    except ImportError:import archive_blocks
+    def section(current,ranges):
+        source,target=source_read(current['asset']),target_read(current['asset'])
+        if asset_mod.digest(source)!=current['source_sha256']:raise ValueError(f"{current['asset']}: unexpected source archive")
+        if source==target:return dict(current),0
+        def members(data):
+            result={}
+            for block in archive_blocks.blocks(data):result.setdefault(block['member'],[]).append(block)
+            return result
+        before,after=members(source),members(target)
+        bases={row['plain_offset'] for row in current['chunks']}
+        name=next((n for n,parts in before.items() if {b['member_offset'] for b in parts if
+                   asset_mod.digest(b['plain']) in {r['decoded_sha256'] for r in current['chunks']}}=={*bases}),None)
+        if name is None or name not in after:raise ValueError(f"{current['asset']}: the drawn blocks are not in one member")
+        old=b''.join(b['plain'] for b in before[name]);new=b''.join(b['plain'] for b in after[name])
+        shifts=set()
+        for start,size in ranges:
+            data=old[start:start+size]
+            if not data or new.count(data)!=1:raise ValueError(f"{current['asset']}: a texture is not found once in the other build")
+            shifts.add(new.find(data)-start)
+        if len(shifts)!=1:raise ValueError(f"{current['asset']}: the textures moved by different distances")
+        shift=shifts.pop()
+        wanted=set()
+        for base in bases:
+            for at in range(base+shift,base+shift+32768,32768):wanted.add(at//32768*32768)
+            wanted.add((base+shift+32767)//32768*32768)
+        rows=[]
+        for block in after[name]:
+            if block['member_offset'] in wanted and block['member_offset']<len(new):
+                rows.append(dict(block['chunk'],plain_offset=block['member_offset'],decoded_sha256=asset_mod.digest(block['plain'])))
+        return dict(current,source_sha256=asset_mod.digest(target),chunks=rows),shift
+    result=dict(profile,app_version=target_build['app_version'],executable_sha256=target_build['executable_sha256'])
+    root,shift=section(profile,[(profile['texture_offset'],profile['texture_height']*1024*4)] if 'texture_height' in profile else [])
+    if shift:raise ValueError('the font archive moved; port it by hand')
+    result.update({k:root[k] for k in ('source_sha256','chunks')})
+    for key in ('shapes','prompts','title'):
+        if key not in profile:continue
+        current=profile[key]
+        ranges=([(t['texture_offset'],t['texture_size']) for t in current['textures']] if key=='prompts' else
+                [(current['texture_offset'],current['texture_size'])] if key=='title' else [])
+        ported,shift=section(current,ranges)
+        if key=='shapes' and shift:raise ValueError('the font archive moved; port it by hand')
+        if key=='prompts':ported['textures']=[dict(t,texture_offset=t['texture_offset']+shift) for t in current['textures']]
+        if key=='title':ported['texture_offset']=current['texture_offset']+shift
+        result[key]=ported
+    return result
+
+
 def build_profile(source_root,profile_path,mode,executable_sha256):
     profile=json.loads(Path(profile_path).read_text(encoding='utf-8'))
     if profile['executable_sha256']!=executable_sha256:raise ValueError('controller glyphs require the verified executable')

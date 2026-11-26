@@ -570,8 +570,8 @@ def run(argv,sessions):
             if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
             glyph_mode,glyph_detection='playstation','no imported artwork: original prompts retained'
 
-        if glyph_mode!='playstation' and not mod_manifest.supports(available_mods,'controller-glyphs',executable_sha256):
-            if args.controller_glyphs!='auto':raise ValueError('Controller glyph packs require the verified US update')
+        if glyph_mode!='playstation' and not mod_manifest.supports(available_mods,'controller-glyphs',executable_sha256,installation.title_id):
+            if args.controller_glyphs!='auto':raise ValueError('Controller glyph packs are not available for this game build')
             glyph_mode,glyph_detection='playstation','unsupported build: original prompts retained'
         # Built-in mods selected by their historical flags, then --mod ids.
         selected_mod_ids=list(dict.fromkeys((['nightmare'] if args.unlock_nightmare else [])+
@@ -581,7 +581,7 @@ def run(argv,sessions):
         # Mod choices are saved per game, not per version: one made for another build
         # (Trap Master on 01.01, then playing 01.00) is skipped, not a failed start.
         unsupported=[ident for ident in selected_mod_ids if ident in available_mods
-                     and not mod_manifest.supports(available_mods,ident,executable_sha256)]
+                     and not mod_manifest.supports(available_mods,ident,executable_sha256,installation.title_id)]
         if unsupported:
             print('Skipping mods made for another version of this game: '+', '.join(unsupported),flush=True)
             selected_mod_ids=[ident for ident in selected_mod_ids if ident not in unsupported]
@@ -601,6 +601,7 @@ def run(argv,sessions):
                  for operation in available_mods[ident]['operations'])
         applied_mods=mod_manifest.plan(available_mods,selected_mod_ids,executable_sha256,
                                        settings=mod_settings,title_id=installation.title_id,
+                                       asset_source=installation.source,find_cache=ROOT/'out/asset-mod-cache/find',
                                        executable=Path(build['executable']).read_bytes() if code else None,writes=mod_writes)
         if any(operation['type']=='code-patch' for mod in applied_mods for operation in mod['operations']):
             raise ValueError('code-patch mods are validated but cannot yet be applied to the translated pack')

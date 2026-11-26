@@ -1,0 +1,1110 @@
+{
+  "schema_version": 1,
+  "title_id": "CUSA00626",
+  "app_version": "01.00",
+  "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+  "asset": "permanent/bootstrap.bld",
+  "source_sha256": "71269ddb939eb3a33c0d3f06a71d9c39c74557a83874ffdcd5d8e2a1ccf28398",
+  "texture_offset": 14774872,
+  "chunks": [
+    {
+      "plain_offset": 14745600,
+      "offset": 2699264,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "ef22b5445c89d19007c4a984576a07a500dde2925913ab5e1d5394eeb1e36c03",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 594,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 14778368,
+      "offset": 2701312,
+      "allocation": 8192,
+      "decoded_size": 32768,
+      "decoded_sha256": "e522e2fe85495805a7e10a65eb29f23279e8e1950a07bded0bf066d4a7493847",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 6998,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 14811136,
+      "offset": 2709504,
+      "allocation": 8192,
+      "decoded_size": 32768,
+      "decoded_sha256": "dd72c75192e159733fd11d63adf1f657ff578daed30b5ddbcee7f04cd8ca727a",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 6714,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 14843904,
+      "offset": 2717696,
+      "allocation": 6144,
+      "decoded_size": 32768,
+      "decoded_sha256": "ac1ec276e34c8fa402ed5b57197e1d28d64d460e87ca79b2de01dc44fefb56ad",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 4838,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 14909440,
+      "offset": 2727936,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "d29180454b3b09515cb8b4a3d4162a459ed6fe0547740706682ea9400b06c65c",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 2692,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 14942208,
+      "offset": 2732032,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "fdc6c437249f6449283b30cc3295a09e71fc1ef8058313b77d55f1152096de5f",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 3311,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 14974976,
+      "offset": 2736128,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "9568026777574fb05d0a28fade153526cf1e8763e36be02e6ca0b5b3f6c9cdaa",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 3457,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15007744,
+      "offset": 2740224,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "09ce96ee7f8a38b75195b778ed8bbccd0af131e7b970692176ba46236360964e",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 2079,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15040512,
+      "offset": 2744320,
+      "allocation": 6144,
+      "decoded_size": 32768,
+      "decoded_sha256": "1b394103d858852c25a6d6647cac000e24352f61a7d4e5037d90cf0465159c09",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 4441,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15073280,
+      "offset": 2750464,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "9c3b10ce316bca5e073f50084f4e4e1b5dd750377731ddc286ef60c92984da98",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 4071,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15106048,
+      "offset": 2754560,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "3b45fc9206ba89551e5b640629090f39fefb271bf0bec4970c4840ec7f0095c9",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 3451,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15171584,
+      "offset": 2760704,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "a9eab4d05a7985f0b3228adb65fa924e3251c0e69a986f03ed46ddfacbc0bd38",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 717,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15204352,
+      "offset": 2762752,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "dde5109f06efbc49fbe5a488f301f1237780ec3382bba31d4d2c0ef30bff8bb0",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 771,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15237120,
+      "offset": 2764800,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "e436e9649066536ddb38ad25ea0e1f1165ab75fecbda3a574fa1e0909c565824",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 1184,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15269888,
+      "offset": 2766848,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "f4af16c6310ca36a3ecf2b0ef9e670d0b5f7b925a4b6481718674b8265657f39",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 958,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15302656,
+      "offset": 2768896,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "fd26a69755bfaf5559556d28261defd65a2ce69dc9023f0f62fe012e9a6ba4ac",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 1965,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15335424,
+      "offset": 2770944,
+      "allocation": 4096,
+      "decoded_size": 32768,
+      "decoded_sha256": "b087a0926600ef29dd3ae037c0e374dd02c8d52320c249d4964346146cd11e47",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 2848,
+      "properties_hex": "5d00800000"
+    },
+    {
+      "plain_offset": 15368192,
+      "offset": 2775040,
+      "allocation": 2048,
+      "decoded_size": 32768,
+      "decoded_sha256": "4b2e60c0316d8f1273a3894d8c51f96d92f5ca41c156c1f95eb4b6f524aa6916",
+      "encoding": "raw-lzma",
+      "alignment": 2048,
+      "encoded_size": 1949,
+      "properties_hex": "5d00800000"
+    }
+  ],
+  "prompts": {
+    "asset": "permanent/global.bld",
+    "source_sha256": "5e73a6d2fd875cf2c1d24cc92e7287372725d54e36f4a17d2a2f35e470eb7863",
+    "chunks": [
+      {
+        "offset": 2324480,
+        "allocation": 8192,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 7218,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12550144,
+        "decoded_sha256": "61a675af8206ed121179790c662b9cda84094567a18a28c05c2db39a0195b1e7"
+      },
+      {
+        "offset": 2332672,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 6002,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12582912,
+        "decoded_sha256": "b4fe148df9ef3f418a0b30d82f3b971fdb64611d1d45f0f4413436823cad05f5"
+      },
+      {
+        "offset": 2338816,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 5318,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12615680,
+        "decoded_sha256": "7babf50ff9e0b1fd911355118c107c07842a8c02ca9824e4bd330d14a1b4a531"
+      },
+      {
+        "offset": 2344960,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4732,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12648448,
+        "decoded_sha256": "63dd608cf9392e2337cc2dafc36e51618a83dcfd64fbc17fa89d90716b019078"
+      },
+      {
+        "offset": 2351104,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4175,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12681216,
+        "decoded_sha256": "1f3684fcd7b819b04274569c3efaeb2d523ec06e206a64061c190c4f41a5a075"
+      },
+      {
+        "offset": 2357248,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4220,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12713984,
+        "decoded_sha256": "e1070fa47101b29dc81bf5c0a41103584de72cb943f1aab8d25563018b4b1c65"
+      },
+      {
+        "offset": 2363392,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 3183,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12746752,
+        "decoded_sha256": "e005d3ccdb3d1419719ab36ab72a992b1ebded7c0144b7a97f46a85b53eeabdb"
+      },
+      {
+        "offset": 2367488,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 3211,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12779520,
+        "decoded_sha256": "dad4a2cf10e64a264b5c2dfb8fa373203e355c4db01001b18f3af0e79ce86433"
+      },
+      {
+        "offset": 2371584,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 3702,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12812288,
+        "decoded_sha256": "924371e62295bc68b6849919fb83ae7909de85543f50769bac99d30c046dbc2f"
+      },
+      {
+        "offset": 2375680,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4727,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12845056,
+        "decoded_sha256": "ceb104477ccb7da69718cb15c04e998aba21cdafe7e2ecc37e63beb8a2735fb3"
+      },
+      {
+        "offset": 2381824,
+        "allocation": 8192,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 6157,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12877824,
+        "decoded_sha256": "c249a6fb253b80252b3e6b504d9ded109d48b3ba71f86bc274d8ba6753b26ee8"
+      },
+      {
+        "offset": 2390016,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 5525,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12910592,
+        "decoded_sha256": "3b8de1829e1a9eee5592b48c6c4a04f1f62507f88aeb46808a3a2db09cef45d6"
+      },
+      {
+        "offset": 2396160,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4310,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12943360,
+        "decoded_sha256": "46ece7814aa34ba493d35114a9b5e28f476e1abb7bf6b905e2143b8450f0c2b8"
+      },
+      {
+        "offset": 2402304,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4589,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 12976128,
+        "decoded_sha256": "4fbfa8ee7929f484b4544e3f05e5123dc430169288e72658fb8fc5303192c341"
+      },
+      {
+        "offset": 2408448,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4747,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 13008896,
+        "decoded_sha256": "20249929a775ffad94e8cb0f9b7cdd217977c2e56d03d5275aa2b705876f4e67"
+      },
+      {
+        "offset": 2414592,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4536,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 13041664,
+        "decoded_sha256": "f871c0492ec45ae73434ad5fcd341689f938a8758685f5c141f8f52f0e48609b"
+      },
+      {
+        "offset": 2420736,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 5796,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 13074432,
+        "decoded_sha256": "ca2e060798222ffff8413ed5e9beb0694faf08b154828e905b3a00f5c1832a54"
+      },
+      {
+        "offset": 2426880,
+        "allocation": 8192,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 6222,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 13107200,
+        "decoded_sha256": "3118821bbfc17ec9097e4c56a557ba4f3a2584c161386ff39e0fe7d7283d35e9"
+      },
+      {
+        "offset": 2435072,
+        "allocation": 8192,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 7308,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 13139968,
+        "decoded_sha256": "2876cbf2e551699153346c2751a8c11201ceb7193458ca52906947e3fcf04fb5"
+      },
+      {
+        "offset": 2443264,
+        "allocation": 8192,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 6456,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 13172736,
+        "decoded_sha256": "aeea0a905f8501eb847d18c116704852b6379eb1e40d90cd0e5cc59282ec6915"
+      }
+    ],
+    "textures": [
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0000.png",
+        "texture_offset": 12586168,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0001.png",
+        "texture_offset": 12602552,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0002.png",
+        "texture_offset": 12618936,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0005.png",
+        "texture_offset": 12635320,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0006.png",
+        "texture_offset": 12651704,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0007.png",
+        "texture_offset": 12668088,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0009.png",
+        "texture_offset": 12684472,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0010.png",
+        "texture_offset": 12700856,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/a_mash/a_mash_0011.png",
+        "texture_offset": 12717240,
+        "texture_size": 16384,
+        "glyph_index": 0,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0000.png",
+        "texture_offset": 12733624,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0001.png",
+        "texture_offset": 12750008,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0002.png",
+        "texture_offset": 12766392,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0003.png",
+        "texture_offset": 12782776,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0004.png",
+        "texture_offset": 12799160,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0005.png",
+        "texture_offset": 12815544,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0006.png",
+        "texture_offset": 12831928,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0007.png",
+        "texture_offset": 12848312,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0008.png",
+        "texture_offset": 12864696,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0009.png",
+        "texture_offset": 12881080,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0010.png",
+        "texture_offset": 12897464,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0011.png",
+        "texture_offset": 12913848,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0012.png",
+        "texture_offset": 12930232,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/rt_mash/rt_mash_0013.png",
+        "texture_offset": 12946616,
+        "texture_size": 16384,
+        "glyph_index": 6,
+        "rectangle": [
+          44,
+          64,
+          40,
+          28
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0000.png",
+        "texture_offset": 12963000,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0001.png",
+        "texture_offset": 12979384,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0002.png",
+        "texture_offset": 12995768,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0003.png",
+        "texture_offset": 13012152,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0004.png",
+        "texture_offset": 13028536,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0005.png",
+        "texture_offset": 13044920,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0006.png",
+        "texture_offset": 13061304,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0007.png",
+        "texture_offset": 13077688,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0008.png",
+        "texture_offset": 13094072,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0009.png",
+        "texture_offset": 13110456,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0010.png",
+        "texture_offset": 13126840,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0011.png",
+        "texture_offset": 13143224,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0012.png",
+        "texture_offset": 13159608,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      },
+      {
+        "name": "ui_sky4/icons/buttonprompts/ps4/square_mash/square_mash_0013.png",
+        "texture_offset": 13175992,
+        "texture_size": 16384,
+        "glyph_index": 1,
+        "rectangle": [
+          40,
+          40,
+          48,
+          48
+        ]
+      }
+    ]
+  },
+  "title": {
+    "asset": "level/title.bld",
+    "source_sha256": "ddcb4983bc3ee55b8e52d92f689b3371f814cc5b8bfc7aaa045b3e3791795b67",
+    "texture_name": "title confirm button (64x64 BC3, 1D thin micro tiled)",
+    "texture_offset": 14711924,
+    "texture_size": 4096,
+    "width": 64,
+    "chunks": [
+      {
+        "offset": 5398528,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 5883,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 14647296,
+        "decoded_sha256": "9ae384fa1d591ec0b15851f43944a137824039adc51c7de863dfecc15a844792"
+      },
+      {
+        "offset": 5404672,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 4558,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 14680064,
+        "decoded_sha256": "d5e4883c3caa8cf292402920d1aae0af7aa57dc8aba63fb04b10e6e4d9fa2d8c"
+      },
+      {
+        "offset": 5410816,
+        "allocation": 10240,
+        "decoded_size": 32768,
+        "encoding": "raw-lzma",
+        "encoded_size": 8361,
+        "properties_hex": "5d00800000",
+        "alignment": 2048,
+        "plain_offset": 14712832,
+        "decoded_sha256": "52d055fb2e4ab07943556bd8146f4ea278ed161345535826a9eb825a896f70a0"
+      }
+    ]
+  },
+  "shapes": {
+    "asset": "permanent/bootstrap.bld",
+    "source_sha256": "71269ddb939eb3a33c0d3f06a71d9c39c74557a83874ffdcd5d8e2a1ccf28398",
+    "texture_name": "fonts/ps4/font_001.png (1024x778 RGBA8 Thin2DThin; R fill, G outline, B shadow)",
+    "texture_offset": 11367000,
+    "texture_height": 832,
+    "cell_row": 610,
+    "chunks": [
+      {
+        "plain_offset": 13697024,
+        "offset": 2621440,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "6d7d26617d0c8c44a30bf97cc54a23ba24e5d0988a8b3c3365dfcd8d7dc56857",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 806,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13729792,
+        "offset": 2623488,
+        "allocation": 6144,
+        "decoded_size": 32768,
+        "decoded_sha256": "c427ca987f80dfa7d2bbccd717b01caf48fe7fff78e6f58c035d8f08068e7daf",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 4708,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13893632,
+        "offset": 2641920,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "d15d82fa63e618484c95cac236d5282259353fc24876fbd4bc4be3d4a9a65a4d",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1127,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13926400,
+        "offset": 2643968,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "e2482542bf1c4da7739687f050fad9f63dbf4be37ac85ee04583c70da721930f",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1479,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13959168,
+        "offset": 2646016,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "328b68eeb57c4abbc94b9374455093f5b6ce9c4f09b955f7d03a78fe935fb24a",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1334,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 13991936,
+        "offset": 2648064,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "decoded_sha256": "71f036f7a34b85daa0af2ce256a18decf6415b5c28b2d7cddcc36cc29e7782b4",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 2433,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14024704,
+        "offset": 2652160,
+        "allocation": 4096,
+        "decoded_size": 32768,
+        "decoded_sha256": "7f1b563b04e1dd5f57fc3229175a16728a9f3e65a47d64e76fd80496f5cd044c",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 2188,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14057472,
+        "offset": 2656256,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "543dd17ab2428cf9376487c2af4fceda959785f9e75b8d440fabbfef82a3b848",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1729,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14155776,
+        "offset": 2662400,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "4dc0f3ebf4358048baef4526d631e73697240dbf3b1dcc3b9fcd0fb6b5ba354a",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1875,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14188544,
+        "offset": 2664448,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "0957fefc1a6091ea4fac4d3c0fdcfbad113116b251912d1fd65ea9a3b507d8f3",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1498,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14221312,
+        "offset": 2666496,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "cbf664feeb34bd8f7ec95e45add2830a3e6698ef98dab1fadac73635b3235907",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 801,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14254080,
+        "offset": 2668544,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "62e1af32c6d73478b1be11ce00ad65ded40a0c34d1823a681b5456b0bbef0404",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1673,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14286848,
+        "offset": 2670592,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "cf9df35694c465eb1e596a6aa529d86af191cb0c86f06146b0d99fbefaeb7d03",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 1147,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14319616,
+        "offset": 2672640,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "6f1d11c219f0dce479ee4ec28f3aa2bec64c5d3f9e28a010ace8654d9ffdb1d0",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 446,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14548992,
+        "offset": 2686976,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "96597bfb683f371ab4fb2f39af6a54da76c6a18e76f38205dec5f174a740090b",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 614,
+        "properties_hex": "5d00800000"
+      },
+      {
+        "plain_offset": 14581760,
+        "offset": 2689024,
+        "allocation": 2048,
+        "decoded_size": 32768,
+        "decoded_sha256": "45868fe5cd767d551db6bb5af9ff2627a0534a9dd7dadff456345e74aaa0e74f",
+        "encoding": "raw-lzma",
+        "alignment": 2048,
+        "encoded_size": 374,
+        "properties_hex": "5d00800000"
+      }
+    ]
+  }
+}

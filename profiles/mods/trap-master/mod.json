@@ -11,6 +11,11 @@
       "title_id": "CUSA00626",
       "app_version": "01.01",
       "executable_sha256": "de464fa2c734dd06b1e957098e8d0a20a1acb8599f073811c4a89c09986a4e56"
+    },
+    {
+      "title_id": "CUSA00626",
+      "app_version": "01.00",
+      "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd"
     }
   ],
   "requires": [],
@@ -43,6 +48,26 @@
         "equals": true
       },
       "profile": "profiles/patches/trap-team-us-01.01-traptanium.experimental.json"
+    },
+    {
+      "type": "asset-patch",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "when": {
+        "setting": "elemental-gates",
+        "equals": true
+      },
+      "profile": "profiles/patches/trap-team-us-01.00-element-gates.experimental.json",
+      "title_id": "CUSA00626"
+    },
+    {
+      "type": "asset-patch",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "when": {
+        "setting": "traptanium",
+        "equals": true
+      },
+      "profile": "profiles/patches/trap-team-us-01.00-traptanium.experimental.json",
+      "title_id": "CUSA00626"
     }
   ]
 }

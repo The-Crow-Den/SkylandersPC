@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -154,14 +155,22 @@ class ManifestTest(unittest.TestCase):
     def test_adventure_pack_mod_carries_both_recipes(self):
         available = mods.discover(ROOT)
         self.assertNotIn('replay-expansion-intros', available)
-        profiles = [operation['profile'] for operation in available['unlock-expansions']['operations']]
-        self.assertEqual(len(profiles), 2)
-        self.assertTrue(any('replay-expansion-intros' in name for name in profiles))
+        # The same two recipes for each build: 01.01, and US 01.00 (ported).
+        for version in ('01.01', '01.00'):
+            profiles = [operation['profile'] for operation in available['unlock-expansions']['operations']
+                        if f'-{version}-' in operation['profile']]
+            self.assertEqual(len(profiles), 2)
+            self.assertTrue(any('replay-expansion-intros' in name for name in profiles))
         self.assertEqual(set(available['unlock-expansions']['settings']), {'unlock-adventure-packs', 'replay-introductions'})
         us = json.loads((ROOT / 'profiles/patches/trap-team-us-01.01-nightmare.json').read_text(encoding='utf-8'))['executable_sha256']
         replay_only = mods.plan(available, ['unlock-expansions'], us, settings={'unlock-expansions': {'unlock-adventure-packs': False}})
         self.assertEqual([op['profile'] for op in replay_only[0]['operations']],
                          ['profiles/patches/trap-team-us-01.01-replay-expansion-intros.experimental.json'])
+        # US and EU 01.00 share an executable; only the US copy has recipes, so EU skips the mod.
+        base = 'bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd'
+        self.assertTrue(mods.supports(available, 'unlock-expansions', base, 'CUSA00626'))
+        self.assertFalse(mods.supports(available, 'unlock-expansions', base, 'CUSA00697'))
+        self.assertTrue(mods.supports(available, 'nightmare', base, 'CUSA00697'))
 
     def test_builtin_manifests_parse(self):
         available = mods.discover(ROOT)
@@ -195,9 +204,19 @@ class ManifestTest(unittest.TestCase):
         # copy gets the recipe for its own file.
         for name in ('trap-team-us-01.01-nightmare.json', 'trap-team-nightmare.json', 'trap-team-us-01.00-nightmare.json'):
             profile = json.loads((ROOT / 'profiles/patches' / name).read_text(encoding='utf-8'))
-            applied = mods.plan({'nightmare': nightmare}, ['nightmare'], profile['executable_sha256'], title_id=profile['title_id'])
-            self.assertEqual(mods.asset_profile(applied, profile['title_id'], profile['app_version'], profile['executable_sha256']),
-                             nightmare_mod.recipe(profile))
+            expected = nightmare_mod.recipe(profile)
+            # The US recipe is a portable edit, resolved against the installed archive;
+            # check it against a local dump of that exact archive when one is present.
+            wanted = expected['assets'][0]['source_sha256']
+            local = [path for path in sorted(ROOT.glob('Game/*/level/title.bld'))
+                     if hashlib.sha256(path.read_bytes()).hexdigest() == wanted]
+            with self.subTest(profile=name):
+                if profile['title_id'] == 'CUSA00626' and not local:
+                    continue
+                applied = mods.plan({'nightmare': nightmare}, ['nightmare'], profile['executable_sha256'], title_id=profile['title_id'],
+                                    asset_source=lambda relative: local[0].parents[1] / relative)
+                self.assertEqual(mods.asset_profile(applied, profile['title_id'], profile['app_version'], profile['executable_sha256']),
+                                 expected)
 
     def test_builtin_skip_cutscenes_settings(self):
         available = mods.discover(ROOT)

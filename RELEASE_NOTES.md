@@ -1,5 +1,12 @@
 ## SkylandersPC 0.1.3 (beta)
 
+**Sorry about the last few releases.** 0.1.1 and 0.1.2 shipped with problems that
+should have been caught first: existing installs stopped working after updating,
+the Windows launcher could freeze while installing, and 4K and ultrawide screens
+crashed. Thank you for your patience and for reporting them. This release fixes
+those problems, and every release is now tested on Windows and Linux, with
+updates from older versions, before it goes out.
+
 ### What's new in 0.1.3
 
 - **Trap Team 01.01 launches again.** After updating to 0.1.1, existing installs
@@ -14,9 +21,14 @@
   asking for Repair.
 - **Installing on Windows no longer freezes or closes the launcher.** Writing the
   install log failed on some characters, which stopped the launcher partway.
-- **The US base game without its update (01.00) now finishes setup** and can use
-  *Unlock Nightmare*. Mods made only for 01.01 are skipped on 01.00 instead of
-  stopping the game.
+- **The US base game without its update (01.00) now finishes setup**, and most
+  mods work on it: *Unlock Nightmare*, *Trap Master*, *Unlock Expansions* and
+  Xbox or Nintendo controller prompts. *Skip Cutscenes* still needs the 01.01
+  update; mods that don't fit your version are skipped instead of stopping the
+  game.
+- **Making mods is easier.** `tools/make_mod.py` turns files you edit into a mod:
+  unpack a game archive, change it, and the tool writes the mod for you, fitting
+  every game version it can. `profiles/mods/README.md` explains how.
 - The launcher has its icon on Windows and in the AppImage, and the Trap Master
   mod now works in release downloads.
 - **4K and ultrawide screens no longer crash.** 2160p, and 21:9 or 32:9 at high

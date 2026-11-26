@@ -70,7 +70,7 @@ def catalogue(root,game):
     rows=[]
     for ident,manifest in sorted(mods.items(),key=lambda item:(not item[1]['builtin'],item[1]['name'].lower())):
         if current is None:status='not-installed'
-        elif not mod_manifest.supports(mods,ident,current[2]):status='other-build'
+        elif not mod_manifest.supports(mods,ident,current[2],current[0]):status='other-build'
         elif not available(manifest,current[2]):status='unavailable'
         else:status='ready'
         rows.append(dict(id=ident,name=manifest['name'],description=manifest.get('description',''),
