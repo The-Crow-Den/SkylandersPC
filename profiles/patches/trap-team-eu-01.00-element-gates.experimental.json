@@ -1,0 +1,3087 @@
+{
+  "executable_sha256": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+  "title_id": "CUSA00697",
+  "app_version": "01.00",
+  "default_enabled": false,
+  "assets": [
+    {
+      "asset": "level/level_313_tutorial.bld",
+      "source_sha256": "e95d323e2377587cc549361427ab50d14551a1a7269ea6b6d2966973b7f0d6ff",
+      "chunks": [
+        {
+          "offset": 163840,
+          "allocation": 12288,
+          "decoded_size": 32652,
+          "encoding": "raw-lzma",
+          "encoded_size": 10677,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "0fb8e9e230658ceb7294e0e43de7a6facecafbc51f049027c22af2457a07b142",
+          "edits": [
+            {
+              "offset": 12814,
+              "expected_hex": "540072006100700020004d0061",
+              "replacement_hex": "53006b0079006c0061006e0064"
+            },
+            {
+              "offset": 12827,
+              "copy_from": 12831,
+              "length": 469,
+              "expected_sha256": "73a2bc21dc46b62465acb7a039894c32dea1c33bb4e541e995f6d4db90d1b343",
+              "source_sha256": "5ab09b3aa2975427d9411ac4df8eccf424a7d2fb464ec61313aabed2e146ad48"
+            },
+            {
+              "offset": 13296,
+              "expected_hex": "74002e00",
+              "replacement_hex": "20002000"
+            },
+            {
+              "offset": 13700,
+              "expected_hex": "49006600200079006f0075002000770061006e007400200074006f00200067006500740020007400680072006f0075006700680020007400680069007300200067006100740065002c00200079006f00750027006c006c0020006e00650065006400200074006f002000740061006700200069006e0020007700690074006800200061002000540072006100700020004d006100730074006500720020006f006600200074006800650020005400650063006800200065006c0065006d0065006e0074002e00",
+              "replacement_hex": "49006600200079006f0075002000770061006e007400200074006f00200067006500740020007400680072006f0075006700680020007400680069007300200067006100740065002c00200079006f00750027006c006c0020006e00650065006400200074006f002000740061006700200069006e002000770069007400680020006100200053006b0079006c0061006e0064006500720020006f006600200074006800650020005400650063006800200065006c0065006d0065006e0074002e0020002000"
+            },
+            {
+              "offset": 29050,
+              "expected_hex": "59006f00750020006e00650065006400200061006e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500",
+              "replacement_hex": "59006f00750020006e006500650064002000610020006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e00200074006800690073002000670061007400650020002000"
+            }
+          ]
+        },
+        {
+          "offset": 2183168,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3448,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d70561ce60255a2453f2e328f69b624f003df0398648cd7d9b84d66404578b5b",
+          "edits": [
+            {
+              "offset": 25012,
+              "expected_hex": "580b490000000000",
+              "replacement_hex": "18a5200000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2197504,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4036,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "40cd7a432e82c8f18eea4eda39153e01835dffa3824212ff6e9445240f5932b9",
+          "edits": [
+            {
+              "offset": 19276,
+              "expected_hex": "f0744a0000000000",
+              "replacement_hex": "18a5200000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2236416,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4366,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "7b0020c7c48d6a6899f09d2d2bfb9dcbe1029a940134a160e134e6fa52b2eff5",
+          "edits": [
+            {
+              "offset": 23996,
+              "expected_hex": "c8272d0000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24004,
+              "expected_hex": "50a6200000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24012,
+              "expected_hex": "f0f9510000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24020,
+              "expected_hex": "58e2470000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24028,
+              "expected_hex": "c0fa510000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24036,
+              "expected_hex": "38fb510000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24044,
+              "expected_hex": "e8b72d0000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24052,
+              "expected_hex": "60b82d0000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24060,
+              "expected_hex": "d8b82d0000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24068,
+              "expected_hex": "50b92d0000000000",
+              "replacement_hex": "a829200000000000"
+            },
+            {
+              "offset": 24076,
+              "expected_hex": "5063200000000000",
+              "replacement_hex": "a829200000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2242560,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3959,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "4825cb6c9fb4375c30af1f71b3d5c16e2d3c6c0bdffae6371b0946d4b33442a9",
+          "edits": [
+            {
+              "offset": 6132,
+              "expected_hex": "181a200000000000",
+              "replacement_hex": "281b200000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2267136,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3766,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "f6faf6b92cdeb5d70a1f28809af9a2808441ac4868677550bde5d7a5f8a31cf2",
+          "edits": [
+            {
+              "offset": 20340,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 20348,
+              "expected_hex": "18f9510000000000",
+              "replacement_hex": "78124f0000000000"
+            },
+            {
+              "offset": 20364,
+              "expected_hex": "281b200000000000",
+              "replacement_hex": "00d9230000000000"
+            },
+            {
+              "offset": 20676,
+              "expected_hex": "68fa510000000000",
+              "replacement_hex": "18a5200000000000"
+            },
+            {
+              "offset": 26564,
+              "expected_hex": "28fc510000000000",
+              "replacement_hex": "005e2f0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "permanent/global.bld",
+      "source_sha256": "f1358f785eb6fb2826adbf028aa30ebdbd1b02b32b3dc3d8f3c70dbd634bcb4f",
+      "chunks": [
+        {
+          "offset": 38912,
+          "allocation": 18432,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 16735,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "5e7edece813bc803934c6190a75b0bef560c2bd613a13eb02d180f2de73854e0",
+          "edits": [
+            {
+              "offset": 31688,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f00660020007400680065002000410069007200200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f00660020007400680065002000410069007200200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 31816,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f0066002000740068006500200045006100720074006800200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f0066002000740068006500200045006100720074006800200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 31948,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f006600200074006800650020004600690072006500200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f006600200074006800650020004600690072006500200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 32078,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f0066002000740068006500200057006100740065007200200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f0066002000740068006500200057006100740065007200200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 32210,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f006600200074006800650020004d006100670069006300200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f006600200074006800650020004d006100670069006300200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 32342,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f006600200074006800650020005400650063006800200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f006600200074006800650020005400650063006800200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 32472,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f006600200074006800650020004c00690066006500200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f006600200074006800650020004c00690066006500200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 32602,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f0066002000740068006500200055006e006400650061006400200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f0066002000740068006500200055006e006400650061006400200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 32736,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f006600",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f00660020007400"
+            }
+          ]
+        },
+        {
+          "offset": 57344,
+          "allocation": 6144,
+          "decoded_size": 26596,
+          "encoding": "raw-lzma",
+          "encoded_size": 5823,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "33a30f6b028bc3102a5eeabb07e9b6ef02ac85e038d97df09e39e701c8a32194",
+          "edits": [
+            {
+              "offset": 0,
+              "expected_hex": "200074006800650020004c006900670068007400200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "6800650020004c006900670068007400200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 100,
+              "expected_hex": "41002000540072006100700020004d006100730074006500720020006f006600200074006800650020004400610072006b00200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f006600200074006800650020004400610072006b00200045006c0065006d0065006e007400200069007300200072006500710075006900720065006400200074006f0020006f00700065006e0020007400680069007300200067006100740065002e0020002000"
+            },
+            {
+              "offset": 230,
+              "expected_hex": "4f006e006c007900200061002000540072006100700020004d00610073007400650072002c00200053006b0079006c0061006e006400650072002c002000630061006e0020006f00700065006e0020007400680069007300200067006100740065002e00",
+              "replacement_hex": "4100200053006b0079006c0061006e0064006500720020006f00660020007400680069007300200065006c0065006d0065006e0074002000630061006e0020006f00700065006e0020007400680069007300200067006100740065002e00200020002000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_300_birdcage.bld",
+      "source_sha256": "66adf12f4245d0a15439146901f63c20f24c030eece74f3cc455e298fd7ba54b",
+      "chunks": [
+        {
+          "offset": 378880,
+          "allocation": 10240,
+          "decoded_size": 30144,
+          "encoding": "raw-lzma",
+          "encoded_size": 9727,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "34ee0cd1d191dd590e269e6793f6a9b1f491a91a9567bad581b757d1e6ed18a2",
+          "edits": [
+            {
+              "offset": 24616,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3835904,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4313,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "5056720daab4eebf234777fa57ac025bcb1372f73022b78f6420cbe0c2b6f112",
+          "edits": [
+            {
+              "offset": 26100,
+              "expected_hex": "08f8240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26108,
+              "expected_hex": "5828240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26116,
+              "expected_hex": "e8f8240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26124,
+              "expected_hex": "b8f9240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26132,
+              "expected_hex": "30fa240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26140,
+              "expected_hex": "40fc240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26148,
+              "expected_hex": "b8fc240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26156,
+              "expected_hex": "30fd240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26164,
+              "expected_hex": "a8fd240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26172,
+              "expected_hex": "20fe240000000000",
+              "replacement_hex": "f84d230000000000"
+            },
+            {
+              "offset": 26180,
+              "expected_hex": "684c230000000000",
+              "replacement_hex": "f84d230000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3842048,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4074,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "7fa84badcf9acc598e75eb95cb98f871410ee1126b283c5ebf6cae285516f8e4",
+          "edits": [
+            {
+              "offset": 9780,
+              "expected_hex": "702b230000000000",
+              "replacement_hex": "802c230000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3852288,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3499,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "ea386cd4e7fcf350ba56eaad052c79d3912f2abfdda46ef64eb06fb25653a921",
+          "edits": [
+            {
+              "offset": 19644,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 19652,
+              "expected_hex": "30f7240000000000",
+              "replacement_hex": "709c230000000000"
+            },
+            {
+              "offset": 19668,
+              "expected_hex": "802c230000000000",
+              "replacement_hex": "30cd230000000000"
+            },
+            {
+              "offset": 29932,
+              "expected_hex": "6800250000000000",
+              "replacement_hex": "3033230000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_301_the_machine.bld",
+      "source_sha256": "60435332bfdc2073f19dafb8820c425e07bc82f149c91cc7c3083b2f6a9b4793",
+      "chunks": [
+        {
+          "offset": 251904,
+          "allocation": 4096,
+          "decoded_size": 13978,
+          "encoding": "raw-lzma",
+          "encoded_size": 3279,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "1fc7512d4a1b0683f30d444b669de83b4d1e203e31b85a2676671e3859366b51",
+          "edits": [
+            {
+              "offset": 10670,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2756608,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4420,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "ff53a34e1152717d7bdde7d267158c207d816e7884800fc7049a52fc78ad6a52",
+          "edits": [
+            {
+              "offset": 21340,
+              "expected_hex": "c0b42c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21348,
+              "expected_hex": "e84f190000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21356,
+              "expected_hex": "a0b52c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21364,
+              "expected_hex": "70b62c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21372,
+              "expected_hex": "e8b62c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21380,
+              "expected_hex": "f8b82c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21388,
+              "expected_hex": "70b92c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21396,
+              "expected_hex": "e8b92c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21404,
+              "expected_hex": "60ba2c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21412,
+              "expected_hex": "d8ba2c0000000000",
+              "replacement_hex": "b83b190000000000"
+            },
+            {
+              "offset": 21420,
+              "expected_hex": "1855190000000000",
+              "replacement_hex": "b83b190000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2762752,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4018,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "910833a9870204ef2f141f39645cb02c3fa4571d8f4ec9c7e8133e14f74f54a4",
+          "edits": [
+            {
+              "offset": 3268,
+              "expected_hex": "683e190000000000",
+              "replacement_hex": "1839190000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2775040,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4234,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "96080484f1bd443ad97df5e73b9af56e1dc420ad5fdaef46490f63197276ca4e",
+          "edits": [
+            {
+              "offset": 24156,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 24164,
+              "expected_hex": "e8b32c0000000000",
+              "replacement_hex": "38b42a0000000000"
+            },
+            {
+              "offset": 24180,
+              "expected_hex": "1839190000000000",
+              "replacement_hex": "d067220000000000"
+            },
+            {
+              "offset": 32292,
+              "expected_hex": "20bd2c0000000000",
+              "replacement_hex": "98351b0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_302_chompywurm.bld",
+      "source_sha256": "e8b45450a0847ec1597a74fb99d26d0357b150375697e6c0ccdfee527f9194bd",
+      "chunks": [
+        {
+          "offset": 206848,
+          "allocation": 4096,
+          "decoded_size": 9000,
+          "encoding": "raw-lzma",
+          "encoded_size": 2428,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "c689c99c4f6718d7e53e8f5f52c68bbf9d65a674f908602625d51e8bc28b48bc",
+          "edits": [
+            {
+              "offset": 4176,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2670592,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4627,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "ff9f2c87dba5e0a99c6663ddcaa736c43ee16aa81a85cbeb9262d6e29eaa30a0",
+          "edits": [
+            {
+              "offset": 4576,
+              "expected_hex": "d01a540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4584,
+              "expected_hex": "58501a0000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4592,
+              "expected_hex": "b01b540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4600,
+              "expected_hex": "801c540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4608,
+              "expected_hex": "f81c540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4616,
+              "expected_hex": "081f540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4624,
+              "expected_hex": "801f540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4632,
+              "expected_hex": "f81f540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4640,
+              "expected_hex": "7020540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4648,
+              "expected_hex": "e820540000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 4656,
+              "expected_hex": "e891180000000000",
+              "replacement_hex": "2092180000000000"
+            },
+            {
+              "offset": 19128,
+              "expected_hex": "087b180000000000",
+              "replacement_hex": "187c180000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2689024,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3720,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "c62495900a526967770d49405b50bb127b218a3647d0e6efba6478b74866104b",
+          "edits": [
+            {
+              "offset": 8664,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 8672,
+              "expected_hex": "f819540000000000",
+              "replacement_hex": "5095520000000000"
+            },
+            {
+              "offset": 8688,
+              "expected_hex": "187c180000000000",
+              "replacement_hex": "68193a0000000000"
+            },
+            {
+              "offset": 16120,
+              "expected_hex": "d821540000000000",
+              "replacement_hex": "a89a180000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_303_dota.bld",
+      "source_sha256": "da54fe2f19207e15d06e8f543d6698e1370cb7103a71d33c26400a4117cc4b30",
+      "chunks": [
+        {
+          "offset": 231424,
+          "allocation": 8192,
+          "decoded_size": 26650,
+          "encoding": "raw-lzma",
+          "encoded_size": 6921,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "cdcfdd8b617314eb0be49920524ae94af5bdbe18ce9be273f701bd32d9ae7c42",
+          "edits": [
+            {
+              "offset": 16074,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2326528,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4502,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "f4a7a2a194ed4d9d98b0590b5b2e23ee76bdadc76d4a75f7392799580204a0f9",
+          "edits": [
+            {
+              "offset": 31720,
+              "expected_hex": "b89f160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31728,
+              "expected_hex": "d0d1150000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31736,
+              "expected_hex": "98a0160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31744,
+              "expected_hex": "68a1160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31752,
+              "expected_hex": "e0a1160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31760,
+              "expected_hex": "f0a3160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31768,
+              "expected_hex": "68a4160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31776,
+              "expected_hex": "e0a4160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31784,
+              "expected_hex": "58a5160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31792,
+              "expected_hex": "d0a5160000000000",
+              "replacement_hex": "b0d3130000000000"
+            },
+            {
+              "offset": 31800,
+              "expected_hex": "78d3130000000000",
+              "replacement_hex": "b0d3130000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2332672,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4382,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "3c6689338ccc2ba415892e8ed22249ff3fa78cc52b618432b776910459163fd3",
+          "edits": [
+            {
+              "offset": 15024,
+              "expected_hex": "b0af130000000000",
+              "replacement_hex": "48b6130000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2353152,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3579,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "2612ba341b2caebb40da616c9d707e2046eacd852dc2359f73997d218748e6b4",
+          "edits": [
+            {
+              "offset": 11416,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 11424,
+              "expected_hex": "e09e160000000000",
+              "replacement_hex": "b879140000000000"
+            },
+            {
+              "offset": 11440,
+              "expected_hex": "48b6130000000000",
+              "replacement_hex": "80a9140000000000"
+            },
+            {
+              "offset": 22640,
+              "expected_hex": "18a8160000000000",
+              "replacement_hex": "a8b4130000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_304_water_wave.bld",
+      "source_sha256": "9b6651b4932cef5c9ad227ebde90e4abd1c6164bd54a46112d7e9901459c907a",
+      "chunks": [
+        {
+          "offset": 378880,
+          "allocation": 10240,
+          "decoded_size": 27944,
+          "encoding": "raw-lzma",
+          "encoded_size": 8282,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "0215fc0124a7be0980b880c67d4bf6f0055fe5162dd55b57f5ca9afdf90a2aff",
+          "edits": [
+            {
+              "offset": 23388,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3983360,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4347,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "e346902cfb2cde59ccf6c94d16ea7f471a7ae3bb98d0b09e6df1e495be579198",
+          "edits": [
+            {
+              "offset": 30212,
+              "expected_hex": "58f8250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30220,
+              "expected_hex": "b83b250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30228,
+              "expected_hex": "38f9250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30236,
+              "expected_hex": "08fa250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30244,
+              "expected_hex": "80fa250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30252,
+              "expected_hex": "90fc250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30260,
+              "expected_hex": "08fd250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30268,
+              "expected_hex": "80fd250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30276,
+              "expected_hex": "f8fd250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30284,
+              "expected_hex": "70fe250000000000",
+              "replacement_hex": "d005230000000000"
+            },
+            {
+              "offset": 30292,
+              "expected_hex": "2817230000000000",
+              "replacement_hex": "d005230000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3989504,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4001,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "3979acff0d7df8f336ceb16848b87c9b89f8cf20dcbe9210f3caf582993a60f6",
+          "edits": [
+            {
+              "offset": 13636,
+              "expected_hex": "48f3220000000000",
+              "replacement_hex": "58f4220000000000"
+            }
+          ]
+        },
+        {
+          "offset": 4007936,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3300,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "32ecc99109801d36d3473d609c9fc9fc1046aab004e0aa1bed6c69f11bdc0006",
+          "edits": [
+            {
+              "offset": 30220,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 30228,
+              "expected_hex": "80f7250000000000",
+              "replacement_hex": "c882230000000000"
+            },
+            {
+              "offset": 30244,
+              "expected_hex": "58f4220000000000",
+              "replacement_hex": "40b3230000000000"
+            }
+          ]
+        },
+        {
+          "offset": 4012032,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3912,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "75a68a8aaa6dec6f6f7c169a831b15091bb0f648afc4bb384e24dd23bf4ad0c9",
+          "edits": [
+            {
+              "offset": 8420,
+              "expected_hex": "b800260000000000",
+              "replacement_hex": "001d230000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_305_wilikinfactory.bld",
+      "source_sha256": "b8e68d7e4081ef8a530ab3e125d75be0980fce8341ec0a0b97a40ec27a6b2094",
+      "chunks": [
+        {
+          "offset": 217088,
+          "allocation": 4096,
+          "decoded_size": 14312,
+          "encoding": "raw-lzma",
+          "encoded_size": 3257,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "5f403255ea248566a54f98a556b199b43402207472fb7af2714520fca6b34aec",
+          "edits": [
+            {
+              "offset": 6580,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2545664,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4354,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d8ff7ae4e958eeae2607fba5d0b5bc59ec84654949a2c291bae8f3acaab09ae9",
+          "edits": [
+            {
+              "offset": 14612,
+              "expected_hex": "08042d0000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14620,
+              "expected_hex": "18f9210000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14628,
+              "expected_hex": "2025390000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14636,
+              "expected_hex": "d807220000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14644,
+              "expected_hex": "f025390000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14652,
+              "expected_hex": "5827390000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14660,
+              "expected_hex": "d80a220000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14668,
+              "expected_hex": "500b220000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14676,
+              "expected_hex": "c80b220000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14684,
+              "expected_hex": "400c220000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 14692,
+              "expected_hex": "b855200000000000",
+              "replacement_hex": "f055200000000000"
+            },
+            {
+              "offset": 29588,
+              "expected_hex": "580a1e0000000000",
+              "replacement_hex": "680b1e0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2566144,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3556,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "54870d22f4f0b06970f4342311985b70590105a6b403dd582ba589fe8f75f79b",
+          "edits": [
+            {
+              "offset": 18388,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 18396,
+              "expected_hex": "4824390000000000",
+              "replacement_hex": "d820370000000000"
+            },
+            {
+              "offset": 18412,
+              "expected_hex": "680b1e0000000000",
+              "replacement_hex": "e800300000000000"
+            },
+            {
+              "offset": 25780,
+              "expected_hex": "a029390000000000",
+              "replacement_hex": "800e1e0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_306_copter.bld",
+      "source_sha256": "f5ce936e08c28a17be4c0ab7c23ebfa6b163c844c16032f033cc4689ff82f7ce",
+      "chunks": [
+        {
+          "offset": 215040,
+          "allocation": 12288,
+          "decoded_size": 30718,
+          "encoding": "raw-lzma",
+          "encoded_size": 10360,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "98ee418a81d8bbf8f2a8080a8163cc18dca34c5f000266169598fa5aaf7f3dca",
+          "edits": [
+            {
+              "offset": 23662,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2353152,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 5080,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "2140b240458885410ebcd05e555a63d5b742f81fc7187588e7df06333bcbf0ef",
+          "edits": [
+            {
+              "offset": 30680,
+              "expected_hex": "58051c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30688,
+              "expected_hex": "d0cf1a0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30696,
+              "expected_hex": "38061c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30704,
+              "expected_hex": "08071c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30712,
+              "expected_hex": "80071c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30720,
+              "expected_hex": "90091c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30728,
+              "expected_hex": "080a1c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30736,
+              "expected_hex": "800a1c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30744,
+              "expected_hex": "f80a1c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30752,
+              "expected_hex": "700b1c0000000000",
+              "replacement_hex": "78af190000000000"
+            },
+            {
+              "offset": 30760,
+              "expected_hex": "c8261a0000000000",
+              "replacement_hex": "78af190000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2359296,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4012,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "663cb2424ec9ab07be31314a42aa92790c3179c72362665226668212a1b50a8f",
+          "edits": [
+            {
+              "offset": 14448,
+              "expected_hex": "c8b0190000000000",
+              "replacement_hex": "e8ef190000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2379776,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3672,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "e864f03c250d4edf98cc2222c31ed3765a2709aac2899f43bd21501832caccb0",
+          "edits": [
+            {
+              "offset": 5848,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 5856,
+              "expected_hex": "80041c0000000000",
+              "replacement_hex": "08f2190000000000"
+            },
+            {
+              "offset": 5872,
+              "expected_hex": "e8ef190000000000",
+              "replacement_hex": "a0221a0000000000"
+            },
+            {
+              "offset": 16256,
+              "expected_hex": "b80d1c0000000000",
+              "replacement_hex": "10361b0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_307_clockworks.bld",
+      "source_sha256": "d907fa488a001c8b1bb021e7508e2e73bcbfb672e8fe5ec342a1f721b6afbddf",
+      "chunks": [
+        {
+          "offset": 256000,
+          "allocation": 2048,
+          "decoded_size": 3910,
+          "encoding": "raw-lzma",
+          "encoded_size": 1241,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "ce4b069cf1a4970d4a27c8e214377dda85858ad4cf902d868bfce9300134e9ec",
+          "edits": [
+            {
+              "offset": 152,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2590720,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4200,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "96b0248018298b35d30710348808ab5d8634ce5613306cbc2eec185b849d023c",
+          "edits": [
+            {
+              "offset": 528,
+              "expected_hex": "28051b0000000000f0dd1a000000000008061b0000000000d8061b000000000050071b000000000060091b0000000000d8091b0000000000500a1b0000000000c80a1b0000000000400b1b0000000000f898",
+              "replacement_hex": "889a190000000000889a190000000000889a190000000000889a190000000000889a190000000000889a190000000000889a190000000000889a190000000000889a190000000000889a190000000000889a"
+            },
+            {
+              "offset": 16856,
+              "expected_hex": "8877190000000000",
+              "replacement_hex": "9878190000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2603008,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3621,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d86efdb0bd2fd46a5a4b6ebbc49e1058156e350e1ef1cb32b04acf5c758090ee",
+          "edits": [
+            {
+              "offset": 10962,
+              "expected_hex": "0d000000000050041b",
+              "replacement_hex": "14000000000018e719"
+            },
+            {
+              "offset": 10984,
+              "expected_hex": "9878190000000000",
+              "replacement_hex": "e0171a0000000000"
+            },
+            {
+              "offset": 22184,
+              "expected_hex": "880d1b0000000000",
+              "replacement_hex": "0882190000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_308_nitelite.bld",
+      "source_sha256": "938c614a9aa62e715ed2f45a7223956a0ec5f311f8fa8587534644028e9e06e5",
+      "chunks": [
+        {
+          "offset": 94208,
+          "allocation": 8192,
+          "decoded_size": 18000,
+          "encoding": "raw-lzma",
+          "encoded_size": 6641,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d456c9937838c511048bd5ded3e26053e366c67722f42fa22a662e062c8c39c9",
+          "edits": [
+            {
+              "offset": 15020,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 1075200,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4321,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "1190f7d372a643ad1acfa9d1131f87b1f8ee47417bb34c98e569df2ff9920706",
+          "edits": [
+            {
+              "offset": 13072,
+              "expected_hex": "387e1d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13080,
+              "expected_hex": "48821c0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13088,
+              "expected_hex": "187f1d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13096,
+              "expected_hex": "e87f1d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13104,
+              "expected_hex": "60801d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13112,
+              "expected_hex": "70821d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13120,
+              "expected_hex": "e8821d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13128,
+              "expected_hex": "60831d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13136,
+              "expected_hex": "d8831d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13144,
+              "expected_hex": "50841d0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 13152,
+              "expected_hex": "e8a91b0000000000",
+              "replacement_hex": "78ab1b0000000000"
+            },
+            {
+              "offset": 29520,
+              "expected_hex": "98821b0000000000",
+              "replacement_hex": "68861b0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 1091584,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3806,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "86cdfd5747d8143e53a2457cba779b7f73d633377ada2f9567243a7d9f11c506",
+          "edits": [
+            {
+              "offset": 16872,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 16880,
+              "expected_hex": "607d1d0000000000",
+              "replacement_hex": "90fa1b0000000000"
+            },
+            {
+              "offset": 16896,
+              "expected_hex": "68861b0000000000",
+              "replacement_hex": "502b1c0000000000"
+            },
+            {
+              "offset": 27280,
+              "expected_hex": "98861d0000000000",
+              "replacement_hex": "68831b0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_309_sewers.bld",
+      "source_sha256": "aa59b327a791056089c8a6b20e9bb42f9eacfb8bcab95040b9738702c8f478cb",
+      "chunks": [
+        {
+          "offset": 270336,
+          "allocation": 10240,
+          "decoded_size": 28146,
+          "encoding": "raw-lzma",
+          "encoded_size": 9328,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "f43fe2e63d1fd0840172d6fdc53dba86e8f59b8829c21908648f51abefc6d97c",
+          "edits": [
+            {
+              "offset": 22072,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2975744,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4236,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "8fcdbe949fe9003aea5600d15e51d37b4745470ec4932f961a6e332d92bc8c0f",
+          "edits": [
+            {
+              "offset": 560,
+              "expected_hex": "a0a3270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 568,
+              "expected_hex": "2025270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 576,
+              "expected_hex": "80a4270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 584,
+              "expected_hex": "50a5270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 592,
+              "expected_hex": "c8a5270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 600,
+              "expected_hex": "d8a7270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 608,
+              "expected_hex": "50a8270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 616,
+              "expected_hex": "c8a8270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 624,
+              "expected_hex": "40a9270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 632,
+              "expected_hex": "b8a9270000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 640,
+              "expected_hex": "684b260000000000",
+              "replacement_hex": "f84c260000000000"
+            },
+            {
+              "offset": 16592,
+              "expected_hex": "b027260000000000",
+              "replacement_hex": "c028260000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2985984,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3547,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d5241c55760218777808d35b8586f58151848ac76125389b63ec4e6fa844d090",
+          "edits": [
+            {
+              "offset": 5728,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 5736,
+              "expected_hex": "c8a2270000000000",
+              "replacement_hex": "209a260000000000"
+            },
+            {
+              "offset": 5752,
+              "expected_hex": "c028260000000000",
+              "replacement_hex": "c0c9260000000000"
+            },
+            {
+              "offset": 16072,
+              "expected_hex": "00ac270000000000",
+              "replacement_hex": "2834260000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_310_dreamland.bld",
+      "source_sha256": "dd19e386fe6486e221d6608358faad2c7155f0b2c981c5d6ed2e3ce09697f9b8",
+      "chunks": [
+        {
+          "offset": 479232,
+          "allocation": 8192,
+          "decoded_size": 30480,
+          "encoding": "raw-lzma",
+          "encoded_size": 6767,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "fc14324e94acee2159b50dee409f2fef1a016b2ea88792f0eb2ba3b09a3718d7",
+          "edits": [
+            {
+              "offset": 25844,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 4997120,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4499,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "9411cb680205ec54e1ad69d5ce41cc08ce1f27dfb17bf42b29b3d0edef113593",
+          "edits": [
+            {
+              "offset": 2752,
+              "expected_hex": "98b32c0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2760,
+              "expected_hex": "d0eb210000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2768,
+              "expected_hex": "e0b32c0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2776,
+              "expected_hex": "b0b42c0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2784,
+              "expected_hex": "28b52c0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2792,
+              "expected_hex": "90b62c0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2800,
+              "expected_hex": "08b72c0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2808,
+              "expected_hex": "08cc280000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2816,
+              "expected_hex": "80cc280000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2824,
+              "expected_hex": "f8cc280000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 2832,
+              "expected_hex": "28881f0000000000",
+              "replacement_hex": "20941f0000000000"
+            },
+            {
+              "offset": 17440,
+              "expected_hex": "907a1f0000000000",
+              "replacement_hex": "a07b1f0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 5015552,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3849,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "fb2bd8f1e439ab82880d211525deec1579b6d08464dfd407c3cbe1dfcad57597",
+          "edits": [
+            {
+              "offset": 3040,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 3048,
+              "expected_hex": "c0b22c0000000000",
+              "replacement_hex": "f0bc2a0000000000"
+            },
+            {
+              "offset": 3064,
+              "expected_hex": "a07b1f0000000000",
+              "replacement_hex": "6815270000000000"
+            },
+            {
+              "offset": 11552,
+              "expected_hex": "50b92c0000000000",
+              "replacement_hex": "b87e1f0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_311_arkeyan_mechanism.bld",
+      "source_sha256": "f47ca6044bcd58ef3bbf94f3a32b1d4276445bd7c966d0ae21c80595332d9189",
+      "chunks": [
+        {
+          "offset": 342016,
+          "allocation": 6144,
+          "decoded_size": 18998,
+          "encoding": "raw-lzma",
+          "encoded_size": 4457,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "7a474e055b6c56a65cf1cd98b4b43e9323f7307760cb41ddfbb9520531d6c819",
+          "edits": [
+            {
+              "offset": 13382,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3381248,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4488,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "602f331dc305fd77a0aa808a124186f924fc6fabbdc320b32c41a2fb017bb855",
+          "edits": [
+            {
+              "offset": 24032,
+              "expected_hex": "a02a220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24040,
+              "expected_hex": "2074210000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24048,
+              "expected_hex": "802b220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24056,
+              "expected_hex": "502c220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24064,
+              "expected_hex": "c82c220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24072,
+              "expected_hex": "d82e220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24080,
+              "expected_hex": "502f220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24088,
+              "expected_hex": "c82f220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24096,
+              "expected_hex": "4030220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24104,
+              "expected_hex": "b830220000000000",
+              "replacement_hex": "50d81e0000000000"
+            },
+            {
+              "offset": 24112,
+              "expected_hex": "c0d61e0000000000",
+              "replacement_hex": "50d81e0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3387392,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4691,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "45df25fab8e8c5b0fddb931638ff49b6055f9e24a7068920055f7d85666312d3",
+          "edits": [
+            {
+              "offset": 6984,
+              "expected_hex": "60b41e0000000000",
+              "replacement_hex": "70b51e0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3407872,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3874,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "14b12b592785c5e1a1dfcb8b6931c9b159ea89adbc30d8e84a05fcb7f1fc5604",
+          "edits": [
+            {
+              "offset": 21280,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 21288,
+              "expected_hex": "c829220000000000",
+              "replacement_hex": "10c01f0000000000"
+            },
+            {
+              "offset": 21304,
+              "expected_hex": "70b51e0000000000",
+              "replacement_hex": "78ee1f0000000000"
+            },
+            {
+              "offset": 31248,
+              "expected_hex": "0033220000000000",
+              "replacement_hex": "e0be1e0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_312_starlands.bld",
+      "source_sha256": "8c2eae0013b0b3fabace23aefeac7e8947324a3194dca3f8bd0ec752906fa4ce",
+      "chunks": [
+        {
+          "offset": 319488,
+          "allocation": 4096,
+          "decoded_size": 13006,
+          "encoding": "raw-lzma",
+          "encoded_size": 3330,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "2269a69a132c032a26632db7f0b0593182d6a70d45e75e2ce2bd49e3a56eda99",
+          "edits": [
+            {
+              "offset": 3392,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3653632,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4617,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "ec838a3f98b88293c9b71dfa2aa031e52b0dec1a1483f030950d504718c2557b",
+          "edits": [
+            {
+              "offset": 27704,
+              "expected_hex": "5089290000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27712,
+              "expected_hex": "58801d0000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27720,
+              "expected_hex": "d87d4f0000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27728,
+              "expected_hex": "f00a410000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27736,
+              "expected_hex": "a87e4f0000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27744,
+              "expected_hex": "10804f0000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27752,
+              "expected_hex": "588e290000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27760,
+              "expected_hex": "d08e290000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27768,
+              "expected_hex": "488f290000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27776,
+              "expected_hex": "c08f290000000000",
+              "replacement_hex": "c84c160000000000"
+            },
+            {
+              "offset": 27784,
+              "expected_hex": "904c160000000000",
+              "replacement_hex": "c84c160000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3659776,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3950,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "36def3ea3dc566df452b8da5b0fddc47f9b68099d568e041b50d87290d8bbcba",
+          "edits": [
+            {
+              "offset": 9704,
+              "expected_hex": "582a160000000000",
+              "replacement_hex": "f030160000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3670016,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3715,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "1261cede03b3faa9a44d11d3d5c345fca7b0bc6f06638d6ede6b12ef5ee84cba",
+          "edits": [
+            {
+              "offset": 9504,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 9512,
+              "expected_hex": "007d4f0000000000",
+              "replacement_hex": "684f4e0000000000"
+            },
+            {
+              "offset": 9528,
+              "expected_hex": "f030160000000000",
+              "replacement_hex": "50091f0000000000"
+            },
+            {
+              "offset": 15968,
+              "expected_hex": "00814f0000000000",
+              "replacement_hex": "502f160000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_314_tutorial_2.bld",
+      "source_sha256": "c17ce18ecc9d49746d770acfb8fb29d7327f2f6dcca78c975c20166e40c3d437",
+      "chunks": [
+        {
+          "offset": 307200,
+          "allocation": 8192,
+          "decoded_size": 27690,
+          "encoding": "raw-lzma",
+          "encoded_size": 8158,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "3e1d819feb9cc2f44aed59caddc1c9f60eb0d74b748c73c166c15b48bc2c14d8",
+          "edits": [
+            {
+              "offset": 23166,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3209216,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4362,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "457d10ccd821deea3544a1f0aeb143a1a5346c9b944bc0f08f1eb1bc8abcb680",
+          "edits": [
+            {
+              "offset": 18900,
+              "expected_hex": "d048250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18908,
+              "expected_hex": "8811240000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18916,
+              "expected_hex": "b049250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18924,
+              "expected_hex": "804a250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18932,
+              "expected_hex": "f84a250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18940,
+              "expected_hex": "084d250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18948,
+              "expected_hex": "804d250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18956,
+              "expected_hex": "f84d250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18964,
+              "expected_hex": "704e250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18972,
+              "expected_hex": "e84e250000000000",
+              "replacement_hex": "a8cb220000000000"
+            },
+            {
+              "offset": 18980,
+              "expected_hex": "18ca220000000000",
+              "replacement_hex": "a8cb220000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3215360,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4478,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "c0814dd7ec0ea2e321a9c5dd5fb4de6e90a7439fb516726e3c7830b046525bba",
+          "edits": [
+            {
+              "offset": 2580,
+              "expected_hex": "90aa220000000000",
+              "replacement_hex": "a0ab220000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3237888,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3810,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "4a6b6cb80c7c9a8547606198c575188c69020788a2da5b3fd271894681f4bc50",
+          "edits": [
+            {
+              "offset": 916,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 924,
+              "expected_hex": "f847250000000000",
+              "replacement_hex": "401a230000000000"
+            },
+            {
+              "offset": 940,
+              "expected_hex": "a0ab220000000000",
+              "replacement_hex": "004b230000000000"
+            },
+            {
+              "offset": 11268,
+              "expected_hex": "3051250000000000",
+              "replacement_hex": "58b5220000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_316_piratefortress.bld",
+      "source_sha256": "274a98119331853246386c6ea1d0a6aadee1071a0b856ddda5991567c71f5252",
+      "chunks": [
+        {
+          "offset": 337920,
+          "allocation": 4096,
+          "decoded_size": 15958,
+          "encoding": "raw-lzma",
+          "encoded_size": 3935,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d8aaaf8ee80c40efb82cf73a709b43991b802873f51717017c5be2289662096d",
+          "edits": [
+            {
+              "offset": 11056,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3690496,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4540,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "c57d792163c635f857e13b1f4e9e5d7982f32f3a334ffbce868d5d9e297bc20e",
+          "edits": [
+            {
+              "offset": 29696,
+              "expected_hex": "d06d2c0000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29704,
+              "expected_hex": "00e51f0000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29712,
+              "expected_hex": "e8af320000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29720,
+              "expected_hex": "b8b0320000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29728,
+              "expected_hex": "30b1320000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29736,
+              "expected_hex": "98b2320000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29744,
+              "expected_hex": "d8722c0000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29752,
+              "expected_hex": "50732c0000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29760,
+              "expected_hex": "c8732c0000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29768,
+              "expected_hex": "40742c0000000000",
+              "replacement_hex": "20d41e0000000000"
+            },
+            {
+              "offset": 29776,
+              "expected_hex": "c0391f0000000000",
+              "replacement_hex": "20d41e0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3696640,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3979,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "078914f70c018af5faf2fb5a159edf685665f2f5cf75b0c17c952dea6045ff14",
+          "edits": [
+            {
+              "offset": 11960,
+              "expected_hex": "a8291e0000000000",
+              "replacement_hex": "30171a0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3715072,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3994,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d1c980a52e432c5a670f6f420f89cf71d2121ad52ceb093009e8969a70732009",
+          "edits": [
+            {
+              "offset": 1240,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 1248,
+              "expected_hex": "10af320000000000",
+              "replacement_hex": "88a9300000000000"
+            },
+            {
+              "offset": 1264,
+              "expected_hex": "30171a0000000000",
+              "replacement_hex": "a80b230000000000"
+            },
+            {
+              "offset": 9344,
+              "expected_hex": "e0b4320000000000",
+              "replacement_hex": "502d1e0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_318_dotafortress.bld",
+      "source_sha256": "4c2d2455222549cec1638327d9e698a296c990e66ae4e499c5f30d8578168e84",
+      "chunks": [
+        {
+          "offset": 319488,
+          "allocation": 8192,
+          "decoded_size": 24084,
+          "encoding": "raw-lzma",
+          "encoded_size": 7208,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "4c1705914caa1ba618c0155651e1e62429e9c8df1bcf2563db94e95f7a35f891",
+          "edits": [
+            {
+              "offset": 19722,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 3368960,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4314,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "feb8b5ff390c25d838271f1c01718ae1fd810f72925ebb4ba2a00442ce7dc92b",
+          "edits": [
+            {
+              "offset": 3324,
+              "expected_hex": "08b8200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3332,
+              "expected_hex": "f8921b0000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3340,
+              "expected_hex": "e8b8200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3348,
+              "expected_hex": "b8b9200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3356,
+              "expected_hex": "30ba200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3364,
+              "expected_hex": "40bc200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3372,
+              "expected_hex": "b8bc200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3380,
+              "expected_hex": "30bd200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3388,
+              "expected_hex": "a8bd200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3396,
+              "expected_hex": "20be200000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 3404,
+              "expected_hex": "f0491b0000000000",
+              "replacement_hex": "b0431b0000000000"
+            },
+            {
+              "offset": 18740,
+              "expected_hex": "70101b0000000000",
+              "replacement_hex": "40031b0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 3381248,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3540,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "5909e30f5f03099e7e0088a33dbf316cb790d8f0abc3a5d3b39c103759443623",
+          "edits": [
+            {
+              "offset": 20788,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 20796,
+              "expected_hex": "30b7200000000000",
+              "replacement_hex": "487e1f0000000000"
+            },
+            {
+              "offset": 20812,
+              "expected_hex": "40031b0000000000",
+              "replacement_hex": "10311d0000000000"
+            },
+            {
+              "offset": 30564,
+              "expected_hex": "68c0200000000000",
+              "replacement_hex": "f8731b0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_319_pyramid.bld",
+      "source_sha256": "e1c2c88b70d0ff42a1257b0192027093f3528c3f5f8fad94af282b440d74ca0e",
+      "chunks": [
+        {
+          "offset": 385024,
+          "allocation": 8192,
+          "decoded_size": 22788,
+          "encoding": "raw-lzma",
+          "encoded_size": 6151,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "0d53ef579ea0af2ee55bed58450ea1b7c949a074daf308c1b7e5a0052935d6af",
+          "edits": [
+            {
+              "offset": 19420,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 4898816,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4474,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "be5e08b164bb69a598419bf3a90de924ba47a9f8f5c1ff9ea12a433092380256",
+          "edits": [
+            {
+              "offset": 24476,
+              "expected_hex": "38ff260000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24484,
+              "expected_hex": "083b1e0000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24492,
+              "expected_hex": "78ba720000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24500,
+              "expected_hex": "48bb720000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24508,
+              "expected_hex": "c0bb720000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24516,
+              "expected_hex": "38bc720000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24524,
+              "expected_hex": "b043430000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24532,
+              "expected_hex": "6004270000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24540,
+              "expected_hex": "d804270000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24548,
+              "expected_hex": "5005270000000000",
+              "replacement_hex": "781c1e0000000000"
+            },
+            {
+              "offset": 24556,
+              "expected_hex": "28231e0000000000",
+              "replacement_hex": "781c1e0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 4904960,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4149,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d0125f3b33b2653966fd2720fb65e0dbece9374f3753448ed1407c5a331e0e16",
+          "edits": [
+            {
+              "offset": 6140,
+              "expected_hex": "c0f21d0000000000",
+              "replacement_hex": "d0f31d0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 4917248,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4049,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "07194f6c01829ead339810e086394c021e2781f31c9fb75c26c20eb30587eeba",
+          "edits": [
+            {
+              "offset": 6724,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 6732,
+              "expected_hex": "a0b9720000000000",
+              "replacement_hex": "d889710000000000"
+            },
+            {
+              "offset": 6748,
+              "expected_hex": "d0f31d0000000000",
+              "replacement_hex": "789d290000000000"
+            },
+            {
+              "offset": 13068,
+              "expected_hex": "28bd720000000000",
+              "replacement_hex": "a0f61d0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_320_elementoflight.bld",
+      "source_sha256": "2c0635f5973a08c12e9cf6b49f13a2281615acc7dc09a0f319f86ff457783f1a",
+      "chunks": [
+        {
+          "offset": 112640,
+          "allocation": 6144,
+          "decoded_size": 21506,
+          "encoding": "raw-lzma",
+          "encoded_size": 5443,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "34572d2b6449a14ccff305221db4a25e2444784c401b554551c9d6f0710e27d7",
+          "edits": [
+            {
+              "offset": 13296,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 1607680,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4343,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "0181aaa9eca95990c4121d814b0bf31f82fe7fca9d5b4827e415ce61a5fcc44a",
+          "edits": [
+            {
+              "offset": 14144,
+              "expected_hex": "400c450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14152,
+              "expected_hex": "f857440000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14160,
+              "expected_hex": "200d450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14168,
+              "expected_hex": "f00d450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14176,
+              "expected_hex": "680e450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14184,
+              "expected_hex": "7810450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14192,
+              "expected_hex": "f010450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14200,
+              "expected_hex": "6811450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14208,
+              "expected_hex": "e011450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14216,
+              "expected_hex": "5812450000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 14224,
+              "expected_hex": "9063420000000000",
+              "replacement_hex": "2065420000000000"
+            },
+            {
+              "offset": 29648,
+              "expected_hex": "e83f420000000000",
+              "replacement_hex": "4041420000000000"
+            }
+          ]
+        },
+        {
+          "offset": 1624064,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4263,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "d22068017bebb91f7679cdb4e533a8952de5f256238d6ea7639e0597708f8350",
+          "edits": [
+            {
+              "offset": 26840,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 26848,
+              "expected_hex": "680b450000000000",
+              "replacement_hex": "5865430000000000"
+            },
+            {
+              "offset": 26864,
+              "expected_hex": "4041420000000000",
+              "replacement_hex": "e892430000000000"
+            }
+          ]
+        },
+        {
+          "offset": 1630208,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4094,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "29ff21471ebcde8839bcc50f1863f25648802f26c26e30e3c318f86d854d52f8",
+          "edits": [
+            {
+              "offset": 4424,
+              "expected_hex": "a014450000000000",
+              "replacement_hex": "1044420000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_325_flynnxp.bld",
+      "source_sha256": "b7b12740d27afb1f75e774ef29b3b4a6f58de5690984b1ea964140572bd4d2b8",
+      "chunks": [
+        {
+          "offset": 268288,
+          "allocation": 4096,
+          "decoded_size": 14610,
+          "encoding": "raw-lzma",
+          "encoded_size": 3400,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "fb57204674935d6893b8195db9c9eb944d3b53591c38ffd504e09eee62139f62",
+          "edits": [
+            {
+              "offset": 10222,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2883584,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4344,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "518e7167815d48a568d1c001712cd0f8b59f632bdc86ab0ca8c11cfde024f846",
+          "edits": [
+            {
+              "offset": 15180,
+              "expected_hex": "30952b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15188,
+              "expected_hex": "00d6240000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15196,
+              "expected_hex": "10962b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15204,
+              "expected_hex": "e0962b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15212,
+              "expected_hex": "58972b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15220,
+              "expected_hex": "68992b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15228,
+              "expected_hex": "e0992b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15236,
+              "expected_hex": "589a2b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15244,
+              "expected_hex": "d09a2b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15252,
+              "expected_hex": "489b2b0000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 15260,
+              "expected_hex": "f888230000000000",
+              "replacement_hex": "b084230000000000"
+            },
+            {
+              "offset": 30548,
+              "expected_hex": "a873230000000000",
+              "replacement_hex": "b874230000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2904064,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4100,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "a0c14c1e31041a9e5c75bcdd9280fb4a7e54445e13c719ab2f44222708e688a1",
+          "edits": [
+            {
+              "offset": 812,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 820,
+              "expected_hex": "58942b0000000000",
+              "replacement_hex": "c8d7290000000000"
+            },
+            {
+              "offset": 836,
+              "expected_hex": "b874230000000000",
+              "replacement_hex": "a0b6240000000000"
+            },
+            {
+              "offset": 9540,
+              "expected_hex": "909d2b0000000000",
+              "replacement_hex": "68f2230000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_326_scifi.bld",
+      "source_sha256": "c8e0c52290f5a5e41fcdb97befda07fe657664cf09a6011df23bca0970033322",
+      "chunks": [
+        {
+          "offset": 256000,
+          "allocation": 4096,
+          "decoded_size": 12418,
+          "encoding": "raw-lzma",
+          "encoded_size": 3032,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "a5093091fd497dd88b505345469298da38e932f39633df76e85851f4872945eb",
+          "edits": [
+            {
+              "offset": 7152,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2811904,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4377,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "fe0ff666ab37a3f37844bcb44f45bfe1f2a0b5e871e53b6d3d1f90e95c18b48d",
+          "edits": [
+            {
+              "offset": 18976,
+              "expected_hex": "30453a0000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 18984,
+              "expected_hex": "f0f52b0000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 18992,
+              "expected_hex": "78453a0000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19000,
+              "expected_hex": "48463a0000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19008,
+              "expected_hex": "c0463a0000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19016,
+              "expected_hex": "28483a0000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19024,
+              "expected_hex": "40e7340000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19032,
+              "expected_hex": "b8e7340000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19040,
+              "expected_hex": "30e8340000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19048,
+              "expected_hex": "a8e8340000000000",
+              "replacement_hex": "c8492b0000000000"
+            },
+            {
+              "offset": 19056,
+              "expected_hex": "60482b0000000000",
+              "replacement_hex": "c8492b0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2818048,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3893,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "bb0381498aad6f0de4cd8ffb3b5a8d2838e31de6194490aa09956b4a561a8cb9",
+          "edits": [
+            {
+              "offset": 976,
+              "expected_hex": "c8162b0000000000",
+              "replacement_hex": "d8172b0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2828288,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3784,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "eb3c5417ca1e5e3c5ce0720861eb6f543498ade95761258af8eca2f101ca3b14",
+          "edits": [
+            {
+              "offset": 13544,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 13552,
+              "expected_hex": "58443a0000000000",
+              "replacement_hex": "a8e4380000000000"
+            },
+            {
+              "offset": 13568,
+              "expected_hex": "d8172b0000000000",
+              "replacement_hex": "7027310000000000"
+            },
+            {
+              "offset": 20256,
+              "expected_hex": "18493a0000000000",
+              "replacement_hex": "70042c0000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "level/level_327_kaos_xp.bld",
+      "source_sha256": "974606375a6dc24921199e50be85c5186c0ec0c9871d37bc5061219559d81eae",
+      "chunks": [
+        {
+          "offset": 233472,
+          "allocation": 8192,
+          "decoded_size": 31640,
+          "encoding": "raw-lzma",
+          "encoded_size": 6630,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "a553f47614321d982cd3ad42c8196b1233d36b3b646a5a2c4156b2a8988163c7",
+          "edits": [
+            {
+              "offset": 18884,
+              "expected_hex": "6e00200075006e006b006e006f0077006e002000540072006100700020004d0061007300740065007200200074006f0020006f00700065006e0020007400680069007300200067006100740065",
+              "replacement_hex": "20006d00610074006300680069006e006700200053006b0079006c0061006e00640065007200200074006f0020006f00700065006e002000740068006900730020006700610074006500200020"
+            }
+          ]
+        },
+        {
+          "offset": 2557952,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4383,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "80bbb544b761d9ee78eec8219e4f6032abda07688fa1ff2af68da4d238d2397f",
+          "edits": [
+            {
+              "offset": 3400,
+              "expected_hex": "90661f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3408,
+              "expected_hex": "88a01e0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3416,
+              "expected_hex": "70671f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3424,
+              "expected_hex": "40681f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3432,
+              "expected_hex": "b8681f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3440,
+              "expected_hex": "c86a1f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3448,
+              "expected_hex": "406b1f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3456,
+              "expected_hex": "b86b1f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3464,
+              "expected_hex": "306c1f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3472,
+              "expected_hex": "a86c1f0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 3480,
+              "expected_hex": "c0c61d0000000000",
+              "replacement_hex": "50c81d0000000000"
+            },
+            {
+              "offset": 19440,
+              "expected_hex": "c0a71d0000000000",
+              "replacement_hex": "d0a81d0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2570240,
+          "allocation": 4096,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 3447,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "4ce2eaefcdb419ca86e506f471158ec46d707b33586e06e8a18fc8f47f506dd8",
+          "edits": [
+            {
+              "offset": 26960,
+              "expected_hex": "01000d0000000000",
+              "replacement_hex": "0100140000000000"
+            },
+            {
+              "offset": 26968,
+              "expected_hex": "b8651f0000000000",
+              "replacement_hex": "38151e0000000000"
+            },
+            {
+              "offset": 26984,
+              "expected_hex": "d0a81d0000000000",
+              "replacement_hex": "e0441e0000000000"
+            }
+          ]
+        },
+        {
+          "offset": 2574336,
+          "allocation": 6144,
+          "decoded_size": 32768,
+          "encoding": "raw-lzma",
+          "encoded_size": 4133,
+          "properties_hex": "5d00800000",
+          "alignment": 2048,
+          "decoded_sha256": "848684b88a40270d7d43c5fc3934eefe2ba7c706482437b6f3c8073f8398c06f",
+          "edits": [
+            {
+              "offset": 4480,
+              "expected_hex": "f06e1f0000000000",
+              "replacement_hex": "80af1d0000000000"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "id": "matching-element-gates",
+  "revision": 10,
+  "status": "Ported from the US 01.00 recipe to EU 01.00 by tools/make_mod.py port (pointers placed by object); not yet played on EU.",
+  "scope": "EU 01.00: 22 elemental-gate copies and English gate wording, from the US recipe",
+  "recipe_features": [
+    "original-block-copy",
+    "iga-block-alignment"
+  ]
+}

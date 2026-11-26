@@ -29,9 +29,9 @@ import re
 import sys
 
 try:
-    from . import archive_blocks, asset_mod, game_install, game_library, mod_manifest
+    from . import archive_blocks, asset_mod, game_install, game_library, igz_objects, mod_manifest
 except ImportError:
-    import archive_blocks, asset_mod, game_install, game_library, mod_manifest
+    import archive_blocks, asset_mod, game_install, game_library, igz_objects, mod_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 GAP = 8          # changed runs closer than this become one edit
@@ -322,7 +322,12 @@ def port_asset(recipe, source, target):
         ported = dict(recipe, source_sha256=hashlib.sha256(target).hexdigest(), chunks=chunks)
         asset_mod.patch_asset(target, ported)  # every check, before it is written anywhere
         return ported, 'identical blocks'
-    # The edited blocks differ: find each change again by content.
+    # Game data files: place each change by object, the exact way.
+    try:
+        return port_by_objects(recipe, source, target), 'placed by object'
+    except ValueError:
+        pass
+    # Otherwise find each change again by content.
     patched, _ = asset_mod.patch_asset(source, recipe)
     before, after = _member_bytes(source), _member_bytes(patched)
     changed = {}
@@ -366,6 +371,142 @@ def _translate(original, whole, value):
                 sum(a is not None and b is not None for a, b in zip(wanted, other)) >= 6:
             hits.append(value + distance)
     return hits[0] if len(hits) == 1 else None
+
+
+def _place_loose(asset, member, original, edited, whole, cells):
+    """Changes outside any object (strings), placed where the other copy holds
+    the same original bytes: the changed run with 32 bytes of context each side
+    must occur exactly once there."""
+    result = []
+    spans = []
+    for q in sorted(cells):
+        if spans and q <= spans[-1][1] + GAP:
+            spans[-1][1] = q + 8
+        else:
+            spans.append([q, q + 8])
+    for start, end in spans:
+        while start < end and original[start] == edited[start]:
+            start += 1
+        while end > start and original[end - 1] == edited[end - 1]:
+            end -= 1
+        if start == end:
+            continue
+        a, b = max(0, start - 32), min(len(original), end + 32)
+        context = original[a:b]
+        found = whole.find(context)
+        if found < 0 or whole.find(context, found + 1) >= 0:
+            raise ValueError(f'{asset}: the change at byte {start} of {member} is not found once in the other build')
+        at = found + start - a
+        result.append((member, at, whole[at:at + end - start], edited[start:end]))
+    return result
+
+
+def port_by_objects(recipe, source, target):
+    """An exact recipe for target, placing every change by object (game data files).
+
+    Changes are compared in 8-byte fields. A pointer field (the file's own
+    pointer table) gets its new value translated to the other copy, and its
+    old value must already be the translated old value there; any other field
+    must hold the same bytes in both copies. A member whose content is
+    identical keeps its offsets. Anything else is refused.
+    """
+    asset = recipe['asset']
+    other = _member_bytes(target)
+    # A block whose decoded bytes occur once, unchanged, in the other copy keeps its
+    # edits as they are (compact copy edits included).
+    by_hash = {}
+    for parts in other.values():
+        for block in parts:
+            by_hash.setdefault(hashlib.sha256(block['plain']).hexdigest(), []).append(block)
+    kept, rest = [], []
+    for chunk in recipe['chunks']:
+        found = by_hash.get(chunk['decoded_sha256'], [])
+        if len(found) == 1 and found[0]['chunk']['decoded_size'] == chunk['decoded_size']:
+            kept.append(dict(found[0]['chunk'], decoded_sha256=chunk['decoded_sha256'], edits=chunk['edits']))
+        else:
+            rest.append(chunk)
+    if not rest:
+        ported = dict(asset=asset, source_sha256=hashlib.sha256(target).hexdigest(),
+                      chunks=sorted(kept, key=lambda item: item['offset']))
+        asset_mod.patch_asset(target, ported)
+        return ported
+    patched, _ = asset_mod.patch_asset(source, dict(recipe, chunks=rest))
+    before, after = _member_bytes(source), _member_bytes(patched)
+    changes = []  # (member, offset, expected, replacement)
+    for member, parts in after.items():
+        original = b''.join(block['plain'] for block in before[member])
+        edited = b''.join(block['plain'] for block in parts)
+        if original == edited:
+            continue
+        if member not in other:
+            raise ValueError(f'{asset}: {member} is not in the other build')
+        whole = b''.join(block['plain'] for block in other[member])
+        if whole == original:
+            changes += [(member, start, original[start:end], edited[start:end]) for start, end in runs(original, edited)]
+            continue
+        translate = igz_objects.Translator(original, whole)
+        # Fields are 8 bytes from the object section's start, which need not be
+        # 8-aligned in the file (and may differ between the two copies).
+        phase = translate.source_start % 8
+        loose = []
+        for base in range(0, len(original), archive_blocks.BLOCK):
+            if original[base:base + archive_blocks.BLOCK] == edited[base:base + archive_blocks.BLOCK]:
+                continue
+            first = base - 8 + (phase - (base - 8)) % 8
+            for q in range(max(0, first), min(base + archive_blocks.BLOCK, len(original)), 8):
+                old, new = original[q:q + 8], edited[q:q + 8]
+                if old == new:
+                    continue
+                field = q - translate.source_start
+                place = translate(field)
+                if place is None:
+                    loose.append(q)  # outside the objects (text): placed by its own bytes below
+                    continue
+                at = translate.target_start + place
+                there = whole[at:at + 8]
+                if field in translate.pointers:
+                    moved_old = translate(int.from_bytes(old, 'little'))
+                    moved_new = translate(int.from_bytes(new, 'little'))
+                    if place not in translate.target_pointers or moved_old is None or moved_new is None:
+                        raise ValueError(f'{asset}: the pointer at byte {q} of {member} has no match in the other build')
+                    if int.from_bytes(there, 'little') != moved_old:
+                        raise ValueError(f'{asset}: the pointer at byte {q} of {member} differs in the other build')
+                    new = moved_new.to_bytes(8, 'little')
+                elif there != old:
+                    raise ValueError(f'{asset}: the value at byte {q} of {member} differs in the other build')
+                changes.append((member, at, there, new))
+        changes += _place_loose(asset, member, original, edited, whole, loose)
+    if not changes and not kept:
+        raise ValueError(f'{asset}: nothing to change in the other build')
+    # A field may straddle two blocks in the other copy: split it there.
+    split = []
+    for member, offset, expected, replacement in changes:
+        cut = (offset // archive_blocks.BLOCK + 1) * archive_blocks.BLOCK
+        if offset + len(expected) > cut:
+            split += [(member, offset, expected[:cut - offset], replacement[:cut - offset]),
+                      (member, cut, expected[cut - offset:], replacement[cut - offset:])]
+        else:
+            split.append((member, offset, expected, replacement))
+    changes = list({(m, o): (m, o, e, r) for m, o, e, r in split if e != r}.values())
+    chunks = {}
+    for member, offset, expected, replacement in changes:
+        parts = other[member]
+        index = offset // archive_blocks.BLOCK
+        if index >= len(parts):
+            raise ValueError(f'{asset}: a change in {member} is past its end')
+        block = parts[index]
+        chunk = chunks.setdefault(block['chunk']['offset'], dict(
+            block['chunk'], decoded_sha256=hashlib.sha256(block['plain']).hexdigest(), edits=[]))
+        chunk['edits'].append(dict(offset=offset - block['member_offset'], expected_hex=expected.hex(),
+                                   replacement_hex=replacement.hex()))
+    for chunk in chunks.values():
+        chunk['edits'].sort(key=lambda item: item['offset'])
+    if any(chunk['offset'] in chunks for chunk in kept):
+        raise ValueError(f'{asset}: kept and placed edits share a block')
+    ported = dict(asset=asset, source_sha256=hashlib.sha256(target).hexdigest(),
+                  chunks=sorted([chunks[key] for key in chunks] + kept, key=lambda item: item['offset']))
+    asset_mod.patch_asset(target, ported)  # every check, before it is written anywhere
+    return ported
 
 
 def relocate(asset, source, target, before, changed):
