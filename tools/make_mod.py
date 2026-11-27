@@ -455,10 +455,16 @@ def port_by_objects(recipe, source, target, rename=None):
     for parts in other.values():
         for block in parts:
             by_hash.setdefault(hashlib.sha256(block['plain']).hexdigest(), []).append(block)
+    # Only where the whole member is the same in both copies: elsewhere a kept
+    # edit could write this copy's pointer values into the other copy.
+    mine = _member_bytes(source)
+    same = {member for member, parts in other.items() if member in mine and
+            b''.join(block['plain'] for block in parts) == b''.join(block['plain'] for block in mine[member])}
     kept, rest = [], []
     for chunk in recipe['chunks']:
         found = by_hash.get(chunk['decoded_sha256'], [])
-        if len(found) == 1 and found[0]['chunk']['decoded_size'] == chunk['decoded_size']:
+        if len(found) == 1 and found[0]['chunk']['decoded_size'] == chunk['decoded_size'] and \
+                found[0]['member'] in same:
             kept.append(dict(found[0]['chunk'], decoded_sha256=chunk['decoded_sha256'], edits=chunk['edits'],
                              _block=found[0]))
         else:
@@ -493,6 +499,7 @@ def port_by_objects(recipe, source, target, rename=None):
         loose = []
         head = translate.source_start
         full = b''.join(block['plain'] for block in complete[member])
+        new_pointers = igz_objects.pointer_fields(full)
         if original[:head] != full[:head]:
             # Fixup tables and strings, rebuilt for the other copy from the whole edit
             # (blocks kept as they are included); kept blocks there are dropped.
@@ -514,16 +521,22 @@ def port_by_objects(recipe, source, target, rename=None):
                     continue
                 at = translate.target_start + place
                 there = whole[at:at + 8]
+                # The old value is checked as a pointer if it was one; the new value
+                # is translated if it is one after the edit (an edit may turn an
+                # external reference into a pointer, adding it to the fixups).
                 if field in translate.pointers:
                     moved_old = translate(int.from_bytes(old, 'little'))
-                    moved_new = translate(int.from_bytes(new, 'little'))
-                    if place not in translate.target_pointers or moved_old is None or moved_new is None:
+                    if place not in translate.target_pointers or moved_old is None:
                         raise ValueError(f'{asset}: the pointer at byte {q} of {member} has no match in the other build')
                     if int.from_bytes(there, 'little') != moved_old:
                         raise ValueError(f'{asset}: the pointer at byte {q} of {member} differs in the other build')
-                    new = moved_new.to_bytes(8, 'little')
                 elif there != old:
                     raise ValueError(f'{asset}: the value at byte {q} of {member} differs in the other build')
+                if field in new_pointers:
+                    moved_new = translate(int.from_bytes(new, 'little'))
+                    if moved_new is None:
+                        raise ValueError(f'{asset}: the new pointer at byte {q} of {member} has no match in the other build')
+                    new = moved_new.to_bytes(8, 'little')
                 changes.append((member, at, there, new))
         changes += _place_loose(asset, member, original, edited, whole, loose)
     if not changes and not kept:

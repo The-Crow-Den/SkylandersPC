@@ -213,8 +213,8 @@ def port_fixups(original, edited, target, translate, rename=None):
                 packed = _pack(_unpack(t_payload, t_count))
                 if t_payload.rstrip(b'\0') == packed.rstrip(b'\0'):
                     t_payload = packed
-            if tag == b'TSTR' and rename:
-                t_payload = _encode_strings(_renamed(_strings(t_payload, t_count), rename))
+            if tag == b'TSTR':
+                t_payload = _encode_strings(_renamed(_strings(t_payload, t_count), rename or {}))
             built.append((tag, t_count, t_extra, t_payload))
         elif tag in OFFSET_LISTS:
             a, b = _unpack(payload, count), _unpack(new_payload, new_count)

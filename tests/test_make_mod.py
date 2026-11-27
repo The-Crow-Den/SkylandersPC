@@ -141,6 +141,50 @@ class MakeModTests(unittest.TestCase):
         self.assertFalse(any('replacement_hex' in item for item in compact))
         self.assertEqual(asset_mod.edits(plain, compact), asset_mod.edits(plain, edits))
 
+    def test_object_port_translates_a_pointer_the_edit_creates(self):
+        # The edit turns a plain field into a pointer (adding it to the fixups). The
+        # other copy has one more object early on, so the pointer must move with it.
+        from test_igz_objects import chunk, pack
+        import hashlib
+        import igz_objects
+
+        def igz(objects, pointers, room=0x40):
+            body, starts = bytearray(8), []
+            for size, kind, fields in objects:
+                starts.append(len(body))
+                item = bytearray(size);struct.pack_into('<Q', item, 0, kind)
+                for field, value in fields.items():
+                    struct.pack_into('<Q', item, field, value)
+                body += item
+            rofs = sorted(starts[index] + field for index, field in pointers)
+            fixups = chunk(b'TSTR', 1, b'ab\0\0' + bytes(room)) + chunk(b'RVTB', len(starts), pack(starts)) + \
+                chunk(b'ROFS', len(rofs), pack(rofs)) + chunk(b'ROOT', 1, bytes(4))
+            head = bytearray(0x800);head[:4] = igz_objects.MAGIC
+            struct.pack_into('<II', head, 0x28, 0x800 + len(fixups), len(body))
+            return bytes(head + fixups + body), starts
+
+        common, later = [(0x40, 3, {}), (0x30, 5, {})], [(0x20, 7, {}), (0x28, 9, {8: 0x1234})]
+        source, s_starts = igz(common + later, [], room=0x44)  # the edited table is 4 bytes longer
+        edited, _ = igz(common + later[:1] + [(0x28, 9, {8: 0})], [(3, 8)])
+        edited = bytearray(edited)  # the new pointer names the third object
+        struct.pack_into('<Q', edited, struct.unpack_from('<I', edited, 0x28)[0] + s_starts[3] + 8, s_starts[2])
+        target, t_starts = igz(common[:1] + [(0x50, 11, {})] + common[1:] + later, [], room=0x44)
+        source_archive, target_archive = archive([('level.bld', source)]), archive([('level.bld', target)])
+        chunks = []
+        for block in archive_blocks.blocks(source_archive):
+            start = block['member_offset'];plain = block['plain'];new = bytes(edited[start:start + len(plain)])
+            edits = [dict(offset=a, expected_hex=plain[a:b].hex(), replacement_hex=new[a:b].hex())
+                     for a, b in make_mod.runs(plain, new)]
+            if edits:
+                chunks.append(dict(block['chunk'], decoded_sha256=hashlib.sha256(plain).hexdigest(), edits=edits))
+        recipe = dict(asset='x.bld', source_sha256=hashlib.sha256(source_archive).hexdigest(), chunks=chunks)
+        self.assertEqual(plain_of(asset_mod.patch_asset(source_archive, recipe)[0]), bytes(edited))
+        ported = make_mod.port_by_objects(recipe, source_archive, target_archive)
+        result = plain_of(asset_mod.patch_asset(target_archive, ported)[0])
+        start = struct.unpack_from('<I', result, 0x28)[0]
+        self.assertEqual(struct.unpack_from('<Q', result, start + t_starts[4] + 8)[0], t_starts[3])
+        self.assertEqual(igz_objects.pointer_fields(result), {t_starts[4] + 8})
+
 
 if __name__ == '__main__':
     unittest.main()
