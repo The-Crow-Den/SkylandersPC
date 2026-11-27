@@ -1,13 +1,11 @@
 ## SkylandersPC 0.1.3 (beta)
 
-**We're sorry.** 0.1.1 let you down. If you updated, a game that worked the day
-before may have stopped starting, and getting it back meant time spent on fixes
-instead of playing. That's on us, not on you. Thank you for sticking with it and
-for taking the time to tell us what went wrong.
-
-You may also notice there was never a 0.1.2. It was ready, but we held it back to
-fix more of what you reported rather than ship another release in a rush, so
-everything from it is in this one.
+**Sorry about the last few releases.** 0.1.1 and 0.1.2 shipped with problems that
+should have been caught first: existing installs stopped working after updating,
+the Windows launcher could freeze while installing, and 4K and ultrawide screens
+crashed. Thank you for your patience and for reporting them. This release fixes
+those problems, and every release is now tested on Windows and Linux, with
+updates from older versions, before it goes out.
 
 ### What's new in 0.1.3
 
