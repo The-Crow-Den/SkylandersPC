@@ -1,13 +1,13 @@
-## SkylandersPC 0.1.3 (beta)
+## SkylandersPC 0.1.2 (beta)
 
-**Sorry about the last few releases.** 0.1.1 and 0.1.2 shipped with problems that
-should have been caught first: existing installs stopped working after updating,
+**Sorry about the last release.** 0.1.1 shipped with problems that should have
+been caught first: existing installs stopped working after updating,
 the Windows launcher could freeze while installing, and 4K and ultrawide screens
 crashed. Thank you for your patience and for reporting them. This release fixes
 those problems, and every release is now tested on Windows and Linux, with
 updates from older versions, before it goes out.
 
-### What's new in 0.1.3
+### What's new in 0.1.2
 
 - **Trap Team 01.01 launches again.** After updating to 0.1.1, existing installs
   stopped at "exit code 2" until Repair was run. They now start normally.
@@ -26,6 +26,9 @@ updates from older versions, before it goes out.
   Xbox or Nintendo controller prompts. *Skip Cutscenes* still needs the 01.01
   update; mods that don't fit your version are skipped instead of stopping the
   game.
+- **60 FPS in the challenges.** On Automatic, Kaos Doom Challenges, arena
+  challenges and the other challenge maps stayed at 30 FPS. They now play at 60
+  like the story levels.
 - **More mods on the EU game (01.00).** Elemental gates and Traptanium without a
   Trap Master, Xbox or Nintendo controller prompts and *Unlock adventure packs*
   now work on it, alongside *Unlock Nightmare* and 60 FPS (not yet played
