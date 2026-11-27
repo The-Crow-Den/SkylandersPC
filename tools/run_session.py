@@ -567,7 +567,14 @@ def run(argv,sessions):
                             if json.loads(path.read_text(encoding='utf-8')).get('executable_sha256')==executable_sha256),None) if args.skip_intro else None
         glyph_mode,glyph_detection=controller_glyphs.detect() if args.controller_glyphs=='auto' else (args.controller_glyphs,'manual')
         if glyph_mode!='playstation' and not controller_art.available():
-            if args.controller_glyphs!='auto':raise ValueError('Import local Steam controller artwork with tools/import_controller_glyphs.py first')
+            # Xbox or Nintendo prompts were chosen (here or in the in-game menu):
+            # import Steam's controller artwork now instead of stopping the game.
+            print('Importing controller artwork from Steam…',flush=True)
+            game_prepare.prepare_optional(ROOT,entry,'controller-art',lambda value:None)
+        if glyph_mode!='playstation' and not controller_art.available():
+            if args.controller_glyphs!='auto':
+                print(f'{glyph_mode.title()} prompts need Steam controller artwork, which was not found on this PC; '
+                      'keeping the original prompts',file=sys.stderr,flush=True)
             glyph_mode,glyph_detection='playstation','no imported artwork: original prompts retained'
 
         if glyph_mode!='playstation' and not mod_manifest.supports(available_mods,'controller-glyphs',executable_sha256,installation.title_id):
