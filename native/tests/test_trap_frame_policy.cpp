@@ -68,6 +68,13 @@ int main() {
     event(2,"level0/Level_313_Tutorial");check(state.decide(gates).fps==60);
     event(3,"level/Title");gates.pc_menu=true;check(state.decide(gates).phase=="loading");
     event(2,"level0/Title");check(state.decide(gates).fps==30);gates.pc_menu=false;
+    // Challenge maps are played too: Kaos Doom (seen live), arena and other challenges.
+    for(const char* world:{"level0/Horde_Level_356_A+ROP_GlobalIncludes","level0/Arena_Challenge_300_000",
+                           "level0/Challenge_Level_056"}) {
+        event(3,"level/Title");event(2,"level0/Title");check(state.decide(gates).fps==30);
+        event(3,world+7);event(2,world);check(state.decide(gates).fps==60);
+    }
+    event(3,"level/Credits_Sky4");event(2,"level0/Credits_Sky4");check(state.decide(gates).phase=="menu");
     // A synthetic guest directory exercises relocation, type/name corroboration,
     // visibility bit interpretation and stale/unreadable object rejection.
     std::map<std::uintptr_t,unsigned char> memory;

@@ -20,6 +20,16 @@ inline std::string canonical(std::string_view name) {
     while(!category.empty() && category.back()>='0' && category.back()<='9')category.remove_suffix(1);
     return std::string(category)+std::string(name.substr(slash));
 }
+// Worlds that are played: story and hub levels, Kaos Doom Challenge maps
+// (Horde_Level_*), arena challenges (Arena_Challenge_*) and the other
+// challenge maps (Challenge_Level_*). The title screen and credits are not.
+inline bool playable_world(std::string_view root) {
+    std::string lower(root);
+    for(auto& c:lower)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for(std::string_view prefix:{"level/level_","level/horde_level_","level/arena_challenge_","level/challenge_level_"})
+        if(lower.starts_with(prefix))return true;
+    return false;
+}
 class Upshift {
     std::uint64_t ready_since_=0,generation_=UINT64_MAX;
     bool qualified_=false;
@@ -71,11 +81,11 @@ public:
         const auto pending=std::string_view(pending_);
         const bool hat_name=pending.starts_with(hat_prefix) && pending.size()>hat_prefix.size() &&
             pending.substr(hat_prefix.size()).find_first_not_of("0123456789")==std::string_view::npos;
-        const bool cosmetic=hat_name && root_.starts_with("level/Level_") &&
+        const bool cosmetic=hat_name && playable_world(root_) &&
             gates.control_valid && gates.control_ready && !gates.pause_ui &&
             gates.cutscenes_valid && gates.cutscenes==0;
         if(loading_ && !resumed && !cosmetic)return {30,"loading"};
-        if(!root_.starts_with("level/Level_"))return {30,"menu"};
+        if(!playable_world(root_))return {30,"menu"};
         if((paused_ && !resumed) || gates.pause_ui)return {30,"pause"};
         if(!gates.cutscenes_valid)return {30,"unknown"};
         if(gates.movies_valid && gates.movies)return {30,"video"};
