@@ -80,6 +80,26 @@
       },
       "profile": "profiles/patches/trap-team-eu-01.00-element-gates.experimental.json",
       "title_id": "CUSA00697"
+    },
+    {
+      "type": "asset-patch",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "when": {
+        "setting": "traptanium",
+        "equals": true
+      },
+      "profile": "profiles/patches/trap-team-eu-01.00-traptanium.experimental.json",
+      "title_id": "CUSA00697"
+    },
+    {
+      "type": "asset-patch",
+      "target": "bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd",
+      "when": {
+        "setting": "traptanium",
+        "equals": true
+      },
+      "profile": "profiles/patches/trap-team-eu-01.00-traptanium-challenges.experimental.json",
+      "title_id": "CUSA00697"
     }
   ]
 }

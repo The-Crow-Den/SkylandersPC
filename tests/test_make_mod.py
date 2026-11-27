@@ -130,6 +130,17 @@ class MakeModTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 make_mod.safe_name(bad)
 
+    def test_compact_edits_patch_the_same_bytes(self):
+        rng = random.Random(7)
+        plain = bytes(rng.randrange(256) for _ in range(4096))
+        moved = plain[100:400]  # a run shifted by 4 bytes, as when a table grows
+        new = bytes([1, 2, 3, 4]) + moved
+        edits = [dict(offset=96, expected_hex=plain[96:400].hex(), replacement_hex=new.hex())]
+        compact = make_mod.compact_edits(plain, edits)
+        self.assertTrue(any('copy_from' in item for item in compact))
+        self.assertFalse(any('replacement_hex' in item for item in compact))
+        self.assertEqual(asset_mod.edits(plain, compact), asset_mod.edits(plain, edits))
+
 
 if __name__ == '__main__':
     unittest.main()

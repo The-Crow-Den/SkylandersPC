@@ -37,7 +37,9 @@ SUBMODULES={'renderer/gpu/third_party/imgui','renderer/third_party/LibAtrac9'}
 # Literal mod payloads the project owner reviewed and chose to publish (2026-11-08).
 # The 01.00 file carries the same edits as the reviewed 01.01 one (its archives are shared).
 REVIEWED_LITERAL={'profiles/patches/trap-team-us-01.01-traptanium.experimental.json',
-                  'profiles/patches/trap-team-us-01.00-traptanium.experimental.json'}
+                  'profiles/patches/trap-team-us-01.00-traptanium.experimental.json',
+                  'profiles/patches/trap-team-eu-01.00-traptanium.experimental.json',
+                  'profiles/patches/trap-team-eu-01.00-traptanium-challenges.experimental.json'}
 PRIVATE_KEY=re.compile(r'-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----\r?\n')
 INLINE_IMAGE=re.compile(r'data:image/[^;,\s]+;base64,[A-Za-z0-9+/=]{256,}')
 

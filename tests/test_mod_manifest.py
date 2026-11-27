@@ -151,11 +151,13 @@ class ManifestTest(unittest.TestCase):
         gates_only = mods.plan(available, ['trap-master'], us, settings={'trap-master': {'traptanium': False}})
         self.assertEqual([op['profile'] for op in gates_only[0]['operations']],
                          ['profiles/patches/trap-team-us-01.01-element-gates.experimental.json'])
-        # EU 01.00 (same executable as US 01.00) gets its own gates recipe and no Traptanium.
+        # EU 01.00 (same executable as US 01.00) gets its own recipes.
         base = 'bd5c0433860287599824adb3660964ae623c0505c1300e86cd17e65d5315d3bd'
         eu = mods.plan(available, ['trap-master'], base, title_id='CUSA00697')
         self.assertEqual([op['profile'] for op in eu[0]['operations']],
-                         ['profiles/patches/trap-team-eu-01.00-element-gates.experimental.json'])
+                         ['profiles/patches/trap-team-eu-01.00-element-gates.experimental.json',
+                          'profiles/patches/trap-team-eu-01.00-traptanium.experimental.json',
+                          'profiles/patches/trap-team-eu-01.00-traptanium-challenges.experimental.json'])
         self.assertEqual(eu[0]['title_id'], 'CUSA00697')
 
     def test_adventure_pack_mod_carries_both_recipes(self):
