@@ -994,7 +994,16 @@ def run(argv,sessions):
         if os.name == 'nt':
             # Windows execv spawns a new process and exits this one, so the
             # launcher would lose the game it is tracking; run it as a child.
-            return subprocess.run(restart).returncode
+            # The windowless launcher gives no console: hand the child this
+            # process's output explicitly, or its messages (and the reason it
+            # stops) never reach the launcher, and open no console window.
+            def stream(value):
+                try:
+                    value.flush();value.fileno();return value
+                except (AttributeError, OSError, ValueError):
+                    return subprocess.DEVNULL
+            return subprocess.run(restart, stdin=subprocess.DEVNULL, stdout=stream(sys.stdout), stderr=stream(sys.stderr),
+                                  creationflags=subprocess.CREATE_NO_WINDOW).returncode
         os.execv(sys.executable,restart)
     return 0 if result['stop_reason'] != 'process-exit' else (result['returncode'] if result['returncode'] >= 0 else 128 - result['returncode'])
 
